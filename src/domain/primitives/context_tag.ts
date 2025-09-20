@@ -1,0 +1,112 @@
+import { Result } from "../../shared/result.ts";
+import {
+  ValidationError,
+  createValidationError,
+  createValidationIssue,
+} from "../../shared/errors.ts";
+
+const CONTEXT_TAG_KIND = "ContextTag" as const;
+const CONTEXT_TAG_BRAND: unique symbol = Symbol(CONTEXT_TAG_KIND);
+
+export type ContextTag = Readonly<{
+  readonly data: Readonly<{
+    readonly value: string;
+  }>;
+  toString(): string;
+  toJSON(): string;
+  equals(other: ContextTag): boolean;
+  readonly [CONTEXT_TAG_BRAND]: true;
+}>;
+
+const toString = function (this: ContextTag): string {
+  return this.data.value;
+};
+
+const toJSON = function (this: ContextTag): string {
+  return this.toString();
+};
+
+const equals = function (this: ContextTag, other: ContextTag): boolean {
+  return this.data.value === other.data.value;
+};
+
+const instantiate = (value: string): ContextTag =>
+  Object.freeze({
+    data: Object.freeze({ value }),
+    toString,
+    toJSON,
+    equals,
+    [CONTEXT_TAG_BRAND]: true,
+  });
+
+export type ContextTagValidationError = ValidationError<typeof CONTEXT_TAG_KIND>;
+
+export const isContextTag = (value: unknown): value is ContextTag =>
+  typeof value === "object" && value !== null && CONTEXT_TAG_BRAND in value;
+
+const CONTEXT_TAG_REGEX = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
+const MIN_LENGTH = 1;
+const MAX_LENGTH = 32;
+
+export const parseContextTag = (
+  input: unknown,
+): Result<ContextTag, ContextTagValidationError> => {
+  if (isContextTag(input)) {
+    return Result.ok(input);
+  }
+
+  if (typeof input !== "string") {
+    return Result.error(
+      createValidationError(CONTEXT_TAG_KIND, [
+        createValidationIssue("context must be a string", {
+          path: ["value"],
+          code: "not_string",
+        }),
+      ]),
+    );
+  }
+
+  let candidate = input.trim().toLowerCase();
+  if (candidate.startsWith("@")) {
+    candidate = candidate.slice(1);
+  }
+
+  if (candidate.length < MIN_LENGTH) {
+    return Result.error(
+      createValidationError(CONTEXT_TAG_KIND, [
+        createValidationIssue("context cannot be empty", {
+          path: ["value"],
+          code: "min_length",
+        }),
+      ]),
+    );
+  }
+
+  if (candidate.length > MAX_LENGTH) {
+    return Result.error(
+      createValidationError(CONTEXT_TAG_KIND, [
+        createValidationIssue("context is too long", {
+          path: ["value"],
+          code: "max_length",
+        }),
+      ]),
+    );
+  }
+
+  if (!CONTEXT_TAG_REGEX.test(candidate)) {
+    return Result.error(
+      createValidationError(CONTEXT_TAG_KIND, [
+        createValidationIssue("context contains invalid characters", {
+          path: ["value"],
+          code: "format",
+        }),
+      ]),
+    );
+  }
+
+  return Result.ok(instantiate(candidate));
+};
+
+export const contextTagFromString = (
+  input: string,
+): Result<ContextTag, ContextTagValidationError> => parseContextTag(input);
