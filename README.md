@@ -1,6 +1,8 @@
 # mm CLI
 
-mm is a personal knowledge management CLI that stores notes and tasks as Markdown and JSON files. The tool organises content as a graph of container and item nodes, keeping immutable on-disk locations while managing logical placements through edges and ranks.
+mm is a personal knowledge management CLI that stores notes and tasks as Markdown and JSON files.
+The tool organises content as a graph of container and item nodes, keeping immutable on-disk
+locations while managing logical placements through edges and ranks.
 
 ## Getting Started
 

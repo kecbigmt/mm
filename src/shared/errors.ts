@@ -11,8 +11,7 @@ export interface BaseError<TKind extends string = string> {
   toString(): string;
 }
 
-export interface ValidationError<K extends string>
-  extends BaseError<"ValidationError"> {
+export interface ValidationError<K extends string> extends BaseError<"ValidationError"> {
   readonly objectKind: K;
   readonly issues: ReadonlyArray<ValidationIssue>;
 }

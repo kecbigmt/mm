@@ -1,8 +1,8 @@
 import { Result } from "../../shared/result.ts";
 import {
-  ValidationError,
   createValidationError,
   createValidationIssue,
+  ValidationError,
 } from "../../shared/errors.ts";
 
 const CONTAINER_INDEX_KIND = "ContainerIndex" as const;
@@ -33,8 +33,7 @@ const instantiate = (index: number): ContainerIndex =>
     [CONTAINER_INDEX_BRAND]: true,
   });
 
-export type ContainerIndexValidationError =
-  ValidationError<typeof CONTAINER_INDEX_KIND>;
+export type ContainerIndexValidationError = ValidationError<typeof CONTAINER_INDEX_KIND>;
 
 export const isContainerIndex = (value: unknown): value is ContainerIndex =>
   typeof value === "object" && value !== null && CONTAINER_INDEX_BRAND in value;
@@ -98,5 +97,4 @@ export const parseContainerIndex = (
 
 export const containerIndexFromNumber = (
   input: number,
-): Result<ContainerIndex, ContainerIndexValidationError> =>
-  parseContainerIndex(input);
+): Result<ContainerIndex, ContainerIndexValidationError> => parseContainerIndex(input);

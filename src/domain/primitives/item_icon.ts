@@ -1,8 +1,8 @@
 import { Result } from "../../shared/result.ts";
 import {
-  ValidationError,
   createValidationError,
   createValidationIssue,
+  ValidationError,
 } from "../../shared/errors.ts";
 
 const ITEM_ICON_KIND = "ItemIcon" as const;
@@ -81,5 +81,4 @@ export const parseItemIcon = (
   return Result.ok(instantiate(normalized as ItemIconValue));
 };
 
-export const createItemIcon = (value: ItemIconValue): ItemIcon =>
-  instantiate(value);
+export const createItemIcon = (value: ItemIconValue): ItemIcon => instantiate(value);

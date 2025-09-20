@@ -1,8 +1,8 @@
 import { Result } from "../../shared/result.ts";
 import {
-  ValidationError,
   createValidationError,
   createValidationIssue,
+  ValidationError,
 } from "../../shared/errors.ts";
 
 const CONTAINER_PATH_KIND = "ContainerPath" as const;
@@ -59,8 +59,7 @@ const instantiate = (segmentsValue: ReadonlyArray<string>): ContainerPath =>
     [CONTAINER_PATH_BRAND]: true,
   });
 
-export type ContainerPathValidationError =
-  ValidationError<typeof CONTAINER_PATH_KIND>;
+export type ContainerPathValidationError = ValidationError<typeof CONTAINER_PATH_KIND>;
 
 export const isContainerPath = (value: unknown): value is ContainerPath =>
   typeof value === "object" && value !== null && CONTAINER_PATH_BRAND in value;
@@ -166,5 +165,4 @@ export const parseContainerPath = (
 
 export const containerPathFromSegments = (
   segmentsValue: ReadonlyArray<string>,
-): Result<ContainerPath, ContainerPathValidationError> =>
-  createFromSegments(segmentsValue);
+): Result<ContainerPath, ContainerPathValidationError> => createFromSegments(segmentsValue);

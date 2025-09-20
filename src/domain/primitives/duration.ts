@@ -1,8 +1,8 @@
 import { Result } from "../../shared/result.ts";
 import {
-  ValidationError,
   createValidationError,
   createValidationIssue,
+  ValidationError,
 } from "../../shared/errors.ts";
 
 const DURATION_KIND = "Duration" as const;
@@ -96,8 +96,7 @@ export const createDurationFromMinutes = (
 
 export const createDurationFromHours = (
   hours: number,
-): Result<Duration, DurationValidationError> =>
-  parseMinutes(hours * HOURS_TO_MINUTES);
+): Result<Duration, DurationValidationError> => parseMinutes(hours * HOURS_TO_MINUTES);
 
 const DURATION_TOKEN_REGEX = /^(\d+h)?(\d+m)?$/;
 const SINGLE_PART_REGEX = /(\d+)(h|m)/g;

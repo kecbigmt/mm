@@ -1,8 +1,8 @@
 import { Result } from "../../shared/result.ts";
 import {
-  ValidationError,
   createValidationError,
   createValidationIssue,
+  ValidationError,
 } from "../../shared/errors.ts";
 
 const ALIAS_SLUG_KIND = "AliasSlug" as const;
