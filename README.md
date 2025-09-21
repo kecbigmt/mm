@@ -16,13 +16,15 @@ deno task dev
 
 Use `deno task test` to run the full unit test suite.
 
-Build a standalone binary with `deno task compile`, or install the CLI globally via `deno task install`.
+Build a standalone binary with `deno task compile`, or install the CLI globally via
+`deno task install`.
 
 ## Commands
 
 ### Creating Items
 
 #### `note [title]`
+
 Create a new note.
 
 ```sh
@@ -31,6 +33,7 @@ mm note --body "Note content" --date today "Weekly Review"
 ```
 
 Options:
+
 - `-b, --body <body>` - Body text
 - `-p, --project <project>` - Project tag
 - `-c, --context <context>` - Context tag
@@ -40,6 +43,7 @@ Options:
 ### Managing Item Status
 
 #### `close <ids...>`
+
 Close one or more items (tasks/notes/events).
 
 ```sh
@@ -48,6 +52,7 @@ mm close abc1234 def5678 ghi9012
 ```
 
 #### `reopen <ids...>`
+
 Reopen one or more closed items.
 
 ```sh
@@ -56,6 +61,7 @@ mm reopen abc1234 def5678
 ```
 
 Both commands accept:
+
 - **Full item IDs**: Complete UUID v7 identifiers
 - **Short IDs**: Last 7 characters of the item ID (e.g., `abc1234`)
 
