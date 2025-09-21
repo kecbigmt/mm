@@ -1,4 +1,4 @@
-import { Command } from "jsr:@cliffy/command@1.0.0-rc.4";
+import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { parseDateArgument } from "../utils/date.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";

@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run --allow-read --allow-write --allow-env
 
-import { Command } from "jsr:@cliffy/command@1.0.0-rc.4";
+import { Command } from "jsr:@cliffy/command";
 import { createNoteCommand } from "./presentation/cli/commands/note.ts";
 import { createCloseCommand } from "./presentation/cli/commands/close.ts";
 import { createReopenCommand } from "./presentation/cli/commands/reopen.ts";

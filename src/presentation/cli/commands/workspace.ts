@@ -1,4 +1,4 @@
-import { Command } from "jsr:@cliffy/command@1.0.0-rc.4";
+import { Command } from "@cliffy/command";
 import { Result } from "../../../shared/result.ts";
 import { resolveMmHome } from "../dependencies.ts";
 import { workspaceNameFromString } from "../../../domain/primitives/workspace_name.ts";
