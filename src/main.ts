@@ -11,7 +11,6 @@ async function main() {
     .name("mm")
     .version("0.1.0")
     .description("Personal knowledge management CLI tool")
-    .globalOption("-w, --workspace <workspace:string>", "Workspace to use")
     .command("note", createNoteCommand().description("Create a new note")).alias("n")
     .command("close", createCloseCommand().description("Close items"))
     .command("reopen", createReopenCommand().description("Reopen closed items"))

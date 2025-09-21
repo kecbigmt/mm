@@ -122,8 +122,6 @@ Deno.test({
           "workspace",
           "use",
           "project",
-          "--timezone",
-          "Asia/Tokyo",
         ]);
       } finally {
         useOutput.restore();
@@ -136,7 +134,7 @@ Deno.test({
       const projectMeta = JSON.parse(await Deno.readTextFile(projectWorkspace)) as {
         readonly timezone: string;
       };
-      assertEquals(projectMeta.timezone, "Asia/Tokyo");
+      assertEquals(projectMeta.timezone, "UTC");
 
       const configPath = join(home, "config.json");
       const config = JSON.parse(await Deno.readTextFile(configPath)) as {

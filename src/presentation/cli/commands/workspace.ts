@@ -35,7 +35,7 @@ const workspaceNameOrReport = (
 const timezoneOrReport = (timezone?: string) => {
   const candidate = typeof timezone === "string" && timezone.trim().length > 0
     ? timezone.trim()
-    : Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+    : "UTC";
   return parseTimezoneIdentifier(candidate);
 };
 
@@ -132,7 +132,6 @@ const initAction = async (
 };
 
 const useAction = async (
-  options: Record<string, unknown>,
   name: string,
 ) => {
   const envResult = resolveEnvironment();
@@ -156,8 +155,7 @@ const useAction = async (
 
   let wasCreated = false;
   if (!existsResult.value) {
-    const timezoneInput = typeof options.timezone === "string" ? options.timezone : undefined;
-    const timezoneResult = timezoneOrReport(timezoneInput);
+    const timezoneResult = timezoneOrReport();
     if (timezoneResult.type === "error") {
       console.error(formatIssues(timezoneResult.error.issues));
       return;
@@ -204,9 +202,7 @@ export const createWorkspaceCommand = () =>
       new Command()
         .description("Switch to workspace")
         .arguments("<name:string>")
-        .option(
-          "-t, --timezone <timezone:string>",
-          "Timezone identifier used when creating a new workspace",
-        )
-        .action(useAction),
+        .action(async (_options, name: string) => {
+          await useAction(name);
+        }),
     );

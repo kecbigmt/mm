@@ -19,6 +19,7 @@ export function createNoteCommand() {
   return new Command()
     .description("Create a new note")
     .arguments("[title:string]")
+    .option("-w, --workspace <workspace:string>", "Workspace to override")
     .option("-b, --body <body:string>", "Body text")
     .option("-p, --project <project:string>", "Project tag")
     .option("-c, --context <context:string>", "Context tag")
