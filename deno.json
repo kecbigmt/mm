@@ -2,7 +2,7 @@
   "tasks": {
     "start": "deno run src/main.ts",
     "dev": "deno run --watch src/main.ts",
-    "test": "deno test"
+    "test": "deno test --allow-read --allow-write"
   },
   "compilerOptions": {
     "strict": true
