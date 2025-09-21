@@ -18,7 +18,7 @@ export type ItemRank = Readonly<{
   readonly [ITEM_RANK_BRAND]: true;
 }>;
 
-const ORDER_KEY_REGEX = /^[0-9A-Za-z:]+$/;
+const ORDER_KEY_REGEX = /^[0-9A-Za-z:|]+$/;
 const MIN_LENGTH = 1;
 const MAX_LENGTH = 30;
 
