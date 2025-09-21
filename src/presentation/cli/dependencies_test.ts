@@ -28,6 +28,24 @@ const unwrapError = <T, E>(
   return result.error;
 };
 
+const withTempMmHome = async (
+  fn: (home: string) => Promise<void>,
+) => {
+  const originalMmHome = Deno.env.get("MM_HOME");
+  const home = await Deno.makeTempDir({ prefix: "mm-cli-home-" });
+  try {
+    Deno.env.set("MM_HOME", home);
+    await fn(home);
+  } finally {
+    if (originalMmHome === undefined) {
+      Deno.env.delete("MM_HOME");
+    } else {
+      Deno.env.set("MM_HOME", originalMmHome);
+    }
+    await Deno.remove(home, { recursive: true });
+  }
+};
+
 Deno.test({
   name: "resolveWorkspaceRootFromSources prioritizes explicit workspace path",
   permissions: { read: true, write: true },
@@ -93,7 +111,7 @@ Deno.test({
 
 Deno.test({
   name: "loadCliDependencies uses provided workspace path",
-  permissions: { read: true, write: true },
+  permissions: { env: true, read: true, write: true },
   async fn() {
     const workspace = await Deno.makeTempDir({ prefix: "mm-cli-load-workspace-" });
     try {
@@ -106,5 +124,27 @@ Deno.test({
     } finally {
       await Deno.remove(workspace, { recursive: true });
     }
+  },
+});
+
+Deno.test({
+  name: "loadCliDependencies resolves current workspace from config",
+  permissions: { env: true, read: true, write: true },
+  async fn() {
+    await withTempMmHome(async (home) => {
+      const workspacePath = join(home, "workspaces", "home");
+      await writeWorkspace(workspacePath);
+      const configPath = join(home, "config.json");
+      await Deno.writeTextFile(
+        configPath,
+        `${JSON.stringify({ currentWorkspace: "home" }, null, 2)}\n`,
+      );
+
+      const deps = unwrapOk(
+        await loadCliDependencies(),
+        "load cli dependencies from config",
+      );
+      assertEquals(deps.root, resolve(workspacePath));
+    });
   },
 });

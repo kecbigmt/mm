@@ -45,6 +45,7 @@ const captureConsole = () => {
 Deno.test({
   name: "note command persists note to workspace",
   permissions: {
+    env: true,
     read: true,
     write: true,
   },

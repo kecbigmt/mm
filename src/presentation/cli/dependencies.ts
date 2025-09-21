@@ -18,6 +18,9 @@ import {
   IdGenerationService,
 } from "../../domain/services/id_generation_service.ts";
 import { createUuidV7Generator } from "../../infrastructure/uuid/generator.ts";
+import { WorkspaceName, workspaceNameFromString } from "../../domain/primitives/workspace_name.ts";
+import { createWorkspaceConfigRepository } from "../../infrastructure/fileSystem/workspace_config_repository.ts";
+import { createWorkspaceStore } from "../../infrastructure/fileSystem/workspace_store.ts";
 
 export type CliDependencies = Readonly<{
   readonly root: string;
@@ -49,6 +52,14 @@ const normalizePathInput = (value?: string): string | undefined => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
+const safeGetEnv = (key: string): string | undefined => {
+  try {
+    return Deno.env.get(key) ?? undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export const resolveWorkspaceRootFromSources = (
   sources: WorkspaceRootSources,
 ): Result<string, CliDependencyError> => {
@@ -78,27 +89,102 @@ export const resolveWorkspaceRootFromSources = (
   });
 };
 
-const determineWorkspaceRoot = (
-  workspacePath?: string,
-): Result<string, CliDependencyError> => {
+export const resolveMmHome = (): Result<string, CliDependencyError> =>
+  resolveWorkspaceRootFromSources({
+    mmHome: safeGetEnv("MM_HOME"),
+    home: safeGetEnv("HOME"),
+    userProfile: safeGetEnv("USERPROFILE"),
+  });
+
+const determineWorkspaceFromName = async (
+  home: string,
+  name: WorkspaceName,
+): Promise<Result<string, CliDependencyError>> => {
+  const store = createWorkspaceStore({ home });
+  const existsResult = await store.exists(name);
+  if (existsResult.type === "error") {
+    return Result.error({ type: "repository", error: existsResult.error });
+  }
+  if (!existsResult.value) {
+    return Result.error({
+      type: "workspace",
+      message:
+        `workspace '${name.toString()}' does not exist; run mm workspace add ${name.toString()}`,
+    });
+  }
+  return Result.ok(store.pathFor(name));
+};
+
+const determineWorkspaceRoot = async (
+  workspacePath: string | undefined,
+): Promise<Result<string, CliDependencyError>> => {
+  const homeResult = resolveMmHome();
+  if (homeResult.type === "error") {
+    return homeResult;
+  }
+  const home = homeResult.value;
+
   const explicit = normalizePathInput(workspacePath);
   if (explicit) {
-    return resolveWorkspaceRootFromSources({ workspacePath: explicit });
+    if (explicit.includes("/") || explicit.includes("\\") || explicit.startsWith(".")) {
+      const path = resolve(explicit);
+      try {
+        const stat = await Deno.stat(path);
+        if (!stat.isDirectory) {
+          return Result.error({
+            type: "workspace",
+            message: `workspace path '${path}' is not a directory`,
+          });
+        }
+      } catch (error) {
+        if (error instanceof Deno.errors.NotFound) {
+          return Result.error({
+            type: "workspace",
+            message: `workspace path '${path}' does not exist`,
+          });
+        }
+        return Result.error({
+          type: "workspace",
+          message: `failed to inspect workspace path '${path}'`,
+        });
+      }
+      return Result.ok(path);
+    }
+
+    const parsedName = workspaceNameFromString(explicit);
+    if (parsedName.type === "error") {
+      return Result.error({
+        type: "workspace",
+        message: parsedName.error.issues[0]?.message ?? "invalid workspace name",
+      });
+    }
+    return await determineWorkspaceFromName(home, parsedName.value);
   }
 
-  return resolveWorkspaceRootFromSources({
-    mmHome: Deno.env.get("MM_HOME"),
-    home: Deno.env.get("HOME"),
-    userProfile: Deno.env.get("USERPROFILE"),
-  });
+  const configRepository = createWorkspaceConfigRepository({ home });
+  const currentResult = await configRepository.getCurrentWorkspace();
+  if (currentResult.type === "error") {
+    return Result.error({ type: "repository", error: currentResult.error });
+  }
+
+  const currentName = currentResult.value ?? "home";
+  const parsedName = workspaceNameFromString(currentName);
+  if (parsedName.type === "error") {
+    return Result.error({
+      type: "workspace",
+      message: parsedName.error.issues[0]?.message ?? "workspace name is invalid",
+    });
+  }
+
+  return await determineWorkspaceFromName(home, parsedName.value);
 };
 
 export const loadCliDependencies = async (
   workspacePath?: string,
 ): Promise<Result<CliDependencies, CliDependencyError>> => {
-  const rootResult = determineWorkspaceRoot(workspacePath);
+  const rootResult = await determineWorkspaceRoot(workspacePath);
   if (rootResult.type === "error") {
-    return Result.error(rootResult.error);
+    return rootResult;
   }
 
   const root = rootResult.value;
