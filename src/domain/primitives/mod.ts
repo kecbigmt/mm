@@ -1,6 +1,9 @@
 export type { ItemId, ItemIdValidationError } from "./item_id.ts";
 export { isItemId, itemIdFromString, parseItemId } from "./item_id.ts";
 
+export type { ItemShortId, ItemShortIdValidationError } from "./item_short_id.ts";
+export { isItemShortId, parseItemShortId } from "./item_short_id.ts";
+
 export type { ItemTitle, ItemTitleValidationError } from "./item_title.ts";
 export { isItemTitle, itemTitleFromString, parseItemTitle } from "./item_title.ts";
 

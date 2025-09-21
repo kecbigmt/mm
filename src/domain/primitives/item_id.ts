@@ -4,6 +4,7 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
+import { ItemShortId, parseItemShortId } from "./item_short_id.ts";
 
 const ITEM_ID_KIND = "ItemId" as const;
 const ITEM_ID_BRAND: unique symbol = Symbol(ITEM_ID_KIND);
@@ -16,6 +17,7 @@ export type ItemId = Readonly<{
   toString(): string;
   equals(other: ItemId): boolean;
   toJSON(): string;
+  toShortId(): ItemShortId;
   readonly [ITEM_ID_BRAND]: true;
 }>;
 
@@ -31,12 +33,22 @@ const toJSON = function (this: ItemId): string {
   return this.toString();
 };
 
+const toShortId = function (this: ItemId): ItemShortId {
+  const shortIdString = this.data.value.slice(-7);
+  const result = parseItemShortId(shortIdString);
+  if (result.type === "error") {
+    throw new Error(`Failed to create short ID from valid ItemId: ${result.error.message}`);
+  }
+  return result.value;
+};
+
 const instantiate = (value: string): ItemId =>
   Object.freeze({
     data: Object.freeze({ value }),
     toString,
     equals,
     toJSON,
+    toShortId,
     [ITEM_ID_BRAND]: true,
   });
 
