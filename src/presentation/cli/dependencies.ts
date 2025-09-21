@@ -20,7 +20,6 @@ import {
 import { createUuidV7Generator } from "../../infrastructure/uuid/generator.ts";
 import { WorkspaceName, workspaceNameFromString } from "../../domain/primitives/workspace_name.ts";
 import { createWorkspaceConfigRepository } from "../../infrastructure/fileSystem/workspace_config_repository.ts";
-import { createWorkspaceStore } from "../../infrastructure/fileSystem/workspace_store.ts";
 
 export type CliDependencies = Readonly<{
   readonly root: string;
@@ -97,11 +96,10 @@ export const resolveMmHome = (): Result<string, CliDependencyError> =>
   });
 
 const determineWorkspaceFromName = async (
-  home: string,
+  repository: WorkspaceRepository,
   name: WorkspaceName,
 ): Promise<Result<string, CliDependencyError>> => {
-  const store = createWorkspaceStore({ home });
-  const existsResult = await store.exists(name);
+  const existsResult = await repository.exists(name);
   if (existsResult.type === "error") {
     return Result.error({ type: "repository", error: existsResult.error });
   }
@@ -112,18 +110,14 @@ const determineWorkspaceFromName = async (
         `workspace '${name.toString()}' does not exist; run mm workspace init ${name.toString()}`,
     });
   }
-  return Result.ok(store.pathFor(name));
+  return Result.ok(repository.pathFor(name));
 };
 
 const determineWorkspaceRoot = async (
   workspacePath: string | undefined,
+  repository: WorkspaceRepository,
+  configRepository: ReturnType<typeof createWorkspaceConfigRepository>,
 ): Promise<Result<string, CliDependencyError>> => {
-  const homeResult = resolveMmHome();
-  if (homeResult.type === "error") {
-    return homeResult;
-  }
-  const home = homeResult.value;
-
   const explicit = normalizePathInput(workspacePath);
   if (explicit) {
     if (explicit.includes("/") || explicit.includes("\\") || explicit.startsWith(".")) {
@@ -158,10 +152,9 @@ const determineWorkspaceRoot = async (
         message: parsedName.error.issues[0]?.message ?? "invalid workspace name",
       });
     }
-    return await determineWorkspaceFromName(home, parsedName.value);
+    return await determineWorkspaceFromName(repository, parsedName.value);
   }
 
-  const configRepository = createWorkspaceConfigRepository({ home });
   const currentResult = await configRepository.getCurrentWorkspace();
   if (currentResult.type === "error") {
     return Result.error({ type: "repository", error: currentResult.error });
@@ -176,21 +169,32 @@ const determineWorkspaceRoot = async (
     });
   }
 
-  return await determineWorkspaceFromName(home, parsedName.value);
+  return await determineWorkspaceFromName(repository, parsedName.value);
 };
 
 export const loadCliDependencies = async (
   workspacePath?: string,
 ): Promise<Result<CliDependencies, CliDependencyError>> => {
-  const rootResult = await determineWorkspaceRoot(workspacePath);
+  const homeResult = resolveMmHome();
+  if (homeResult.type === "error") {
+    return homeResult;
+  }
+  const home = homeResult.value;
+
+  const workspaceRepository = createFileSystemWorkspaceRepository({ home });
+  const configRepository = createWorkspaceConfigRepository({ home });
+
+  const rootResult = await determineWorkspaceRoot(
+    workspacePath,
+    workspaceRepository,
+    configRepository,
+  );
   if (rootResult.type === "error") {
     return rootResult;
   }
 
   const root = rootResult.value;
-  const workspaceRepository = createFileSystemWorkspaceRepository({ root });
-
-  const workspaceResult = await workspaceRepository.load();
+  const workspaceResult = await workspaceRepository.load(root);
   if (workspaceResult.type === "error") {
     return Result.error({ type: "repository", error: workspaceResult.error });
   }

@@ -1,12 +1,17 @@
 import { join } from "@std/path";
 import { Result } from "../../shared/result.ts";
-import { WorkspaceRepository } from "../../domain/repositories/workspace_repository.ts";
-import { parseWorkspaceSettings, WorkspaceSettings } from "../../domain/models/workspace.ts";
-import { createRepositoryError } from "../../domain/repositories/mod.ts";
+import { createRepositoryError, WorkspaceRepository } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
+import {
+  createWorkspaceSettings,
+  parseWorkspaceSettings,
+  WorkspaceSettings,
+} from "../../domain/models/workspace.ts";
+import { WorkspaceName, workspaceNameFromString } from "../../domain/primitives/workspace_name.ts";
+import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.ts";
 
 export type FileSystemWorkspaceRepositoryDependencies = Readonly<{
-  readonly root: string;
+  readonly home: string;
 }>;
 
 type WorkspaceSnapshot = Parameters<typeof parseWorkspaceSettings>[0];
@@ -14,6 +19,13 @@ type WorkspaceSnapshot = Parameters<typeof parseWorkspaceSettings>[0];
 type LoadResult = Result<WorkspaceSettings, RepositoryError>;
 type SaveResult = Result<void, RepositoryError>;
 
+type ListResult = Result<ReadonlyArray<WorkspaceName>, RepositoryError>;
+type ExistsResult = Result<boolean, RepositoryError>;
+type CreateResult = Result<void, RepositoryError>;
+
+const workspacesDir = (home: string): string => join(home, "workspaces");
+const workspaceRootPath = (home: string, name: WorkspaceName): string =>
+  join(workspacesDir(home), name.toString());
 const workspaceFilePath = (root: string): string => join(root, "workspace.json");
 
 const readWorkspaceSnapshot = async (
@@ -69,13 +81,30 @@ const writeWorkspaceSnapshot = async (
   }
 };
 
+const ensureWorkspaceStructure = async (
+  root: string,
+): Promise<Result<void, RepositoryError>> => {
+  try {
+    await Deno.mkdir(root, { recursive: true });
+    await Deno.mkdir(join(root, "nodes"), { recursive: true });
+    return Result.ok(undefined);
+  } catch (error) {
+    if (error instanceof Deno.errors.AlreadyExists) {
+      return Result.ok(undefined);
+    }
+    return Result.error(
+      createRepositoryError("workspace", "ensure", "failed to prepare workspace directories", {
+        cause: error,
+      }),
+    );
+  }
+};
+
 export const createFileSystemWorkspaceRepository = (
   dependencies: FileSystemWorkspaceRepositoryDependencies,
 ): WorkspaceRepository => {
-  const path = workspaceFilePath(dependencies.root);
-
-  const load = async (): Promise<LoadResult> => {
-    const snapshotResult = await readWorkspaceSnapshot(path);
+  const load = async (root: string): Promise<LoadResult> => {
+    const snapshotResult = await readWorkspaceSnapshot(workspaceFilePath(root));
     if (snapshotResult.type === "error") {
       return snapshotResult;
     }
@@ -93,13 +122,80 @@ export const createFileSystemWorkspaceRepository = (
     return Result.ok(parsed.value);
   };
 
-  const save = async (settings: WorkspaceSettings): Promise<SaveResult> => {
+  const save = async (
+    root: string,
+    settings: WorkspaceSettings,
+  ): Promise<SaveResult> => {
     const snapshot = settings.toJSON();
-    return await writeWorkspaceSnapshot(path, snapshot);
+    return await writeWorkspaceSnapshot(workspaceFilePath(root), snapshot);
   };
+
+  const list = async (): Promise<ListResult> => {
+    const base = workspacesDir(dependencies.home);
+    try {
+      const names: WorkspaceName[] = [];
+      for await (const entry of Deno.readDir(base)) {
+        if (!entry.isDirectory) {
+          continue;
+        }
+        const parsed = workspaceNameFromString(entry.name);
+        if (parsed.type === "ok") {
+          names.push(parsed.value);
+        }
+      }
+      names.sort((a, b) => a.toString().localeCompare(b.toString()));
+      return Result.ok(names);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.ok([]);
+      }
+      return Result.error(
+        createRepositoryError("workspace", "list", "failed to list workspaces", {
+          cause: error,
+        }),
+      );
+    }
+  };
+
+  const exists = async (name: WorkspaceName): Promise<ExistsResult> => {
+    try {
+      const stat = await Deno.stat(workspaceRootPath(dependencies.home, name));
+      return Result.ok(stat.isDirectory);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.ok(false);
+      }
+      return Result.error(
+        createRepositoryError("workspace", "load", "failed to inspect workspace", {
+          identifier: name.toString(),
+          cause: error,
+        }),
+      );
+    }
+  };
+
+  const create = async (
+    name: WorkspaceName,
+    timezone: TimezoneIdentifier,
+  ): Promise<CreateResult> => {
+    const root = workspaceRootPath(dependencies.home, name);
+    const ensureResult = await ensureWorkspaceStructure(root);
+    if (ensureResult.type === "error") {
+      return ensureResult;
+    }
+
+    const settings = createWorkspaceSettings({ timezone });
+    return await save(root, settings);
+  };
+
+  const pathFor = (name: WorkspaceName): string => workspaceRootPath(dependencies.home, name);
 
   return {
     load,
     save,
+    list,
+    exists,
+    create,
+    pathFor,
   };
 };

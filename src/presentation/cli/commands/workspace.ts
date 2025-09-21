@@ -3,10 +3,8 @@ import { Result } from "../../../shared/result.ts";
 import { resolveMmHome } from "../dependencies.ts";
 import { workspaceNameFromString } from "../../../domain/primitives/workspace_name.ts";
 import { createWorkspaceConfigRepository } from "../../../infrastructure/fileSystem/workspace_config_repository.ts";
-import {
-  createWorkspaceStore,
-  resolveWorkspaceTimezone,
-} from "../../../infrastructure/fileSystem/workspace_store.ts";
+import { createFileSystemWorkspaceRepository } from "../../../infrastructure/fileSystem/workspace_repository.ts";
+import { parseTimezoneIdentifier } from "../../../domain/primitives/timezone_identifier.ts";
 import { CliDependencyError } from "../dependencies.ts";
 
 const reportError = (error: CliDependencyError): void => {
@@ -25,7 +23,7 @@ const resolveEnvironment = () => {
   const home = homeResult.value;
   return Result.ok({
     home,
-    store: createWorkspaceStore({ home }),
+    repository: createFileSystemWorkspaceRepository({ home }),
     config: createWorkspaceConfigRepository({ home }),
   });
 };
@@ -34,7 +32,12 @@ const workspaceNameOrReport = (
   name: string,
 ): ReturnType<typeof workspaceNameFromString> => workspaceNameFromString(name);
 
-const timezoneOrReport = (timezone?: string) => resolveWorkspaceTimezone(timezone);
+const timezoneOrReport = (timezone?: string) => {
+  const candidate = typeof timezone === "string" && timezone.trim().length > 0
+    ? timezone.trim()
+    : Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+  return parseTimezoneIdentifier(candidate);
+};
 
 const formatIssues = (
   issues: ReadonlyArray<{ message: string }>,
@@ -55,7 +58,7 @@ const listAction = async () => {
   }
   const current = currentResult.value ?? "home";
 
-  const listResult = await env.store.list();
+  const listResult = await env.repository.list();
   if (listResult.type === "error") {
     console.error(listResult.error.message);
     return;
@@ -103,7 +106,7 @@ const initAction = async (
     return;
   }
 
-  const existsResult = await env.store.exists(parsedName.value);
+  const existsResult = await env.repository.exists(parsedName.value);
   if (existsResult.type === "error") {
     console.error(existsResult.error.message);
     return;
@@ -113,7 +116,7 @@ const initAction = async (
     return;
   }
 
-  const createResult = await env.store.create(parsedName.value, timezoneResult.value);
+  const createResult = await env.repository.create(parsedName.value, timezoneResult.value);
   if (createResult.type === "error") {
     console.error(createResult.error.message);
     return;
@@ -146,7 +149,7 @@ const useAction = async (
     return;
   }
 
-  const existsResult = await env.store.exists(parsedName.value);
+  const existsResult = await env.repository.exists(parsedName.value);
   if (existsResult.type === "error") {
     console.error(existsResult.error.message);
     return;
@@ -160,7 +163,7 @@ const useAction = async (
       console.error(formatIssues(timezoneResult.error.issues));
       return;
     }
-    const createResult = await env.store.create(parsedName.value, timezoneResult.value);
+    const createResult = await env.repository.create(parsedName.value, timezoneResult.value);
     if (createResult.type === "error") {
       console.error(createResult.error.message);
       return;
