@@ -128,7 +128,6 @@ const initAction = async (
     return;
   }
 
-  console.log(`Created workspace: ${parsedName.value.toString()}`);
   console.log(`Switched to workspace: ${parsedName.value.toString()}`);
 };
 
