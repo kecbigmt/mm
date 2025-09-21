@@ -121,6 +121,9 @@ export const createItemEdge = (
   rank: ItemRank,
 ): ItemEdge => instantiateItemEdge({ to, rank });
 
+export const isItemEdge = (edge: Edge): edge is ItemEdge => edge.kind === "ItemEdge";
+export const isContainerEdge = (edge: Edge): edge is ContainerEdge => edge.kind === "ContainerEdge";
+
 export const parseContainerEdge = (
   input: unknown,
 ): Result<ContainerEdge, ContainerEdgeValidationError> => {
