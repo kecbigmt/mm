@@ -2,9 +2,13 @@ import { join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { ItemRepository } from "../../domain/repositories/item_repository.ts";
 import { Item, ItemSnapshot, parseItem } from "../../domain/models/item.ts";
-import { ItemId } from "../../domain/primitives/mod.ts";
+import { ItemId, ItemShortId, parseItemId } from "../../domain/primitives/mod.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
+import {
+  AmbiguousShortIdError,
+  createAmbiguousShortIdError,
+} from "../../domain/repositories/short_id_resolution_error.ts";
 import { readEdgeSnapshots, writeEdges } from "./edge_store.ts";
 import { EdgeSnapshot } from "../../domain/models/edge.ts";
 
@@ -15,6 +19,7 @@ export type FileSystemItemRepositoryDependencies = Readonly<{
 type LoadResult = Result<Item | undefined, RepositoryError>;
 type SaveResult = Result<void, RepositoryError>;
 type DeleteResult = Result<void, RepositoryError>;
+type FindByShortIdResult = Result<Item | undefined, RepositoryError | AmbiguousShortIdError>;
 
 type ItemMetaSnapshot = Omit<ItemSnapshot, "body" | "edges">;
 
@@ -261,6 +266,44 @@ const deleteIndexEntry = async (
   }
 };
 
+const findIdsByShortId = async (
+  root: string,
+  shortId: ItemShortId,
+): Promise<Result<string[], RepositoryError>> => {
+  const shortIdStr = shortId.toString();
+  const matchingIds: string[] = [];
+
+  try {
+    const indexDir = indexDirectory(root);
+    try {
+      const entries = Deno.readDir(indexDir);
+      for await (const entry of entries) {
+        if (entry.isFile && entry.name.endsWith(".json")) {
+          const id = entry.name.slice(0, -5); // Remove .json extension
+          if (id.endsWith(shortIdStr)) {
+            matchingIds.push(id);
+          }
+        }
+      }
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        // Index directory doesn't exist, no items
+        return Result.ok([]);
+      }
+      throw error;
+    }
+
+    return Result.ok(matchingIds);
+  } catch (error) {
+    return Result.error(
+      createRepositoryError("item", "findByShortId", "failed to scan index directory", {
+        identifier: shortIdStr,
+        cause: error,
+      }),
+    );
+  }
+};
+
 export const createFileSystemItemRepository = (
   dependencies: FileSystemItemRepositoryDependencies,
 ): ItemRepository => {
@@ -378,9 +421,39 @@ export const createFileSystemItemRepository = (
     return Result.ok(undefined);
   };
 
+  const findByShortId = async (shortId: ItemShortId): Promise<FindByShortIdResult> => {
+    const idsResult = await findIdsByShortId(dependencies.root, shortId);
+    if (idsResult.type === "error") {
+      return idsResult;
+    }
+
+    const matchingIds = idsResult.value;
+
+    if (matchingIds.length === 0) {
+      return Result.ok(undefined);
+    }
+
+    if (matchingIds.length > 1) {
+      return Result.error(createAmbiguousShortIdError(shortId.toString(), matchingIds.length));
+    }
+
+    // Exactly one match - load and return the item
+    const itemIdResult = parseItemId(matchingIds[0]);
+    if (itemIdResult.type === "error") {
+      return Result.error(
+        createRepositoryError("item", "findByShortId", "invalid item ID in index", {
+          identifier: matchingIds[0],
+        }),
+      );
+    }
+
+    return await load(itemIdResult.value);
+  };
+
   return {
     load,
     save,
     delete: remove,
+    findByShortId,
   };
 };
