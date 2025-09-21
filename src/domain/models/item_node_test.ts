@@ -85,6 +85,35 @@ Deno.test("parseItemNode parses full snapshot payload", () => {
   assertEquals(node.data.dueAt?.toString(), "2024-09-22T10:00:00.000Z");
   assertEquals(node.data.createdAt.toString(), "2024-09-20T08:00:00.000Z");
   assertEquals(node.data.updatedAt.toString(), "2024-09-21T14:00:00.000Z");
+  assertEquals(node.edges.length, 0);
+});
+
+Deno.test("parseItemNode parses edges collection", () => {
+  const result = parseItemNode(
+    baseSnapshot({
+      edges: [
+        {
+          kind: "ItemEdge",
+          to: "019965a7-2789-740a-b8c1-1415904fd109",
+          rank: "b1",
+        },
+        {
+          kind: "ContainerEdge",
+          to: "projects/focus",
+          index: 1,
+        },
+      ],
+    }),
+  );
+
+  const node = unwrapOk(result, "parse node with edges");
+  assertEquals(node.edges.length, 2);
+  assertEquals(node.edges[0].kind, "ItemEdge");
+  assertEquals(node.edges[1].kind, "ContainerEdge");
+
+  const roundTrip = node.toJSON();
+  assert(roundTrip.edges !== undefined, "edges should be serialized");
+  assertEquals(roundTrip.edges?.length, 2);
 });
 
 Deno.test("setContext updates and normalizes context tag", () => {

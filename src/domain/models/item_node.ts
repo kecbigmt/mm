@@ -39,6 +39,7 @@ import {
   parseNodeRank,
   parseNodeTitle,
 } from "../primitives/mod.ts";
+import { Edge, EdgeSnapshot, parseEdge } from "./edge.ts";
 
 export type ItemNodeData = Readonly<{
   readonly id: NodeId;
@@ -61,6 +62,7 @@ export type ItemNodeData = Readonly<{
 export type ItemNode = Readonly<{
   readonly kind: "ItemNode";
   readonly data: ItemNodeData;
+  readonly edges: ReadonlyArray<Edge>;
   close(closedAt: DateTime): ItemNode;
   reopen(reopenedAt: DateTime): ItemNode;
   relocate(
@@ -103,14 +105,18 @@ export type ItemNodeSnapshot = Readonly<{
   readonly alias?: string;
   readonly context?: string;
   readonly body?: string;
+  readonly edges?: ReadonlyArray<EdgeSnapshot>;
 }>;
 
 export type ItemNodeValidationError = ValidationError<"ItemNode">;
 
 const makeData = (data: ItemNodeData): ItemNodeData => Object.freeze({ ...data });
 
-const instantiate = (data: ItemNodeData): ItemNode => {
+const makeEdges = (edges: ReadonlyArray<Edge>): ReadonlyArray<Edge> => Object.freeze([...edges]);
+
+const instantiate = (data: ItemNodeData, edges: ReadonlyArray<Edge>): ItemNode => {
   const frozenData = makeData(data);
+  const frozenEdges = makeEdges(edges);
 
   const close = function (this: ItemNode, closedAt: DateTime): ItemNode {
     if (this.data.status.isClosed()) {
@@ -121,7 +127,7 @@ const instantiate = (data: ItemNodeData): ItemNode => {
       status: itemStatusClosed(),
       closedAt,
       updatedAt: closedAt,
-    });
+    }, this.edges);
   };
 
   const reopen = function (this: ItemNode, reopenedAt: DateTime): ItemNode {
@@ -133,7 +139,7 @@ const instantiate = (data: ItemNodeData): ItemNode => {
       status: itemStatusOpen(),
       closedAt: undefined,
       updatedAt: reopenedAt,
-    });
+    }, this.edges);
   };
 
   const relocate = function (
@@ -152,7 +158,7 @@ const instantiate = (data: ItemNodeData): ItemNode => {
       container,
       rank,
       updatedAt: occurredAt,
-    });
+    }, this.edges);
   };
 
   const retitle = function (
@@ -167,7 +173,7 @@ const instantiate = (data: ItemNodeData): ItemNode => {
       ...this.data,
       title,
       updatedAt,
-    });
+    }, this.edges);
   };
 
   const changeIcon = function (
@@ -182,7 +188,7 @@ const instantiate = (data: ItemNodeData): ItemNode => {
       ...this.data,
       icon,
       updatedAt,
-    });
+    }, this.edges);
   };
 
   const setBody = function (
@@ -202,7 +208,7 @@ const instantiate = (data: ItemNodeData): ItemNode => {
       ...this.data,
       body: normalized,
       updatedAt,
-    });
+    }, this.edges);
   };
 
   const schedule = function (
@@ -221,7 +227,7 @@ const instantiate = (data: ItemNodeData): ItemNode => {
       dueAt: schedule.dueAt,
       updatedAt,
     } as ItemNodeData;
-    return instantiate(next);
+    return instantiate(next, this.edges);
   };
 
   const setAlias = function (
@@ -238,7 +244,7 @@ const instantiate = (data: ItemNodeData): ItemNode => {
       ...this.data,
       alias,
       updatedAt,
-    });
+    }, this.edges);
   };
 
   const setContext = function (
@@ -255,7 +261,7 @@ const instantiate = (data: ItemNodeData): ItemNode => {
       ...this.data,
       context,
       updatedAt,
-    });
+    }, this.edges);
   };
 
   const toJSON = function (this: ItemNode): ItemNodeSnapshot {
@@ -275,12 +281,14 @@ const instantiate = (data: ItemNodeData): ItemNode => {
       alias: this.data.alias?.toString(),
       context: this.data.context?.toString(),
       body: this.data.body,
+      edges: this.edges.map((edge) => edge.toJSON()),
     };
   };
 
   return Object.freeze({
     kind: "ItemNode" as const,
     data: frozenData,
+    edges: frozenEdges,
     close,
     reopen,
     relocate,
@@ -315,12 +323,16 @@ const prefixIssues = (
     })
   );
 
-export const createItemNode = (data: ItemNodeData): ItemNode => instantiate(data);
+export const createItemNode = (
+  data: ItemNodeData,
+  edges: ReadonlyArray<Edge> = [],
+): ItemNode => instantiate(data, edges);
 
 export const parseItemNode = (
   snapshot: ItemNodeSnapshot,
 ): Result<ItemNode, ItemNodeValidationError> => {
   const issues: ValidationIssue[] = [];
+  const edges: Edge[] = [];
 
   const idResult = parseNodeId(snapshot.id);
   const titleResult = parseNodeTitle(snapshot.title);
@@ -416,6 +428,24 @@ export const parseItemNode = (
     }
   }
 
+  if (snapshot.edges !== undefined) {
+    for (const [index, edgeSnapshot] of snapshot.edges.entries()) {
+      const result = parseEdge(edgeSnapshot);
+      if (result.type === "error") {
+        issues.push(
+          ...result.error.issues.map((issue) =>
+            createValidationIssue(issue.message, {
+              code: issue.code,
+              path: ["edges", index, ...issue.path],
+            })
+          ),
+        );
+      } else {
+        edges.push(result.value);
+      }
+    }
+  }
+
   if (issues.length > 0) {
     return Result.error(createValidationError("ItemNode", issues));
   }
@@ -447,5 +477,5 @@ export const parseItemNode = (
     body: snapshot.body?.trim() ?? undefined,
   };
 
-  return Result.ok(instantiate(data));
+  return Result.ok(instantiate(data, edges));
 };

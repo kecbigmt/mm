@@ -25,7 +25,7 @@ model, stored as plain Markdown + JSON, Git-friendly. Items are created under a 
 
 ### Node (abstract)
 
-- Has a name and 0 or 1 parent Node.
+- Has 0 or 1 parent Node.
 - Two concrete kinds: **ContainerNode**, **ItemNode**.
 
 ### ContainerNode

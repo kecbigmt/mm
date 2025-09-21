@@ -1,5 +1,7 @@
 import { parseContainerNode } from "./container_node.ts";
 
+const parsePath = (path: string) => parseContainerNode({ path, edges: [] });
+
 const assertEquals = <T>(actual: T, expected: T, message?: string): void => {
   if (actual !== expected) {
     throw new Error(message ?? `expected ${expected} but received ${actual}`);
@@ -13,7 +15,7 @@ const assertStringIncludes = (actual: string, expected: string, message?: string
 };
 
 Deno.test("parses workspace root container", () => {
-  const result = parseContainerNode("/");
+  const result = parsePath("/");
   if (result.type !== "ok") {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
@@ -22,10 +24,11 @@ Deno.test("parses workspace root container", () => {
     throw new Error(`expected WorkspaceRoot, got ${node.kind}`);
   }
   assertEquals(node.path.isRoot(), true);
+  assertEquals(node.edges.length, 0);
 });
 
 Deno.test("parses calendar year container", () => {
-  const result = parseContainerNode("2024");
+  const result = parsePath("2024");
   if (result.type !== "ok") {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
@@ -34,10 +37,11 @@ Deno.test("parses calendar year container", () => {
     throw new Error(`expected CalendarYear, got ${node.kind}`);
   }
   assertEquals(node.year.value(), 2024);
+  assertEquals(node.edges.length, 0);
 });
 
 Deno.test("parses calendar month container", () => {
-  const result = parseContainerNode("2024/09");
+  const result = parsePath("2024/09");
   if (result.type !== "ok") {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
@@ -47,10 +51,11 @@ Deno.test("parses calendar month container", () => {
   }
   assertEquals(node.year.value(), 2024);
   assertEquals(node.month.month(), 9);
+  assertEquals(node.edges.length, 0);
 });
 
 Deno.test("parses calendar day container", () => {
-  const result = parseContainerNode("2024/09/20");
+  const result = parsePath("2024/09/20");
   if (result.type !== "ok") {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
@@ -61,10 +66,11 @@ Deno.test("parses calendar day container", () => {
   assertEquals(node.year.value(), 2024);
   assertEquals(node.month.month(), 9);
   assertEquals(node.day.toString(), "2024-09-20");
+  assertEquals(node.edges.length, 0);
 });
 
 Deno.test("parses item root container", () => {
-  const result = parseContainerNode("019965a7-2789-740a-b8c1-1415904fd108");
+  const result = parsePath("019965a7-2789-740a-b8c1-1415904fd108");
   if (result.type !== "ok") {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
@@ -73,10 +79,41 @@ Deno.test("parses item root container", () => {
     throw new Error(`expected ItemRoot, got ${node.kind}`);
   }
   assertEquals(node.ownerId.toString(), "019965a7-2789-740a-b8c1-1415904fd108");
+  assertEquals(node.edges.length, 0);
+});
+
+Deno.test("parses container snapshot with edges", () => {
+  const result = parseContainerNode({
+    path: "019965a7-2789-740a-b8c1-1415904fd108/0001",
+    edges: [
+      {
+        kind: "ItemEdge",
+        to: "019965a7-2789-740a-b8c1-1415904fd109",
+        rank: "a1",
+      },
+      {
+        kind: "ContainerEdge",
+        to: "projects/focus",
+        index: 1,
+      },
+    ],
+  });
+
+  if (result.type !== "ok") {
+    throw new Error(`expected ok result, got error: ${result.error.toString()}`);
+  }
+
+  const node = result.value;
+  if (node.kind !== "ItemNumbering") {
+    throw new Error(`expected ItemNumbering, got ${node.kind}`);
+  }
+  assertEquals(node.edges.length, 2);
+  assertEquals(node.edges[0].kind, "ItemEdge");
+  assertEquals(node.edges[1].kind, "ContainerEdge");
 });
 
 Deno.test("parses item numbering container", () => {
-  const result = parseContainerNode("019965a7-2789-740a-b8c1-1415904fd108/0001/0002");
+  const result = parsePath("019965a7-2789-740a-b8c1-1415904fd108/0001/0002");
   if (result.type !== "ok") {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
@@ -87,10 +124,11 @@ Deno.test("parses item numbering container", () => {
   assertEquals(node.indexes.length, 2);
   assertEquals(node.indexes[0].value(), 1);
   assertEquals(node.indexes[1].value(), 2);
+  assertEquals(node.edges.length, 0);
 });
 
 Deno.test("rejects invalid numbering segment", () => {
-  const result = parseContainerNode("019965a7-2789-740a-b8c1-1415904fd108/1");
+  const result = parsePath("019965a7-2789-740a-b8c1-1415904fd108/1");
   if (result.type !== "error") {
     throw new Error("expected error result");
   }
@@ -101,7 +139,7 @@ Deno.test("rejects invalid numbering segment", () => {
 });
 
 Deno.test("rejects invalid calendar date", () => {
-  const result = parseContainerNode("2024/02/30");
+  const result = parsePath("2024/02/30");
   if (result.type !== "error") {
     throw new Error("expected error result");
   }
