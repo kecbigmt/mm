@@ -86,6 +86,9 @@ Deno.test("parseItem parses full snapshot payload", () => {
   assertEquals(item.data.createdAt.toString(), "2024-09-20T08:00:00.000Z");
   assertEquals(item.data.updatedAt.toString(), "2024-09-21T14:00:00.000Z");
   assertEquals(item.edges.length, 0);
+  assertEquals(item.itemEdges().length, 0);
+  assertEquals(item.containerEdges().length, 0);
+  assertEquals(item.path.toString(), item.data.id.toString());
 });
 
 Deno.test("parseItem parses edges collection", () => {
@@ -110,6 +113,8 @@ Deno.test("parseItem parses edges collection", () => {
   assertEquals(item.edges.length, 2);
   assertEquals(item.edges[0].kind, "ItemEdge");
   assertEquals(item.edges[1].kind, "ContainerEdge");
+  assertEquals(item.itemEdges().length, 1);
+  assertEquals(item.containerEdges().length, 1);
 
   const roundTrip = item.toJSON();
   assert(roundTrip.edges !== undefined, "edges should be serialized");

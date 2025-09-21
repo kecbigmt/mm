@@ -24,54 +24,63 @@ import {
   parseContainerPath,
   parseItemId,
 } from "../primitives/mod.ts";
-import { Edge, EdgeSnapshot, parseEdge } from "./edge.ts";
+import type { Node } from "./node.ts";
+import {
+  ContainerEdge,
+  Edge,
+  EdgeSnapshot,
+  isContainerEdge,
+  isItemEdge,
+  ItemEdge,
+  parseEdge,
+} from "./edge.ts";
 
 const CONTAINER_KIND = "Container" as const;
 
-export type WorkspaceRootContainer = Readonly<{
-  readonly kind: "WorkspaceRoot";
-  readonly path: ContainerPath;
-  readonly edges: ReadonlyArray<Edge>;
-}>;
+export type WorkspaceRootContainer =
+  & Node
+  & Readonly<{
+    readonly kind: "WorkspaceRoot";
+  }>;
 
-export type CalendarYearContainer = Readonly<{
-  readonly kind: "CalendarYear";
-  readonly path: ContainerPath;
-  readonly year: CalendarYear;
-  readonly edges: ReadonlyArray<Edge>;
-}>;
+export type CalendarYearContainer =
+  & Node
+  & Readonly<{
+    readonly kind: "CalendarYear";
+    readonly year: CalendarYear;
+  }>;
 
-export type CalendarMonthContainer = Readonly<{
-  readonly kind: "CalendarMonth";
-  readonly path: ContainerPath;
-  readonly year: CalendarYear;
-  readonly month: CalendarMonth;
-  readonly edges: ReadonlyArray<Edge>;
-}>;
+export type CalendarMonthContainer =
+  & Node
+  & Readonly<{
+    readonly kind: "CalendarMonth";
+    readonly year: CalendarYear;
+    readonly month: CalendarMonth;
+  }>;
 
-export type CalendarDayContainer = Readonly<{
-  readonly kind: "CalendarDay";
-  readonly path: ContainerPath;
-  readonly year: CalendarYear;
-  readonly month: CalendarMonth;
-  readonly day: CalendarDay;
-  readonly edges: ReadonlyArray<Edge>;
-}>;
+export type CalendarDayContainer =
+  & Node
+  & Readonly<{
+    readonly kind: "CalendarDay";
+    readonly year: CalendarYear;
+    readonly month: CalendarMonth;
+    readonly day: CalendarDay;
+  }>;
 
-export type ItemRootContainer = Readonly<{
-  readonly kind: "ItemRoot";
-  readonly path: ContainerPath;
-  readonly ownerId: ItemId;
-  readonly edges: ReadonlyArray<Edge>;
-}>;
+export type ItemRootContainer =
+  & Node
+  & Readonly<{
+    readonly kind: "ItemRoot";
+    readonly ownerId: ItemId;
+  }>;
 
-export type ItemNumberingContainer = Readonly<{
-  readonly kind: "ItemNumbering";
-  readonly path: ContainerPath;
-  readonly ownerId: ItemId;
-  readonly indexes: ReadonlyArray<ContainerIndex>;
-  readonly edges: ReadonlyArray<Edge>;
-}>;
+export type ItemNumberingContainer =
+  & Node
+  & Readonly<{
+    readonly kind: "ItemNumbering";
+    readonly ownerId: ItemId;
+    readonly indexes: ReadonlyArray<ContainerIndex>;
+  }>;
 
 export type Container =
   | WorkspaceRootContainer
@@ -98,14 +107,32 @@ const createError = (
 
 const freezeEdges = (edges: ReadonlyArray<Edge>): ReadonlyArray<Edge> => Object.freeze([...edges]);
 
+const createNodeCore = (
+  path: ContainerPath,
+  edges: ReadonlyArray<Edge>,
+) => {
+  const frozenEdges = freezeEdges(edges);
+  const itemEdges = Object.freeze(
+    frozenEdges.filter(isItemEdge),
+  ) as ReadonlyArray<ItemEdge>;
+  const containerEdges = Object.freeze(
+    frozenEdges.filter(isContainerEdge),
+  ) as ReadonlyArray<ContainerEdge>;
+  return {
+    path,
+    edges: frozenEdges,
+    itemEdges: () => itemEdges,
+    containerEdges: () => containerEdges,
+  } as const;
+};
+
 const instantiateWorkspaceRoot = (
   path: ContainerPath,
   edges: ReadonlyArray<Edge>,
 ): WorkspaceRootContainer =>
   Object.freeze({
     kind: "WorkspaceRoot" as const,
-    path,
-    edges: freezeEdges(edges),
+    ...createNodeCore(path, edges),
   });
 
 const instantiateCalendarYear = (
@@ -115,9 +142,8 @@ const instantiateCalendarYear = (
 ): CalendarYearContainer =>
   Object.freeze({
     kind: "CalendarYear" as const,
-    path,
     year,
-    edges: freezeEdges(edges),
+    ...createNodeCore(path, edges),
   });
 
 const instantiateCalendarMonth = (
@@ -128,10 +154,9 @@ const instantiateCalendarMonth = (
 ): CalendarMonthContainer =>
   Object.freeze({
     kind: "CalendarMonth" as const,
-    path,
     year,
     month,
-    edges: freezeEdges(edges),
+    ...createNodeCore(path, edges),
   });
 
 const instantiateCalendarDay = (
@@ -143,11 +168,10 @@ const instantiateCalendarDay = (
 ): CalendarDayContainer =>
   Object.freeze({
     kind: "CalendarDay" as const,
-    path,
     year,
     month,
     day,
-    edges: freezeEdges(edges),
+    ...createNodeCore(path, edges),
   });
 
 const instantiateItemRoot = (
@@ -157,9 +181,8 @@ const instantiateItemRoot = (
 ): ItemRootContainer =>
   Object.freeze({
     kind: "ItemRoot" as const,
-    path,
     ownerId,
-    edges: freezeEdges(edges),
+    ...createNodeCore(path, edges),
   });
 
 const instantiateItemNumbering = (
@@ -170,10 +193,9 @@ const instantiateItemNumbering = (
 ): ItemNumberingContainer =>
   Object.freeze({
     kind: "ItemNumbering" as const,
-    path,
     ownerId,
     indexes: Object.freeze([...indexes]),
-    edges: freezeEdges(edges),
+    ...createNodeCore(path, edges),
   });
 
 const prefixIssuesWithSegment = (

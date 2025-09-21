@@ -9,6 +9,7 @@ import {
   AliasSlug,
   AliasSlugValidationError,
   ContainerPath,
+  containerPathFromSegments,
   ContainerPathValidationError,
   ContextTag,
   ContextTagValidationError,
@@ -39,7 +40,16 @@ import {
   parseItemStatus,
   parseItemTitle,
 } from "../primitives/mod.ts";
-import { Edge, EdgeSnapshot, parseEdge } from "./edge.ts";
+import { Node } from "./node.ts";
+import {
+  ContainerEdge,
+  Edge,
+  EdgeSnapshot,
+  isContainerEdge,
+  isItemEdge,
+  ItemEdge,
+  parseEdge,
+} from "./edge.ts";
 
 export type ItemData = Readonly<{
   readonly id: ItemId;
@@ -59,35 +69,36 @@ export type ItemData = Readonly<{
   readonly body?: string;
 }>;
 
-export type Item = Readonly<{
-  readonly kind: "Item";
-  readonly data: ItemData;
-  readonly edges: ReadonlyArray<Edge>;
-  close(closedAt: DateTime): Item;
-  reopen(reopenedAt: DateTime): Item;
-  relocate(
-    container: ContainerPath,
-    rank: ItemRank,
-    occurredAt: DateTime,
-  ): Item;
-  retitle(title: ItemTitle, updatedAt: DateTime): Item;
-  changeIcon(icon: ItemIcon, updatedAt: DateTime): Item;
-  setBody(body: string | undefined, updatedAt: DateTime): Item;
-  schedule(
-    schedule: Readonly<{
-      startAt?: DateTime;
-      duration?: Duration;
-      dueAt?: DateTime;
-    }>,
-    updatedAt: DateTime,
-  ): Item;
-  setAlias(alias: AliasSlug | undefined, updatedAt: DateTime): Item;
-  setContext(
-    context: ContextTag | undefined,
-    updatedAt: DateTime,
-  ): Item;
-  toJSON(): ItemSnapshot;
-}>;
+export type Item =
+  & Node
+  & Readonly<{
+    readonly kind: "Item";
+    readonly data: ItemData;
+    close(closedAt: DateTime): Item;
+    reopen(reopenedAt: DateTime): Item;
+    relocate(
+      container: ContainerPath,
+      rank: ItemRank,
+      occurredAt: DateTime,
+    ): Item;
+    retitle(title: ItemTitle, updatedAt: DateTime): Item;
+    changeIcon(icon: ItemIcon, updatedAt: DateTime): Item;
+    setBody(body: string | undefined, updatedAt: DateTime): Item;
+    schedule(
+      schedule: Readonly<{
+        startAt?: DateTime;
+        duration?: Duration;
+        dueAt?: DateTime;
+      }>,
+      updatedAt: DateTime,
+    ): Item;
+    setAlias(alias: AliasSlug | undefined, updatedAt: DateTime): Item;
+    setContext(
+      context: ContextTag | undefined,
+      updatedAt: DateTime,
+    ): Item;
+    toJSON(): ItemSnapshot;
+  }>;
 
 export type ItemSnapshot = Readonly<{
   readonly id: string;
@@ -112,11 +123,32 @@ export type ItemValidationError = ValidationError<"Item">;
 
 const makeData = (data: ItemData): ItemData => Object.freeze({ ...data });
 
-const makeEdges = (edges: ReadonlyArray<Edge>): ReadonlyArray<Edge> => Object.freeze([...edges]);
+const makeEdges = (
+  edges: ReadonlyArray<Edge>,
+): Readonly<{
+  edges: ReadonlyArray<Edge>;
+  itemEdges: () => ReadonlyArray<ItemEdge>;
+  containerEdges: () => ReadonlyArray<ContainerEdge>;
+}> => {
+  const frozenEdges = Object.freeze([...edges]) as ReadonlyArray<Edge>;
+  const itemEdges = Object.freeze(
+    frozenEdges.filter(isItemEdge),
+  ) as ReadonlyArray<ItemEdge>;
+  const containerEdges = Object.freeze(
+    frozenEdges.filter(isContainerEdge),
+  ) as ReadonlyArray<ContainerEdge>;
+  return {
+    edges: frozenEdges,
+    itemEdges: () => itemEdges,
+    containerEdges: () => containerEdges,
+  } as const;
+};
 
 const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
   const frozenData = makeData(data);
-  const frozenEdges = makeEdges(edges);
+  const edgeAccess = makeEdges(edges);
+  const pathResult = containerPathFromSegments([frozenData.id.toString()]);
+  const selfPath = Result.unwrap(pathResult);
 
   const close = function (this: Item, closedAt: DateTime): Item {
     if (this.data.status.isClosed()) {
@@ -288,7 +320,10 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
   return Object.freeze({
     kind: "Item" as const,
     data: frozenData,
-    edges: frozenEdges,
+    path: selfPath,
+    edges: edgeAccess.edges,
+    itemEdges: edgeAccess.itemEdges,
+    containerEdges: edgeAccess.containerEdges,
     close,
     reopen,
     relocate,

@@ -25,6 +25,8 @@ Deno.test("parses workspace root container", () => {
   }
   assertEquals(container.path.isRoot(), true);
   assertEquals(container.edges.length, 0);
+  assertEquals(container.itemEdges().length, 0);
+  assertEquals(container.containerEdges().length, 0);
 });
 
 Deno.test("parses calendar year container", () => {
@@ -38,6 +40,8 @@ Deno.test("parses calendar year container", () => {
   }
   assertEquals(container.year.value(), 2024);
   assertEquals(container.edges.length, 0);
+  assertEquals(container.itemEdges().length, 0);
+  assertEquals(container.containerEdges().length, 0);
 });
 
 Deno.test("parses calendar month container", () => {
@@ -52,6 +56,8 @@ Deno.test("parses calendar month container", () => {
   assertEquals(container.year.value(), 2024);
   assertEquals(container.month.month(), 9);
   assertEquals(container.edges.length, 0);
+  assertEquals(container.itemEdges().length, 0);
+  assertEquals(container.containerEdges().length, 0);
 });
 
 Deno.test("parses calendar day container", () => {
@@ -67,6 +73,8 @@ Deno.test("parses calendar day container", () => {
   assertEquals(container.month.month(), 9);
   assertEquals(container.day.toString(), "2024-09-20");
   assertEquals(container.edges.length, 0);
+  assertEquals(container.itemEdges().length, 0);
+  assertEquals(container.containerEdges().length, 0);
 });
 
 Deno.test("parses item root container", () => {
@@ -80,6 +88,8 @@ Deno.test("parses item root container", () => {
   }
   assertEquals(container.ownerId.toString(), "019965a7-2789-740a-b8c1-1415904fd108");
   assertEquals(container.edges.length, 0);
+  assertEquals(container.itemEdges().length, 0);
+  assertEquals(container.containerEdges().length, 0);
 });
 
 Deno.test("parses container snapshot with edges", () => {
@@ -110,6 +120,8 @@ Deno.test("parses container snapshot with edges", () => {
   assertEquals(container.edges.length, 2);
   assertEquals(container.edges[0].kind, "ItemEdge");
   assertEquals(container.edges[1].kind, "ContainerEdge");
+  assertEquals(container.itemEdges().length, 1);
+  assertEquals(container.containerEdges().length, 1);
 });
 
 Deno.test("parses item numbering container", () => {
@@ -125,6 +137,8 @@ Deno.test("parses item numbering container", () => {
   assertEquals(container.indexes[0].value(), 1);
   assertEquals(container.indexes[1].value(), 2);
   assertEquals(container.edges.length, 0);
+  assertEquals(container.itemEdges().length, 0);
+  assertEquals(container.containerEdges().length, 0);
 });
 
 Deno.test("rejects invalid numbering segment", () => {

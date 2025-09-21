@@ -18,7 +18,7 @@ import { CalendarDay } from "../primitives/calendar_day.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { ContainerRepository } from "../repositories/container_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
-import { createItemEdge, Edge, isContainerEdge, isItemEdge } from "../models/edge.ts";
+import { createItemEdge, Edge } from "../models/edge.ts";
 import { RankService } from "../services/rank_service.ts";
 import { IdGenerationService } from "../services/id_generation_service.ts";
 
@@ -146,7 +146,7 @@ export const CreateItemWorkflow = {
     }
     const container = ensureResult.value;
 
-    const existingItemEdges = container.edges.filter(isItemEdge);
+    const existingItemEdges = container.itemEdges();
 
     let rankResult: Result<ItemRank, CreateItemError>;
     if (existingItemEdges.length === 0) {
@@ -200,7 +200,7 @@ export const CreateItemWorkflow = {
       return Result.error(repositoryFailure(saveResult.error));
     }
 
-    const containerEdges = container.edges.filter(isContainerEdge);
+    const containerEdges = container.containerEdges();
     const newItemEdge = createItemEdge(resolvedId, rankResult.value);
     const updatedItemEdges = [...existingItemEdges, newItemEdge].sort((a, b) =>
       deps.rankService.compareRanks(a.data.rank, b.data.rank)
