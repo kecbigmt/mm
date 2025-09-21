@@ -19,7 +19,7 @@ import {
 } from "../../domain/services/id_generation_service.ts";
 import { createUuidV7Generator } from "../../infrastructure/uuid/generator.ts";
 import { WorkspaceName, workspaceNameFromString } from "../../domain/primitives/workspace_name.ts";
-import { createWorkspaceConfigRepository } from "../../infrastructure/fileSystem/workspace_config_repository.ts";
+import { createFileSystemConfigRepository } from "../../infrastructure/fileSystem/config_repository.ts";
 
 export type CliDependencies = Readonly<{
   readonly root: string;
@@ -116,7 +116,7 @@ const determineWorkspaceFromName = async (
 const determineWorkspaceRoot = async (
   workspacePath: string | undefined,
   repository: WorkspaceRepository,
-  configRepository: ReturnType<typeof createWorkspaceConfigRepository>,
+  configRepository: ReturnType<typeof createFileSystemConfigRepository>,
 ): Promise<Result<string, CliDependencyError>> => {
   const explicit = normalizePathInput(workspacePath);
   if (explicit) {
@@ -182,7 +182,7 @@ export const loadCliDependencies = async (
   const home = homeResult.value;
 
   const workspaceRepository = createFileSystemWorkspaceRepository({ home });
-  const configRepository = createWorkspaceConfigRepository({ home });
+  const configRepository = createFileSystemConfigRepository({ home });
 
   const rootResult = await determineWorkspaceRoot(
     workspacePath,

@@ -2,7 +2,7 @@ import { Command } from "@cliffy/command";
 import { Result } from "../../../shared/result.ts";
 import { resolveMmHome } from "../dependencies.ts";
 import { workspaceNameFromString } from "../../../domain/primitives/workspace_name.ts";
-import { createWorkspaceConfigRepository } from "../../../infrastructure/fileSystem/workspace_config_repository.ts";
+import { createFileSystemConfigRepository } from "../../../infrastructure/fileSystem/config_repository.ts";
 import { createFileSystemWorkspaceRepository } from "../../../infrastructure/fileSystem/workspace_repository.ts";
 import { parseTimezoneIdentifier } from "../../../domain/primitives/timezone_identifier.ts";
 import { CliDependencyError } from "../dependencies.ts";
@@ -24,7 +24,7 @@ const resolveEnvironment = () => {
   return Result.ok({
     home,
     repository: createFileSystemWorkspaceRepository({ home }),
-    config: createWorkspaceConfigRepository({ home }),
+    config: createFileSystemConfigRepository({ home }),
   });
 };
 

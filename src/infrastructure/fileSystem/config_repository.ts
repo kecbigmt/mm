@@ -2,24 +2,20 @@ import { dirname, join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
-
-type WorkspaceConfig = Readonly<{
-  readonly currentWorkspace?: string;
-}>;
-
-export type WorkspaceConfigRepository = Readonly<{
-  getCurrentWorkspace(): Promise<Result<string | undefined, RepositoryError>>;
-  setCurrentWorkspace(name: string): Promise<Result<void, RepositoryError>>;
-}>;
+import { ConfigRepository } from "../../domain/repositories/config_repository.ts";
 
 const CONFIG_FILE_NAME = "config.json";
 
+type ConfigSnapshot = Readonly<{
+  readonly currentWorkspace?: string;
+}>;
+
 const readConfig = async (
   path: string,
-): Promise<Result<WorkspaceConfig | undefined, RepositoryError>> => {
+): Promise<Result<ConfigSnapshot | undefined, RepositoryError>> => {
   try {
     const text = await Deno.readTextFile(path);
-    const data = JSON.parse(text) as WorkspaceConfig;
+    const data = JSON.parse(text) as ConfigSnapshot;
     return Result.ok(data);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
@@ -27,13 +23,13 @@ const readConfig = async (
     }
     if (error instanceof SyntaxError) {
       return Result.error(
-        createRepositoryError("workspace", "load", "workspace config contains invalid JSON", {
+        createRepositoryError("config", "load", "config file contains invalid JSON", {
           cause: error,
         }),
       );
     }
     return Result.error(
-      createRepositoryError("workspace", "load", "failed to read workspace config", {
+      createRepositoryError("config", "load", "failed to read config file", {
         cause: error,
       }),
     );
@@ -42,14 +38,14 @@ const readConfig = async (
 
 const writeConfig = async (
   path: string,
-  config: WorkspaceConfig,
+  config: ConfigSnapshot,
 ): Promise<Result<void, RepositoryError>> => {
   try {
     await Deno.mkdir(dirname(path), { recursive: true });
   } catch (error) {
     if (!(error instanceof Deno.errors.AlreadyExists)) {
       return Result.error(
-        createRepositoryError("workspace", "save", "failed to prepare workspace config directory", {
+        createRepositoryError("config", "save", "failed to prepare config directory", {
           cause: error,
         }),
       );
@@ -62,16 +58,16 @@ const writeConfig = async (
     return Result.ok(undefined);
   } catch (error) {
     return Result.error(
-      createRepositoryError("workspace", "save", "failed to write workspace config", {
+      createRepositoryError("config", "save", "failed to write config file", {
         cause: error,
       }),
     );
   }
 };
 
-export const createWorkspaceConfigRepository = (
+export const createFileSystemConfigRepository = (
   options: Readonly<{ readonly home: string }>,
-): WorkspaceConfigRepository => {
+): ConfigRepository => {
   const configPath = join(options.home, CONFIG_FILE_NAME);
 
   const getCurrentWorkspace = async (): Promise<Result<string | undefined, RepositoryError>> => {
@@ -90,7 +86,7 @@ export const createWorkspaceConfigRepository = (
       return configResult;
     }
 
-    const nextConfig: WorkspaceConfig = { currentWorkspace: name };
+    const nextConfig: ConfigSnapshot = { currentWorkspace: name };
     return await writeConfig(configPath, nextConfig);
   };
 
