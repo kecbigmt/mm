@@ -2,7 +2,9 @@
   "tasks": {
     "start": "deno run src/main.ts",
     "dev": "deno run --watch src/main.ts",
-    "test": "deno test --allow-read --allow-write"
+    "test": "deno test --allow-read --allow-write",
+    "compile": "deno compile --config=deno.json --allow-read --allow-write --allow-env --output=mm src/main.ts",
+    "install": "deno install --global --config=deno.json --allow-read --allow-write --allow-env --force --name mm src/main.ts"
   },
   "compilerOptions": {
     "strict": true

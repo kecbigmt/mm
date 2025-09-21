@@ -12,6 +12,8 @@ deno task dev
 
 Use `deno task test` to run the full unit test suite.
 
+Build a standalone binary with `deno task compile`, or install the CLI globally via `deno task install`.
+
 ## Documentation
 
 Domain and product design notes live in `docs/steering/design.md`.
