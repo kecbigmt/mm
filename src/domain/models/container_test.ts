@@ -1,6 +1,6 @@
-import { parseContainerNode } from "./container_node.ts";
+import { parseContainer } from "./container.ts";
 
-const parsePath = (path: string) => parseContainerNode({ path, edges: [] });
+const parsePath = (path: string) => parseContainer({ path, edges: [] });
 
 const assertEquals = <T>(actual: T, expected: T, message?: string): void => {
   if (actual !== expected) {
@@ -19,12 +19,12 @@ Deno.test("parses workspace root container", () => {
   if (result.type !== "ok") {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
-  const node = result.value;
-  if (node.kind !== "WorkspaceRoot") {
-    throw new Error(`expected WorkspaceRoot, got ${node.kind}`);
+  const container = result.value;
+  if (container.kind !== "WorkspaceRoot") {
+    throw new Error(`expected WorkspaceRoot, got ${container.kind}`);
   }
-  assertEquals(node.path.isRoot(), true);
-  assertEquals(node.edges.length, 0);
+  assertEquals(container.path.isRoot(), true);
+  assertEquals(container.edges.length, 0);
 });
 
 Deno.test("parses calendar year container", () => {
@@ -32,12 +32,12 @@ Deno.test("parses calendar year container", () => {
   if (result.type !== "ok") {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
-  const node = result.value;
-  if (node.kind !== "CalendarYear") {
-    throw new Error(`expected CalendarYear, got ${node.kind}`);
+  const container = result.value;
+  if (container.kind !== "CalendarYear") {
+    throw new Error(`expected CalendarYear, got ${container.kind}`);
   }
-  assertEquals(node.year.value(), 2024);
-  assertEquals(node.edges.length, 0);
+  assertEquals(container.year.value(), 2024);
+  assertEquals(container.edges.length, 0);
 });
 
 Deno.test("parses calendar month container", () => {
@@ -45,13 +45,13 @@ Deno.test("parses calendar month container", () => {
   if (result.type !== "ok") {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
-  const node = result.value;
-  if (node.kind !== "CalendarMonth") {
-    throw new Error(`expected CalendarMonth, got ${node.kind}`);
+  const container = result.value;
+  if (container.kind !== "CalendarMonth") {
+    throw new Error(`expected CalendarMonth, got ${container.kind}`);
   }
-  assertEquals(node.year.value(), 2024);
-  assertEquals(node.month.month(), 9);
-  assertEquals(node.edges.length, 0);
+  assertEquals(container.year.value(), 2024);
+  assertEquals(container.month.month(), 9);
+  assertEquals(container.edges.length, 0);
 });
 
 Deno.test("parses calendar day container", () => {
@@ -59,14 +59,14 @@ Deno.test("parses calendar day container", () => {
   if (result.type !== "ok") {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
-  const node = result.value;
-  if (node.kind !== "CalendarDay") {
-    throw new Error(`expected CalendarDay, got ${node.kind}`);
+  const container = result.value;
+  if (container.kind !== "CalendarDay") {
+    throw new Error(`expected CalendarDay, got ${container.kind}`);
   }
-  assertEquals(node.year.value(), 2024);
-  assertEquals(node.month.month(), 9);
-  assertEquals(node.day.toString(), "2024-09-20");
-  assertEquals(node.edges.length, 0);
+  assertEquals(container.year.value(), 2024);
+  assertEquals(container.month.month(), 9);
+  assertEquals(container.day.toString(), "2024-09-20");
+  assertEquals(container.edges.length, 0);
 });
 
 Deno.test("parses item root container", () => {
@@ -74,16 +74,16 @@ Deno.test("parses item root container", () => {
   if (result.type !== "ok") {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
-  const node = result.value;
-  if (node.kind !== "ItemRoot") {
-    throw new Error(`expected ItemRoot, got ${node.kind}`);
+  const container = result.value;
+  if (container.kind !== "ItemRoot") {
+    throw new Error(`expected ItemRoot, got ${container.kind}`);
   }
-  assertEquals(node.ownerId.toString(), "019965a7-2789-740a-b8c1-1415904fd108");
-  assertEquals(node.edges.length, 0);
+  assertEquals(container.ownerId.toString(), "019965a7-2789-740a-b8c1-1415904fd108");
+  assertEquals(container.edges.length, 0);
 });
 
 Deno.test("parses container snapshot with edges", () => {
-  const result = parseContainerNode({
+  const result = parseContainer({
     path: "019965a7-2789-740a-b8c1-1415904fd108/0001",
     edges: [
       {
@@ -103,13 +103,13 @@ Deno.test("parses container snapshot with edges", () => {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
 
-  const node = result.value;
-  if (node.kind !== "ItemNumbering") {
-    throw new Error(`expected ItemNumbering, got ${node.kind}`);
+  const container = result.value;
+  if (container.kind !== "ItemNumbering") {
+    throw new Error(`expected ItemNumbering, got ${container.kind}`);
   }
-  assertEquals(node.edges.length, 2);
-  assertEquals(node.edges[0].kind, "ItemEdge");
-  assertEquals(node.edges[1].kind, "ContainerEdge");
+  assertEquals(container.edges.length, 2);
+  assertEquals(container.edges[0].kind, "ItemEdge");
+  assertEquals(container.edges[1].kind, "ContainerEdge");
 });
 
 Deno.test("parses item numbering container", () => {
@@ -117,14 +117,14 @@ Deno.test("parses item numbering container", () => {
   if (result.type !== "ok") {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
-  const node = result.value;
-  if (node.kind !== "ItemNumbering") {
-    throw new Error(`expected ItemNumbering, got ${node.kind}`);
+  const container = result.value;
+  if (container.kind !== "ItemNumbering") {
+    throw new Error(`expected ItemNumbering, got ${container.kind}`);
   }
-  assertEquals(node.indexes.length, 2);
-  assertEquals(node.indexes[0].value(), 1);
-  assertEquals(node.indexes[1].value(), 2);
-  assertEquals(node.edges.length, 0);
+  assertEquals(container.indexes.length, 2);
+  assertEquals(container.indexes[0].value(), 1);
+  assertEquals(container.indexes[1].value(), 2);
+  assertEquals(container.edges.length, 0);
 });
 
 Deno.test("rejects invalid numbering segment", () => {

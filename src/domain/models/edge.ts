@@ -10,14 +10,14 @@ import {
   ContainerIndexValidationError,
   ContainerPath,
   ContainerPathValidationError,
-  NodeId,
-  NodeIdValidationError,
-  NodeRank,
-  NodeRankValidationError,
+  ItemId,
+  ItemIdValidationError,
+  ItemRank,
+  ItemRankValidationError,
   parseContainerIndex,
   parseContainerPath,
-  parseNodeId,
-  parseNodeRank,
+  parseItemId,
+  parseItemRank,
 } from "../primitives/mod.ts";
 
 const CONTAINER_EDGE_KIND = "ContainerEdge" as const;
@@ -30,8 +30,8 @@ type ContainerEdgeData = Readonly<{
 }>;
 
 type ItemEdgeData = Readonly<{
-  readonly to: NodeId;
-  readonly rank: NodeRank;
+  readonly to: ItemId;
+  readonly rank: ItemRank;
 }>;
 
 export type ContainerEdge = Readonly<{
@@ -101,8 +101,8 @@ const prefixIssues = (
   error:
     | ContainerPathValidationError
     | ContainerIndexValidationError
-    | NodeIdValidationError
-    | NodeRankValidationError,
+    | ItemIdValidationError
+    | ItemRankValidationError,
 ): ValidationIssue[] =>
   error.issues.map((issue) =>
     createValidationIssue(issue.message, {
@@ -117,8 +117,8 @@ export const createContainerEdge = (
 ): ContainerEdge => instantiateContainerEdge({ to, index });
 
 export const createItemEdge = (
-  to: NodeId,
-  rank: NodeRank,
+  to: ItemId,
+  rank: ItemRank,
 ): ItemEdge => instantiateItemEdge({ to, rank });
 
 export const parseContainerEdge = (
@@ -190,9 +190,9 @@ export const parseItemEdge = (
   const snapshot = input as ItemEdgeSnapshot;
   const issues: ValidationIssue[] = [];
 
-  let to: NodeId | undefined;
+  let to: ItemId | undefined;
   if ("to" in snapshot) {
-    const result = parseNodeId(snapshot.to);
+    const result = parseItemId(snapshot.to);
     if (result.type === "error") {
       issues.push(...prefixIssues("to", result.error));
     } else {
@@ -207,9 +207,9 @@ export const parseItemEdge = (
     );
   }
 
-  let rank: NodeRank | undefined;
+  let rank: ItemRank | undefined;
   if ("rank" in snapshot) {
-    const result = parseNodeRank(snapshot.rank);
+    const result = parseItemRank(snapshot.rank);
     if (result.type === "error") {
       issues.push(...prefixIssues("rank", result.error));
     } else {

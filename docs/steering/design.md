@@ -2,8 +2,9 @@
 
 mm is a personal knowledgement CLI tool with built-in MCP server.
 
-It has a local-files PKM system unifying GTD / Bullet Journal / Zettelkasten via a single **Node**
-model, stored as plain Markdown + JSON, Git-friendly. Items are created under a date container
+It has a local-files PKM system unifying GTD / Bullet Journal / Zettelkasten around concise
+vocabulary: people interact with **Items** that live inside **Containers**, while the code models
+their union as a single Node algebraic data type. Items are created under a date container
 (Calendar), never moved physically; “moves” are reference (edge) relocations.
 
 ## 2) Goals / Non-Goals
@@ -11,7 +12,7 @@ model, stored as plain Markdown + JSON, Git-friendly. Items are created under a 
 **Goals**
 
 - Simple diffs, conflict-resistant Git workflow.
-- One mental model: Node (Container/Item), single active placement per Item.
+- One mental model: Item inside a Container, single active placement per Item.
 - Fast navigation by date, numbering paths, or aliases.
 - Deterministic ordering via ranks (LexoRank).
 
@@ -23,12 +24,12 @@ model, stored as plain Markdown + JSON, Git-friendly. Items are created under a 
 
 ## 3) Core Concepts
 
-### Node (abstract)
+### Node (domain core)
 
 - Has 0 or 1 parent Node.
-- Two concrete kinds: **ContainerNode**, **ItemNode**.
+- Two concrete kinds in code: `Container` and `Item`.
 
-### ContainerNode
+### Container (user vocabulary)
 
 - No content “body”; acts as a fixed **place** to hold Nodes.
 - Not movable; addressed by a **path**.
@@ -37,7 +38,7 @@ model, stored as plain Markdown + JSON, Git-friendly. Items are created under a 
 - **Top level of the graph is Calendar (year/month/day)**; Items are initially stored under their
   creation date.
 
-### ItemNode
+### Item
 
 - Must have exactly **one current parent container**.
 - Has content: `content.md` and `meta.json`.
@@ -71,22 +72,22 @@ model, stored as plain Markdown + JSON, Git-friendly. Items are created under a 
           <uuid>.edge.json                # child edge (Item → Item), e.g. { rank }
           ...
           0001/                           # numbering segment "1"
-            <uuid>.edge.json              # { schema, node_id?, rank }
+            <uuid>.edge.json              # { schema, item_id?, rank }
             0002/                         # numbering "1-2"
               <uuid>.edge.json
           0002/
             <uuid>.edge.json
           ...
   aliases/
-    <slug>.alias.json                     # { schema, node_id: "<uuidv7>", created_at }
+    <slug>.alias.json                     # { schema, item_id: "<uuidv7>", created_at }
   contexts/
     <slug>.context.json                   # { schema, description, created_at }
 ```
 
 **Edge files**
 
-- File name is `<target-id>.edge.json`. The target id is therefore known from the filename;
-  `node_id` inside JSON is optional (if present, must match).
+- File name is `<target-id>.edge.json`. The target id is therefore known from the filename; an
+  optional `item_id` entry inside JSON must match when present.
 - `rank` orders children **within that container/segment**.
 
 **Mixing is allowed** within `edges/`: direct child edges and numbering subfolders (e.g.,
@@ -110,7 +111,7 @@ model, stored as plain Markdown + JSON, Git-friendly. Items are created under a 
 
 ## 7) Aliases & Contexts
 
-- **Alias**: human-friendly slug → `node_id` mapping (ASCII slug recommended).
+- **Alias**: human-friendly slug → `item_id` mapping (ASCII slug recommended).
 - **Context**: metadata for filtering (e.g., `github.context.json`).
 
 ## 8) Time & Ranges

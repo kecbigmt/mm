@@ -18,36 +18,36 @@ import {
   DurationValidationError,
   ItemIcon,
   ItemIconValidationError,
+  ItemId,
+  ItemIdValidationError,
+  ItemRank,
+  ItemRankValidationError,
   ItemStatus,
   itemStatusClosed,
   itemStatusOpen,
   ItemStatusValidationError,
-  NodeId,
-  NodeIdValidationError,
-  NodeRank,
-  NodeRankValidationError,
-  NodeTitle,
-  NodeTitleValidationError,
+  ItemTitle,
+  ItemTitleValidationError,
   parseAliasSlug,
   parseContainerPath,
   parseContextTag,
   parseDateTime,
   parseDuration,
   parseItemIcon,
+  parseItemId,
+  parseItemRank,
   parseItemStatus,
-  parseNodeId,
-  parseNodeRank,
-  parseNodeTitle,
+  parseItemTitle,
 } from "../primitives/mod.ts";
 import { Edge, EdgeSnapshot, parseEdge } from "./edge.ts";
 
-export type ItemNodeData = Readonly<{
-  readonly id: NodeId;
-  readonly title: NodeTitle;
+export type ItemData = Readonly<{
+  readonly id: ItemId;
+  readonly title: ItemTitle;
   readonly icon: ItemIcon;
   readonly status: ItemStatus;
   readonly container: ContainerPath;
-  readonly rank: NodeRank;
+  readonly rank: ItemRank;
   readonly createdAt: DateTime;
   readonly updatedAt: DateTime;
   readonly closedAt?: DateTime;
@@ -59,20 +59,20 @@ export type ItemNodeData = Readonly<{
   readonly body?: string;
 }>;
 
-export type ItemNode = Readonly<{
-  readonly kind: "ItemNode";
-  readonly data: ItemNodeData;
+export type Item = Readonly<{
+  readonly kind: "Item";
+  readonly data: ItemData;
   readonly edges: ReadonlyArray<Edge>;
-  close(closedAt: DateTime): ItemNode;
-  reopen(reopenedAt: DateTime): ItemNode;
+  close(closedAt: DateTime): Item;
+  reopen(reopenedAt: DateTime): Item;
   relocate(
     container: ContainerPath,
-    rank: NodeRank,
+    rank: ItemRank,
     occurredAt: DateTime,
-  ): ItemNode;
-  retitle(title: NodeTitle, updatedAt: DateTime): ItemNode;
-  changeIcon(icon: ItemIcon, updatedAt: DateTime): ItemNode;
-  setBody(body: string | undefined, updatedAt: DateTime): ItemNode;
+  ): Item;
+  retitle(title: ItemTitle, updatedAt: DateTime): Item;
+  changeIcon(icon: ItemIcon, updatedAt: DateTime): Item;
+  setBody(body: string | undefined, updatedAt: DateTime): Item;
   schedule(
     schedule: Readonly<{
       startAt?: DateTime;
@@ -80,16 +80,16 @@ export type ItemNode = Readonly<{
       dueAt?: DateTime;
     }>,
     updatedAt: DateTime,
-  ): ItemNode;
-  setAlias(alias: AliasSlug | undefined, updatedAt: DateTime): ItemNode;
+  ): Item;
+  setAlias(alias: AliasSlug | undefined, updatedAt: DateTime): Item;
   setContext(
     context: ContextTag | undefined,
     updatedAt: DateTime,
-  ): ItemNode;
-  toJSON(): ItemNodeSnapshot;
+  ): Item;
+  toJSON(): ItemSnapshot;
 }>;
 
-export type ItemNodeSnapshot = Readonly<{
+export type ItemSnapshot = Readonly<{
   readonly id: string;
   readonly title: string;
   readonly icon: string;
@@ -108,17 +108,17 @@ export type ItemNodeSnapshot = Readonly<{
   readonly edges?: ReadonlyArray<EdgeSnapshot>;
 }>;
 
-export type ItemNodeValidationError = ValidationError<"ItemNode">;
+export type ItemValidationError = ValidationError<"Item">;
 
-const makeData = (data: ItemNodeData): ItemNodeData => Object.freeze({ ...data });
+const makeData = (data: ItemData): ItemData => Object.freeze({ ...data });
 
 const makeEdges = (edges: ReadonlyArray<Edge>): ReadonlyArray<Edge> => Object.freeze([...edges]);
 
-const instantiate = (data: ItemNodeData, edges: ReadonlyArray<Edge>): ItemNode => {
+const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
   const frozenData = makeData(data);
   const frozenEdges = makeEdges(edges);
 
-  const close = function (this: ItemNode, closedAt: DateTime): ItemNode {
+  const close = function (this: Item, closedAt: DateTime): Item {
     if (this.data.status.isClosed()) {
       return this;
     }
@@ -130,7 +130,7 @@ const instantiate = (data: ItemNodeData, edges: ReadonlyArray<Edge>): ItemNode =
     }, this.edges);
   };
 
-  const reopen = function (this: ItemNode, reopenedAt: DateTime): ItemNode {
+  const reopen = function (this: Item, reopenedAt: DateTime): Item {
     if (this.data.status.isOpen() && !this.data.closedAt) {
       return this;
     }
@@ -143,11 +143,11 @@ const instantiate = (data: ItemNodeData, edges: ReadonlyArray<Edge>): ItemNode =
   };
 
   const relocate = function (
-    this: ItemNode,
+    this: Item,
     container: ContainerPath,
-    rank: NodeRank,
+    rank: ItemRank,
     occurredAt: DateTime,
-  ): ItemNode {
+  ): Item {
     const sameContainer = this.data.container.toString() === container.toString();
     const sameRank = this.data.rank.compare(rank) === 0;
     if (sameContainer && sameRank) {
@@ -162,10 +162,10 @@ const instantiate = (data: ItemNodeData, edges: ReadonlyArray<Edge>): ItemNode =
   };
 
   const retitle = function (
-    this: ItemNode,
-    title: NodeTitle,
+    this: Item,
+    title: ItemTitle,
     updatedAt: DateTime,
-  ): ItemNode {
+  ): Item {
     if (this.data.title.toString() === title.toString()) {
       return this;
     }
@@ -177,10 +177,10 @@ const instantiate = (data: ItemNodeData, edges: ReadonlyArray<Edge>): ItemNode =
   };
 
   const changeIcon = function (
-    this: ItemNode,
+    this: Item,
     icon: ItemIcon,
     updatedAt: DateTime,
-  ): ItemNode {
+  ): Item {
     if (this.data.icon.toString() === icon.toString()) {
       return this;
     }
@@ -192,10 +192,10 @@ const instantiate = (data: ItemNodeData, edges: ReadonlyArray<Edge>): ItemNode =
   };
 
   const setBody = function (
-    this: ItemNode,
+    this: Item,
     body: string | undefined,
     updatedAt: DateTime,
-  ): ItemNode {
+  ): Item {
     let normalized: string | undefined;
     if (typeof body === "string") {
       const trimmed = body.trim();
@@ -212,29 +212,29 @@ const instantiate = (data: ItemNodeData, edges: ReadonlyArray<Edge>): ItemNode =
   };
 
   const schedule = function (
-    this: ItemNode,
+    this: Item,
     schedule: Readonly<{
       startAt?: DateTime;
       duration?: Duration;
       dueAt?: DateTime;
     }>,
     updatedAt: DateTime,
-  ): ItemNode {
+  ): Item {
     const next = {
       ...this.data,
       startAt: schedule.startAt,
       duration: schedule.duration,
       dueAt: schedule.dueAt,
       updatedAt,
-    } as ItemNodeData;
+    } as ItemData;
     return instantiate(next, this.edges);
   };
 
   const setAlias = function (
-    this: ItemNode,
+    this: Item,
     alias: AliasSlug | undefined,
     updatedAt: DateTime,
-  ): ItemNode {
+  ): Item {
     const current = this.data.alias?.toString();
     const next = alias?.toString();
     if (current === next) {
@@ -248,10 +248,10 @@ const instantiate = (data: ItemNodeData, edges: ReadonlyArray<Edge>): ItemNode =
   };
 
   const setContext = function (
-    this: ItemNode,
+    this: Item,
     context: ContextTag | undefined,
     updatedAt: DateTime,
-  ): ItemNode {
+  ): Item {
     const current = this.data.context?.toString();
     const next = context?.toString();
     if (current === next) {
@@ -264,7 +264,7 @@ const instantiate = (data: ItemNodeData, edges: ReadonlyArray<Edge>): ItemNode =
     }, this.edges);
   };
 
-  const toJSON = function (this: ItemNode): ItemNodeSnapshot {
+  const toJSON = function (this: Item): ItemSnapshot {
     return {
       id: this.data.id.toString(),
       title: this.data.title.toString(),
@@ -286,7 +286,7 @@ const instantiate = (data: ItemNodeData, edges: ReadonlyArray<Edge>): ItemNode =
   };
 
   return Object.freeze({
-    kind: "ItemNode" as const,
+    kind: "Item" as const,
     data: frozenData,
     edges: frozenEdges,
     close,
@@ -309,9 +309,9 @@ const prefixIssues = (
     | ItemIconValidationError
     | AliasSlugValidationError
     | ContainerPathValidationError
-    | NodeRankValidationError
-    | NodeTitleValidationError
-    | NodeIdValidationError
+    | ItemRankValidationError
+    | ItemTitleValidationError
+    | ItemIdValidationError
     | DateTimeValidationError
     | DurationValidationError
     | ContextTagValidationError,
@@ -323,23 +323,23 @@ const prefixIssues = (
     })
   );
 
-export const createItemNode = (
-  data: ItemNodeData,
+export const createItem = (
+  data: ItemData,
   edges: ReadonlyArray<Edge> = [],
-): ItemNode => instantiate(data, edges);
+): Item => instantiate(data, edges);
 
-export const parseItemNode = (
-  snapshot: ItemNodeSnapshot,
-): Result<ItemNode, ItemNodeValidationError> => {
+export const parseItem = (
+  snapshot: ItemSnapshot,
+): Result<Item, ItemValidationError> => {
   const issues: ValidationIssue[] = [];
   const edges: Edge[] = [];
 
-  const idResult = parseNodeId(snapshot.id);
-  const titleResult = parseNodeTitle(snapshot.title);
+  const idResult = parseItemId(snapshot.id);
+  const titleResult = parseItemTitle(snapshot.title);
   const iconResult = parseItemIcon(snapshot.icon);
   const statusResult = parseItemStatus(snapshot.status);
   const containerResult = parseContainerPath(snapshot.container);
-  const rankResult = parseNodeRank(snapshot.rank);
+  const rankResult = parseItemRank(snapshot.rank);
   const createdAtResult = parseDateTime(snapshot.createdAt);
   const updatedAtResult = parseDateTime(snapshot.updatedAt);
 
@@ -447,7 +447,7 @@ export const parseItemNode = (
   }
 
   if (issues.length > 0) {
-    return Result.error(createValidationError("ItemNode", issues));
+    return Result.error(createValidationError("Item", issues));
   }
 
   const id = Result.unwrap(idResult);
@@ -459,7 +459,7 @@ export const parseItemNode = (
   const createdAt = Result.unwrap(createdAtResult);
   const updatedAt = Result.unwrap(updatedAtResult);
 
-  const data: ItemNodeData = {
+  const data: ItemData = {
     id,
     title,
     icon,

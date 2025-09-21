@@ -18,30 +18,30 @@ import {
   ContainerIndexValidationError,
   ContainerPath,
   ContainerPathValidationError,
-  NodeId,
+  ItemId,
   parseCalendarYear,
   parseContainerIndex,
   parseContainerPath,
-  parseNodeId,
+  parseItemId,
 } from "../primitives/mod.ts";
 import { Edge, EdgeSnapshot, parseEdge } from "./edge.ts";
 
-const CONTAINER_NODE_KIND = "ContainerNode" as const;
+const CONTAINER_KIND = "Container" as const;
 
-export type WorkspaceRootContainerNode = Readonly<{
+export type WorkspaceRootContainer = Readonly<{
   readonly kind: "WorkspaceRoot";
   readonly path: ContainerPath;
   readonly edges: ReadonlyArray<Edge>;
 }>;
 
-export type CalendarYearContainerNode = Readonly<{
+export type CalendarYearContainer = Readonly<{
   readonly kind: "CalendarYear";
   readonly path: ContainerPath;
   readonly year: CalendarYear;
   readonly edges: ReadonlyArray<Edge>;
 }>;
 
-export type CalendarMonthContainerNode = Readonly<{
+export type CalendarMonthContainer = Readonly<{
   readonly kind: "CalendarMonth";
   readonly path: ContainerPath;
   readonly year: CalendarYear;
@@ -49,7 +49,7 @@ export type CalendarMonthContainerNode = Readonly<{
   readonly edges: ReadonlyArray<Edge>;
 }>;
 
-export type CalendarDayContainerNode = Readonly<{
+export type CalendarDayContainer = Readonly<{
   readonly kind: "CalendarDay";
   readonly path: ContainerPath;
   readonly year: CalendarYear;
@@ -58,35 +58,35 @@ export type CalendarDayContainerNode = Readonly<{
   readonly edges: ReadonlyArray<Edge>;
 }>;
 
-export type ItemRootContainerNode = Readonly<{
+export type ItemRootContainer = Readonly<{
   readonly kind: "ItemRoot";
   readonly path: ContainerPath;
-  readonly ownerId: NodeId;
+  readonly ownerId: ItemId;
   readonly edges: ReadonlyArray<Edge>;
 }>;
 
-export type ItemNumberingContainerNode = Readonly<{
+export type ItemNumberingContainer = Readonly<{
   readonly kind: "ItemNumbering";
   readonly path: ContainerPath;
-  readonly ownerId: NodeId;
+  readonly ownerId: ItemId;
   readonly indexes: ReadonlyArray<ContainerIndex>;
   readonly edges: ReadonlyArray<Edge>;
 }>;
 
-export type ContainerNode =
-  | WorkspaceRootContainerNode
-  | CalendarYearContainerNode
-  | CalendarMonthContainerNode
-  | CalendarDayContainerNode
-  | ItemRootContainerNode
-  | ItemNumberingContainerNode;
+export type Container =
+  | WorkspaceRootContainer
+  | CalendarYearContainer
+  | CalendarMonthContainer
+  | CalendarDayContainer
+  | ItemRootContainer
+  | ItemNumberingContainer;
 
-export type ContainerNodeSnapshot = Readonly<{
+export type ContainerSnapshot = Readonly<{
   readonly path: string;
   readonly edges: ReadonlyArray<EdgeSnapshot>;
 }>;
 
-export type ContainerNodeValidationError = ValidationError<typeof CONTAINER_NODE_KIND>;
+export type ContainerValidationError = ValidationError<typeof CONTAINER_KIND>;
 
 const NUMBERING_SEGMENT_REGEX = /^\d{4}$/;
 const MONTH_SEGMENT_REGEX = /^\d{2}$/;
@@ -94,14 +94,14 @@ const DAY_SEGMENT_REGEX = /^\d{2}$/;
 
 const createError = (
   issues: ReadonlyArray<ValidationIssue>,
-): ContainerNodeValidationError => createValidationError(CONTAINER_NODE_KIND, issues);
+): ContainerValidationError => createValidationError(CONTAINER_KIND, issues);
 
 const freezeEdges = (edges: ReadonlyArray<Edge>): ReadonlyArray<Edge> => Object.freeze([...edges]);
 
 const instantiateWorkspaceRoot = (
   path: ContainerPath,
   edges: ReadonlyArray<Edge>,
-): WorkspaceRootContainerNode =>
+): WorkspaceRootContainer =>
   Object.freeze({
     kind: "WorkspaceRoot" as const,
     path,
@@ -112,7 +112,7 @@ const instantiateCalendarYear = (
   path: ContainerPath,
   year: CalendarYear,
   edges: ReadonlyArray<Edge>,
-): CalendarYearContainerNode =>
+): CalendarYearContainer =>
   Object.freeze({
     kind: "CalendarYear" as const,
     path,
@@ -125,7 +125,7 @@ const instantiateCalendarMonth = (
   year: CalendarYear,
   month: CalendarMonth,
   edges: ReadonlyArray<Edge>,
-): CalendarMonthContainerNode =>
+): CalendarMonthContainer =>
   Object.freeze({
     kind: "CalendarMonth" as const,
     path,
@@ -140,7 +140,7 @@ const instantiateCalendarDay = (
   month: CalendarMonth,
   day: CalendarDay,
   edges: ReadonlyArray<Edge>,
-): CalendarDayContainerNode =>
+): CalendarDayContainer =>
   Object.freeze({
     kind: "CalendarDay" as const,
     path,
@@ -152,9 +152,9 @@ const instantiateCalendarDay = (
 
 const instantiateItemRoot = (
   path: ContainerPath,
-  ownerId: NodeId,
+  ownerId: ItemId,
   edges: ReadonlyArray<Edge>,
-): ItemRootContainerNode =>
+): ItemRootContainer =>
   Object.freeze({
     kind: "ItemRoot" as const,
     path,
@@ -164,10 +164,10 @@ const instantiateItemRoot = (
 
 const instantiateItemNumbering = (
   path: ContainerPath,
-  ownerId: NodeId,
+  ownerId: ItemId,
   indexes: ReadonlyArray<ContainerIndex>,
   edges: ReadonlyArray<Edge>,
-): ItemNumberingContainerNode =>
+): ItemNumberingContainer =>
   Object.freeze({
     kind: "ItemNumbering" as const,
     path,
@@ -227,7 +227,7 @@ const mapContainerPathError = (
 
 const parseEdges = (
   snapshots: ReadonlyArray<EdgeSnapshot>,
-): Result<ReadonlyArray<Edge>, ContainerNodeValidationError> => {
+): Result<ReadonlyArray<Edge>, ContainerValidationError> => {
   if (snapshots.length === 0) {
     return Result.ok<ReadonlyArray<Edge>>([]);
   }
@@ -262,7 +262,7 @@ const parseCalendarYearNode = (
   path: ContainerPath,
   yearSegment: string,
   edges: ReadonlyArray<Edge>,
-): Result<CalendarYearContainerNode, ContainerNodeValidationError> => {
+): Result<CalendarYearContainer, ContainerValidationError> => {
   const yearResult = parseCalendarYear(yearSegment);
   if (yearResult.type === "error") {
     return Result.error(createError(prefixIssuesWithSegment(0, yearResult.error)));
@@ -274,7 +274,7 @@ const parseCalendarMonthNode = (
   path: ContainerPath,
   segments: ReadonlyArray<string>,
   edges: ReadonlyArray<Edge>,
-): Result<CalendarMonthContainerNode, ContainerNodeValidationError> => {
+): Result<CalendarMonthContainer, ContainerValidationError> => {
   const yearResult = parseCalendarYear(segments[0]);
   if (yearResult.type === "error") {
     return Result.error(createError(prefixIssuesWithSegment(0, yearResult.error)));
@@ -310,7 +310,7 @@ const parseCalendarDayNode = (
   path: ContainerPath,
   segments: ReadonlyArray<string>,
   edges: ReadonlyArray<Edge>,
-): Result<CalendarDayContainerNode, ContainerNodeValidationError> => {
+): Result<CalendarDayContainer, ContainerValidationError> => {
   const yearResult = parseCalendarYear(segments[0]);
   if (yearResult.type === "error") {
     return Result.error(createError(prefixIssuesWithSegment(0, yearResult.error)));
@@ -376,9 +376,9 @@ const parseCalendarDayNode = (
 const parseItemNumberingNode = (
   path: ContainerPath,
   segments: ReadonlyArray<string>,
-  ownerId: NodeId,
+  ownerId: ItemId,
   edges: ReadonlyArray<Edge>,
-): Result<ItemNumberingContainerNode, ContainerNodeValidationError> => {
+): Result<ItemNumberingContainer, ContainerValidationError> => {
   const issues: ValidationIssue[] = [];
   const indexes: ContainerIndex[] = [];
 
@@ -417,14 +417,14 @@ const parseItemNumberingNode = (
 const fromPath = (
   path: ContainerPath,
   edges: ReadonlyArray<Edge>,
-): Result<ContainerNode, ContainerNodeValidationError> => {
+): Result<Container, ContainerValidationError> => {
   const segments = path.segments();
 
   if (segments.length === 0) {
     return Result.ok(instantiateWorkspaceRoot(path, edges));
   }
 
-  const nodeIdResult = parseNodeId(segments[0]);
+  const nodeIdResult = parseItemId(segments[0]);
   if (nodeIdResult.type === "ok") {
     if (segments.length === 1) {
       return Result.ok(instantiateItemRoot(path, nodeIdResult.value, edges));
@@ -455,9 +455,9 @@ const fromPath = (
   );
 };
 
-export const parseContainerNode = (
-  snapshot: ContainerNodeSnapshot,
-): Result<ContainerNode, ContainerNodeValidationError> => {
+export const parseContainer = (
+  snapshot: ContainerSnapshot,
+): Result<Container, ContainerValidationError> => {
   const pathResult = parseContainerPath(snapshot.path);
   if (pathResult.type === "error") {
     return Result.error(createError(mapContainerPathError(pathResult.error)));

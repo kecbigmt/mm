@@ -5,56 +5,56 @@ import {
   ValidationError,
 } from "../../shared/errors.ts";
 
-const NODE_ID_KIND = "NodeId" as const;
-const NODE_ID_BRAND: unique symbol = Symbol(NODE_ID_KIND);
+const ITEM_ID_KIND = "ItemId" as const;
+const ITEM_ID_BRAND: unique symbol = Symbol(ITEM_ID_KIND);
 const UUID_V7_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export type NodeId = Readonly<{
+export type ItemId = Readonly<{
   readonly data: Readonly<{
     readonly value: string;
   }>;
   toString(): string;
-  equals(other: NodeId): boolean;
+  equals(other: ItemId): boolean;
   toJSON(): string;
-  readonly [NODE_ID_BRAND]: true;
+  readonly [ITEM_ID_BRAND]: true;
 }>;
 
-const toString = function (this: NodeId): string {
+const toString = function (this: ItemId): string {
   return this.data.value;
 };
 
-const equals = function (this: NodeId, other: NodeId): boolean {
+const equals = function (this: ItemId, other: ItemId): boolean {
   return this.data.value === other.data.value;
 };
 
-const toJSON = function (this: NodeId): string {
+const toJSON = function (this: ItemId): string {
   return this.toString();
 };
 
-const instantiate = (value: string): NodeId =>
+const instantiate = (value: string): ItemId =>
   Object.freeze({
     data: Object.freeze({ value }),
     toString,
     equals,
     toJSON,
-    [NODE_ID_BRAND]: true,
+    [ITEM_ID_BRAND]: true,
   });
 
-export type NodeIdValidationError = ValidationError<typeof NODE_ID_KIND>;
+export type ItemIdValidationError = ValidationError<typeof ITEM_ID_KIND>;
 
-export const isNodeId = (value: unknown): value is NodeId =>
-  typeof value === "object" && value !== null && NODE_ID_BRAND in value;
+export const isItemId = (value: unknown): value is ItemId =>
+  typeof value === "object" && value !== null && ITEM_ID_BRAND in value;
 
-export const parseNodeId = (
+export const parseItemId = (
   input: unknown,
-): Result<NodeId, NodeIdValidationError> => {
-  if (isNodeId(input)) {
+): Result<ItemId, ItemIdValidationError> => {
+  if (isItemId(input)) {
     return Result.ok(input);
   }
 
   if (typeof input !== "string") {
     return Result.error(
-      createValidationError(NODE_ID_KIND, [
+      createValidationError(ITEM_ID_KIND, [
         createValidationIssue("id must be a string", { path: ["value"] }),
       ]),
     );
@@ -63,7 +63,7 @@ export const parseNodeId = (
   const candidate = input.trim().toLowerCase();
   if (!UUID_V7_REGEX.test(candidate)) {
     return Result.error(
-      createValidationError(NODE_ID_KIND, [
+      createValidationError(ITEM_ID_KIND, [
         createValidationIssue("value must be a UUID v7", { path: ["value"] }),
       ]),
     );
@@ -72,6 +72,6 @@ export const parseNodeId = (
   return Result.ok(instantiate(candidate));
 };
 
-export const nodeIdFromString = (
+export const itemIdFromString = (
   input: string,
-): Result<NodeId, NodeIdValidationError> => parseNodeId(input);
+): Result<ItemId, ItemIdValidationError> => parseItemId(input);

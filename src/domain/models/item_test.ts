@@ -1,4 +1,4 @@
-import { parseItemNode } from "./item_node.ts";
+import { parseItem } from "./item.ts";
 import {
   parseAliasSlug,
   parseContainerPath,
@@ -6,11 +6,11 @@ import {
   parseDateTime,
   parseDuration,
   parseItemIcon,
-  parseNodeRank,
-  parseNodeTitle,
+  parseItemRank,
+  parseItemTitle,
 } from "../primitives/mod.ts";
 
-type ItemNodeSnapshot = Parameters<typeof parseItemNode>[0];
+type ItemSnapshot = Parameters<typeof parseItem>[0];
 
 const assert = (condition: unknown, message: string): void => {
   if (!condition) {
@@ -34,7 +34,7 @@ const unwrapOk = <T, E>(
   return result.value;
 };
 
-const baseSnapshot = (overrides: Partial<ItemNodeSnapshot> = {}): ItemNodeSnapshot => ({
+const baseSnapshot = (overrides: Partial<ItemSnapshot> = {}): ItemSnapshot => ({
   id: "019965a7-2789-740a-b8c1-1415904fd108",
   title: "Test item",
   icon: "note",
@@ -47,7 +47,7 @@ const baseSnapshot = (overrides: Partial<ItemNodeSnapshot> = {}): ItemNodeSnapsh
   ...overrides,
 });
 
-Deno.test("parseItemNode parses full snapshot payload", () => {
+Deno.test("parseItem parses full snapshot payload", () => {
   const snapshot = baseSnapshot({
     title: "Detailed item",
     icon: "task",
@@ -65,31 +65,31 @@ Deno.test("parseItemNode parses full snapshot payload", () => {
     updatedAt: "2024-09-21T14:00:00Z",
   });
 
-  const result = parseItemNode(snapshot);
+  const result = parseItem(snapshot);
   if (result.type !== "ok") {
     throw new Error(`expected ok result, got error: ${result.error.toString()}`);
   }
 
-  const node = result.value;
-  assertEquals(node.data.title.toString(), "Detailed item");
-  assertEquals(node.data.icon.toString(), "task");
-  assertEquals(node.data.status.toString(), "closed");
-  assertEquals(node.data.container.toString(), "project-alpha");
-  assertEquals(node.data.rank.toString(), "b1");
-  assertEquals(node.data.alias?.toString(), "focus-work");
-  assertEquals(node.data.context?.toString(), "deep-work");
-  assertEquals(node.data.body, "Example body");
-  assertEquals(node.data.closedAt?.toString(), "2024-09-21T06:00:00.000Z");
-  assertEquals(node.data.startAt?.toString(), "2024-09-22T08:00:00.000Z");
-  assertEquals(node.data.duration?.toMinutes(), 90);
-  assertEquals(node.data.dueAt?.toString(), "2024-09-22T10:00:00.000Z");
-  assertEquals(node.data.createdAt.toString(), "2024-09-20T08:00:00.000Z");
-  assertEquals(node.data.updatedAt.toString(), "2024-09-21T14:00:00.000Z");
-  assertEquals(node.edges.length, 0);
+  const item = result.value;
+  assertEquals(item.data.title.toString(), "Detailed item");
+  assertEquals(item.data.icon.toString(), "task");
+  assertEquals(item.data.status.toString(), "closed");
+  assertEquals(item.data.container.toString(), "project-alpha");
+  assertEquals(item.data.rank.toString(), "b1");
+  assertEquals(item.data.alias?.toString(), "focus-work");
+  assertEquals(item.data.context?.toString(), "deep-work");
+  assertEquals(item.data.body, "Example body");
+  assertEquals(item.data.closedAt?.toString(), "2024-09-21T06:00:00.000Z");
+  assertEquals(item.data.startAt?.toString(), "2024-09-22T08:00:00.000Z");
+  assertEquals(item.data.duration?.toMinutes(), 90);
+  assertEquals(item.data.dueAt?.toString(), "2024-09-22T10:00:00.000Z");
+  assertEquals(item.data.createdAt.toString(), "2024-09-20T08:00:00.000Z");
+  assertEquals(item.data.updatedAt.toString(), "2024-09-21T14:00:00.000Z");
+  assertEquals(item.edges.length, 0);
 });
 
-Deno.test("parseItemNode parses edges collection", () => {
-  const result = parseItemNode(
+Deno.test("parseItem parses edges collection", () => {
+  const result = parseItem(
     baseSnapshot({
       edges: [
         {
@@ -106,22 +106,22 @@ Deno.test("parseItemNode parses edges collection", () => {
     }),
   );
 
-  const node = unwrapOk(result, "parse node with edges");
-  assertEquals(node.edges.length, 2);
-  assertEquals(node.edges[0].kind, "ItemEdge");
-  assertEquals(node.edges[1].kind, "ContainerEdge");
+  const item = unwrapOk(result, "parse item with edges");
+  assertEquals(item.edges.length, 2);
+  assertEquals(item.edges[0].kind, "ItemEdge");
+  assertEquals(item.edges[1].kind, "ContainerEdge");
 
-  const roundTrip = node.toJSON();
+  const roundTrip = item.toJSON();
   assert(roundTrip.edges !== undefined, "edges should be serialized");
   assertEquals(roundTrip.edges?.length, 2);
 });
 
 Deno.test("setContext updates and normalizes context tag", () => {
-  const parseResult = parseItemNode(baseSnapshot());
+  const parseResult = parseItem(baseSnapshot());
   if (parseResult.type !== "ok") {
     throw new Error(`expected ok result, got error: ${parseResult.error.toString()}`);
   }
-  const node = parseResult.value;
+  const item = parseResult.value;
 
   const focusContextResult = parseContextTag("focus");
   if (focusContextResult.type !== "ok") {
@@ -132,10 +132,10 @@ Deno.test("setContext updates and normalizes context tag", () => {
     throw new Error("failed to parse updatedAt timestamp");
   }
 
-  const updated = node.setContext(focusContextResult.value, updatedAtResult.value);
+  const updated = item.setContext(focusContextResult.value, updatedAtResult.value);
   assertEquals(updated.data.context?.toString(), "focus");
   assert(updated.data.updatedAt.equals(updatedAtResult.value), "updatedAt should update");
-  assertEquals(node.data.context?.toString(), "work", "original node should be unchanged");
+  assertEquals(item.data.context?.toString(), "work", "original item should be unchanged");
 
   const repeat = updated.setContext(focusContextResult.value, updatedAtResult.value);
   assertEquals(repeat, updated, "setting same context should return same instance");
@@ -149,12 +149,12 @@ Deno.test("setContext updates and normalizes context tag", () => {
   assertEquals(cleared.data.context, undefined);
   assert(
     cleared.data.updatedAt.equals(clearedAtResult.value),
-    "cleared node should have new updatedAt",
+    "cleared item should have new updatedAt",
   );
 });
 
-Deno.test("parseItemNode rejects invalid context tag", () => {
-  const result = parseItemNode(baseSnapshot({ context: "Invalid Context!" }));
+Deno.test("parseItem rejects invalid context tag", () => {
+  const result = parseItem(baseSnapshot({ context: "Invalid Context!" }));
   if (result.type !== "error") {
     throw new Error("expected parse failure for invalid context");
   }
@@ -163,7 +163,7 @@ Deno.test("parseItemNode rejects invalid context tag", () => {
   assertEquals(result.error.issues[0].code, "format");
 });
 
-Deno.test("parseItemNode aggregates validation issues", () => {
+Deno.test("parseItem aggregates validation issues", () => {
   const snapshot = baseSnapshot({
     id: "not-a-uuid",
     icon: "unknown",
@@ -171,7 +171,7 @@ Deno.test("parseItemNode aggregates validation issues", () => {
     updatedAt: "invalid-date",
   });
 
-  const result = parseItemNode(snapshot);
+  const result = parseItem(snapshot);
   if (result.type !== "error") {
     throw new Error("expected parse failure for invalid snapshot");
   }
@@ -192,19 +192,19 @@ Deno.test("parseItemNode aggregates validation issues", () => {
   assert(paths.some((path) => path === "updatedAt.iso"), "updatedAt issues expected");
 });
 
-Deno.test("ItemNode.close transitions to closed state", () => {
-  const node = unwrapOk(parseItemNode(baseSnapshot()), "parse node");
+Deno.test("Item.close transitions to closed state", () => {
+  const item = unwrapOk(parseItem(baseSnapshot()), "parse item");
   const closedAt = unwrapOk(parseDateTime("2024-09-21T06:00:00Z"), "parse closedAt");
-  const closed = node.close(closedAt);
+  const closed = item.close(closedAt);
 
   assertEquals(closed.data.status.toString(), "closed");
   assert(closed.data.closedAt?.equals(closedAt), "closedAt should match");
   assert(closed.data.updatedAt.equals(closedAt), "updatedAt should match close timestamp");
-  assertEquals(node.data.status.toString(), "open");
+  assertEquals(item.data.status.toString(), "open");
 });
 
-Deno.test("ItemNode.reopen clears closed state", () => {
-  const base = unwrapOk(parseItemNode(baseSnapshot()), "parse node");
+Deno.test("Item.reopen clears closed state", () => {
+  const base = unwrapOk(parseItem(baseSnapshot()), "parse item");
   const closedAt = unwrapOk(parseDateTime("2024-09-21T06:00:00Z"), "parse closedAt");
   const closed = base.close(closedAt);
 
@@ -217,10 +217,10 @@ Deno.test("ItemNode.reopen clears closed state", () => {
   assertEquals(closed.data.status.toString(), "closed");
 });
 
-Deno.test("ItemNode.relocate updates container and rank", () => {
-  const base = unwrapOk(parseItemNode(baseSnapshot()), "parse node");
+Deno.test("Item.relocate updates container and rank", () => {
+  const base = unwrapOk(parseItem(baseSnapshot()), "parse item");
   const targetContainer = unwrapOk(parseContainerPath("project-alpha"), "parse container");
-  const targetRank = unwrapOk(parseNodeRank("b1"), "parse rank");
+  const targetRank = unwrapOk(parseItemRank("b1"), "parse rank");
   const relocateAt = unwrapOk(parseDateTime("2024-09-21T10:00:00Z"), "parse relocate timestamp");
 
   const relocated = base.relocate(targetContainer, targetRank, relocateAt);
@@ -230,9 +230,9 @@ Deno.test("ItemNode.relocate updates container and rank", () => {
   assertEquals(base.data.container.toString(), "2024/09/20");
 });
 
-Deno.test("ItemNode.retitle updates title when changed", () => {
-  const base = unwrapOk(parseItemNode(baseSnapshot()), "parse node");
-  const newTitle = unwrapOk(parseNodeTitle("Updated item"), "parse title");
+Deno.test("Item.retitle updates title when changed", () => {
+  const base = unwrapOk(parseItem(baseSnapshot()), "parse item");
+  const newTitle = unwrapOk(parseItemTitle("Updated item"), "parse title");
   const retitleAt = unwrapOk(parseDateTime("2024-09-21T11:00:00Z"), "parse retitle timestamp");
 
   const retitled = base.retitle(newTitle, retitleAt);
@@ -241,8 +241,8 @@ Deno.test("ItemNode.retitle updates title when changed", () => {
   assertEquals(base.data.title.toString(), "Test item");
 });
 
-Deno.test("ItemNode.changeIcon persists new icon", () => {
-  const base = unwrapOk(parseItemNode(baseSnapshot()), "parse node");
+Deno.test("Item.changeIcon persists new icon", () => {
+  const base = unwrapOk(parseItem(baseSnapshot()), "parse item");
   const newIcon = unwrapOk(parseItemIcon("task"), "parse icon");
   const iconAt = unwrapOk(parseDateTime("2024-09-21T11:30:00Z"), "parse icon timestamp");
 
@@ -252,8 +252,8 @@ Deno.test("ItemNode.changeIcon persists new icon", () => {
   assertEquals(base.data.icon.toString(), "note");
 });
 
-Deno.test("ItemNode.setBody trims whitespace and updates timestamp", () => {
-  const base = unwrapOk(parseItemNode(baseSnapshot({ body: undefined })), "parse node");
+Deno.test("Item.setBody trims whitespace and updates timestamp", () => {
+  const base = unwrapOk(parseItem(baseSnapshot({ body: undefined })), "parse item");
   const bodyAt = unwrapOk(parseDateTime("2024-09-21T12:00:00Z"), "parse body timestamp");
 
   const updated = base.setBody("  Updated body  ", bodyAt);
@@ -262,13 +262,13 @@ Deno.test("ItemNode.setBody trims whitespace and updates timestamp", () => {
   assertEquals(base.data.body, undefined);
 });
 
-Deno.test("ItemNode.schedule overwrites scheduling fields", () => {
+Deno.test("Item.schedule overwrites scheduling fields", () => {
   const base = unwrapOk(
-    parseItemNode(baseSnapshot({
+    parseItem(baseSnapshot({
       startAt: undefined,
       dueAt: undefined,
     })),
-    "parse node",
+    "parse item",
   );
 
   const startAt = unwrapOk(parseDateTime("2024-09-22T08:00:00Z"), "parse startAt");
@@ -283,8 +283,8 @@ Deno.test("ItemNode.schedule overwrites scheduling fields", () => {
   assert(scheduled.data.updatedAt.equals(scheduleAt), "updatedAt should match schedule timestamp");
 });
 
-Deno.test("ItemNode.setAlias stores alias when changed", () => {
-  const base = unwrapOk(parseItemNode(baseSnapshot({ alias: undefined })), "parse node");
+Deno.test("Item.setAlias stores alias when changed", () => {
+  const base = unwrapOk(parseItem(baseSnapshot({ alias: undefined })), "parse item");
   const alias = unwrapOk(parseAliasSlug("deep-focus"), "parse alias");
   const aliasAt = unwrapOk(parseDateTime("2024-09-21T13:00:00Z"), "parse alias timestamp");
 
@@ -294,16 +294,16 @@ Deno.test("ItemNode.setAlias stores alias when changed", () => {
   assertEquals(base.data.alias, undefined);
 });
 
-Deno.test("ItemNode.toJSON reflects current data", () => {
+Deno.test("Item.toJSON reflects current data", () => {
   const base = unwrapOk(
-    parseItemNode(baseSnapshot({
+    parseItem(baseSnapshot({
       context: undefined,
       alias: "focus-work",
       body: "Initial body",
       startAt: undefined,
       dueAt: undefined,
     })),
-    "parse node",
+    "parse item",
   );
 
   const closedAt = unwrapOk(parseDateTime("2024-09-21T06:00:00Z"), "parse closedAt");
@@ -320,10 +320,10 @@ Deno.test("ItemNode.toJSON reflects current data", () => {
   const reopened = closed.reopen(reopenedAt);
 
   const targetContainer = unwrapOk(parseContainerPath("project-alpha"), "parse container");
-  const targetRank = unwrapOk(parseNodeRank("b1"), "parse rank");
+  const targetRank = unwrapOk(parseItemRank("b1"), "parse rank");
   const relocated = reopened.relocate(targetContainer, targetRank, relocateAt);
 
-  const newTitle = unwrapOk(parseNodeTitle("Updated item"), "parse title");
+  const newTitle = unwrapOk(parseItemTitle("Updated item"), "parse title");
   const retitled = relocated.retitle(newTitle, retitleAt);
 
   const newIcon = unwrapOk(parseItemIcon("task"), "parse icon");

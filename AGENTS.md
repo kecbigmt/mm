@@ -11,7 +11,7 @@ model, stored as plain Markdown + JSON, Git-friendly. Items are created under a 
 ## Project Structure & Module Organization
 
 mm is a Deno TypeScript CLI with a functional domain core. Domain logic lives under `src/domain`,
-split into `primitives` (branded types such as `node_id.ts`, `container_path.ts`), `models`
+split into `primitives` (branded types such as `item_id.ts`, `container_path.ts`), `models`
 (container/item node ADTs), and `workflows` for orchestration. Shared functional helpers (e.g.
 `brand.ts`, `result.ts`, validation errors) sit in `src/shared`. Infrastructure adapters and
 presentation code live under `src/infrastructure` and `src/presentation` respectively. Documentation
@@ -53,7 +53,7 @@ tests mirroring the implementation name plus `_test`.
 ## Testing Guidelines
 
 Use Deno’s test runner with colocated unit tests. Name suites after the module under test
-(`Deno.test("nodeId.parse", ...)`). Cover success and failure branches, asserting `Result` variants
+(`Deno.test("itemId.parse", ...)`). Cover success and failure branches, asserting `Result` variants
 instead of throwing. Property-based tests are welcome for domain invariants; keep fixtures
 deterministic. For acceptance coverage, add scenario files under `tests/` and reference real
 workspace fixtures.

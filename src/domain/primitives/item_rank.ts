@@ -5,62 +5,62 @@ import {
   ValidationError,
 } from "../../shared/errors.ts";
 
-const NODE_RANK_KIND = "NodeRank" as const;
-const NODE_RANK_BRAND: unique symbol = Symbol(NODE_RANK_KIND);
+const ITEM_RANK_KIND = "ItemRank" as const;
+const ITEM_RANK_BRAND: unique symbol = Symbol(ITEM_RANK_KIND);
 
-export type NodeRank = Readonly<{
+export type ItemRank = Readonly<{
   readonly data: Readonly<{
     readonly value: string;
   }>;
   toString(): string;
   toJSON(): string;
-  compare(other: NodeRank): number;
-  readonly [NODE_RANK_BRAND]: true;
+  compare(other: ItemRank): number;
+  readonly [ITEM_RANK_BRAND]: true;
 }>;
 
 const ORDER_KEY_REGEX = /^[0-9A-Za-z:]+$/;
 const MIN_LENGTH = 1;
 const MAX_LENGTH = 30;
 
-const toString = function (this: NodeRank): string {
+const toString = function (this: ItemRank): string {
   return this.data.value;
 };
 
-const toJSON = function (this: NodeRank): string {
+const toJSON = function (this: ItemRank): string {
   return this.toString();
 };
 
-const compare = function (this: NodeRank, other: NodeRank): number {
+const compare = function (this: ItemRank, other: ItemRank): number {
   if (this.data.value === other.data.value) {
     return 0;
   }
   return this.data.value < other.data.value ? -1 : 1;
 };
 
-const instantiate = (value: string): NodeRank =>
+const instantiate = (value: string): ItemRank =>
   Object.freeze({
     data: Object.freeze({ value }),
     toString,
     toJSON,
     compare,
-    [NODE_RANK_BRAND]: true,
+    [ITEM_RANK_BRAND]: true,
   });
 
-export type NodeRankValidationError = ValidationError<typeof NODE_RANK_KIND>;
+export type ItemRankValidationError = ValidationError<typeof ITEM_RANK_KIND>;
 
-export const isNodeRank = (value: unknown): value is NodeRank =>
-  typeof value === "object" && value !== null && NODE_RANK_BRAND in value;
+export const isItemRank = (value: unknown): value is ItemRank =>
+  typeof value === "object" && value !== null && ITEM_RANK_BRAND in value;
 
-export const parseNodeRank = (
+export const parseItemRank = (
   input: unknown,
-): Result<NodeRank, NodeRankValidationError> => {
-  if (isNodeRank(input)) {
+): Result<ItemRank, ItemRankValidationError> => {
+  if (isItemRank(input)) {
     return Result.ok(input);
   }
 
   if (typeof input !== "string") {
     return Result.error(
-      createValidationError(NODE_RANK_KIND, [
+      createValidationError(ITEM_RANK_KIND, [
         createValidationIssue("rank must be a string", {
           path: ["value"],
           code: "not_string",
@@ -72,7 +72,7 @@ export const parseNodeRank = (
   const trimmed = input.trim();
   if (trimmed.length < MIN_LENGTH) {
     return Result.error(
-      createValidationError(NODE_RANK_KIND, [
+      createValidationError(ITEM_RANK_KIND, [
         createValidationIssue("rank cannot be empty", {
           path: ["value"],
           code: "min_length",
@@ -83,7 +83,7 @@ export const parseNodeRank = (
 
   if (trimmed.length > MAX_LENGTH) {
     return Result.error(
-      createValidationError(NODE_RANK_KIND, [
+      createValidationError(ITEM_RANK_KIND, [
         createValidationIssue("rank is too long", {
           path: ["value"],
           code: "max_length",
@@ -94,7 +94,7 @@ export const parseNodeRank = (
 
   if (!ORDER_KEY_REGEX.test(trimmed)) {
     return Result.error(
-      createValidationError(NODE_RANK_KIND, [
+      createValidationError(ITEM_RANK_KIND, [
         createValidationIssue("rank has invalid characters", {
           path: ["value"],
           code: "format",
@@ -106,6 +106,6 @@ export const parseNodeRank = (
   return Result.ok(instantiate(trimmed));
 };
 
-export const nodeRankFromString = (
+export const itemRankFromString = (
   input: string,
-): Result<NodeRank, NodeRankValidationError> => parseNodeRank(input);
+): Result<ItemRank, ItemRankValidationError> => parseItemRank(input);
