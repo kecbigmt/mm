@@ -109,7 +109,7 @@ const determineWorkspaceFromName = async (
     return Result.error({
       type: "workspace",
       message:
-        `workspace '${name.toString()}' does not exist; run mm workspace add ${name.toString()}`,
+        `workspace '${name.toString()}' does not exist; run mm workspace init ${name.toString()}`,
     });
   }
   return Result.ok(store.pathFor(name));

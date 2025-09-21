@@ -64,7 +64,7 @@ const listAction = async () => {
   const workspaces = listResult.value;
   if (workspaces.length === 0) {
     console.log("No workspaces found.");
-    console.log("\nCreate a workspace with: mm workspace add <name>");
+    console.log("\nCreate a workspace with: mm workspace init <name>");
     return;
   }
 
@@ -79,7 +79,7 @@ const listAction = async () => {
   }
 };
 
-const addAction = async (
+const initAction = async (
   options: Record<string, unknown>,
   name: string,
 ) => {
@@ -119,8 +119,14 @@ const addAction = async (
     return;
   }
 
+  const setResult = await env.config.setCurrentWorkspace(parsedName.value.toString());
+  if (setResult.type === "error") {
+    console.error(setResult.error.message);
+    return;
+  }
+
   console.log(`Created workspace: ${parsedName.value.toString()}`);
-  console.log(`\nSwitch to it with: mm workspace use ${parsedName.value.toString()}`);
+  console.log(`Switched to workspace: ${parsedName.value.toString()}`);
 };
 
 const useAction = async (
@@ -184,12 +190,12 @@ export const createWorkspaceCommand = () =>
         .action(listAction),
     ).alias("ls")
     .command(
-      "add",
+      "init",
       new Command()
-        .description("Add new workspace")
+        .description("Initialize a new workspace")
         .arguments("<name:string>")
         .option("-t, --timezone <timezone:string>", "Timezone identifier")
-        .action(addAction),
+        .action(initAction),
     )
     .command(
       "use",

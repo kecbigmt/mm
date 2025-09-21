@@ -69,23 +69,24 @@ Deno.test({
 });
 
 Deno.test({
-  name: "workspace add and use create workspace and set config",
+  name: "workspace init creates workspace and sets config",
   permissions: { env: true, read: true, write: true },
   async fn() {
     await withTempHome(async (home) => {
-      const addOutput = captureConsole();
+      const initOutput = captureConsole();
       try {
         await buildCli().parse([
           "workspace",
-          "add",
+          "init",
           "home",
           "--timezone",
           "UTC",
         ]);
       } finally {
-        addOutput.restore();
+        initOutput.restore();
       }
-      assertEquals(addOutput.errors.length, 0);
+      assertEquals(initOutput.errors.length, 0);
+      assert(initOutput.logs.some((line) => line.includes("Switched to workspace: home")));
       const workspacePath = join(home, "workspaces", "home");
       const workspaceFile = join(workspacePath, "workspace.json");
       const meta = JSON.parse(await Deno.readTextFile(workspaceFile)) as {
@@ -93,24 +94,55 @@ Deno.test({
       };
       assertEquals(meta.timezone, "UTC");
 
-      const useOutput = captureConsole();
-      try {
-        await buildCli().parse([
-          "workspace",
-          "use",
-          "home",
-        ]);
-      } finally {
-        useOutput.restore();
-      }
-      assertEquals(useOutput.errors.length, 0);
-      assert(useOutput.logs.some((line) => line.includes("Switched to workspace")));
-
       const configPath = join(home, "config.json");
       const config = JSON.parse(await Deno.readTextFile(configPath)) as {
         readonly currentWorkspace: string;
       };
       assertEquals(config.currentWorkspace, "home");
+    });
+  },
+});
+
+Deno.test({
+  name: "workspace use switches workspaces and creates when missing",
+  permissions: { env: true, read: true, write: true },
+  async fn() {
+    await withTempHome(async (home) => {
+      await buildCli().parse([
+        "workspace",
+        "init",
+        "home",
+        "--timezone",
+        "UTC",
+      ]);
+
+      const useOutput = captureConsole();
+      try {
+        await buildCli().parse([
+          "workspace",
+          "use",
+          "project",
+          "--timezone",
+          "Asia/Tokyo",
+        ]);
+      } finally {
+        useOutput.restore();
+      }
+
+      assertEquals(useOutput.errors.length, 0);
+      assert(useOutput.logs.some((line) => line.includes("Switched to workspace: project")));
+
+      const projectWorkspace = join(home, "workspaces", "project", "workspace.json");
+      const projectMeta = JSON.parse(await Deno.readTextFile(projectWorkspace)) as {
+        readonly timezone: string;
+      };
+      assertEquals(projectMeta.timezone, "Asia/Tokyo");
+
+      const configPath = join(home, "config.json");
+      const config = JSON.parse(await Deno.readTextFile(configPath)) as {
+        readonly currentWorkspace: string;
+      };
+      assertEquals(config.currentWorkspace, "project");
     });
   },
 });
