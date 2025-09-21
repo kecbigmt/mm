@@ -1,5 +1,5 @@
-import { assert, assertEquals } from "jsr:@std/assert";
-import { join } from "jsr:@std/path";
+import { assert, assertEquals } from "@std/assert";
+import { join } from "@std/path";
 import { createFileSystemContainerRepository } from "./container_repository.ts";
 import {
   ContainerEdge,

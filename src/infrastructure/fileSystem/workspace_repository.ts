@@ -1,4 +1,4 @@
-import { join } from "jsr:@std/path";
+import { join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { WorkspaceRepository } from "../../domain/repositories/workspace_repository.ts";
 import { parseWorkspaceSettings, WorkspaceSettings } from "../../domain/models/workspace.ts";

@@ -1,4 +1,4 @@
-import { join } from "jsr:@std/path";
+import { join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { ContainerRepository } from "../../domain/repositories/container_repository.ts";
 import { Container, ContainerSnapshot, parseContainer } from "../../domain/models/container.ts";

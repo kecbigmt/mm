@@ -1,4 +1,4 @@
-import { dirname, join } from "jsr:@std/path";
+import { dirname, join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { ContextRepository } from "../../domain/repositories/context_repository.ts";
 import { Context, ContextSnapshot, parseContext } from "../../domain/models/context.ts";

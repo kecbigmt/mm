@@ -1,5 +1,5 @@
-import { assert, assertEquals } from "jsr:@std/assert";
-import { join } from "jsr:@std/path";
+import { assert, assertEquals } from "@std/assert";
+import { join } from "@std/path";
 import { createFileSystemWorkspaceRepository } from "./workspace_repository.ts";
 import { parseWorkspaceSettings } from "../../domain/models/workspace.ts";
 

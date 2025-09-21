@@ -1,5 +1,5 @@
-import { assert, assertEquals, assertRejects } from "jsr:@std/assert";
-import { join } from "jsr:@std/path";
+import { assert, assertEquals, assertRejects } from "@std/assert";
+import { join } from "@std/path";
 import { createFileSystemItemRepository } from "./item_repository.ts";
 import { parseItem } from "../../domain/models/item.ts";
 import { parseItemId } from "../../domain/primitives/mod.ts";

@@ -1,4 +1,4 @@
-import { join } from "jsr:@std/path";
+import { join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { Edge, EdgeSnapshot } from "../../domain/models/edge.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";

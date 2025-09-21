@@ -1,5 +1,5 @@
-import { assertEquals, assertRejects } from "jsr:@std/assert";
-import { join } from "jsr:@std/path";
+import { assertEquals, assertRejects } from "@std/assert";
+import { join } from "@std/path";
 import { createFileSystemAliasRepository } from "./alias_repository.ts";
 import { parseAlias } from "../../domain/models/alias.ts";
 import { aliasSlugFromString } from "../../domain/primitives/mod.ts";

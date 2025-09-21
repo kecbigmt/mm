@@ -1,5 +1,5 @@
-import { assertEquals, assertRejects } from "jsr:@std/assert";
-import { join } from "jsr:@std/path";
+import { assertEquals, assertRejects } from "@std/assert";
+import { join } from "@std/path";
 import { createFileSystemContextRepository } from "./context_repository.ts";
 import { parseContext } from "../../domain/models/context.ts";
 import { contextTagFromString } from "../../domain/primitives/mod.ts";

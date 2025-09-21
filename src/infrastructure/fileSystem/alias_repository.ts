@@ -1,4 +1,4 @@
-import { dirname, join } from "jsr:@std/path";
+import { dirname, join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { AliasRepository } from "../../domain/repositories/alias_repository.ts";
 import { Alias, AliasSnapshot, parseAlias } from "../../domain/models/alias.ts";
