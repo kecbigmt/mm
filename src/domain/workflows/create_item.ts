@@ -10,7 +10,6 @@ import {
   createItemIcon,
   DateTime,
   ItemId,
-  itemIdFromString,
   ItemRank,
   itemStatusOpen,
   itemTitleFromString,
@@ -21,6 +20,7 @@ import { ContainerRepository } from "../repositories/container_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { createItemEdge, Edge, isContainerEdge, isItemEdge } from "../models/edge.ts";
 import { RankService } from "../services/rank_service.ts";
+import { IdGenerationService } from "../services/id_generation_service.ts";
 
 export type CreateItemInput = Readonly<{
   title: string;
@@ -35,7 +35,7 @@ export type CreateItemDependencies = Readonly<{
   itemRepository: ItemRepository;
   containerRepository: ContainerRepository;
   rankService: RankService;
-  generateId(): string;
+  idGenerationService: IdGenerationService;
 }>;
 
 export type CreateItemValidationError = Readonly<{
@@ -119,7 +119,7 @@ export const CreateItemWorkflow = {
       );
     }
 
-    const idResult = itemIdFromString(deps.generateId());
+    const idResult = deps.idGenerationService.generateId();
     const id = idResult.type === "ok" ? idResult.value : undefined;
     if (idResult.type === "error") {
       issues.push(
