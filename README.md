@@ -4,6 +4,10 @@ mm is a personal knowledge management CLI that stores notes and tasks as Markdow
 The tool organises content as a graph of container and item nodes, keeping immutable on-disk
 locations while managing logical placements through edges and ranks.
 
+## Documentation
+
+Domain and product design notes live in `docs/steering/design.md`.
+
 ## Getting Started
 
 ```sh
@@ -11,6 +15,8 @@ deno task dev
 ```
 
 Use `deno task test` to run the full unit test suite.
+
+Build a standalone binary with `deno task compile`, or install the CLI globally via `deno task install`.
 
 ## Commands
 
@@ -54,7 +60,3 @@ Both commands accept:
 - **Short IDs**: Last 7 characters of the item ID (e.g., `abc1234`)
 
 If a short ID matches multiple items, the command will show an error listing the ambiguous matches.
-
-## Documentation
-
-Domain and product design notes live in `docs/steering/design.md`.
