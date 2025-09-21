@@ -14,6 +14,16 @@ const unwrapOk = <T, E>(
   return result.value;
 };
 
+const unwrapError = <T, E>(
+  result: { type: "ok"; value: T } | { type: "error"; error: E },
+  context: string,
+): E => {
+  if (result.type !== "error") {
+    throw new Error(`${context}: expected error`);
+  }
+  return result.error;
+};
+
 const sampleContext = () =>
   unwrapOk(
     parseContext({
@@ -97,6 +107,91 @@ Deno.test({
       if (missingResult.type !== "ok" || missingResult.value !== undefined) {
         throw new Error("expected missing context lookup to return undefined");
       }
+    } finally {
+      await Deno.remove(root, { recursive: true });
+    }
+  },
+});
+
+Deno.test({
+  name: "context repository load fails when JSON is invalid",
+  permissions: { read: true, write: true },
+  async fn() {
+    const root = await Deno.makeTempDir({ prefix: "mm-context-invalid-json-" });
+    try {
+      const repository = createFileSystemContextRepository({ root });
+      const tag = unwrapOk(contextTagFromString("broken"), "create context tag");
+      const filePath = join(root, "contexts", "broken.context.json");
+      await Deno.mkdir(join(root, "contexts"), { recursive: true });
+      await Deno.writeTextFile(filePath, "{ invalid");
+
+      const loadResult = await repository.load(tag);
+      const error = unwrapError(loadResult, "load context error");
+
+      assertEquals(error.scope, "context");
+      assertEquals(error.operation, "load");
+      assertEquals(error.identifier, "broken");
+      assertEquals(error.message, "context file contains invalid JSON");
+    } finally {
+      await Deno.remove(root, { recursive: true });
+    }
+  },
+});
+
+Deno.test({
+  name: "context repository load fails when snapshot is invalid",
+  permissions: { read: true, write: true },
+  async fn() {
+    const root = await Deno.makeTempDir({ prefix: "mm-context-invalid-snapshot-" });
+    try {
+      const repository = createFileSystemContextRepository({ root });
+      const tag = unwrapOk(contextTagFromString("deep-work"), "create context tag");
+      const filePath = join(root, "contexts", "deep-work.context.json");
+      await Deno.mkdir(join(root, "contexts"), { recursive: true });
+      await Deno.writeTextFile(
+        filePath,
+        JSON.stringify({
+          tag: "deep-work",
+          createdAt: "invalid-date",
+          description: "Deep work focus",
+        }),
+      );
+
+      const loadResult = await repository.load(tag);
+      const error = unwrapError(loadResult, "load context error");
+
+      assertEquals(error.scope, "context");
+      assertEquals(error.operation, "load");
+      assertEquals(error.identifier, "deep-work");
+      assertEquals(error.message, "context data is invalid");
+    } finally {
+      await Deno.remove(root, { recursive: true });
+    }
+  },
+});
+
+Deno.test({
+  name: "context repository list fails when any snapshot is invalid",
+  permissions: { read: true, write: true },
+  async fn() {
+    const root = await Deno.makeTempDir({ prefix: "mm-context-list-invalid-" });
+    try {
+      const repository = createFileSystemContextRepository({ root });
+      await Deno.mkdir(join(root, "contexts"), { recursive: true });
+      await Deno.writeTextFile(
+        join(root, "contexts", "deep-work.context.json"),
+        JSON.stringify({
+          tag: "deep-work",
+          createdAt: "invalid-date",
+        }),
+      );
+
+      const listResult = await repository.list();
+      const error = unwrapError(listResult, "list contexts error");
+
+      assertEquals(error.scope, "context");
+      assertEquals(error.operation, "list");
+      assertEquals(error.message, "context data is invalid");
     } finally {
       await Deno.remove(root, { recursive: true });
     }
