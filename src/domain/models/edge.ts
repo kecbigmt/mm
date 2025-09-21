@@ -1,0 +1,288 @@
+import { Result } from "../../shared/result.ts";
+import {
+  createValidationError,
+  createValidationIssue,
+  ValidationError,
+  ValidationIssue,
+} from "../../shared/errors.ts";
+import {
+  ContainerIndex,
+  ContainerIndexValidationError,
+  ContainerPath,
+  ContainerPathValidationError,
+  NodeId,
+  NodeIdValidationError,
+  NodeRank,
+  NodeRankValidationError,
+  parseContainerIndex,
+  parseContainerPath,
+  parseNodeId,
+  parseNodeRank,
+} from "../primitives/mod.ts";
+
+const CONTAINER_EDGE_KIND = "ContainerEdge" as const;
+const ITEM_EDGE_KIND = "ItemEdge" as const;
+const EDGE_KIND = "Edge" as const;
+
+type ContainerEdgeData = Readonly<{
+  readonly to: ContainerPath;
+  readonly index: ContainerIndex;
+}>;
+
+type ItemEdgeData = Readonly<{
+  readonly to: NodeId;
+  readonly rank: NodeRank;
+}>;
+
+export type ContainerEdge = Readonly<{
+  readonly kind: typeof CONTAINER_EDGE_KIND;
+  readonly data: ContainerEdgeData;
+  toJSON(): ContainerEdgeSnapshot;
+}>;
+
+export type ItemEdge = Readonly<{
+  readonly kind: typeof ITEM_EDGE_KIND;
+  readonly data: ItemEdgeData;
+  toJSON(): ItemEdgeSnapshot;
+}>;
+
+export type Edge = ContainerEdge | ItemEdge;
+
+export type ContainerEdgeSnapshot = Readonly<{
+  readonly kind?: typeof CONTAINER_EDGE_KIND;
+  readonly to: string;
+  readonly index: number;
+}>;
+
+export type ItemEdgeSnapshot = Readonly<{
+  readonly kind?: typeof ITEM_EDGE_KIND;
+  readonly to: string;
+  readonly rank: string;
+}>;
+
+export type EdgeSnapshot = ContainerEdgeSnapshot | ItemEdgeSnapshot;
+
+export type ContainerEdgeValidationError = ValidationError<typeof CONTAINER_EDGE_KIND>;
+export type ItemEdgeValidationError = ValidationError<typeof ITEM_EDGE_KIND>;
+export type EdgeValidationError = ValidationError<typeof EDGE_KIND>;
+
+const instantiateContainerEdge = (data: ContainerEdgeData): ContainerEdge => {
+  const frozen = Object.freeze({ ...data });
+  return Object.freeze({
+    kind: CONTAINER_EDGE_KIND,
+    data: frozen,
+    toJSON() {
+      return Object.freeze({
+        kind: CONTAINER_EDGE_KIND,
+        to: frozen.to.toString(),
+        index: frozen.index.value(),
+      });
+    },
+  });
+};
+
+const instantiateItemEdge = (data: ItemEdgeData): ItemEdge => {
+  const frozen = Object.freeze({ ...data });
+  return Object.freeze({
+    kind: ITEM_EDGE_KIND,
+    data: frozen,
+    toJSON() {
+      return Object.freeze({
+        kind: ITEM_EDGE_KIND,
+        to: frozen.to.toString(),
+        rank: frozen.rank.toString(),
+      });
+    },
+  });
+};
+
+const prefixIssues = (
+  field: string,
+  error:
+    | ContainerPathValidationError
+    | ContainerIndexValidationError
+    | NodeIdValidationError
+    | NodeRankValidationError,
+): ValidationIssue[] =>
+  error.issues.map((issue) =>
+    createValidationIssue(issue.message, {
+      code: issue.code,
+      path: [field, ...issue.path],
+    })
+  );
+
+export const createContainerEdge = (
+  to: ContainerPath,
+  index: ContainerIndex,
+): ContainerEdge => instantiateContainerEdge({ to, index });
+
+export const createItemEdge = (
+  to: NodeId,
+  rank: NodeRank,
+): ItemEdge => instantiateItemEdge({ to, rank });
+
+export const parseContainerEdge = (
+  input: unknown,
+): Result<ContainerEdge, ContainerEdgeValidationError> => {
+  if (typeof input !== "object" || input === null) {
+    return Result.error(
+      createValidationError(CONTAINER_EDGE_KIND, [
+        createValidationIssue("edge must be an object", { path: ["value"], code: "type" }),
+      ]),
+    );
+  }
+
+  const snapshot = input as ContainerEdgeSnapshot;
+  const issues: ValidationIssue[] = [];
+
+  let to: ContainerPath | undefined;
+  if ("to" in snapshot) {
+    const result = parseContainerPath(snapshot.to);
+    if (result.type === "error") {
+      issues.push(...prefixIssues("to", result.error));
+    } else {
+      to = result.value;
+    }
+  } else {
+    issues.push(
+      createValidationIssue("to is required", {
+        path: ["to"],
+        code: "required",
+      }),
+    );
+  }
+
+  let index: ContainerIndex | undefined;
+  if ("index" in snapshot) {
+    const result = parseContainerIndex(snapshot.index);
+    if (result.type === "error") {
+      issues.push(...prefixIssues("index", result.error));
+    } else {
+      index = result.value;
+    }
+  } else {
+    issues.push(
+      createValidationIssue("index is required", {
+        path: ["index"],
+        code: "required",
+      }),
+    );
+  }
+
+  if (issues.length > 0 || !to || !index) {
+    return Result.error(createValidationError(CONTAINER_EDGE_KIND, issues));
+  }
+
+  return Result.ok(instantiateContainerEdge({ to, index }));
+};
+
+export const parseItemEdge = (
+  input: unknown,
+): Result<ItemEdge, ItemEdgeValidationError> => {
+  if (typeof input !== "object" || input === null) {
+    return Result.error(
+      createValidationError(ITEM_EDGE_KIND, [
+        createValidationIssue("edge must be an object", { path: ["value"], code: "type" }),
+      ]),
+    );
+  }
+
+  const snapshot = input as ItemEdgeSnapshot;
+  const issues: ValidationIssue[] = [];
+
+  let to: NodeId | undefined;
+  if ("to" in snapshot) {
+    const result = parseNodeId(snapshot.to);
+    if (result.type === "error") {
+      issues.push(...prefixIssues("to", result.error));
+    } else {
+      to = result.value;
+    }
+  } else {
+    issues.push(
+      createValidationIssue("to is required", {
+        path: ["to"],
+        code: "required",
+      }),
+    );
+  }
+
+  let rank: NodeRank | undefined;
+  if ("rank" in snapshot) {
+    const result = parseNodeRank(snapshot.rank);
+    if (result.type === "error") {
+      issues.push(...prefixIssues("rank", result.error));
+    } else {
+      rank = result.value;
+    }
+  } else {
+    issues.push(
+      createValidationIssue("rank is required", {
+        path: ["rank"],
+        code: "required",
+      }),
+    );
+  }
+
+  if (issues.length > 0 || !to || !rank) {
+    return Result.error(createValidationError(ITEM_EDGE_KIND, issues));
+  }
+
+  return Result.ok(instantiateItemEdge({ to, rank }));
+};
+
+export const parseEdge = (
+  input: EdgeSnapshot | unknown,
+): Result<Edge, EdgeValidationError> => {
+  if (typeof input !== "object" || input === null) {
+    return Result.error(
+      createValidationError(EDGE_KIND, [
+        createValidationIssue("edge must be an object", { path: ["value"], code: "type" }),
+      ]),
+    );
+  }
+
+  const candidate = input as EdgeSnapshot & { kind?: string };
+  const kind = candidate.kind;
+
+  if (kind === CONTAINER_EDGE_KIND) {
+    const result = parseContainerEdge(candidate);
+    if (result.type === "error") {
+      return Result.error(createValidationError(EDGE_KIND, result.error.issues));
+    }
+    return Result.ok(result.value);
+  }
+
+  if (kind === ITEM_EDGE_KIND) {
+    const result = parseItemEdge(candidate);
+    if (result.type === "error") {
+      return Result.error(createValidationError(EDGE_KIND, result.error.issues));
+    }
+    return Result.ok(result.value);
+  }
+
+  if ("index" in candidate && "to" in candidate) {
+    const result = parseContainerEdge(candidate);
+    if (result.type === "error") {
+      return Result.error(createValidationError(EDGE_KIND, result.error.issues));
+    }
+    return Result.ok(result.value);
+  }
+
+  if ("rank" in candidate && "to" in candidate) {
+    const result = parseItemEdge(candidate);
+    if (result.type === "error") {
+      return Result.error(createValidationError(EDGE_KIND, result.error.issues));
+    }
+    return Result.ok(result.value);
+  }
+
+  return Result.error(
+    createValidationError(EDGE_KIND, [
+      createValidationIssue("edge kind is not recognized", {
+        path: ["kind"],
+        code: "unknown_variant",
+      }),
+    ]),
+  );
+};
