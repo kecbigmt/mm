@@ -34,10 +34,74 @@ export type CliDependencyError =
   | { readonly type: "repository"; readonly error: RepositoryError }
   | { readonly type: "workspace"; readonly message: string };
 
+type WorkspaceRootSources = Readonly<{
+  readonly workspacePath?: string;
+  readonly mmHome?: string;
+  readonly home?: string;
+  readonly userProfile?: string;
+}>;
+
+const normalizePathInput = (value?: string): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+export const resolveWorkspaceRootFromSources = (
+  sources: WorkspaceRootSources,
+): Result<string, CliDependencyError> => {
+  const explicit = normalizePathInput(sources.workspacePath);
+  if (explicit) {
+    return Result.ok(resolve(explicit));
+  }
+
+  const envRoot = normalizePathInput(sources.mmHome);
+  if (envRoot) {
+    return Result.ok(resolve(envRoot));
+  }
+
+  const home = normalizePathInput(sources.home);
+  if (home) {
+    return Result.ok(resolve(home, ".mm"));
+  }
+
+  const userProfile = normalizePathInput(sources.userProfile);
+  if (userProfile) {
+    return Result.ok(resolve(userProfile, ".mm"));
+  }
+
+  return Result.error({
+    type: "workspace",
+    message: "workspace root could not be determined; set --workspace, MM_HOME, or HOME",
+  });
+};
+
+const determineWorkspaceRoot = (
+  workspacePath?: string,
+): Result<string, CliDependencyError> => {
+  const explicit = normalizePathInput(workspacePath);
+  if (explicit) {
+    return resolveWorkspaceRootFromSources({ workspacePath: explicit });
+  }
+
+  return resolveWorkspaceRootFromSources({
+    mmHome: Deno.env.get("MM_HOME"),
+    home: Deno.env.get("HOME"),
+    userProfile: Deno.env.get("USERPROFILE"),
+  });
+};
+
 export const loadCliDependencies = async (
   workspacePath?: string,
 ): Promise<Result<CliDependencies, CliDependencyError>> => {
-  const root = workspacePath ? resolve(workspacePath) : Deno.cwd();
+  const rootResult = determineWorkspaceRoot(workspacePath);
+  if (rootResult.type === "error") {
+    return Result.error(rootResult.error);
+  }
+
+  const root = rootResult.value;
   const workspaceRepository = createFileSystemWorkspaceRepository({ root });
 
   const workspaceResult = await workspaceRepository.load();
