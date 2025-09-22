@@ -81,3 +81,6 @@ export {
   isContainerIndex,
   parseContainerIndex,
 } from "./container_index.ts";
+
+export type { WorkspaceName, WorkspaceNameValidationError } from "./workspace_name.ts";
+export { isWorkspaceName, parseWorkspaceName, workspaceNameFromString } from "./workspace_name.ts";

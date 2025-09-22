@@ -66,3 +66,41 @@ Both commands accept:
 - **Short IDs**: Last 7 characters of the item ID (e.g., `abc1234`)
 
 If a short ID matches multiple items, the command will show an error listing the ambiguous matches.
+
+### Workspace Management
+
+Workspaces are stored under `~/.mm/workspaces` by default (override with `MM_HOME`). The `workspace`
+command also accepts the short alias `ws`.
+
+#### `workspace list`
+
+Show all known workspaces and highlight the active one.
+
+```sh
+mm workspace list
+mm ws list
+```
+
+#### `workspace init <name>`
+
+Create a new workspace (fails if one already exists) and switch to it immediately. Optionally set
+the timezone to embed in the new workspace.
+
+```sh
+mm workspace init research
+mm ws init client-a --timezone Asia/Tokyo
+```
+
+Options:
+
+- `-t, --timezone <iana-id>` – Timezone identifier for the new workspace (default: host timezone)
+
+#### `workspace use <name>`
+
+Switch to an existing workspace. If the workspace is missing, it is created first using the
+specified (or default) timezone.
+
+```sh
+mm workspace use research
+mm ws use client-a --timezone Asia/Tokyo
+```

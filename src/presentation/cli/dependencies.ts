@@ -1,4 +1,4 @@
-import { resolve } from "@std/path";
+import { isAbsolute, resolve } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import {
   createFileSystemContainerRepository,
@@ -18,6 +18,8 @@ import {
   IdGenerationService,
 } from "../../domain/services/id_generation_service.ts";
 import { createUuidV7Generator } from "../../infrastructure/uuid/generator.ts";
+import { WorkspaceName, workspaceNameFromString } from "../../domain/primitives/workspace_name.ts";
+import { createFileSystemConfigRepository } from "../../infrastructure/fileSystem/config_repository.ts";
 
 export type CliDependencies = Readonly<{
   readonly root: string;
@@ -34,13 +36,168 @@ export type CliDependencyError =
   | { readonly type: "repository"; readonly error: RepositoryError }
   | { readonly type: "workspace"; readonly message: string };
 
+type WorkspaceRootSources = Readonly<{
+  readonly workspacePath?: string;
+  readonly mmHome?: string;
+  readonly home?: string;
+  readonly userProfile?: string;
+}>;
+
+const normalizePathInput = (value?: string): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const safeGetEnv = (key: string): string | undefined => {
+  try {
+    return Deno.env.get(key) ?? undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+export const resolveWorkspaceRootFromSources = (
+  sources: WorkspaceRootSources,
+): Result<string, CliDependencyError> => {
+  const explicit = normalizePathInput(sources.workspacePath);
+  if (explicit) {
+    return Result.ok(resolve(explicit));
+  }
+
+  const envRoot = normalizePathInput(sources.mmHome);
+  if (envRoot) {
+    return Result.ok(resolve(envRoot));
+  }
+
+  const home = normalizePathInput(sources.home);
+  if (home) {
+    return Result.ok(resolve(home, ".mm"));
+  }
+
+  const userProfile = normalizePathInput(sources.userProfile);
+  if (userProfile) {
+    return Result.ok(resolve(userProfile, ".mm"));
+  }
+
+  return Result.error({
+    type: "workspace",
+    message: "workspace root could not be determined; set --workspace, MM_HOME, or HOME",
+  });
+};
+
+export const resolveMmHome = (): Result<string, CliDependencyError> =>
+  resolveWorkspaceRootFromSources({
+    mmHome: safeGetEnv("MM_HOME"),
+    home: safeGetEnv("HOME"),
+    userProfile: safeGetEnv("USERPROFILE"),
+  });
+
+const determineWorkspaceFromName = async (
+  repository: WorkspaceRepository,
+  name: WorkspaceName,
+): Promise<Result<string, CliDependencyError>> => {
+  const existsResult = await repository.exists(name);
+  if (existsResult.type === "error") {
+    return Result.error({ type: "repository", error: existsResult.error });
+  }
+  if (!existsResult.value) {
+    return Result.error({
+      type: "workspace",
+      message:
+        `workspace '${name.toString()}' does not exist; run mm workspace init ${name.toString()}`,
+    });
+  }
+  return Result.ok(repository.pathFor(name));
+};
+
+const determineWorkspaceRoot = async (
+  workspacePath: string | undefined,
+  repository: WorkspaceRepository,
+  configRepository: ReturnType<typeof createFileSystemConfigRepository>,
+): Promise<Result<string, CliDependencyError>> => {
+  const explicit = normalizePathInput(workspacePath);
+  if (explicit) {
+    if (
+      isAbsolute(explicit) || explicit.includes("/") || explicit.includes("\\") ||
+      explicit.startsWith(".")
+    ) {
+      const path = resolve(explicit);
+      try {
+        const stat = await Deno.stat(path);
+        if (!stat.isDirectory) {
+          return Result.error({
+            type: "workspace",
+            message: `workspace path '${path}' is not a directory`,
+          });
+        }
+      } catch (error) {
+        if (error instanceof Deno.errors.NotFound) {
+          return Result.error({
+            type: "workspace",
+            message: `workspace path '${path}' does not exist`,
+          });
+        }
+        return Result.error({
+          type: "workspace",
+          message: `failed to inspect workspace path '${path}'`,
+        });
+      }
+      return Result.ok(path);
+    }
+
+    const parsedName = workspaceNameFromString(explicit);
+    if (parsedName.type === "error") {
+      return Result.error({
+        type: "workspace",
+        message: parsedName.error.issues[0]?.message ?? "invalid workspace name",
+      });
+    }
+    return await determineWorkspaceFromName(repository, parsedName.value);
+  }
+
+  const currentResult = await configRepository.getCurrentWorkspace();
+  if (currentResult.type === "error") {
+    return Result.error({ type: "repository", error: currentResult.error });
+  }
+
+  const currentName = currentResult.value ?? "home";
+  const parsedName = workspaceNameFromString(currentName);
+  if (parsedName.type === "error") {
+    return Result.error({
+      type: "workspace",
+      message: parsedName.error.issues[0]?.message ?? "workspace name is invalid",
+    });
+  }
+
+  return await determineWorkspaceFromName(repository, parsedName.value);
+};
+
 export const loadCliDependencies = async (
   workspacePath?: string,
 ): Promise<Result<CliDependencies, CliDependencyError>> => {
-  const root = workspacePath ? resolve(workspacePath) : Deno.cwd();
-  const workspaceRepository = createFileSystemWorkspaceRepository({ root });
+  const homeResult = resolveMmHome();
+  if (homeResult.type === "error") {
+    return homeResult;
+  }
+  const home = homeResult.value;
 
-  const workspaceResult = await workspaceRepository.load();
+  const workspaceRepository = createFileSystemWorkspaceRepository({ home });
+  const configRepository = createFileSystemConfigRepository({ home });
+
+  const rootResult = await determineWorkspaceRoot(
+    workspacePath,
+    workspaceRepository,
+    configRepository,
+  );
+  if (rootResult.type === "error") {
+    return rootResult;
+  }
+
+  const root = rootResult.value;
+  const workspaceResult = await workspaceRepository.load(root);
   if (workspaceResult.type === "error") {
     return Result.error({ type: "repository", error: workspaceResult.error });
   }

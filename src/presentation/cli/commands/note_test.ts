@@ -1,6 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { join } from "@std/path";
-import { Command } from "jsr:@cliffy/command@1.0.0-rc.4";
+import { Command } from "@cliffy/command";
 import { createNoteCommand } from "./note.ts";
 
 const buildCli = () =>
@@ -45,6 +45,7 @@ const captureConsole = () => {
 Deno.test({
   name: "note command persists note to workspace",
   permissions: {
+    env: true,
     read: true,
     write: true,
   },

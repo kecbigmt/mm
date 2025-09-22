@@ -1,4 +1,4 @@
-import { Command } from "jsr:@cliffy/command@1.0.0-rc.4";
+import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { parseDateArgument } from "../utils/date.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
@@ -19,6 +19,7 @@ export function createNoteCommand() {
   return new Command()
     .description("Create a new note")
     .arguments("[title:string]")
+    .option("-w, --workspace <workspace:string>", "Workspace to override")
     .option("-b, --body <body:string>", "Body text")
     .option("-p, --project <project:string>", "Project tag")
     .option("-c, --context <context:string>", "Context tag")
