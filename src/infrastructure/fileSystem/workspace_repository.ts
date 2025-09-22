@@ -187,7 +187,7 @@ export const createFileSystemWorkspaceRepository = (
     }
 
     const settings = createWorkspaceSettings({ timezone });
-    return await save(root, settings);
+    return save(root, settings);
   };
 
   const pathFor = (name: WorkspaceName): string => workspaceRootPath(dependencies.home, name);
