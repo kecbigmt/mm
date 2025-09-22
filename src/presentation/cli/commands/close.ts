@@ -45,11 +45,7 @@ export function createCloseCommand() {
       });
 
       if (workflowResult.type === "error") {
-        console.error(
-          workflowResult.error.kind === "ValidationError"
-            ? workflowResult.error.message
-            : workflowResult.error.error.message,
-        );
+        console.error(workflowResult.error.message);
         return;
       }
 
@@ -74,10 +70,7 @@ export function createCloseCommand() {
       if (failed.length > 0) {
         console.error(`\n❌ ${failed.length} error(s) occurred:`);
         for (const { itemId, error } of failed) {
-          const errorMessage = error.kind === "ValidationError"
-            ? error.message
-            : error.error.message;
-          console.error(`  ${itemId}: ${errorMessage}`);
+          console.error(`  ${itemId}: ${error.message}`);
         }
       }
 
