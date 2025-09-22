@@ -24,7 +24,7 @@
     "@cliffy/command": "jsr:@cliffy/command@1.0.0-rc.8",
     "@std/testing": "jsr:@std/testing@^1.0.15",
     "@std/testing/bdd": "jsr:@std/testing@1.0.15/bdd",
-    "@std/uuid/unstable-v7": "jsr:@std/uuid/unstable-v7@1.0.0",
+    "@std/uuid/unstable-v7": "jsr:@std/uuid@1.0.9/unstable-v7",
     "lexorank": "npm:lexorank@1.0.5"
   }
 }
