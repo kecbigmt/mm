@@ -1,4 +1,4 @@
-import { generate } from "jsr:@std/uuid/unstable-v7";
+import { generate } from "@std/uuid/unstable-v7";
 import { IdGenerator } from "../../domain/services/id_generation_service.ts";
 
 /**
