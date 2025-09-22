@@ -1,4 +1,4 @@
-import { resolve } from "@std/path";
+import { isAbsolute, resolve } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import {
   createFileSystemContainerRepository,
@@ -120,7 +120,10 @@ const determineWorkspaceRoot = async (
 ): Promise<Result<string, CliDependencyError>> => {
   const explicit = normalizePathInput(workspacePath);
   if (explicit) {
-    if (explicit.includes("/") || explicit.includes("\\") || explicit.startsWith(".")) {
+    if (
+      isAbsolute(explicit) || explicit.includes("/") || explicit.includes("\\") ||
+      explicit.startsWith(".")
+    ) {
       const path = resolve(explicit);
       try {
         const stat = await Deno.stat(path);
