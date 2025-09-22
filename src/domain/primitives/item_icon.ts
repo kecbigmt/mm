@@ -4,47 +4,33 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
+import { createStringPrimitiveFactory, StringPrimitive } from "./string_primitive.ts";
 
 const ITEM_ICON_KIND = "ItemIcon" as const;
-const ITEM_ICON_BRAND: unique symbol = Symbol(ITEM_ICON_KIND);
 
 export type ItemIconValue = "note" | "task" | "event";
 
-export type ItemIcon = Readonly<{
-  readonly data: Readonly<{
-    readonly value: ItemIconValue;
-  }>;
-  toString(): ItemIconValue;
-  toJSON(): ItemIconValue;
-  equals(other: ItemIcon): boolean;
-  readonly [ITEM_ICON_BRAND]: true;
-}>;
+const itemIconFactory = createStringPrimitiveFactory<
+  typeof ITEM_ICON_KIND,
+  ItemIconValue,
+  ItemIconValue
+>({
+  kind: ITEM_ICON_KIND,
+});
 
-const toString = function (this: ItemIcon): ItemIconValue {
-  return this.data.value;
-};
+export type ItemIcon = StringPrimitive<
+  typeof itemIconFactory.brand,
+  ItemIconValue,
+  ItemIconValue,
+  true,
+  false
+>;
 
-const toJSON = function (this: ItemIcon): ItemIconValue {
-  return this.toString();
-};
-
-const equals = function (this: ItemIcon, other: ItemIcon): boolean {
-  return this.data.value === other.data.value;
-};
-
-const instantiate = (value: ItemIconValue): ItemIcon =>
-  Object.freeze({
-    data: Object.freeze({ value }),
-    toString,
-    toJSON,
-    equals,
-    [ITEM_ICON_BRAND]: true,
-  });
+const instantiate = (value: ItemIconValue): ItemIcon => itemIconFactory.instantiate(value);
 
 export type ItemIconValidationError = ValidationError<typeof ITEM_ICON_KIND>;
 
-export const isItemIcon = (value: unknown): value is ItemIcon =>
-  typeof value === "object" && value !== null && ITEM_ICON_BRAND in value;
+export const isItemIcon = (value: unknown): value is ItemIcon => itemIconFactory.is(value);
 
 const ITEM_ICON_VALUES: ReadonlyArray<ItemIconValue> = ["note", "task", "event"];
 

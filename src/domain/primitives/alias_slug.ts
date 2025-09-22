@@ -4,45 +4,26 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
+import { createStringPrimitiveFactory, StringPrimitive } from "./string_primitive.ts";
 
 const ALIAS_SLUG_KIND = "AliasSlug" as const;
-const ALIAS_SLUG_BRAND: unique symbol = Symbol(ALIAS_SLUG_KIND);
+const aliasSlugFactory = createStringPrimitiveFactory({
+  kind: ALIAS_SLUG_KIND,
+});
 
-export type AliasSlug = Readonly<{
-  readonly data: Readonly<{
-    readonly value: string;
-  }>;
-  toString(): string;
-  toJSON(): string;
-  equals(other: AliasSlug): boolean;
-  readonly [ALIAS_SLUG_BRAND]: true;
-}>;
+export type AliasSlug = StringPrimitive<
+  typeof aliasSlugFactory.brand,
+  string,
+  string,
+  true,
+  false
+>;
 
-const toString = function (this: AliasSlug): string {
-  return this.data.value;
-};
-
-const toJSON = function (this: AliasSlug): string {
-  return this.toString();
-};
-
-const equals = function (this: AliasSlug, other: AliasSlug): boolean {
-  return this.data.value === other.data.value;
-};
-
-const instantiate = (value: string): AliasSlug =>
-  Object.freeze({
-    data: Object.freeze({ value }),
-    toString,
-    toJSON,
-    equals,
-    [ALIAS_SLUG_BRAND]: true,
-  });
+const instantiate = (value: string): AliasSlug => aliasSlugFactory.instantiate(value);
 
 export type AliasSlugValidationError = ValidationError<typeof ALIAS_SLUG_KIND>;
 
-export const isAliasSlug = (value: unknown): value is AliasSlug =>
-  typeof value === "object" && value !== null && ALIAS_SLUG_BRAND in value;
+export const isAliasSlug = (value: unknown): value is AliasSlug => aliasSlugFactory.is(value);
 
 const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MIN_LENGTH = 3;

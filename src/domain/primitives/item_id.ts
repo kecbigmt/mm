@@ -5,33 +5,23 @@ import {
   ValidationError,
 } from "../../shared/errors.ts";
 import { ItemShortId, parseItemShortId } from "./item_short_id.ts";
+import { createStringPrimitiveFactory, StringPrimitive } from "./string_primitive.ts";
 
 const ITEM_ID_KIND = "ItemId" as const;
-const ITEM_ID_BRAND: unique symbol = Symbol(ITEM_ID_KIND);
 const UUID_V7_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export type ItemId = Readonly<{
-  readonly data: Readonly<{
-    readonly value: string;
-  }>;
-  toString(): string;
-  equals(other: ItemId): boolean;
-  toJSON(): string;
-  toShortId(): ItemShortId;
-  readonly [ITEM_ID_BRAND]: true;
-}>;
+const itemIdFactory = createStringPrimitiveFactory({
+  kind: ITEM_ID_KIND,
+});
 
-const toString = function (this: ItemId): string {
-  return this.data.value;
-};
-
-const equals = function (this: ItemId, other: ItemId): boolean {
-  return this.data.value === other.data.value;
-};
-
-const toJSON = function (this: ItemId): string {
-  return this.toString();
-};
+export type ItemId = StringPrimitive<
+  typeof itemIdFactory.brand,
+  string,
+  string,
+  true,
+  false,
+  { toShortId(): ItemShortId }
+>;
 
 const toShortId = function (this: ItemId): ItemShortId {
   const shortIdString = this.data.value.slice(-7);
@@ -42,20 +32,12 @@ const toShortId = function (this: ItemId): ItemShortId {
   return result.value;
 };
 
-const instantiate = (value: string): ItemId =>
-  Object.freeze({
-    data: Object.freeze({ value }),
-    toString,
-    equals,
-    toJSON,
-    toShortId,
-    [ITEM_ID_BRAND]: true,
-  });
+const instantiate = (value: string): ItemId => itemIdFactory.instantiate(value, { toShortId });
 
 export type ItemIdValidationError = ValidationError<typeof ITEM_ID_KIND>;
 
 export const isItemId = (value: unknown): value is ItemId =>
-  typeof value === "object" && value !== null && ITEM_ID_BRAND in value;
+  itemIdFactory.is<{ toShortId(): ItemShortId }>(value);
 
 export const parseItemId = (
   input: unknown,

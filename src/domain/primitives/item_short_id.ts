@@ -4,45 +4,26 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
+import { createStringPrimitiveFactory, StringPrimitive } from "./string_primitive.ts";
 
 const ITEM_SHORT_ID_KIND = "ItemShortId" as const;
-const ITEM_SHORT_ID_BRAND: unique symbol = Symbol(ITEM_SHORT_ID_KIND);
+const itemShortIdFactory = createStringPrimitiveFactory({
+  kind: ITEM_SHORT_ID_KIND,
+});
 
-export type ItemShortId = Readonly<{
-  readonly data: Readonly<{
-    readonly value: string;
-  }>;
-  toString(): string;
-  equals(other: ItemShortId): boolean;
-  toJSON(): string;
-  readonly [ITEM_SHORT_ID_BRAND]: true;
-}>;
+export type ItemShortId = StringPrimitive<
+  typeof itemShortIdFactory.brand,
+  string,
+  string,
+  true,
+  false
+>;
 
-const toString = function (this: ItemShortId): string {
-  return this.data.value;
-};
-
-const equals = function (this: ItemShortId, other: ItemShortId): boolean {
-  return this.data.value === other.data.value;
-};
-
-const toJSON = function (this: ItemShortId): string {
-  return this.toString();
-};
-
-const instantiate = (value: string): ItemShortId =>
-  Object.freeze({
-    data: Object.freeze({ value }),
-    toString,
-    equals,
-    toJSON,
-    [ITEM_SHORT_ID_BRAND]: true,
-  });
+const instantiate = (value: string): ItemShortId => itemShortIdFactory.instantiate(value);
 
 export type ItemShortIdValidationError = ValidationError<typeof ITEM_SHORT_ID_KIND>;
 
-export const isItemShortId = (value: unknown): value is ItemShortId =>
-  typeof value === "object" && value !== null && ITEM_SHORT_ID_BRAND in value;
+export const isItemShortId = (value: unknown): value is ItemShortId => itemShortIdFactory.is(value);
 
 export const parseItemShortId = (
   input: unknown,
