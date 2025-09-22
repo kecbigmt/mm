@@ -10,8 +10,9 @@ export function createReopenCommand() {
   return new Command()
     .description("Reopen closed items (tasks/notes/events)")
     .arguments("<ids...:string>")
-    .action(async (_options, ...ids: string[]) => {
-      const workspaceOption = undefined; // TODO: handle workspace option
+    .option("-w, --workspace <workspace:string>", "Workspace to override")
+    .action(async (options: Record<string, unknown>, ...ids: string[]) => {
+      const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
       const depsResult = await loadCliDependencies(workspaceOption);
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
