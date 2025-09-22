@@ -99,7 +99,8 @@ const initAction = async (
     return;
   }
 
-  const timezoneInput = typeof options.timezone === "string" ? options.timezone : undefined;
+  const hostTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timezoneInput = typeof options.timezone === "string" ? options.timezone : hostTimezone;
   const timezoneResult = timezoneOrReport(timezoneInput);
   if (timezoneResult.type === "error") {
     console.error(formatIssues(timezoneResult.error.issues));
