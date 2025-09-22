@@ -28,10 +28,6 @@ const resolveEnvironment = () => {
   });
 };
 
-const workspaceNameOrReport = (
-  name: string,
-): ReturnType<typeof workspaceNameFromString> => workspaceNameFromString(name);
-
 const timezoneOrReport = (timezone?: string) => {
   const candidate = typeof timezone === "string" && timezone.trim().length > 0
     ? timezone.trim()
@@ -93,7 +89,7 @@ const initAction = async (
   }
   const env = envResult.value;
 
-  const parsedName = workspaceNameOrReport(name);
+  const parsedName = workspaceNameFromString(name);
   if (parsedName.type === "error") {
     console.error(formatIssues(parsedName.error.issues));
     return;
@@ -142,7 +138,7 @@ const useAction = async (
   }
   const env = envResult.value;
 
-  const parsedName = workspaceNameOrReport(name);
+  const parsedName = workspaceNameFromString(name);
   if (parsedName.type === "error") {
     console.error(formatIssues(parsedName.error.issues));
     return;
