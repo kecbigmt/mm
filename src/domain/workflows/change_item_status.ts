@@ -5,10 +5,13 @@ import {
   ValidationError,
 } from "../../shared/errors.ts";
 import { Item } from "../models/item.ts";
-import { parseItemId } from "../primitives/item_id.ts";
 import { DateTime } from "../primitives/date_time.ts";
-import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
+import {
+  ItemResolutionDependencies,
+  ItemResolutionError,
+  ItemResolutionService,
+} from "../services/item_resolution_service.ts";
 
 export type StatusAction = "close" | "reopen";
 
@@ -18,20 +21,14 @@ export type ChangeItemStatusInput = Readonly<{
   occurredAt: DateTime;
 }>;
 
-export type ChangeItemStatusDependencies = Readonly<{
-  itemRepository: ItemRepository;
-}>;
+export type ChangeItemStatusDependencies = ItemResolutionDependencies;
 
 export type ChangeItemStatusValidationError = ValidationError<"ChangeItemStatus">;
 
-export type ChangeItemStatusRepositoryError = Readonly<{
-  kind: "repository";
-  error: RepositoryError;
-}>;
-
 export type ChangeItemStatusError =
   | ChangeItemStatusValidationError
-  | ChangeItemStatusRepositoryError;
+  | ItemResolutionError
+  | RepositoryError;
 
 export type ChangeItemStatusResult = Readonly<{
   succeeded: ReadonlyArray<Item>;
@@ -40,11 +37,6 @@ export type ChangeItemStatusResult = Readonly<{
     error: ChangeItemStatusError;
   }>;
 }>;
-
-const repositoryFailure = (error: RepositoryError): ChangeItemStatusRepositoryError => ({
-  kind: "repository",
-  error,
-});
 
 export const ChangeItemStatusWorkflow = {
   execute: async (
@@ -69,25 +61,16 @@ export const ChangeItemStatusWorkflow = {
     }> = [];
 
     for (const itemId of input.itemIds) {
-      const parseResult = parseItemId(itemId);
-      if (parseResult.type === "error") {
+      const resolutionResult = await ItemResolutionService.resolveItemId(itemId, deps);
+      if (resolutionResult.type === "error") {
         failed.push({
           itemId,
-          error: createValidationError("ChangeItemStatus", parseResult.error.issues),
+          error: resolutionResult.error,
         });
         continue;
       }
 
-      const loadResult = await deps.itemRepository.load(parseResult.value);
-      if (loadResult.type === "error") {
-        failed.push({
-          itemId,
-          error: repositoryFailure(loadResult.error),
-        });
-        continue;
-      }
-
-      const item = loadResult.value;
+      const item = resolutionResult.value;
       if (!item) {
         failed.push({
           itemId,
@@ -122,7 +105,7 @@ export const ChangeItemStatusWorkflow = {
       if (saveResult.type === "error") {
         failed.push({
           itemId,
-          error: repositoryFailure(saveResult.error),
+          error: saveResult.error,
         });
         continue;
       }
