@@ -85,8 +85,10 @@ const ensureWorkspaceStructure = async (
   root: string,
 ): Promise<Result<void, RepositoryError>> => {
   try {
-    await Deno.mkdir(root, { recursive: true });
-    await Deno.mkdir(join(root, "nodes"), { recursive: true });
+    await Promise.all([
+      Deno.mkdir(root, { recursive: true }),
+      Deno.mkdir(join(root, "nodes"), { recursive: true }),
+    ]);
     return Result.ok(undefined);
   } catch (error) {
     if (error instanceof Deno.errors.AlreadyExists) {
