@@ -4,52 +4,34 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
+import { createStringPrimitiveFactory, StringPrimitive } from "./string_primitive.ts";
 
 const ITEM_RANK_KIND = "ItemRank" as const;
-const ITEM_RANK_BRAND: unique symbol = Symbol(ITEM_RANK_KIND);
 
-export type ItemRank = Readonly<{
-  readonly data: Readonly<{
-    readonly value: string;
-  }>;
-  toString(): string;
-  toJSON(): string;
-  compare(other: ItemRank): number;
-  readonly [ITEM_RANK_BRAND]: true;
-}>;
+const itemRankFactory = createStringPrimitiveFactory({
+  kind: ITEM_RANK_KIND,
+  includeEquals: false,
+  includeCompare: true,
+  compare: (value, other) => (value === other ? 0 : value < other ? -1 : 1),
+});
+
+export type ItemRank = StringPrimitive<
+  typeof itemRankFactory.brand,
+  string,
+  string,
+  false,
+  true
+>;
 
 const ORDER_KEY_REGEX = /^[0-9A-Za-z:|]+$/;
 const MIN_LENGTH = 1;
 const MAX_LENGTH = 30;
 
-const toString = function (this: ItemRank): string {
-  return this.data.value;
-};
-
-const toJSON = function (this: ItemRank): string {
-  return this.toString();
-};
-
-const compare = function (this: ItemRank, other: ItemRank): number {
-  if (this.data.value === other.data.value) {
-    return 0;
-  }
-  return this.data.value < other.data.value ? -1 : 1;
-};
-
-const instantiate = (value: string): ItemRank =>
-  Object.freeze({
-    data: Object.freeze({ value }),
-    toString,
-    toJSON,
-    compare,
-    [ITEM_RANK_BRAND]: true,
-  });
+const instantiate = (value: string): ItemRank => itemRankFactory.instantiate(value);
 
 export type ItemRankValidationError = ValidationError<typeof ITEM_RANK_KIND>;
 
-export const isItemRank = (value: unknown): value is ItemRank =>
-  typeof value === "object" && value !== null && ITEM_RANK_BRAND in value;
+export const isItemRank = (value: unknown): value is ItemRank => itemRankFactory.is(value);
 
 export const parseItemRank = (
   input: unknown,

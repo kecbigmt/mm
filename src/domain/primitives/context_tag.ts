@@ -4,45 +4,26 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
+import { createStringPrimitiveFactory, StringPrimitive } from "./string_primitive.ts";
 
 const CONTEXT_TAG_KIND = "ContextTag" as const;
-const CONTEXT_TAG_BRAND: unique symbol = Symbol(CONTEXT_TAG_KIND);
+const contextTagFactory = createStringPrimitiveFactory({
+  kind: CONTEXT_TAG_KIND,
+});
 
-export type ContextTag = Readonly<{
-  readonly data: Readonly<{
-    readonly value: string;
-  }>;
-  toString(): string;
-  toJSON(): string;
-  equals(other: ContextTag): boolean;
-  readonly [CONTEXT_TAG_BRAND]: true;
-}>;
+export type ContextTag = StringPrimitive<
+  typeof contextTagFactory.brand,
+  string,
+  string,
+  true,
+  false
+>;
 
-const toString = function (this: ContextTag): string {
-  return this.data.value;
-};
-
-const toJSON = function (this: ContextTag): string {
-  return this.toString();
-};
-
-const equals = function (this: ContextTag, other: ContextTag): boolean {
-  return this.data.value === other.data.value;
-};
-
-const instantiate = (value: string): ContextTag =>
-  Object.freeze({
-    data: Object.freeze({ value }),
-    toString,
-    toJSON,
-    equals,
-    [CONTEXT_TAG_BRAND]: true,
-  });
+const instantiate = (value: string): ContextTag => contextTagFactory.instantiate(value);
 
 export type ContextTagValidationError = ValidationError<typeof CONTEXT_TAG_KIND>;
 
-export const isContextTag = (value: unknown): value is ContextTag =>
-  typeof value === "object" && value !== null && CONTEXT_TAG_BRAND in value;
+export const isContextTag = (value: unknown): value is ContextTag => contextTagFactory.is(value);
 
 const CONTEXT_TAG_REGEX = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 const MIN_LENGTH = 1;

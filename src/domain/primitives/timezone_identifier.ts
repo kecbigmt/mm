@@ -4,45 +4,28 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
+import { createStringPrimitiveFactory, StringPrimitive } from "./string_primitive.ts";
 
 const TIMEZONE_IDENTIFIER_KIND = "TimezoneIdentifier" as const;
-const TIMEZONE_IDENTIFIER_BRAND: unique symbol = Symbol(TIMEZONE_IDENTIFIER_KIND);
+const timezoneIdentifierFactory = createStringPrimitiveFactory({
+  kind: TIMEZONE_IDENTIFIER_KIND,
+});
 
-export type TimezoneIdentifier = Readonly<{
-  readonly data: Readonly<{
-    readonly value: string;
-  }>;
-  toString(): string;
-  toJSON(): string;
-  equals(other: TimezoneIdentifier): boolean;
-  readonly [TIMEZONE_IDENTIFIER_BRAND]: true;
-}>;
-
-const toString = function (this: TimezoneIdentifier): string {
-  return this.data.value;
-};
-
-const toJSON = function (this: TimezoneIdentifier): string {
-  return this.toString();
-};
-
-const equals = function (this: TimezoneIdentifier, other: TimezoneIdentifier): boolean {
-  return this.data.value === other.data.value;
-};
+export type TimezoneIdentifier = StringPrimitive<
+  typeof timezoneIdentifierFactory.brand,
+  string,
+  string,
+  true,
+  false
+>;
 
 const instantiate = (value: string): TimezoneIdentifier =>
-  Object.freeze({
-    data: Object.freeze({ value }),
-    toString,
-    toJSON,
-    equals,
-    [TIMEZONE_IDENTIFIER_BRAND]: true,
-  });
+  timezoneIdentifierFactory.instantiate(value);
 
 export type TimezoneIdentifierValidationError = ValidationError<typeof TIMEZONE_IDENTIFIER_KIND>;
 
 export const isTimezoneIdentifier = (value: unknown): value is TimezoneIdentifier =>
-  typeof value === "object" && value !== null && TIMEZONE_IDENTIFIER_BRAND in value;
+  timezoneIdentifierFactory.is(value);
 
 const isValidTimezone = (value: string): boolean => {
   try {

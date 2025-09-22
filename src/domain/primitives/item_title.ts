@@ -4,45 +4,27 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
+import { createStringPrimitiveFactory, StringPrimitive } from "./string_primitive.ts";
 
 const ITEM_TITLE_KIND = "ItemTitle" as const;
-const ITEM_TITLE_BRAND: unique symbol = Symbol(ITEM_TITLE_KIND);
+const itemTitleFactory = createStringPrimitiveFactory({
+  kind: ITEM_TITLE_KIND,
+  equals: (value, other) => value.localeCompare(other) === 0,
+});
 
-export type ItemTitle = Readonly<{
-  readonly data: Readonly<{
-    readonly value: string;
-  }>;
-  toString(): string;
-  equals(other: ItemTitle): boolean;
-  toJSON(): string;
-  readonly [ITEM_TITLE_BRAND]: true;
-}>;
+export type ItemTitle = StringPrimitive<
+  typeof itemTitleFactory.brand,
+  string,
+  string,
+  true,
+  false
+>;
 
-const toString = function (this: ItemTitle): string {
-  return this.data.value;
-};
-
-const equals = function (this: ItemTitle, other: ItemTitle): boolean {
-  return this.data.value.localeCompare(other.data.value) === 0;
-};
-
-const toJSON = function (this: ItemTitle): string {
-  return this.toString();
-};
-
-const instantiate = (value: string): ItemTitle =>
-  Object.freeze({
-    data: Object.freeze({ value }),
-    toString,
-    equals,
-    toJSON,
-    [ITEM_TITLE_BRAND]: true,
-  });
+const instantiate = (value: string): ItemTitle => itemTitleFactory.instantiate(value);
 
 export type ItemTitleValidationError = ValidationError<typeof ITEM_TITLE_KIND>;
 
-export const isItemTitle = (value: unknown): value is ItemTitle =>
-  typeof value === "object" && value !== null && ITEM_TITLE_BRAND in value;
+export const isItemTitle = (value: unknown): value is ItemTitle => itemTitleFactory.is(value);
 
 const MAX_LENGTH = 200;
 

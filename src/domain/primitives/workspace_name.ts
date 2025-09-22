@@ -4,40 +4,22 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
+import { createStringPrimitiveFactory, StringPrimitive } from "./string_primitive.ts";
 
 const WORKSPACE_NAME_KIND = "WorkspaceName" as const;
-const WORKSPACE_NAME_BRAND: unique symbol = Symbol(WORKSPACE_NAME_KIND);
+const workspaceNameFactory = createStringPrimitiveFactory({
+  kind: WORKSPACE_NAME_KIND,
+});
 
-export type WorkspaceName = Readonly<{
-  readonly data: Readonly<{
-    readonly value: string;
-  }>;
-  toString(): string;
-  equals(other: WorkspaceName): boolean;
-  toJSON(): string;
-  readonly [WORKSPACE_NAME_BRAND]: true;
-}>;
+export type WorkspaceName = StringPrimitive<
+  typeof workspaceNameFactory.brand,
+  string,
+  string,
+  true,
+  false
+>;
 
-const toString = function (this: WorkspaceName): string {
-  return this.data.value;
-};
-
-const equals = function (this: WorkspaceName, other: WorkspaceName): boolean {
-  return this.data.value === other.data.value;
-};
-
-const toJSON = function (this: WorkspaceName): string {
-  return this.toString();
-};
-
-const instantiate = (value: string): WorkspaceName =>
-  Object.freeze({
-    data: Object.freeze({ value }),
-    toString,
-    equals,
-    toJSON,
-    [WORKSPACE_NAME_BRAND]: true,
-  });
+const instantiate = (value: string): WorkspaceName => workspaceNameFactory.instantiate(value);
 
 export type WorkspaceNameValidationError = ValidationError<typeof WORKSPACE_NAME_KIND>;
 
@@ -46,7 +28,7 @@ const MAX_LENGTH = 50;
 const NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-_]*[a-z0-9])?$/;
 
 export const isWorkspaceName = (value: unknown): value is WorkspaceName =>
-  typeof value === "object" && value !== null && WORKSPACE_NAME_BRAND in value;
+  workspaceNameFactory.is(value);
 
 export const parseWorkspaceName = (
   input: unknown,
