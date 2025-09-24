@@ -1,7 +1,7 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { join } from "@std/path";
 import { createFileSystemTagRepository } from "./tag_repository.ts";
-import { createTag, parseTag } from "../../domain/models/tag.ts";
+import { parseTag } from "../../domain/models/tag.ts";
 import { tagSlugFromString } from "../../domain/primitives/mod.ts";
 import { createSha256HashingService } from "../hash/sha256_hashing_service.ts";
 
