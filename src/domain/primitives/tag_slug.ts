@@ -7,38 +7,38 @@ import {
 } from "../../shared/errors.ts";
 import { CanonicalKey, createCanonicalKey } from "./canonical_key.ts";
 
-const ALIAS_SLUG_KIND = "AliasSlug" as const;
-const aliasSlugBrand: unique symbol = Symbol(ALIAS_SLUG_KIND);
+const TAG_SLUG_KIND = "TagSlug" as const;
+const tagSlugBrand: unique symbol = Symbol(TAG_SLUG_KIND);
 
-export type AliasSlug = Readonly<{
+export type TagSlug = Readonly<{
   readonly raw: string;
   readonly canonicalKey: CanonicalKey;
   toString(): string;
   toJSON(): string;
-  equals(other: AliasSlug): boolean;
-  readonly __brand: typeof aliasSlugBrand;
+  equals(other: TagSlug): boolean;
+  readonly __brand: typeof tagSlugBrand;
 }>;
 
-export type AliasSlugValidationError = ValidationError<typeof ALIAS_SLUG_KIND>;
+export type TagSlugValidationError = ValidationError<typeof TAG_SLUG_KIND>;
 
-const instantiate = (raw: string, canonicalKey: CanonicalKey): AliasSlug => {
+const instantiate = (raw: string, canonicalKey: CanonicalKey): TagSlug => {
   const value = Object.freeze({
     raw,
     canonicalKey,
     toString: () => raw,
     toJSON: () => raw,
-    equals: (other: AliasSlug) => canonicalKey.toString() === other.canonicalKey.toString(),
-    __brand: aliasSlugBrand,
+    equals: (other: TagSlug) => canonicalKey.toString() === other.canonicalKey.toString(),
+    __brand: tagSlugBrand,
   });
   return value;
 };
 
-export const isAliasSlug = (value: unknown): value is AliasSlug => {
+export const isTagSlug = (value: unknown): value is TagSlug => {
   if (typeof value !== "object" || value === null) {
     return false;
   }
-  const candidate = value as Partial<AliasSlug>;
-  return candidate.__brand === aliasSlugBrand && typeof candidate.toString === "function";
+  const candidate = value as Partial<TagSlug>;
+  return candidate.__brand === tagSlugBrand && typeof candidate.toString === "function";
 };
 
 const MIN_CODEPOINTS = 1;
@@ -54,19 +54,19 @@ const RELATIVE_PERIOD_REGEX = /^[~+]\d+[dwmy]$/u;
 
 const buildError = (
   issues: ValidationIssue[],
-): Result<AliasSlug, AliasSlugValidationError> =>
-  Result.error(createValidationError(ALIAS_SLUG_KIND, issues));
+): Result<TagSlug, TagSlugValidationError> =>
+  Result.error(createValidationError(TAG_SLUG_KIND, issues));
 
-export const parseAliasSlug = (
+export const parseTagSlug = (
   input: unknown,
-): Result<AliasSlug, AliasSlugValidationError> => {
-  if (isAliasSlug(input)) {
+): Result<TagSlug, TagSlugValidationError> => {
+  if (isTagSlug(input)) {
     return Result.ok(input);
   }
 
   if (typeof input !== "string") {
     return buildError([
-      createValidationIssue("alias must be a string", {
+      createValidationIssue("tag must be a string", {
         path: ["raw"],
         code: "not_string",
       }),
@@ -77,28 +77,28 @@ export const parseAliasSlug = (
   const issues: ValidationIssue[] = [];
 
   if (trimmed.length === 0) {
-    issues.push(createValidationIssue("alias cannot be empty", {
+    issues.push(createValidationIssue("tag cannot be empty", {
       path: ["raw"],
       code: "empty",
     }));
   }
 
   if (trimmed !== input) {
-    issues.push(createValidationIssue("alias cannot include leading or trailing whitespace", {
+    issues.push(createValidationIssue("tag cannot include leading or trailing whitespace", {
       path: ["raw"],
       code: "whitespace",
     }));
   }
 
   if (WHITESPACE_REGEX.test(trimmed)) {
-    issues.push(createValidationIssue("alias cannot contain whitespace", {
+    issues.push(createValidationIssue("tag cannot contain whitespace", {
       path: ["raw"],
       code: "whitespace",
     }));
   }
 
   if (CONTROL_REGEX.test(trimmed)) {
-    issues.push(createValidationIssue("alias cannot contain control characters", {
+    issues.push(createValidationIssue("tag cannot contain control characters", {
       path: ["raw"],
       code: "control",
     }));
@@ -106,14 +106,14 @@ export const parseAliasSlug = (
 
   const codepoints = Array.from(trimmed);
   if (codepoints.length < MIN_CODEPOINTS) {
-    issues.push(createValidationIssue("alias must include at least one character", {
+    issues.push(createValidationIssue("tag must include at least one character", {
       path: ["raw"],
       code: "min_length",
     }));
   }
 
   if (codepoints.length > MAX_CODEPOINTS) {
-    issues.push(createValidationIssue("alias must be at most 64 characters", {
+    issues.push(createValidationIssue("tag must be at most 64 characters", {
       path: ["raw"],
       code: "max_length",
     }));
@@ -121,7 +121,7 @@ export const parseAliasSlug = (
 
   if (!ALLOWED_CHARACTERS.test(trimmed)) {
     issues.push(
-      createValidationIssue("alias may contain only letters, numbers, marks, '_', '-', '.'", {
+      createValidationIssue("tag may contain only letters, numbers, marks, '_', '-', '.'", {
         path: ["raw"],
         code: "format",
       }),
@@ -143,7 +143,7 @@ export const parseAliasSlug = (
     RELATIVE_PERIOD_REGEX.test(canonicalValue)
   ) {
     return buildError([
-      createValidationIssue("alias collides with a reserved locator shape", {
+      createValidationIssue("tag collides with a reserved locator shape", {
         path: ["raw"],
         code: "reserved",
       }),
@@ -153,6 +153,6 @@ export const parseAliasSlug = (
   return Result.ok(instantiate(trimmed, canonicalKey));
 };
 
-export const aliasSlugFromString = (
+export const tagSlugFromString = (
   input: string,
-): Result<AliasSlug, AliasSlugValidationError> => parseAliasSlug(input);
+): Result<TagSlug, TagSlugValidationError> => parseTagSlug(input);

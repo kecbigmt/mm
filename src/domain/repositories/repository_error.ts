@@ -5,7 +5,7 @@ export type RepositoryScope =
   | "container"
   | "item"
   | "alias"
-  | "context"
+  | "tag"
   | "config";
 
 export type RepositoryOperation =

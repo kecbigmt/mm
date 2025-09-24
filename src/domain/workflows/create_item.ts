@@ -5,14 +5,14 @@ import { createItem } from "../models/item.ts";
 import {
   ContainerPath,
   containerPathFromSegments,
-  ContextTag,
-  contextTagFromString,
   createItemIcon,
   DateTime,
   ItemId,
   ItemRank,
   itemStatusOpen,
   itemTitleFromString,
+  TagSlug,
+  tagSlugFromString,
 } from "../primitives/mod.ts";
 import { CalendarDay } from "../primitives/calendar_day.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
@@ -88,9 +88,9 @@ export const CreateItemWorkflow = {
       );
     }
 
-    let context: ContextTag | undefined;
+    let context: TagSlug | undefined;
     if (typeof input.context === "string") {
-      const contextResult = contextTagFromString(input.context);
+      const contextResult = tagSlugFromString(input.context);
       if (contextResult.type === "error") {
         issues.push(
           ...contextResult.error.issues.map((issue) =>

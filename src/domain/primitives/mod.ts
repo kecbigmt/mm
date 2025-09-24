@@ -72,8 +72,11 @@ export { createItemIcon, isItemIcon, parseItemIcon } from "./item_icon.ts";
 export type { AliasSlug, AliasSlugValidationError } from "./alias_slug.ts";
 export { aliasSlugFromString, isAliasSlug, parseAliasSlug } from "./alias_slug.ts";
 
-export type { ContextTag, ContextTagValidationError } from "./context_tag.ts";
-export { contextTagFromString, isContextTag, parseContextTag } from "./context_tag.ts";
+export type { CanonicalKey } from "./canonical_key.ts";
+export { canonicalKeyFromString, createCanonicalKey, isCanonicalKey } from "./canonical_key.ts";
+
+export type { TagSlug, TagSlugValidationError } from "./tag_slug.ts";
+export { isTagSlug, parseTagSlug, tagSlugFromString } from "./tag_slug.ts";
 
 export type { ContainerIndex, ContainerIndexValidationError } from "./container_index.ts";
 export {
@@ -84,3 +87,14 @@ export {
 
 export type { WorkspaceName, WorkspaceNameValidationError } from "./workspace_name.ts";
 export { isWorkspaceName, parseWorkspaceName, workspaceNameFromString } from "./workspace_name.ts";
+
+export type {
+  DateSectionSegment,
+  NumericSectionSegment,
+  SectionSegment,
+  SectionSegmentValidationError,
+} from "./section_segment.ts";
+export { isSectionSegment, parseSectionSegment } from "./section_segment.ts";
+
+export type { SectionPath, SectionPathMode, SectionPathValidationError } from "./section_path.ts";
+export { isSectionPath, parseSectionPath } from "./section_path.ts";

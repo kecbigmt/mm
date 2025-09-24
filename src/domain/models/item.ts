@@ -11,8 +11,6 @@ import {
   ContainerPath,
   containerPathFromSegments,
   ContainerPathValidationError,
-  ContextTag,
-  ContextTagValidationError,
   DateTime,
   DateTimeValidationError,
   Duration,
@@ -31,7 +29,6 @@ import {
   ItemTitleValidationError,
   parseAliasSlug,
   parseContainerPath,
-  parseContextTag,
   parseDateTime,
   parseDuration,
   parseItemIcon,
@@ -39,6 +36,9 @@ import {
   parseItemRank,
   parseItemStatus,
   parseItemTitle,
+  parseTagSlug,
+  TagSlug,
+  TagSlugValidationError,
 } from "../primitives/mod.ts";
 import { Node } from "./node.ts";
 import {
@@ -65,7 +65,7 @@ export type ItemData = Readonly<{
   readonly duration?: Duration;
   readonly dueAt?: DateTime;
   readonly alias?: AliasSlug;
-  readonly context?: ContextTag;
+  readonly context?: TagSlug;
   readonly body?: string;
 }>;
 
@@ -94,7 +94,7 @@ export type Item =
     ): Item;
     setAlias(alias: AliasSlug | undefined, updatedAt: DateTime): Item;
     setContext(
-      context: ContextTag | undefined,
+      context: TagSlug | undefined,
       updatedAt: DateTime,
     ): Item;
     toJSON(): ItemSnapshot;
@@ -281,7 +281,7 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
 
   const setContext = function (
     this: Item,
-    context: ContextTag | undefined,
+    context: TagSlug | undefined,
     updatedAt: DateTime,
   ): Item {
     const current = this.data.context?.toString();
@@ -349,7 +349,7 @@ const prefixIssues = (
     | ItemIdValidationError
     | DateTimeValidationError
     | DurationValidationError
-    | ContextTagValidationError,
+    | TagSlugValidationError,
 ): ValidationIssue[] =>
   error.issues.map((issue) =>
     createValidationIssue(issue.message, {
@@ -453,9 +453,9 @@ export const parseItem = (
     }
   }
 
-  let context: ContextTag | undefined;
+  let context: TagSlug | undefined;
   if (snapshot.context !== undefined) {
-    const result = parseContextTag(snapshot.context);
+    const result = parseTagSlug(snapshot.context);
     if (result.type === "error") {
       issues.push(...prefixIssues("context", result.error));
     } else {
