@@ -3,6 +3,7 @@ import { join } from "@std/path";
 import { createFileSystemAliasRepository } from "./alias_repository.ts";
 import { parseAlias } from "../../domain/models/alias.ts";
 import { aliasSlugFromString } from "../../domain/primitives/mod.ts";
+import { createSha256HashingService } from "../hash/sha256_hashing_service.ts";
 
 const unwrapOk = <T, E>(
   result: { type: "ok"; value: T } | { type: "error"; error: E },
@@ -17,7 +18,8 @@ const unwrapOk = <T, E>(
 const sampleAlias = () =>
   unwrapOk(
     parseAlias({
-      slug: "focus-work",
+      raw: "focus-work",
+      canonicalKey: "focus-work",
       itemId: "019965a7-2789-740a-b8c1-1415904fd108",
       createdAt: "2024-09-20T12:00:00Z",
     }),
@@ -30,7 +32,8 @@ Deno.test({
   async fn() {
     const root = await Deno.makeTempDir({ prefix: "mm-alias-" });
     try {
-      const repository = createFileSystemAliasRepository({ root });
+      const hashingService = createSha256HashingService();
+      const repository = createFileSystemAliasRepository({ root, hashingService });
       const alias = sampleAlias();
 
       const saveResult = await repository.save(alias);
@@ -46,20 +49,30 @@ Deno.test({
       assertEquals(loaded.data.slug.toString(), alias.data.slug.toString());
       assertEquals(loaded.data.itemId.toString(), alias.data.itemId.toString());
 
-      const aliasFile = join(root, "aliases", "focus-work.alias.json");
+      const hashResult = await hashingService.hash(alias.data.slug.canonicalKey.toString());
+      const hash = unwrapOk(hashResult, "hash alias");
+      const aliasFile = join(
+        root,
+        ".index",
+        "aliases",
+        hash.slice(0, 2),
+        `${hash}.alias.json`,
+      );
       const persisted = JSON.parse(await Deno.readTextFile(aliasFile));
-      assertEquals(persisted.schema, "mm.alias/1");
-      assertEquals(persisted.slug, "focus-work");
+      assertEquals(persisted.schema, "mm.alias/2");
+      assertEquals(persisted.raw, "focus-work");
+      assertEquals(persisted.canonicalKey, "focus-work");
       assertEquals(persisted.itemId, alias.data.itemId.toString());
 
       const dirEntries: string[] = [];
-      for await (const entry of Deno.readDir(join(root, "aliases"))) {
+      const shardDir = join(root, ".index", "aliases", hash.slice(0, 2));
+      for await (const entry of Deno.readDir(shardDir)) {
         if (entry.isFile) {
           dirEntries.push(entry.name);
         }
       }
       dirEntries.sort();
-      assertEquals(dirEntries, ["focus-work.alias.json"]);
+      assertEquals(dirEntries, [`${hash}.alias.json`]);
 
       const listResult = await repository.list();
       const aliases = unwrapOk(listResult, "list aliases");
@@ -77,14 +90,23 @@ Deno.test({
   async fn() {
     const root = await Deno.makeTempDir({ prefix: "mm-alias-delete-" });
     try {
-      const repository = createFileSystemAliasRepository({ root });
+      const hashingService = createSha256HashingService();
+      const repository = createFileSystemAliasRepository({ root, hashingService });
       const alias = sampleAlias();
       unwrapOk(await repository.save(alias), "save alias");
 
       const deleteResult = await repository.delete(alias.data.slug);
       unwrapOk(deleteResult, "delete alias");
 
-      const aliasFile = join(root, "aliases", "focus-work.alias.json");
+      const hashResult = await hashingService.hash(alias.data.slug.canonicalKey.toString());
+      const hash = unwrapOk(hashResult, "hash alias");
+      const aliasFile = join(
+        root,
+        ".index",
+        "aliases",
+        hash.slice(0, 2),
+        `${hash}.alias.json`,
+      );
       await assertRejects(() => Deno.stat(aliasFile), Deno.errors.NotFound);
 
       const loadResult = await repository.load(alias.data.slug);
