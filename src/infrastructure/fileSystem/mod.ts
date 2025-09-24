@@ -4,8 +4,8 @@ export type { FileSystemWorkspaceRepositoryDependencies } from "./workspace_repo
 export { createFileSystemAliasRepository } from "./alias_repository.ts";
 export type { FileSystemAliasRepositoryDependencies } from "./alias_repository.ts";
 
-export { createFileSystemContextRepository } from "./context_repository.ts";
-export type { FileSystemContextRepositoryDependencies } from "./context_repository.ts";
+export { createFileSystemTagRepository } from "./tag_repository.ts";
+export type { FileSystemTagRepositoryDependencies } from "./tag_repository.ts";
 
 export { createFileSystemContainerRepository } from "./container_repository.ts";
 export type { FileSystemContainerRepositoryDependencies } from "./container_repository.ts";

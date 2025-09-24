@@ -6,47 +6,49 @@ import {
   ValidationIssue,
 } from "../../shared/errors.ts";
 import {
-  ContextTag,
-  ContextTagValidationError,
   DateTime,
   DateTimeValidationError,
-  parseContextTag,
   parseDateTime,
+  parseTagSlug,
+  TagSlug,
+  TagSlugValidationError,
 } from "../primitives/mod.ts";
 
-const CONTEXT_KIND = "Context" as const;
+const TAG_KIND = "Tag" as const;
 
-export type ContextData = Readonly<{
-  readonly tag: ContextTag;
+export type TagData = Readonly<{
+  readonly alias: TagSlug;
   readonly createdAt: DateTime;
   readonly description?: string;
 }>;
 
-export type Context = Readonly<{
-  readonly kind: typeof CONTEXT_KIND;
-  readonly data: ContextData;
-  toJSON(): ContextSnapshot;
+export type Tag = Readonly<{
+  readonly kind: typeof TAG_KIND;
+  readonly data: TagData;
+  toJSON(): TagSnapshot;
 }>;
 
-export type ContextSnapshot = Readonly<{
-  readonly tag: string;
+export type TagSnapshot = Readonly<{
+  readonly rawAlias: string;
+  readonly canonicalAlias: string;
   readonly createdAt: string;
   readonly description?: string;
 }>;
 
-export type ContextValidationError = ValidationError<typeof CONTEXT_KIND>;
+export type TagValidationError = ValidationError<typeof TAG_KIND>;
 
-const instantiate = (data: ContextData): Context => {
+const instantiate = (data: TagData): Tag => {
   const normalizedDescription = typeof data.description === "string"
     ? data.description.trim() || undefined
     : undefined;
   const frozen = Object.freeze({ ...data, description: normalizedDescription });
   return Object.freeze({
-    kind: CONTEXT_KIND,
+    kind: TAG_KIND,
     data: frozen,
     toJSON() {
       return Object.freeze({
-        tag: frozen.tag.toString(),
+        rawAlias: frozen.alias.raw,
+        canonicalAlias: frozen.alias.canonicalKey.toString(),
         createdAt: frozen.createdAt.toString(),
         description: frozen.description,
       });
@@ -56,7 +58,7 @@ const instantiate = (data: ContextData): Context => {
 
 const prefixIssues = (
   field: string,
-  error: ContextTagValidationError | DateTimeValidationError,
+  error: TagSlugValidationError | DateTimeValidationError,
 ): ValidationIssue[] =>
   error.issues.map((issue) =>
     createValidationIssue(issue.message, {
@@ -65,18 +67,39 @@ const prefixIssues = (
     })
   );
 
-export const createContext = (data: ContextData): Context => instantiate(data);
+export const createTag = (data: TagData): Tag => instantiate(data);
 
-export const parseContext = (
-  snapshot: ContextSnapshot,
-): Result<Context, ContextValidationError> => {
+export const parseTag = (
+  snapshot: TagSnapshot,
+): Result<Tag, TagValidationError> => {
   const issues: ValidationIssue[] = [];
 
-  const tagResult = parseContextTag(snapshot.tag);
+  const aliasResult = parseTagSlug(snapshot.rawAlias);
   const createdAtResult = parseDateTime(snapshot.createdAt);
 
-  if (tagResult.type === "error") {
-    issues.push(...prefixIssues("tag", tagResult.error));
+  if (typeof snapshot.canonicalAlias !== "string") {
+    issues.push(
+      createValidationIssue("canonicalAlias must be a string", {
+        path: ["canonicalAlias"],
+        code: "not_string",
+      }),
+    );
+  }
+
+  if (aliasResult.type === "ok" && typeof snapshot.canonicalAlias === "string") {
+    const expected = aliasResult.value.canonicalKey.toString();
+    if (expected !== snapshot.canonicalAlias) {
+      issues.push(
+        createValidationIssue("canonicalAlias does not match raw value", {
+          path: ["canonicalAlias"],
+          code: "mismatch",
+        }),
+      );
+    }
+  }
+
+  if (aliasResult.type === "error") {
+    issues.push(...prefixIssues("rawAlias", aliasResult.error));
   }
   if (createdAtResult.type === "error") {
     issues.push(...prefixIssues("createdAt", createdAtResult.error));
@@ -92,16 +115,16 @@ export const parseContext = (
   }
 
   if (
-    tagResult.type === "error" ||
+    aliasResult.type === "error" ||
     createdAtResult.type === "error" ||
     issues.length > 0
   ) {
-    return Result.error(createValidationError(CONTEXT_KIND, issues));
+    return Result.error(createValidationError(TAG_KIND, issues));
   }
 
   return Result.ok(
     instantiate({
-      tag: tagResult.value,
+      alias: aliasResult.value,
       createdAt: createdAtResult.value,
       description: snapshot.description,
     }),
