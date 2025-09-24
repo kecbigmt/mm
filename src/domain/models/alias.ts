@@ -32,7 +32,8 @@ export type Alias = Readonly<{
 }>;
 
 export type AliasSnapshot = Readonly<{
-  readonly slug: string;
+  readonly raw: string;
+  readonly canonicalKey: string;
   readonly itemId: string;
   readonly createdAt: string;
 }>;
@@ -46,7 +47,8 @@ const instantiate = (data: AliasData): Alias => {
     data: frozen,
     toJSON() {
       return Object.freeze({
-        slug: frozen.slug.toString(),
+        raw: frozen.slug.raw,
+        canonicalKey: frozen.slug.canonicalKey.toString(),
         itemId: frozen.itemId.toString(),
         createdAt: frozen.createdAt.toString(),
       });
@@ -70,12 +72,33 @@ export const createAlias = (data: AliasData): Alias => instantiate(data);
 export const parseAlias = (snapshot: AliasSnapshot): Result<Alias, AliasValidationError> => {
   const issues: ValidationIssue[] = [];
 
-  const slugResult = parseAliasSlug(snapshot.slug);
+  const slugResult = parseAliasSlug(snapshot.raw);
   const itemIdResult = parseItemId(snapshot.itemId);
   const createdAtResult = parseDateTime(snapshot.createdAt);
 
+  if (typeof snapshot.canonicalKey !== "string") {
+    issues.push(
+      createValidationIssue("canonicalKey must be a string", {
+        path: ["canonicalKey"],
+        code: "not_string",
+      }),
+    );
+  }
+
+  if (slugResult.type === "ok" && typeof snapshot.canonicalKey === "string") {
+    const expected = slugResult.value.canonicalKey.toString();
+    if (expected !== snapshot.canonicalKey) {
+      issues.push(
+        createValidationIssue("canonicalKey does not match raw value", {
+          path: ["canonicalKey"],
+          code: "mismatch",
+        }),
+      );
+    }
+  }
+
   if (slugResult.type === "error") {
-    issues.push(...prefixIssues("slug", slugResult.error));
+    issues.push(...prefixIssues("raw", slugResult.error));
   }
   if (itemIdResult.type === "error") {
     issues.push(...prefixIssues("itemId", itemIdResult.error));

@@ -19,7 +19,8 @@ const expectOk = <T, E>(result: Result<T, E>): T => {
 
 Deno.test("parseAlias returns Alias for valid snapshot", () => {
   const result = parseAlias({
-    slug: "daily-focus",
+    raw: "daily-focus",
+    canonicalKey: "daily-focus",
     itemId: "019965a7-2789-740a-b8c1-1415904fd108",
     createdAt: "2024-03-15T12:34:56.000Z",
   });
@@ -27,18 +28,21 @@ Deno.test("parseAlias returns Alias for valid snapshot", () => {
   const alias = expectOk(result);
   assertEquals(alias.kind, "Alias");
   assertEquals(alias.data.slug.toString(), "daily-focus");
+  assertEquals(alias.data.slug.canonicalKey.toString(), "daily-focus");
   assertEquals(alias.data.itemId.toString(), "019965a7-2789-740a-b8c1-1415904fd108");
   assertEquals(alias.data.createdAt.toString(), "2024-03-15T12:34:56.000Z");
 
   const snapshot = alias.toJSON();
-  assertEquals(snapshot.slug, "daily-focus");
+  assertEquals(snapshot.raw, "daily-focus");
+  assertEquals(snapshot.canonicalKey, "daily-focus");
   assertEquals(snapshot.itemId, "019965a7-2789-740a-b8c1-1415904fd108");
   assertEquals(snapshot.createdAt, "2024-03-15T12:34:56.000Z");
 });
 
 Deno.test("parseAlias reports field issues", () => {
   const result = parseAlias({
-    slug: "a",
+    raw: "  ",
+    canonicalKey: 42 as unknown as string,
     itemId: "not-a-uuid",
     createdAt: "invalid",
   });
@@ -47,10 +51,11 @@ Deno.test("parseAlias reports field issues", () => {
     throw new Error("expected error result");
   }
 
-  assertEquals(result.error.issues.length, 3);
-  assertEquals(result.error.issues[0].path[0], "slug");
-  assertEquals(result.error.issues[1].path[0], "itemId");
-  assertEquals(result.error.issues[2].path[0], "createdAt");
+  const paths = result.error.issues.map((issue) => issue.path[0]);
+  assertEquals(paths.includes("raw"), true);
+  assertEquals(paths.includes("canonicalKey"), true);
+  assertEquals(paths.includes("itemId"), true);
+  assertEquals(paths.includes("createdAt"), true);
 });
 
 Deno.test("createAlias preserves provided data", () => {

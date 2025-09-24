@@ -2,12 +2,12 @@ import { parseItem } from "./item.ts";
 import {
   parseAliasSlug,
   parseContainerPath,
-  parseContextTag,
   parseDateTime,
   parseDuration,
   parseItemIcon,
   parseItemRank,
   parseItemTitle,
+  parseTagSlug,
 } from "../primitives/mod.ts";
 
 type ItemSnapshot = Parameters<typeof parseItem>[0];
@@ -128,7 +128,7 @@ Deno.test("setContext updates and normalizes context tag", () => {
   }
   const item = parseResult.value;
 
-  const focusContextResult = parseContextTag("focus");
+  const focusContextResult = parseTagSlug("focus");
   if (focusContextResult.type !== "ok") {
     throw new Error("failed to parse focus context tag");
   }
@@ -163,9 +163,13 @@ Deno.test("parseItem rejects invalid context tag", () => {
   if (result.type !== "error") {
     throw new Error("expected parse failure for invalid context");
   }
-  assertEquals(result.error.issues.length, 1);
-  assertEquals(result.error.issues[0].path[0], "context");
-  assertEquals(result.error.issues[0].code, "format");
+  assert(
+    result.error.issues.every((issue) => issue.path[0] === "context"),
+    "context validation issues should be scoped to context field",
+  );
+  const codes = result.error.issues.map((issue) => issue.code);
+  assert(codes.includes("format"), "expected format issue for invalid characters");
+  assert(codes.includes("whitespace"), "expected whitespace issue for spaces");
 });
 
 Deno.test("parseItem aggregates validation issues", () => {
@@ -344,7 +348,7 @@ Deno.test("Item.toJSON reflects current data", () => {
   const alias = unwrapOk(parseAliasSlug("deep-focus"), "parse alias");
   const withAlias = scheduled.setAlias(alias, aliasAt);
 
-  const finalContext = unwrapOk(parseContextTag("deep-work"), "parse context");
+  const finalContext = unwrapOk(parseTagSlug("deep-work"), "parse context");
   const finalNode = withAlias.setContext(finalContext, contextAt);
 
   const snapshot = finalNode.toJSON();
