@@ -6,38 +6,20 @@ import {
   ValidationIssue,
 } from "../../shared/errors.ts";
 import {
-  ContainerIndex,
-  ContainerIndexValidationError,
-  ContainerPath,
-  ContainerPathValidationError,
   ItemId,
   ItemIdValidationError,
   ItemRank,
   ItemRankValidationError,
-  parseContainerIndex,
-  parseContainerPath,
   parseItemId,
   parseItemRank,
 } from "../primitives/mod.ts";
 
-const CONTAINER_EDGE_KIND = "ContainerEdge" as const;
 const ITEM_EDGE_KIND = "ItemEdge" as const;
 const EDGE_KIND = "Edge" as const;
-
-type ContainerEdgeData = Readonly<{
-  readonly to: ContainerPath;
-  readonly index: ContainerIndex;
-}>;
 
 type ItemEdgeData = Readonly<{
   readonly to: ItemId;
   readonly rank: ItemRank;
-}>;
-
-export type ContainerEdge = Readonly<{
-  readonly kind: typeof CONTAINER_EDGE_KIND;
-  readonly data: ContainerEdgeData;
-  toJSON(): ContainerEdgeSnapshot;
 }>;
 
 export type ItemEdge = Readonly<{
@@ -46,13 +28,7 @@ export type ItemEdge = Readonly<{
   toJSON(): ItemEdgeSnapshot;
 }>;
 
-export type Edge = ContainerEdge | ItemEdge;
-
-export type ContainerEdgeSnapshot = Readonly<{
-  readonly kind?: typeof CONTAINER_EDGE_KIND;
-  readonly to: string;
-  readonly index: number;
-}>;
+export type Edge = ItemEdge;
 
 export type ItemEdgeSnapshot = Readonly<{
   readonly kind?: typeof ITEM_EDGE_KIND;
@@ -60,26 +36,10 @@ export type ItemEdgeSnapshot = Readonly<{
   readonly rank: string;
 }>;
 
-export type EdgeSnapshot = ContainerEdgeSnapshot | ItemEdgeSnapshot;
+export type EdgeSnapshot = ItemEdgeSnapshot;
 
-export type ContainerEdgeValidationError = ValidationError<typeof CONTAINER_EDGE_KIND>;
 export type ItemEdgeValidationError = ValidationError<typeof ITEM_EDGE_KIND>;
 export type EdgeValidationError = ValidationError<typeof EDGE_KIND>;
-
-const instantiateContainerEdge = (data: ContainerEdgeData): ContainerEdge => {
-  const frozen = Object.freeze({ ...data });
-  return Object.freeze({
-    kind: CONTAINER_EDGE_KIND,
-    data: frozen,
-    toJSON() {
-      return Object.freeze({
-        kind: CONTAINER_EDGE_KIND,
-        to: frozen.to.toString(),
-        index: frozen.index.value(),
-      });
-    },
-  });
-};
 
 const instantiateItemEdge = (data: ItemEdgeData): ItemEdge => {
   const frozen = Object.freeze({ ...data });
@@ -98,11 +58,7 @@ const instantiateItemEdge = (data: ItemEdgeData): ItemEdge => {
 
 const prefixIssues = (
   field: string,
-  error:
-    | ContainerPathValidationError
-    | ContainerIndexValidationError
-    | ItemIdValidationError
-    | ItemRankValidationError,
+  error: ItemIdValidationError | ItemRankValidationError,
 ): ValidationIssue[] =>
   error.issues.map((issue) =>
     createValidationIssue(issue.message, {
@@ -111,73 +67,12 @@ const prefixIssues = (
     })
   );
 
-export const createContainerEdge = (
-  to: ContainerPath,
-  index: ContainerIndex,
-): ContainerEdge => instantiateContainerEdge({ to, index });
-
 export const createItemEdge = (
   to: ItemId,
   rank: ItemRank,
 ): ItemEdge => instantiateItemEdge({ to, rank });
 
-export const isItemEdge = (edge: Edge): edge is ItemEdge => edge.kind === "ItemEdge";
-export const isContainerEdge = (edge: Edge): edge is ContainerEdge => edge.kind === "ContainerEdge";
-
-export const parseContainerEdge = (
-  input: unknown,
-): Result<ContainerEdge, ContainerEdgeValidationError> => {
-  if (typeof input !== "object" || input === null) {
-    return Result.error(
-      createValidationError(CONTAINER_EDGE_KIND, [
-        createValidationIssue("edge must be an object", { path: ["value"], code: "type" }),
-      ]),
-    );
-  }
-
-  const snapshot = input as ContainerEdgeSnapshot;
-  const issues: ValidationIssue[] = [];
-
-  let to: ContainerPath | undefined;
-  if ("to" in snapshot) {
-    const result = parseContainerPath(snapshot.to);
-    if (result.type === "error") {
-      issues.push(...prefixIssues("to", result.error));
-    } else {
-      to = result.value;
-    }
-  } else {
-    issues.push(
-      createValidationIssue("to is required", {
-        path: ["to"],
-        code: "required",
-      }),
-    );
-  }
-
-  let index: ContainerIndex | undefined;
-  if ("index" in snapshot) {
-    const result = parseContainerIndex(snapshot.index);
-    if (result.type === "error") {
-      issues.push(...prefixIssues("index", result.error));
-    } else {
-      index = result.value;
-    }
-  } else {
-    issues.push(
-      createValidationIssue("index is required", {
-        path: ["index"],
-        code: "required",
-      }),
-    );
-  }
-
-  if (issues.length > 0 || !to || !index) {
-    return Result.error(createValidationError(CONTAINER_EDGE_KIND, issues));
-  }
-
-  return Result.ok(instantiateContainerEdge({ to, index }));
-};
+export const isItemEdge = (edge: Edge): edge is ItemEdge => edge.kind === ITEM_EDGE_KIND;
 
 export const parseItemEdge = (
   input: unknown,
@@ -246,33 +141,9 @@ export const parseEdge = (
   }
 
   const candidate = input as EdgeSnapshot & { kind?: string };
-  const kind = candidate.kind;
-
-  if (kind === CONTAINER_EDGE_KIND) {
-    const result = parseContainerEdge(candidate);
-    if (result.type === "error") {
-      return Result.error(createValidationError(EDGE_KIND, result.error.issues));
-    }
-    return Result.ok(result.value);
-  }
+  const kind = candidate.kind ?? ITEM_EDGE_KIND;
 
   if (kind === ITEM_EDGE_KIND) {
-    const result = parseItemEdge(candidate);
-    if (result.type === "error") {
-      return Result.error(createValidationError(EDGE_KIND, result.error.issues));
-    }
-    return Result.ok(result.value);
-  }
-
-  if ("index" in candidate && "to" in candidate) {
-    const result = parseContainerEdge(candidate);
-    if (result.type === "error") {
-      return Result.error(createValidationError(EDGE_KIND, result.error.issues));
-    }
-    return Result.ok(result.value);
-  }
-
-  if ("rank" in candidate && "to" in candidate) {
     const result = parseItemEdge(candidate);
     if (result.type === "error") {
       return Result.error(createValidationError(EDGE_KIND, result.error.issues));

@@ -19,8 +19,11 @@ const sampleItemSnapshot = () => ({
   title: "Sample",
   icon: "note",
   status: "open",
-  container: "2024/09/20",
-  rank: "a1",
+  placement: {
+    kind: "root" as const,
+    section: ":2024-09-20",
+    rank: "a1",
+  },
   createdAt: "2024-09-20T12:00:00Z",
   updatedAt: "2024-09-20T12:00:00Z",
   body: "Sample body",
@@ -58,7 +61,8 @@ Deno.test({
       const metaSnapshot = JSON.parse(await Deno.readTextFile(metaPath));
       assertEquals(metaSnapshot.schema, "mm.item/1");
       assertEquals(metaSnapshot.id, itemId);
-      assertEquals(metaSnapshot.rank, item.data.rank.toString());
+      assert(metaSnapshot.placement !== undefined, "placement should be stored in meta");
+      assertEquals(metaSnapshot.placement?.section, ":2024-09-20");
 
       const content = await Deno.readTextFile(contentPath);
       assertEquals(content, "Sample body\n");

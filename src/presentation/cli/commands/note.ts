@@ -73,7 +73,6 @@ export function createNoteCommand() {
         createdAt: createdAtResult.value,
       }, {
         itemRepository: deps.itemRepository,
-        containerRepository: deps.containerRepository,
         rankService: deps.rankService,
         idGenerationService: deps.idGenerationService,
       });

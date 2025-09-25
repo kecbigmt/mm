@@ -7,9 +7,6 @@ export type { FileSystemAliasRepositoryDependencies } from "./alias_repository.t
 export { createFileSystemTagRepository } from "./tag_repository.ts";
 export type { FileSystemTagRepositoryDependencies } from "./tag_repository.ts";
 
-export { createFileSystemContainerRepository } from "./container_repository.ts";
-export type { FileSystemContainerRepositoryDependencies } from "./container_repository.ts";
-
 export { createFileSystemItemRepository } from "./item_repository.ts";
 export type { FileSystemItemRepositoryDependencies } from "./item_repository.ts";
 

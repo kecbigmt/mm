@@ -145,7 +145,7 @@ const readEdgesSnapshots = async (
   directory: string,
   id: string,
 ): Promise<Result<ReadonlyArray<EdgeSnapshot>, RepositoryError>> =>
-  await readEdgeSnapshots({ directory: edgesDirectory(directory), scope: "item", identifier: id });
+  await readEdgeSnapshots({ directory: edgesDirectory(directory), identifier: id });
 
 const combineSnapshot = (
   meta: ItemMetaSnapshot,
@@ -372,7 +372,6 @@ export const createFileSystemItemRepository = (
 
     const edgesResult = await writeEdges(item.edges, {
       directory: edgesDirectory(directory),
-      scope: "item",
       identifier: snapshot.id,
     });
     if (edgesResult.type === "error") {

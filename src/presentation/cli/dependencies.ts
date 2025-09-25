@@ -1,11 +1,9 @@
 import { isAbsolute, resolve } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import {
-  createFileSystemContainerRepository,
   createFileSystemItemRepository,
   createFileSystemWorkspaceRepository,
 } from "../../infrastructure/fileSystem/mod.ts";
-import { ContainerRepository } from "../../domain/repositories/container_repository.ts";
 import { ItemRepository } from "../../domain/repositories/item_repository.ts";
 import { WorkspaceRepository } from "../../domain/repositories/workspace_repository.ts";
 import { WorkspaceSettings } from "../../domain/models/workspace.ts";
@@ -26,7 +24,6 @@ export type CliDependencies = Readonly<{
   readonly workspace: WorkspaceSettings;
   readonly timezone: TimezoneIdentifier;
   readonly itemRepository: ItemRepository;
-  readonly containerRepository: ContainerRepository;
   readonly workspaceRepository: WorkspaceRepository;
   readonly rankService: RankService;
   readonly idGenerationService: IdGenerationService;
@@ -212,7 +209,6 @@ export const loadCliDependencies = async (
   }
 
   const itemRepository = createFileSystemItemRepository({ root });
-  const containerRepository = createFileSystemContainerRepository({ root });
   const rankService = createRankService(createLexoRankGenerator());
   const idGenerationService = createIdGenerationService(createUuidV7Generator());
 
@@ -221,7 +217,6 @@ export const loadCliDependencies = async (
     workspace,
     timezone,
     itemRepository,
-    containerRepository,
     workspaceRepository,
     rankService,
     idGenerationService,
