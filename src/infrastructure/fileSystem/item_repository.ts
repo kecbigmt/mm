@@ -2,19 +2,20 @@ import { join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { ItemRepository } from "../../domain/repositories/item_repository.ts";
 import { Item, ItemSnapshot, parseItem } from "../../domain/models/item.ts";
-import { ItemId, ItemShortId, parseItemId } from "../../domain/primitives/mod.ts";
+import { ItemId, ItemShortId } from "../../domain/primitives/mod.ts";
+import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
 import {
   AmbiguousShortIdError,
   createAmbiguousShortIdError,
 } from "../../domain/repositories/short_id_resolution_error.ts";
-import { readEdgeSnapshots, writeEdges } from "./edge_store.ts";
-import { EdgeSnapshot } from "../../domain/models/edge.ts";
+import { type PlacementTreeSnapshot, readPlacementTree, writePlacementTree } from "./edge_store.ts";
 import { PlacementBin } from "../../domain/models/placement.ts";
 
 export type FileSystemItemRepositoryDependencies = Readonly<{
   readonly root: string;
+  readonly timezone: TimezoneIdentifier;
 }>;
 
 type LoadResult = Result<Item | undefined, RepositoryError>;
@@ -23,16 +24,19 @@ type DeleteResult = Result<void, RepositoryError>;
 type ListByPlacementBinResult = Result<ReadonlyArray<Item>, RepositoryError>;
 type FindByShortIdResult = Result<Item | undefined, RepositoryError | AmbiguousShortIdError>;
 
-type ItemMetaSnapshot = Omit<ItemSnapshot, "body" | "edges">;
+type ItemMetaSnapshot = Omit<ItemSnapshot, "body" | "edges" | "sections">;
 
-type IndexEntry = Readonly<{ path: string }>;
+type ItemDirectoryRecord = Readonly<{
+  readonly id: string;
+  readonly directory: string;
+}>;
 
 const ITEM_SCHEMA = "mm.item/1";
 
-const nodesDirectory = (root: string): string => join(root, "nodes");
-const indexDirectory = (root: string): string => join(nodesDirectory(root), ".index");
+const YEAR_DIRECTORY_REGEX = /^\d{4}$/u;
+const MONTH_DAY_DIRECTORY_REGEX = /^\d{2}$/u;
 
-const idString = (id: ItemId): string => id.toString();
+const itemsDirectory = (root: string): string => join(root, "items");
 
 const parseDateSegments = (iso: string): [string, string, string] => {
   const [date] = iso.split("T");
@@ -40,65 +44,71 @@ const parseDateSegments = (iso: string): [string, string, string] => {
   return [year, month, day];
 };
 
-const itemDirectoryFromSnapshot = (root: string, snapshot: ItemSnapshot): string => {
-  const [year, month, day] = parseDateSegments(snapshot.createdAt);
-  return join(nodesDirectory(root), year, month, day, snapshot.id);
-};
-
-const itemDirectoryFromIndex = (
-  root: string,
-  indexPath: string,
-  id: string,
-): string => join(nodesDirectory(root), ...indexPath.split("/"), id);
-
-const metaFilePath = (directory: string): string => join(directory, "meta.json");
-const contentFilePath = (directory: string): string => join(directory, "content.md");
-const edgesDirectory = (directory: string): string => join(directory, "edges");
-
-const indexFilePath = (root: string, id: string): string =>
-  join(indexDirectory(root), `${id}.json`);
-
-const readIndexEntry = async (
-  root: string,
-  id: string,
-): Promise<Result<IndexEntry | undefined, RepositoryError>> => {
-  try {
-    const text = await Deno.readTextFile(indexFilePath(root, id));
-    const data = JSON.parse(text) as IndexEntry;
-    return Result.ok(data);
-  } catch (error) {
-    if (error instanceof Deno.errors.NotFound) {
-      return Result.ok(undefined);
-    }
-    if (error instanceof SyntaxError) {
-      return Result.error(
-        createRepositoryError("item", "load", "index entry is invalid", {
-          identifier: id,
-          cause: error,
-        }),
-      );
-    }
-    return Result.error(
-      createRepositoryError("item", "load", "failed to read item index", {
-        identifier: id,
-        cause: error,
-      }),
-    );
+const formatSegmentsForTimezone = (
+  date: Date,
+  timezone: TimezoneIdentifier,
+): [string, string, string] => {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone.toString(),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(date);
+  const lookup = new Map(parts.map((part) => [part.type, part.value]));
+  const year = lookup.get("year");
+  const month = lookup.get("month");
+  const day = lookup.get("day");
+  if (year && month && day) {
+    return [year, month, day];
   }
+  return [
+    date.getUTCFullYear().toString().padStart(4, "0"),
+    (date.getUTCMonth() + 1).toString().padStart(2, "0"),
+    date.getUTCDate().toString().padStart(2, "0"),
+  ];
 };
+
+const directorySegmentsFromIso = (
+  iso: string,
+  timezone: TimezoneIdentifier,
+): [string, string, string] => {
+  const parsed = new Date(iso);
+  if (!Number.isNaN(parsed.getTime())) {
+    return formatSegmentsForTimezone(parsed, timezone);
+  }
+  return parseDateSegments(iso);
+};
+
+const itemDirectoryFromSnapshot = (
+  dependencies: FileSystemItemRepositoryDependencies,
+  snapshot: ItemSnapshot,
+): string => {
+  const derived = deriveDirectoryFromId(dependencies, snapshot.id);
+  if (derived) {
+    return derived;
+  }
+  const [year, month, day] = directorySegmentsFromIso(
+    snapshot.createdAt,
+    dependencies.timezone,
+  );
+  return join(itemsDirectory(dependencies.root), year, month, day, snapshot.id);
+};
+
+const edgesDirectory = (directory: string): string => join(directory, "edges");
 
 const readMetaSnapshot = async (
   directory: string,
   id: string,
 ): Promise<Result<ItemMetaSnapshot | undefined, RepositoryError>> => {
   try {
-    const text = await Deno.readTextFile(metaFilePath(directory));
+    const text = await Deno.readTextFile(join(directory, "meta.json"));
     const raw = JSON.parse(text) as ItemMetaSnapshot & { schema?: string };
     if (raw.schema === ITEM_SCHEMA) {
       const { schema: _schema, ...rest } = raw;
       return Result.ok(rest);
     }
-    return Result.ok(raw);
+    return Result.ok(raw as ItemMetaSnapshot);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
       return Result.ok(undefined);
@@ -125,7 +135,7 @@ const readBody = async (
   id: string,
 ): Promise<Result<string | undefined, RepositoryError>> => {
   try {
-    const text = await Deno.readTextFile(contentFilePath(directory));
+    const text = await Deno.readTextFile(join(directory, "content.md"));
     const normalized = text.replace(/\r\n/g, "\n");
     const withoutTrailingNewline = normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized;
     const body = withoutTrailingNewline.trim() === "" ? undefined : withoutTrailingNewline;
@@ -143,20 +153,15 @@ const readBody = async (
   }
 };
 
-const readEdgesSnapshots = async (
-  directory: string,
-  id: string,
-): Promise<Result<ReadonlyArray<EdgeSnapshot>, RepositoryError>> =>
-  await readEdgeSnapshots({ directory: edgesDirectory(directory), identifier: id });
-
 const combineSnapshot = (
   meta: ItemMetaSnapshot,
   body: string | undefined,
-  edges: ReadonlyArray<EdgeSnapshot>,
+  placement: PlacementTreeSnapshot,
 ): ItemSnapshot => ({
   ...meta,
   body,
-  edges: edges.length > 0 ? edges : undefined,
+  edges: placement.edges.length > 0 ? placement.edges : undefined,
+  sections: placement.sections,
 });
 
 const parseSnapshot = (
@@ -178,10 +183,15 @@ const writeMeta = async (
   directory: string,
   snapshot: ItemSnapshot,
 ): Promise<Result<void, RepositoryError>> => {
-  const { body: _body, edges: _edges, ...meta } = snapshot;
+  const {
+    body: _body,
+    edges: _edges,
+    sections: _sections,
+    ...meta
+  } = snapshot;
   const payload = JSON.stringify({ schema: ITEM_SCHEMA, ...meta }, null, 2);
   try {
-    await Deno.writeTextFile(metaFilePath(directory), `${payload}\n`);
+    await Deno.writeTextFile(join(directory, "meta.json"), `${payload}\n`);
     return Result.ok(undefined);
   } catch (error) {
     return Result.error(
@@ -197,7 +207,7 @@ const writeBody = async (
   directory: string,
   snapshot: ItemSnapshot,
 ): Promise<Result<void, RepositoryError>> => {
-  const path = contentFilePath(directory);
+  const path = join(directory, "content.md");
   const body = snapshot.body;
   if (!body || body.trim() === "") {
     try {
@@ -228,109 +238,155 @@ const writeBody = async (
   }
 };
 
-const writeIndexEntry = async (
-  root: string,
-  snapshot: ItemSnapshot,
-): Promise<Result<void, RepositoryError>> => {
-  try {
-    await Deno.mkdir(indexDirectory(root), { recursive: true });
-    const [year, month, day] = parseDateSegments(snapshot.createdAt);
-    const payload = JSON.stringify({ path: `${year}/${month}/${day}` }, null, 2);
-    await Deno.writeTextFile(indexFilePath(root, snapshot.id), `${payload}\n`);
-    return Result.ok(undefined);
-  } catch (error) {
-    return Result.error(
-      createRepositoryError("item", "save", "failed to write item index", {
-        identifier: snapshot.id,
-        cause: error,
-      }),
-    );
-  }
-};
-
-const deleteIndexEntry = async (
-  root: string,
+const loadItemFromDirectory = async (
+  directory: string,
   id: string,
-): Promise<Result<void, RepositoryError>> => {
-  try {
-    await Deno.remove(indexFilePath(root, id));
-    return Result.ok(undefined);
-  } catch (error) {
-    if (error instanceof Deno.errors.NotFound) {
-      return Result.ok(undefined);
-    }
-    return Result.error(
-      createRepositoryError("item", "delete", "failed to update item index", {
-        identifier: id,
-        cause: error,
-      }),
-    );
+): Promise<Result<Item | undefined, RepositoryError>> => {
+  const metaResult = await readMetaSnapshot(directory, id);
+  if (metaResult.type === "error") {
+    return metaResult;
   }
+  const meta = metaResult.value;
+  if (!meta) {
+    return Result.ok(undefined);
+  }
+
+  const bodyResult = await readBody(directory, id);
+  if (bodyResult.type === "error") {
+    return bodyResult;
+  }
+
+  const placementResult = await readPlacementTree({
+    directory: edgesDirectory(directory),
+    identifier: id,
+  });
+  if (placementResult.type === "error") {
+    return placementResult;
+  }
+
+  const snapshot = combineSnapshot(meta, bodyResult.value, placementResult.value);
+  return parseSnapshot(snapshot);
 };
 
-const findIdsByShortId = async (
-  root: string,
-  shortId: ItemShortId,
-): Promise<Result<string[], RepositoryError>> => {
-  const shortIdStr = shortId.toString();
-  const matchingIds: string[] = [];
+const timestampFromUuidV7 = (id: string): number | undefined => {
+  const normalized = id.replace(/-/g, "").toLowerCase();
+  if (normalized.length !== 32) {
+    return undefined;
+  }
+  if (normalized[12] !== "7") {
+    return undefined;
+  }
+  const millisecondsHex = normalized.slice(0, 12);
+  const value = Number.parseInt(millisecondsHex, 16);
+  return Number.isNaN(value) ? undefined : value;
+};
 
-  try {
-    const indexDir = indexDirectory(root);
+const deriveDirectoryFromId = (
+  dependencies: FileSystemItemRepositoryDependencies,
+  id: string,
+): string | undefined => {
+  const timestamp = timestampFromUuidV7(id);
+  if (timestamp === undefined) {
+    return undefined;
+  }
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+  const [year, month, day] = formatSegmentsForTimezone(date, dependencies.timezone);
+  return join(itemsDirectory(dependencies.root), year, month, day, id);
+};
+
+const findItemDirectory = async (
+  dependencies: FileSystemItemRepositoryDependencies,
+  id: string,
+): Promise<Result<string | undefined, RepositoryError>> => {
+  const derived = deriveDirectoryFromId(dependencies, id);
+  if (derived) {
     try {
-      const entries = Deno.readDir(indexDir);
-      for await (const entry of entries) {
-        if (entry.isFile && entry.name.endsWith(".json")) {
-          const id = entry.name.slice(0, -5); // Remove .json extension
-          if (id.endsWith(shortIdStr)) {
-            matchingIds.push(id);
+      const stat = await Deno.stat(derived);
+      if (stat.isDirectory) {
+        return Result.ok(derived);
+      }
+      return Result.error(
+        createRepositoryError("item", "load", "item directory is invalid", {
+          identifier: id,
+        }),
+      );
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.ok(undefined);
+      }
+      return Result.error(
+        createRepositoryError("item", "load", "failed to inspect item directory", {
+          identifier: id,
+          cause: error,
+        }),
+      );
+    }
+  }
+
+  return Result.ok(undefined);
+};
+
+const collectItemDirectories = async (
+  root: string,
+): Promise<Result<ReadonlyArray<ItemDirectoryRecord>, RepositoryError>> => {
+  const base = itemsDirectory(root);
+  const items: ItemDirectoryRecord[] = [];
+  try {
+    for await (const yearEntry of Deno.readDir(base)) {
+      if (!yearEntry.isDirectory || yearEntry.name.startsWith(".")) {
+        continue;
+      }
+      if (!YEAR_DIRECTORY_REGEX.test(yearEntry.name)) {
+        return Result.error(
+          createRepositoryError("item", "list", `unexpected year directory: ${yearEntry.name}`),
+        );
+      }
+      const yearPath = join(base, yearEntry.name);
+      for await (const monthEntry of Deno.readDir(yearPath)) {
+        if (!monthEntry.isDirectory || monthEntry.name.startsWith(".")) {
+          continue;
+        }
+        if (!MONTH_DAY_DIRECTORY_REGEX.test(monthEntry.name)) {
+          return Result.error(
+            createRepositoryError("item", "list", `unexpected month directory: ${monthEntry.name}`),
+          );
+        }
+        const monthPath = join(yearPath, monthEntry.name);
+        for await (const dayEntry of Deno.readDir(monthPath)) {
+          if (!dayEntry.isDirectory || dayEntry.name.startsWith(".")) {
+            continue;
+          }
+          if (dayEntry.name === "edges") {
+            continue;
+          }
+          if (!MONTH_DAY_DIRECTORY_REGEX.test(dayEntry.name)) {
+            return Result.error(
+              createRepositoryError("item", "list", `unexpected day directory: ${dayEntry.name}`),
+            );
+          }
+          const dayPath = join(monthPath, dayEntry.name);
+          for await (const itemEntry of Deno.readDir(dayPath)) {
+            if (!itemEntry.isDirectory || itemEntry.name.startsWith(".")) {
+              continue;
+            }
+            if (itemEntry.name === "edges") {
+              continue;
+            }
+            items.push({ id: itemEntry.name, directory: join(dayPath, itemEntry.name) });
           }
         }
       }
-    } catch (error) {
-      if (error instanceof Deno.errors.NotFound) {
-        // Index directory doesn't exist, no items
-        return Result.ok([]);
-      }
-      throw error;
     }
-
-    return Result.ok(matchingIds);
+    return Result.ok(items);
   } catch (error) {
-    return Result.error(
-      createRepositoryError("item", "findByShortId", "failed to scan index directory", {
-        identifier: shortIdStr,
-        cause: error,
-      }),
-    );
-  }
-};
-
-const listItemIds = async (
-  root: string,
-): Promise<Result<string[], RepositoryError>> => {
-  const ids: string[] = [];
-
-  try {
-    const indexDir = indexDirectory(root);
-    try {
-      const entries = Deno.readDir(indexDir);
-      for await (const entry of entries) {
-        if (entry.isFile && entry.name.endsWith(".json")) {
-          ids.push(entry.name.slice(0, -5));
-        }
-      }
-    } catch (error) {
-      if (error instanceof Deno.errors.NotFound) {
-        return Result.ok([]);
-      }
-      throw error;
+    if (error instanceof Deno.errors.NotFound) {
+      return Result.ok([]);
     }
-
-    return Result.ok(ids);
-  } catch (error) {
     return Result.error(
-      createRepositoryError("item", "list", "failed to scan item index", {
+      createRepositoryError("item", "list", "failed to scan items directory", {
         cause: error,
       }),
     );
@@ -341,44 +397,23 @@ export const createFileSystemItemRepository = (
   dependencies: FileSystemItemRepositoryDependencies,
 ): ItemRepository => {
   const load = async (id: ItemId): Promise<LoadResult> => {
-    const idStr = idString(id);
-    const indexResult = await readIndexEntry(dependencies.root, idStr);
-    if (indexResult.type === "error") {
-      return indexResult;
+    const idStr = id.toString();
+    const directoryResult = await findItemDirectory(dependencies, idStr);
+    if (directoryResult.type === "error") {
+      return directoryResult;
     }
 
-    const entry = indexResult.value;
-    if (!entry) {
+    const directory = directoryResult.value;
+    if (!directory) {
       return Result.ok(undefined);
     }
 
-    const directory = itemDirectoryFromIndex(dependencies.root, entry.path, idStr);
-
-    const metaResult = await readMetaSnapshot(directory, idStr);
-    if (metaResult.type === "error") {
-      return metaResult;
-    }
-    if (!metaResult.value) {
-      return Result.ok(undefined);
-    }
-
-    const bodyResult = await readBody(directory, idStr);
-    if (bodyResult.type === "error") {
-      return bodyResult;
-    }
-
-    const edgesResult = await readEdgesSnapshots(directory, idStr);
-    if (edgesResult.type === "error") {
-      return edgesResult;
-    }
-
-    const snapshot = combineSnapshot(metaResult.value, bodyResult.value, edgesResult.value);
-    return parseSnapshot(snapshot);
+    return await loadItemFromDirectory(directory, idStr);
   };
 
   const save = async (item: Item): Promise<SaveResult> => {
     const snapshot = item.toJSON();
-    const directory = itemDirectoryFromSnapshot(dependencies.root, snapshot);
+    const directory = itemDirectoryFromSnapshot(dependencies, snapshot);
 
     try {
       await Deno.mkdir(directory, { recursive: true });
@@ -403,35 +438,29 @@ export const createFileSystemItemRepository = (
       return contentResult;
     }
 
-    const edgesResult = await writeEdges(item.edges, {
+    const treeResult = await writePlacementTree(item.edges, item.sections(), {
       directory: edgesDirectory(directory),
       identifier: snapshot.id,
     });
-    if (edgesResult.type === "error") {
-      return edgesResult;
-    }
-
-    const indexResult = await writeIndexEntry(dependencies.root, snapshot);
-    if (indexResult.type === "error") {
-      return indexResult;
+    if (treeResult.type === "error") {
+      return treeResult;
     }
 
     return Result.ok(undefined);
   };
 
   const remove = async (id: ItemId): Promise<DeleteResult> => {
-    const idStr = idString(id);
-    const indexResult = await readIndexEntry(dependencies.root, idStr);
-    if (indexResult.type === "error") {
-      return indexResult;
+    const idStr = id.toString();
+    const directoryResult = await findItemDirectory(dependencies, idStr);
+    if (directoryResult.type === "error") {
+      return directoryResult;
     }
 
-    const entry = indexResult.value;
-    if (!entry) {
+    const directory = directoryResult.value;
+    if (!directory) {
       return Result.ok(undefined);
     }
 
-    const directory = itemDirectoryFromIndex(dependencies.root, entry.path, idStr);
     try {
       await Deno.remove(directory, { recursive: true });
     } catch (error) {
@@ -445,36 +474,21 @@ export const createFileSystemItemRepository = (
       }
     }
 
-    const indexDeleteResult = await deleteIndexEntry(dependencies.root, idStr);
-    if (indexDeleteResult.type === "error") {
-      return indexDeleteResult;
-    }
-
     return Result.ok(undefined);
   };
 
   const listByPlacementBin = async (
     bin: PlacementBin,
   ): Promise<ListByPlacementBinResult> => {
-    const idsResult = await listItemIds(dependencies.root);
-    if (idsResult.type === "error") {
-      return idsResult;
+    const directoriesResult = await collectItemDirectories(dependencies.root);
+    if (directoriesResult.type === "error") {
+      return directoriesResult;
     }
 
     const items: Item[] = [];
 
-    for (const idStr of idsResult.value) {
-      const itemIdResult = parseItemId(idStr);
-      if (itemIdResult.type === "error") {
-        return Result.error(
-          createRepositoryError("item", "list", "invalid item ID in index", {
-            identifier: idStr,
-            cause: itemIdResult.error,
-          }),
-        );
-      }
-
-      const itemResult = await load(itemIdResult.value);
+    for (const record of directoriesResult.value) {
+      const itemResult = await loadItemFromDirectory(record.directory, record.id);
       if (itemResult.type === "error") {
         return itemResult;
       }
@@ -482,8 +496,8 @@ export const createFileSystemItemRepository = (
       const item = itemResult.value;
       if (!item) {
         return Result.error(
-          createRepositoryError("item", "list", "item index entry is stale", {
-            identifier: idStr,
+          createRepositoryError("item", "list", "item metadata is missing", {
+            identifier: record.id,
           }),
         );
       }
@@ -499,32 +513,38 @@ export const createFileSystemItemRepository = (
   };
 
   const findByShortId = async (shortId: ItemShortId): Promise<FindByShortIdResult> => {
-    const idsResult = await findIdsByShortId(dependencies.root, shortId);
-    if (idsResult.type === "error") {
-      return idsResult;
+    const directoriesResult = await collectItemDirectories(dependencies.root);
+    if (directoriesResult.type === "error") {
+      return directoriesResult;
     }
 
-    const matchingIds = idsResult.value;
+    const shortIdStr = shortId.toString();
+    const matches = directoriesResult.value.filter((record) => record.id.endsWith(shortIdStr));
 
-    if (matchingIds.length === 0) {
+    if (matches.length === 0) {
       return Result.ok(undefined);
     }
 
-    if (matchingIds.length > 1) {
-      return Result.error(createAmbiguousShortIdError(shortId.toString(), matchingIds.length));
+    if (matches.length > 1) {
+      return Result.error(createAmbiguousShortIdError(shortIdStr, matches.length));
     }
 
-    // Exactly one match - load and return the item
-    const itemIdResult = parseItemId(matchingIds[0]);
-    if (itemIdResult.type === "error") {
+    const [match] = matches;
+    const itemResult = await loadItemFromDirectory(match.directory, match.id);
+    if (itemResult.type === "error") {
+      return itemResult;
+    }
+
+    const item = itemResult.value;
+    if (!item) {
       return Result.error(
-        createRepositoryError("item", "findByShortId", "invalid item ID in index", {
-          identifier: matchingIds[0],
+        createRepositoryError("item", "findByShortId", "item metadata is missing", {
+          identifier: match.id,
         }),
       );
     }
 
-    return await load(itemIdResult.value);
+    return Result.ok(item);
   };
 
   return {

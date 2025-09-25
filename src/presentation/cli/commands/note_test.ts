@@ -78,22 +78,43 @@ Deno.test({
       const successLine = noteConsole.logs.find((line) => line.includes("Integration note"));
       assert(successLine, "note command did not report created note");
 
-      const indexDirectory = join(workspace, "nodes", ".index");
-      const indexFiles: string[] = [];
-      for await (const entry of Deno.readDir(indexDirectory)) {
-        if (entry.isFile && entry.name.endsWith(".json")) {
-          indexFiles.push(entry.name);
+      const itemsDirectory = join(workspace, "items");
+      const itemDirectories: Array<{ id: string; path: string }> = [];
+      for await (const yearEntry of Deno.readDir(itemsDirectory)) {
+        if (!yearEntry.isDirectory || yearEntry.name.startsWith(".")) {
+          continue;
+        }
+        const yearPath = join(itemsDirectory, yearEntry.name);
+        for await (const monthEntry of Deno.readDir(yearPath)) {
+          if (!monthEntry.isDirectory || monthEntry.name.startsWith(".")) {
+            continue;
+          }
+          const monthPath = join(yearPath, monthEntry.name);
+          for await (const dayEntry of Deno.readDir(monthPath)) {
+            if (!dayEntry.isDirectory || dayEntry.name.startsWith(".")) {
+              continue;
+            }
+            if (dayEntry.name === "edges") {
+              continue;
+            }
+            const dayPath = join(monthPath, dayEntry.name);
+            for await (const itemEntry of Deno.readDir(dayPath)) {
+              if (!itemEntry.isDirectory || itemEntry.name.startsWith(".")) {
+                continue;
+              }
+              if (itemEntry.name === "edges") {
+                continue;
+              }
+              itemDirectories.push({ id: itemEntry.name, path: join(dayPath, itemEntry.name) });
+            }
+          }
         }
       }
 
-      assertEquals(indexFiles.length, 1, "expected exactly one index entry");
-      const indexFileName = indexFiles[0];
-      const itemId = indexFileName.replace(/\.json$/, "");
-      const indexSnapshot = JSON.parse(
-        await Deno.readTextFile(join(indexDirectory, indexFileName)),
-      ) as { readonly path: string };
+      assertEquals(itemDirectories.length, 1, "expected exactly one item directory");
+      const [{ path: itemDirectory }] = itemDirectories;
 
-      const metaPath = join(workspace, "nodes", indexSnapshot.path, itemId, "meta.json");
+      const metaPath = join(itemDirectory, "meta.json");
       const metaSnapshot = JSON.parse(await Deno.readTextFile(metaPath)) as {
         readonly title: string;
         readonly placement?: { readonly kind: string; readonly section: string };
@@ -104,7 +125,7 @@ Deno.test({
       assertEquals(metaSnapshot.placement?.kind, "root");
       assertEquals(metaSnapshot.placement?.section, ":2024-01-05");
 
-      const contentPath = join(workspace, "nodes", indexSnapshot.path, itemId, "content.md");
+      const contentPath = join(itemDirectory, "content.md");
       let contentExists = false;
       try {
         await Deno.stat(contentPath);

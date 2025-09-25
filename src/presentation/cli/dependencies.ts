@@ -208,7 +208,7 @@ export const loadCliDependencies = async (
     });
   }
 
-  const itemRepository = createFileSystemItemRepository({ root });
+  const itemRepository = createFileSystemItemRepository({ root, timezone });
   const rankService = createRankService(createLexoRankGenerator());
   const idGenerationService = createIdGenerationService(createUuidV7Generator());
 
