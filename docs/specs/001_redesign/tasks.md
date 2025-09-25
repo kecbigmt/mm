@@ -20,17 +20,19 @@
 
 ## Phase 3 — Filesystem adapters & storage layout
 
-- [ ] Introduce the new `items/YYYY/MM/DD/<item-id>/` layout with per-section edge directories
-- [ ] Remove short-ID index usage; persist hashed canonical alias/tag entries under `.index` and
+- [x] Introduce the new `items/YYYY/MM/DD/<item-id>/` layout with per-section edge directories
+- [x] Remove short-ID index usage; persist hashed canonical alias/tag entries under `.index` and
       `tags`
-- [ ] Ensure item `meta.json` stores only raw alias while indexes handle canonical metadata
-- [ ] Update workspace bootstrap to create the new scaffold and refresh repository tests
+- [x] Ensure item `meta.json` stores only raw alias while indexes handle canonical metadata
+- [x] Update workspace bootstrap to create the new scaffold and refresh repository tests
 
 ## Phase 4 — Locator parsing & resolution services
 
 - [ ] Implement locator parser supporting dates, UUID v7, aliases, and section suffixes
 - [ ] Replace `ItemResolutionService` usage with new `LocatorResolutionService`; remove short-ID
       branches
+- [ ] Delete short-ID primitives, repository methods, and CLI affordances once new locator
+      resolution is in place
 - [ ] Add parser and resolution tests covering relative tokens and range validation
 
 ## Phase 5 — Workflows & CLI experience
