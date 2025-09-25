@@ -2,26 +2,14 @@
 
 ## Current State Snapshot
 
-- The domain item model still stores a `ContainerPath` string for placement
-  (`src/domain/models/item.ts:59`) and delegates ordering to legacy container edges, so there is no
-  notion of parent Item + Section pairing yet.
-- Container infrastructure is calendar-oriented (`src/domain/models/container.ts:214-244`) and the
-  filesystem adapters persist `nodes/<year>/<month>/<day>/<id>` plus container edge directories
-  (`src/infrastructure/fileSystem/item_repository.ts:41-55`,
-  `src/infrastructure/fileSystem/container_repository.ts:19-28`), which diverges from the redesign
-  layout under `items/` with per-section edge folders.
-- Identifier resolution still depends on 7-character short IDs
-  (`src/domain/services/item_resolution_service.ts:35-71`) and the repository exposes
-  `findByShortId` (`src/domain/repositories/item_repository.ts:11-18`), conflicting with the
-  redesign’s “UUID v7 only” rule.
-- Alias and context primitives enforce lowercase ASCII slugs
-  (`src/domain/primitives/alias_slug.ts:28-84`, `src/domain/primitives/tag_slug.ts:21-61`) and
-  repositories persist files named by the raw slug
-  (`src/infrastructure/fileSystem/alias_repository.ts:18-70`), whereas the redesign requires Unicode
-  input, canonical keys, and hashed filenames.
-- CLI flows (e.g. note creation) still assume day containers and short IDs
-  (`src/presentation/cli/commands/note.ts:67-93`), with no support for Sections, ranges, or logical
-  CWD semantics.
+- The domain model now represents placement as `{ bin, rank }`; create-item/status workflows use the
+  new API, but section trees are not wired and move/list services still expect container-era data.
+- File-system adapters continue to write to `nodes/` with container edges; the redesign layout under
+  `items/` and placement bins has not been adopted yet.
+- Identifier resolution still offers short-ID lookups via `ItemResolutionService`; the planned v7-only
+  locator stack is not in place.
+- Alias/tag primitives remain ASCII-focused; canonical key + hashing work is pending.
+- CLI flows (note/close/etc.) still assume day containers and short IDs, with no bin-aware navigation.
 
 ## Guiding Constraints
 

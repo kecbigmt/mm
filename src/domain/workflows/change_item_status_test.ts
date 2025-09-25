@@ -18,7 +18,7 @@ import { ItemId } from "../primitives/item_id.ts";
 import { ItemShortId } from "../primitives/item_short_id.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { AmbiguousShortIdError } from "../repositories/short_id_resolution_error.ts";
-import { createRootPlacement } from "../models/placement.ts";
+import { createRootPlacement, PlacementBin } from "../models/placement.ts";
 
 // Mock ItemRepository for testing
 class MockItemRepository implements ItemRepository {
@@ -40,6 +40,16 @@ class MockItemRepository implements ItemRepository {
   delete(id: ItemId): Promise<Result<void, RepositoryError>> {
     this.items.delete(id.toString());
     return Promise.resolve(Result.ok(undefined));
+  }
+
+  listByPlacementBin(
+    bin: PlacementBin,
+  ): Promise<Result<ReadonlyArray<Item>, RepositoryError>> {
+    const items = Array.from(this.items.values())
+      .filter((item) => item.data.placement.belongsTo(bin))
+      .sort((first, second) => first.data.placement.rank.compare(second.data.placement.rank));
+
+    return Promise.resolve(Result.ok(items));
   }
 
   findByShortId(

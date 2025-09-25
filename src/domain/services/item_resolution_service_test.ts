@@ -5,6 +5,7 @@ import { ItemRepository } from "../repositories/item_repository.ts";
 import { Result } from "../../shared/result.ts";
 import { AmbiguousShortIdError } from "../repositories/short_id_resolution_error.ts";
 import { ItemId, ItemShortId } from "../primitives/mod.ts";
+import { PlacementBin } from "../models/placement.ts";
 
 // Mock item for testing
 const createMockItem = (id: string, title: string): Item => {
@@ -36,6 +37,7 @@ const createMockRepository = (items: Item[]): ItemRepository => ({
   },
   save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
   delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
+  listByPlacementBin: (_bin: PlacementBin) => Promise.resolve(Result.ok(items)),
   findByShortId: (shortId: ItemShortId) => {
     const shortIdStr = shortId.toString();
     const matching = items.filter((item) => item.data.id.toString().endsWith(shortIdStr));

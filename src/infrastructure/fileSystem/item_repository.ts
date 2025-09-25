@@ -11,6 +11,7 @@ import {
 } from "../../domain/repositories/short_id_resolution_error.ts";
 import { readEdgeSnapshots, writeEdges } from "./edge_store.ts";
 import { EdgeSnapshot } from "../../domain/models/edge.ts";
+import { PlacementBin } from "../../domain/models/placement.ts";
 
 export type FileSystemItemRepositoryDependencies = Readonly<{
   readonly root: string;
@@ -19,6 +20,7 @@ export type FileSystemItemRepositoryDependencies = Readonly<{
 type LoadResult = Result<Item | undefined, RepositoryError>;
 type SaveResult = Result<void, RepositoryError>;
 type DeleteResult = Result<void, RepositoryError>;
+type ListByPlacementBinResult = Result<ReadonlyArray<Item>, RepositoryError>;
 type FindByShortIdResult = Result<Item | undefined, RepositoryError | AmbiguousShortIdError>;
 
 type ItemMetaSnapshot = Omit<ItemSnapshot, "body" | "edges">;
@@ -304,6 +306,37 @@ const findIdsByShortId = async (
   }
 };
 
+const listItemIds = async (
+  root: string,
+): Promise<Result<string[], RepositoryError>> => {
+  const ids: string[] = [];
+
+  try {
+    const indexDir = indexDirectory(root);
+    try {
+      const entries = Deno.readDir(indexDir);
+      for await (const entry of entries) {
+        if (entry.isFile && entry.name.endsWith(".json")) {
+          ids.push(entry.name.slice(0, -5));
+        }
+      }
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.ok([]);
+      }
+      throw error;
+    }
+
+    return Result.ok(ids);
+  } catch (error) {
+    return Result.error(
+      createRepositoryError("item", "list", "failed to scan item index", {
+        cause: error,
+      }),
+    );
+  }
+};
+
 export const createFileSystemItemRepository = (
   dependencies: FileSystemItemRepositoryDependencies,
 ): ItemRepository => {
@@ -420,6 +453,51 @@ export const createFileSystemItemRepository = (
     return Result.ok(undefined);
   };
 
+  const listByPlacementBin = async (
+    bin: PlacementBin,
+  ): Promise<ListByPlacementBinResult> => {
+    const idsResult = await listItemIds(dependencies.root);
+    if (idsResult.type === "error") {
+      return idsResult;
+    }
+
+    const items: Item[] = [];
+
+    for (const idStr of idsResult.value) {
+      const itemIdResult = parseItemId(idStr);
+      if (itemIdResult.type === "error") {
+        return Result.error(
+          createRepositoryError("item", "list", "invalid item ID in index", {
+            identifier: idStr,
+            cause: itemIdResult.error,
+          }),
+        );
+      }
+
+      const itemResult = await load(itemIdResult.value);
+      if (itemResult.type === "error") {
+        return itemResult;
+      }
+
+      const item = itemResult.value;
+      if (!item) {
+        return Result.error(
+          createRepositoryError("item", "list", "item index entry is stale", {
+            identifier: idStr,
+          }),
+        );
+      }
+
+      if (item.data.placement.belongsTo(bin)) {
+        items.push(item);
+      }
+    }
+
+    items.sort((first, second) => first.data.placement.rank.compare(second.data.placement.rank));
+
+    return Result.ok(items);
+  };
+
   const findByShortId = async (shortId: ItemShortId): Promise<FindByShortIdResult> => {
     const idsResult = await findIdsByShortId(dependencies.root, shortId);
     if (idsResult.type === "error") {
@@ -453,6 +531,7 @@ export const createFileSystemItemRepository = (
     load,
     save,
     delete: remove,
+    listByPlacementBin,
     findByShortId,
   };
 };

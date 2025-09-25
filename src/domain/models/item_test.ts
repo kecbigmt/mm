@@ -83,7 +83,7 @@ Deno.test("parseItem parses full snapshot payload", () => {
   assertEquals(item.data.icon.toString(), "task");
   assertEquals(item.data.status.toString(), "closed");
   assertEquals(item.data.placement.rank.toString(), "b1");
-  assertEquals(item.data.placement.section.toString(), ":2024-09-21");
+  assertEquals(item.data.placement.section()?.toString(), ":2024-09-21");
   assertEquals(item.data.alias?.toString(), "focus-work");
   assertEquals(item.data.context?.toString(), "deep-work");
   assertEquals(item.data.body, "Example body");
@@ -168,7 +168,7 @@ Deno.test("Item.relocate updates placement", () => {
 
   const relocated = base.relocate(placement, relocateAt);
   assertEquals(relocated.data.placement.rank.toString(), "b1");
-  assertEquals(relocated.data.placement.section.toString(), ":1");
+  assertEquals(relocated.data.placement.section()?.toString(), ":1");
   assert(relocated.data.updatedAt.equals(relocateAt), "updatedAt should match relocate timestamp");
 });
 
