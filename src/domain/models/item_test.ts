@@ -1,4 +1,4 @@
-import { parseItem } from "./item.ts";
+import { createItem, parseItem } from "./item.ts";
 import {
   parseAliasSlug,
   parseDateTime,
@@ -11,6 +11,7 @@ import {
   parseTagSlug,
 } from "../primitives/mod.ts";
 import { createItemPlacement } from "./placement.ts";
+import { parseSectionTree, type SectionTreeSnapshot } from "./section_tree.ts";
 
 const assert = (condition: unknown, message: string): void => {
   if (!condition) {
@@ -95,6 +96,7 @@ Deno.test("parseItem parses full snapshot payload", () => {
   assertEquals(item.data.updatedAt.toString(), "2024-09-21T14:00:00.000Z");
   assertEquals(item.edges.length, 0);
   assertEquals(item.itemEdges().length, 0);
+  assert(item.sections().isEmpty(), "section tree should be empty");
 });
 
 Deno.test("parseItem parses edges collection", () => {
@@ -114,11 +116,37 @@ Deno.test("parseItem parses edges collection", () => {
   assertEquals(item.edges.length, 1);
   assertEquals(item.edges[0].kind, "ItemEdge");
   assertEquals(item.itemEdges().length, 1);
+  assert(item.sections().isEmpty(), "section tree should be empty when sections are absent");
 
   const roundTrip = item.toJSON();
   assert(roundTrip.edges !== undefined, "edges should be serialized");
   assertEquals(roundTrip.edges?.length, 1);
   assert(roundTrip.placement !== undefined, "placement should be serialized");
+});
+
+Deno.test("parseItem parses section tree snapshot", () => {
+  const sections: SectionTreeSnapshot = [
+    {
+      section: ":2024-09-21",
+      edges: [{
+        kind: "ItemEdge",
+        to: "019965a7-2789-740a-b8c1-1415904fd209",
+        rank: "a",
+      }],
+    },
+  ];
+
+  const result = parseItem(baseSnapshot({ sections }));
+  const item = unwrapOk(result, "parse item with sections");
+
+  const sectionPath = unwrapOk(parseSectionPath(":2024-09-21"), "parse section path");
+  const node = item.sections().findSection(sectionPath);
+  assert(node, "expected section node to be present");
+  assertEquals(node?.edges.length ?? 0, 1);
+
+  const snapshot = item.toJSON();
+  assert(snapshot.sections !== undefined, "sections should be serialized");
+  assertEquals(snapshot.sections?.length, 1);
 });
 
 Deno.test("parseItem requires placement metadata", () => {
@@ -300,4 +328,27 @@ Deno.test("Item.toJSON reflects current data", () => {
   assertEquals(snapshot.duration, "1h30m");
   assertEquals(snapshot.startAt, "2024-09-22T08:00:00.000Z");
   assertEquals(snapshot.dueAt, "2024-09-22T10:00:00.000Z");
+  assertEquals(snapshot.sections, undefined);
+});
+
+Deno.test("createItem accepts explicit section tree", () => {
+  const base = unwrapOk(parseItem(baseSnapshot()), "parse base item");
+  const treeSnapshot: SectionTreeSnapshot = [
+    {
+      section: ":2024-09-22",
+      edges: [{
+        kind: "ItemEdge",
+        to: "019965a7-2789-740a-b8c1-1415904fd309",
+        rank: "b",
+      }],
+    },
+  ];
+  const tree = unwrapOk(parseSectionTree(treeSnapshot), "parse section tree");
+
+  const item = createItem(base.data, { sectionTree: tree });
+  assert(!item.sections().isEmpty(), "section tree should be preserved on creation");
+
+  const snapshot = item.toJSON();
+  assert(snapshot.sections !== undefined, "sections should be serialized");
+  assertEquals(snapshot.sections?.length, 1);
 });
