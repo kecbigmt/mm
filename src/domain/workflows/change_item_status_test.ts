@@ -2,11 +2,11 @@ import { assertEquals } from "@std/assert";
 import { ChangeItemStatusWorkflow } from "./change_item_status.ts";
 import { createItem } from "../models/item.ts";
 import {
-  containerPathFromSegments,
   createItemIcon,
   dateTimeFromDate,
   itemStatusClosed,
   itemStatusOpen,
+  parseSectionPath,
 } from "../primitives/mod.ts";
 import { itemIdFromString } from "../primitives/item_id.ts";
 import { itemTitleFromString } from "../primitives/item_title.ts";
@@ -18,6 +18,7 @@ import { ItemId } from "../primitives/item_id.ts";
 import { ItemShortId } from "../primitives/item_short_id.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { AmbiguousShortIdError } from "../repositories/short_id_resolution_error.ts";
+import { createRootPlacement } from "../models/placement.ts";
 
 // Mock ItemRepository for testing
 class MockItemRepository implements ItemRepository {
@@ -82,8 +83,9 @@ function createTestItem(id: string, status: "open" | "closed" = "open") {
   const title = Result.unwrap(itemTitleFromString("Test Item"));
   const icon = createItemIcon("note");
   const itemStatus = status === "open" ? itemStatusOpen() : itemStatusClosed();
-  const container = Result.unwrap(containerPathFromSegments(["2024", "01", "01"]));
   const rank = Result.unwrap(itemRankFromString("a0"));
+  const section = Result.unwrap(parseSectionPath(":2024-01-01"));
+  const placement = createRootPlacement(section, rank);
   const now = Result.unwrap(dateTimeFromDate(new Date()));
 
   return createItem({
@@ -91,8 +93,7 @@ function createTestItem(id: string, status: "open" | "closed" = "open") {
     title,
     icon,
     status: itemStatus,
-    container,
-    rank,
+    placement,
     createdAt: now,
     updatedAt: now,
     closedAt: status === "closed" ? now : undefined,

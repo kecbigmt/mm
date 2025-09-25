@@ -2,7 +2,6 @@ import { BaseError } from "../../shared/errors.ts";
 
 export type RepositoryScope =
   | "workspace"
-  | "container"
   | "item"
   | "alias"
   | "tag"

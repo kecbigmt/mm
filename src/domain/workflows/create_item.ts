@@ -1,26 +1,24 @@
 import { Result } from "../../shared/result.ts";
 import { createValidationIssue, ValidationIssue } from "../../shared/errors.ts";
-import { Item } from "../models/item.ts";
-import { createItem } from "../models/item.ts";
+import { createItem, Item } from "../models/item.ts";
 import {
-  ContainerPath,
-  containerPathFromSegments,
   createItemIcon,
   DateTime,
   ItemId,
-  ItemRank,
   itemStatusOpen,
   itemTitleFromString,
+  parseSectionPath,
+  SectionPath,
   TagSlug,
   tagSlugFromString,
 } from "../primitives/mod.ts";
 import { CalendarDay } from "../primitives/calendar_day.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
-import { ContainerRepository } from "../repositories/container_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
-import { createItemEdge, Edge } from "../models/edge.ts";
+import { createItemEdge } from "../models/edge.ts";
 import { RankService } from "../services/rank_service.ts";
 import { IdGenerationService } from "../services/id_generation_service.ts";
+import { createRootPlacement } from "../models/placement.ts";
 
 export type CreateItemInput = Readonly<{
   title: string;
@@ -33,7 +31,6 @@ export type CreateItemInput = Readonly<{
 
 export type CreateItemDependencies = Readonly<{
   itemRepository: ItemRepository;
-  containerRepository: ContainerRepository;
   rankService: RankService;
   idGenerationService: IdGenerationService;
 }>;
@@ -106,14 +103,14 @@ export const CreateItemWorkflow = {
     }
 
     const daySegments = input.day.toString().split("-");
-    const containerPathResult = containerPathFromSegments(daySegments);
-    const containerPath = containerPathResult.type === "ok" ? containerPathResult.value : undefined;
-    if (containerPathResult.type === "error") {
+    const sectionResult = parseSectionPath(`:${daySegments.join("-")}`);
+    const section = sectionResult.type === "ok" ? sectionResult.value : undefined;
+    if (sectionResult.type === "error") {
       issues.push(
-        ...containerPathResult.error.issues.map((issue) =>
+        ...sectionResult.error.issues.map((issue) =>
           createValidationIssue(issue.message, {
             code: issue.code,
-            path: ["container", ...issue.path],
+            path: ["placement", "section", ...issue.path],
           })
         ),
       );
@@ -136,48 +133,27 @@ export const CreateItemWorkflow = {
       return Result.error(invalidInput(issues));
     }
 
-    const resolvedContainerPath = containerPath as ContainerPath;
+    const resolvedSection = section as SectionPath;
     const resolvedId = id as ItemId;
     const resolvedTitle = title!;
 
-    const ensureResult = await deps.containerRepository.ensure(resolvedContainerPath);
-    if (ensureResult.type === "error") {
-      return Result.error(repositoryFailure(ensureResult.error));
-    }
-    const container = ensureResult.value;
-
-    const existingItemEdges = container.itemEdges();
-
-    let rankResult: Result<ItemRank, CreateItemError>;
-    if (existingItemEdges.length === 0) {
-      const middle = deps.rankService.middleRank();
-      rankResult = middle.type === "ok" ? Result.ok(middle.value) : Result.error(invalidInput(
-        middle.error.issues.map((issue) =>
-          createValidationIssue(issue.message, {
-            code: issue.code,
-            path: ["rank", ...issue.path],
-          })
-        ),
-      ));
-    } else {
-      const sortedEdges = [...existingItemEdges].sort((a, b) =>
-        deps.rankService.compareRanks(a.data.rank, b.data.rank)
-      );
-      const lastRank = sortedEdges[sortedEdges.length - 1].data.rank;
-      const next = deps.rankService.nextRank(lastRank);
-      rankResult = next.type === "ok" ? Result.ok(next.value) : Result.error(invalidInput(
-        next.error.issues.map((issue) =>
-          createValidationIssue(issue.message, {
-            code: issue.code,
-            path: ["rank", ...issue.path],
-          })
-        ),
-      ));
-    }
-
+    const rankResult = deps.rankService.middleRank();
     if (rankResult.type === "error") {
-      return rankResult;
+      return Result.error(invalidInput(
+        rankResult.error.issues.map((issue) =>
+          createValidationIssue(issue.message, {
+            code: issue.code,
+            path: ["rank", ...issue.path],
+          })
+        ),
+      ));
     }
+
+    const placement = createRootPlacement(
+      resolvedSection,
+      rankResult.value,
+    );
+    const placementEdge = createItemEdge(resolvedId, rankResult.value);
 
     const trimmedBody = typeof input.body === "string" ? input.body.trim() : undefined;
     const body = trimmedBody && trimmedBody.length > 0 ? trimmedBody : undefined;
@@ -187,32 +163,16 @@ export const CreateItemWorkflow = {
       title: resolvedTitle,
       icon: createItemIcon(input.itemType),
       status: itemStatusOpen(),
-      container: resolvedContainerPath,
-      rank: rankResult.value,
+      placement,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,
       body,
       context,
-    });
+    }, [placementEdge]);
 
     const saveResult = await deps.itemRepository.save(item);
     if (saveResult.type === "error") {
       return Result.error(repositoryFailure(saveResult.error));
-    }
-
-    const containerEdges = container.containerEdges();
-    const newItemEdge = createItemEdge(resolvedId, rankResult.value);
-    const updatedItemEdges = [...existingItemEdges, newItemEdge].sort((a, b) =>
-      deps.rankService.compareRanks(a.data.rank, b.data.rank)
-    );
-    const updatedEdges: Edge[] = [...containerEdges, ...updatedItemEdges];
-
-    const replaceResult = await deps.containerRepository.replaceEdges(
-      resolvedContainerPath,
-      updatedEdges,
-    );
-    if (replaceResult.type === "error") {
-      return Result.error(repositoryFailure(replaceResult.error));
     }
 
     return Result.ok({ item });

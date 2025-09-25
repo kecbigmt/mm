@@ -1,32 +1,10 @@
-import { parseContainerEdge, parseEdge, parseItemEdge } from "./edge.ts";
+import { parseEdge, parseItemEdge } from "./edge.ts";
 
 const assertEquals = <T>(actual: T, expected: T, message?: string): void => {
   if (actual !== expected) {
     throw new Error(message ?? `expected ${expected} but received ${actual}`);
   }
 };
-
-Deno.test("parseContainerEdge parses valid snapshot", () => {
-  const result = parseContainerEdge({
-    kind: "ContainerEdge",
-    to: "projects/focus",
-    index: 1,
-  });
-
-  if (result.type !== "ok") {
-    throw new Error(`expected ok, got error: ${JSON.stringify(result.error)}`);
-  }
-
-  const edge = result.value;
-  assertEquals(edge.kind, "ContainerEdge");
-  assertEquals(edge.data.to.toString(), "projects/focus");
-  assertEquals(edge.data.index.value(), 1);
-
-  const snapshot = edge.toJSON();
-  assertEquals(snapshot.kind, "ContainerEdge");
-  assertEquals(snapshot.to, "projects/focus");
-  assertEquals(snapshot.index, 1);
-});
 
 Deno.test("parseItemEdge parses valid snapshot", () => {
   const result = parseItemEdge({

@@ -50,13 +50,6 @@ export {
   parseDuration,
 } from "./duration.ts";
 
-export type { ContainerPath, ContainerPathValidationError } from "./container_path.ts";
-export {
-  containerPathFromSegments,
-  isContainerPath,
-  parseContainerPath,
-} from "./container_path.ts";
-
 export type { ItemStatus, ItemStatusValidationError } from "./item_status.ts";
 export {
   createItemStatus,
@@ -77,13 +70,6 @@ export { canonicalKeyFromString, createCanonicalKey, isCanonicalKey } from "./ca
 
 export type { TagSlug, TagSlugValidationError } from "./tag_slug.ts";
 export { isTagSlug, parseTagSlug, tagSlugFromString } from "./tag_slug.ts";
-
-export type { ContainerIndex, ContainerIndexValidationError } from "./container_index.ts";
-export {
-  containerIndexFromNumber,
-  isContainerIndex,
-  parseContainerIndex,
-} from "./container_index.ts";
 
 export type { WorkspaceName, WorkspaceNameValidationError } from "./workspace_name.ts";
 export { isWorkspaceName, parseWorkspaceName, workspaceNameFromString } from "./workspace_name.ts";

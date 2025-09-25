@@ -6,7 +6,6 @@ import { createRepositoryError } from "../../domain/repositories/mod.ts";
 
 export type EdgeStoreOptions = Readonly<{
   readonly directory: string;
-  readonly scope: "item" | "container";
   readonly identifier?: string;
 }>;
 
@@ -14,14 +13,8 @@ const EDGE_SCHEMA = "mm.edge/1";
 
 const sanitizeFileComponent = (value: string): string => value.replace(/[^A-Za-z0-9._-]/g, "_");
 
-const edgeFileName = (edge: Edge): string => {
-  if (edge.kind === "ItemEdge") {
-    return `${edge.data.to.toString()}.edge.json`;
-  }
-  const index = edge.data.index.value().toString().padStart(4, "0");
-  const target = sanitizeFileComponent(edge.data.to.toString());
-  return `container-${index}-${target}.edge.json`;
-};
+const edgeFileName = (edge: Edge): string =>
+  `${sanitizeFileComponent(edge.data.to.toString())}.edge.json`;
 
 const writeEdgeFile = async (
   directory: string,
@@ -40,28 +33,17 @@ const readEdgeFile = async (
 };
 
 const sortEdges = (edges: ReadonlyArray<Edge>): ReadonlyArray<Edge> => {
-  const withKey = edges.map((edge) => {
-    const key = edge.kind === "ItemEdge"
-      ? `item:${edge.data.to.toString()}:${edge.data.rank.toString()}`
-      : `container:${
-        edge.data.index.value().toString().padStart(4, "0")
-      }:${edge.data.to.toString()}`;
-    return { key, edge };
-  });
+  const withKey = edges.map((edge) => ({
+    key: `${edge.data.to.toString()}:${edge.data.rank.toString()}`,
+    edge,
+  }));
   withKey.sort((a, b) => a.key.localeCompare(b.key));
   return withKey.map((entry) => entry.edge);
 };
 
 const edgeSnapshotKey = (snapshot: EdgeSnapshot): string => {
-  if ("rank" in snapshot) {
-    const rank = snapshot.rank ?? "";
-    return `item:${snapshot.to}:${rank}`;
-  }
-  if ("index" in snapshot) {
-    const index = String(snapshot.index).padStart(4, "0");
-    return `container:${index}:${snapshot.to}`;
-  }
-  return JSON.stringify(snapshot);
+  const rank = snapshot.rank ?? "";
+  return `${snapshot.to}:${rank}`;
 };
 
 export const writeEdges = async (
@@ -74,7 +56,7 @@ export const writeEdges = async (
     if (!(error instanceof Deno.errors.NotFound)) {
       return Result.error(
         createRepositoryError(
-          options.scope,
+          "item",
           "save",
           "failed to reset edges directory",
           { identifier: options.identifier, cause: error },
@@ -92,7 +74,7 @@ export const writeEdges = async (
   } catch (error) {
     return Result.error(
       createRepositoryError(
-        options.scope,
+        "item",
         "save",
         "failed to prepare edges directory",
         { identifier: options.identifier, cause: error },
@@ -109,7 +91,7 @@ export const writeEdges = async (
   } catch (error) {
     return Result.error(
       createRepositoryError(
-        options.scope,
+        "item",
         "save",
         "failed to write edges",
         { identifier: options.identifier, cause: error },
@@ -142,7 +124,7 @@ export const readEdgeSnapshots = async (
     }
     return Result.error(
       createRepositoryError(
-        options.scope,
+        "item",
         "load",
         "failed to read edges",
         { identifier: options.identifier, cause: error },
