@@ -87,7 +87,9 @@ const ensureWorkspaceStructure = async (
   try {
     await Promise.all([
       Deno.mkdir(root, { recursive: true }),
-      Deno.mkdir(join(root, "nodes"), { recursive: true }),
+      Deno.mkdir(join(root, "items"), { recursive: true }),
+      Deno.mkdir(join(root, ".index", "aliases"), { recursive: true }),
+      Deno.mkdir(join(root, "tags"), { recursive: true }),
     ]);
     return Result.ok(undefined);
   } catch (error) {

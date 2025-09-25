@@ -40,6 +40,13 @@ import {
   PlacementSnapshot,
   PlacementValidationError,
 } from "./placement.ts";
+import {
+  createSectionTree,
+  parseSectionTree,
+  SectionTree,
+  SectionTreeSnapshot,
+  SectionTreeValidationError,
+} from "./section_tree.ts";
 
 export type ItemData = Readonly<{
   readonly id: ItemId;
@@ -63,6 +70,7 @@ export type Item = Readonly<{
   readonly data: ItemData;
   readonly edges: ReadonlyArray<ItemEdge>;
   itemEdges(): ReadonlyArray<ItemEdge>;
+  sections(): SectionTree;
   close(closedAt: DateTime): Item;
   reopen(reopenedAt: DateTime): Item;
   relocate(placement: Placement, occurredAt: DateTime): Item;
@@ -98,6 +106,7 @@ export type ItemSnapshot = Readonly<{
   readonly context?: string;
   readonly body?: string;
   readonly edges?: ReadonlyArray<EdgeSnapshot>;
+  readonly sections?: SectionTreeSnapshot;
 }>;
 
 export type ItemValidationError = ValidationError<"Item">;
@@ -115,32 +124,45 @@ const makeEdges = (
   } as const;
 };
 
-const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
+const instantiate = (
+  data: ItemData,
+  edges: ReadonlyArray<Edge>,
+  sectionTree: SectionTree,
+): Item => {
   const frozenData = makeData(data);
   const edgeAccess = makeEdges(edges);
+  const tree = sectionTree;
 
   const close = function (this: Item, closedAt: DateTime): Item {
     if (this.data.status.isClosed()) {
       return this;
     }
-    return instantiate({
-      ...this.data,
-      status: itemStatusClosed(),
-      closedAt,
-      updatedAt: closedAt,
-    }, this.edges);
+    return instantiate(
+      {
+        ...this.data,
+        status: itemStatusClosed(),
+        closedAt,
+        updatedAt: closedAt,
+      },
+      this.edges,
+      tree,
+    );
   };
 
   const reopen = function (this: Item, reopenedAt: DateTime): Item {
     if (this.data.status.isOpen() && !this.data.closedAt) {
       return this;
     }
-    return instantiate({
-      ...this.data,
-      status: itemStatusOpen(),
-      closedAt: undefined,
-      updatedAt: reopenedAt,
-    }, this.edges);
+    return instantiate(
+      {
+        ...this.data,
+        status: itemStatusOpen(),
+        closedAt: undefined,
+        updatedAt: reopenedAt,
+      },
+      this.edges,
+      tree,
+    );
   };
 
   const relocate = function (
@@ -164,11 +186,15 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
       return this;
     }
 
-    return instantiate({
-      ...this.data,
-      placement,
-      updatedAt: occurredAt,
-    }, this.edges);
+    return instantiate(
+      {
+        ...this.data,
+        placement,
+        updatedAt: occurredAt,
+      },
+      this.edges,
+      tree,
+    );
   };
 
   const retitle = function (
@@ -179,11 +205,15 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
     if (this.data.title.toString() === title.toString()) {
       return this;
     }
-    return instantiate({
-      ...this.data,
-      title,
-      updatedAt,
-    }, this.edges);
+    return instantiate(
+      {
+        ...this.data,
+        title,
+        updatedAt,
+      },
+      this.edges,
+      tree,
+    );
   };
 
   const changeIcon = function (
@@ -194,11 +224,15 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
     if (this.data.icon.toString() === icon.toString()) {
       return this;
     }
-    return instantiate({
-      ...this.data,
-      icon,
-      updatedAt,
-    }, this.edges);
+    return instantiate(
+      {
+        ...this.data,
+        icon,
+        updatedAt,
+      },
+      this.edges,
+      tree,
+    );
   };
 
   const setBody = function (
@@ -214,11 +248,15 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
     if (this.data.body === normalized) {
       return this;
     }
-    return instantiate({
-      ...this.data,
-      body: normalized,
-      updatedAt,
-    }, this.edges);
+    return instantiate(
+      {
+        ...this.data,
+        body: normalized,
+        updatedAt,
+      },
+      this.edges,
+      tree,
+    );
   };
 
   const schedule = function (
@@ -237,7 +275,7 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
       dueAt: schedule.dueAt,
       updatedAt,
     } as ItemData;
-    return instantiate(next, this.edges);
+    return instantiate(next, this.edges, tree);
   };
 
   const setAlias = function (
@@ -250,11 +288,15 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
     if (current === next) {
       return this;
     }
-    return instantiate({
-      ...this.data,
-      alias,
-      updatedAt,
-    }, this.edges);
+    return instantiate(
+      {
+        ...this.data,
+        alias,
+        updatedAt,
+      },
+      this.edges,
+      tree,
+    );
   };
 
   const setContext = function (
@@ -267,11 +309,15 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
     if (current === next) {
       return this;
     }
-    return instantiate({
-      ...this.data,
-      context,
-      updatedAt,
-    }, this.edges);
+    return instantiate(
+      {
+        ...this.data,
+        context,
+        updatedAt,
+      },
+      this.edges,
+      tree,
+    );
   };
 
   const toJSON = function (this: Item): ItemSnapshot {
@@ -291,6 +337,7 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
       context: this.data.context?.toString(),
       body: this.data.body,
       edges: this.edges.map((edge) => edge.toJSON()),
+      sections: tree.isEmpty() ? undefined : tree.toJSON(),
     };
   };
 
@@ -299,6 +346,7 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
     data: frozenData,
     edges: edgeAccess.edges,
     itemEdges: () => edgeAccess.edges,
+    sections: () => tree,
     close,
     reopen,
     relocate,
@@ -323,7 +371,8 @@ const prefixIssues = (
     | DateTimeValidationError
     | DurationValidationError
     | TagSlugValidationError
-    | PlacementValidationError,
+    | PlacementValidationError
+    | SectionTreeValidationError,
 ): ValidationIssue[] =>
   error.issues.map((issue) =>
     createValidationIssue(issue.message, {
@@ -334,8 +383,16 @@ const prefixIssues = (
 
 export const createItem = (
   data: ItemData,
-  edges: ReadonlyArray<Edge> = [],
-): Item => instantiate(data, edges);
+  options: Readonly<{
+    edges?: ReadonlyArray<Edge>;
+    sectionTree?: SectionTree;
+  }> = {},
+): Item =>
+  instantiate(
+    data,
+    options.edges ?? [],
+    options.sectionTree ?? createSectionTree(),
+  );
 
 export const parseItem = (
   snapshot: ItemSnapshot,
@@ -348,6 +405,7 @@ export const parseItem = (
   const iconResult = parseItemIcon(snapshot.icon);
   const statusResult = parseItemStatus(snapshot.status);
   const placementResult = parsePlacement(snapshot.placement);
+  const sectionTreeResult = parseSectionTree(snapshot.sections);
   const createdAtResult = parseDateTime(snapshot.createdAt);
   const updatedAtResult = parseDateTime(snapshot.updatedAt);
 
@@ -365,6 +423,9 @@ export const parseItem = (
   }
   if (placementResult.type === "error") {
     issues.push(...prefixIssues("placement", placementResult.error));
+  }
+  if (sectionTreeResult.type === "error") {
+    issues.push(...prefixIssues("sections", sectionTreeResult.error));
   }
   if (createdAtResult.type === "error") {
     issues.push(...prefixIssues("createdAt", createdAtResult.error));
@@ -460,6 +521,7 @@ export const parseItem = (
   const icon = Result.unwrap(iconResult);
   const status = Result.unwrap(statusResult);
   const placement = Result.unwrap(placementResult);
+  const sectionTree = Result.unwrap(sectionTreeResult);
   const createdAt = Result.unwrap(createdAtResult);
   const updatedAt = Result.unwrap(updatedAtResult);
 
@@ -480,5 +542,5 @@ export const parseItem = (
     body: snapshot.body?.trim() ?? undefined,
   };
 
-  return Result.ok(instantiate(data, edges));
+  return Result.ok(instantiate(data, edges, sectionTree));
 };
