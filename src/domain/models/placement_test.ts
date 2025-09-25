@@ -42,12 +42,12 @@ Deno.test("parsePlacement parses snapshot payload", () => {
   const result = parsePlacement(snapshot);
   const placement = unwrapOk(result, "parse placement");
 
-  if (placement.kind !== "item") {
+  if (placement.kind() !== "item") {
     throw new Error("expected item placement");
   }
 
-  assertEquals(placement.parentId.toString(), snapshot.parentId);
-  assertEquals(placement.section.toString(), snapshot.section);
+  assertEquals(placement.parentId()?.toString(), snapshot.parentId);
+  assertEquals(placement.section()?.toString(), snapshot.section);
   assertEquals(placement.rank.toString(), snapshot.rank);
 
   const roundTrip = placement.toJSON();
@@ -61,7 +61,7 @@ Deno.test("parsePlacement parses snapshot payload", () => {
 
 Deno.test("createRootPlacement produces immutable placement", () => {
   const placement = createRootPlacement(sampleSection, sampleRank);
-  assert(placement.kind === "root", "expected root placement");
+  assert(placement.kind() === "root", "expected root placement");
   assert(Object.isFrozen(placement), "placement should be frozen");
   const snapshot = placement.toJSON();
   assert(snapshot.kind === "root", "expected root snapshot");
@@ -70,7 +70,7 @@ Deno.test("createRootPlacement produces immutable placement", () => {
 
 Deno.test("createItemPlacement produces immutable placement", () => {
   const placement = createItemPlacement(sampleParentId, sampleSection, sampleRank);
-  assert(placement.kind === "item", "expected item placement");
+  assert(placement.kind() === "item", "expected item placement");
   assert(Object.isFrozen(placement), "placement should be frozen");
   const snapshot = placement.toJSON();
   assert(snapshot.kind === "item", "expected item snapshot");

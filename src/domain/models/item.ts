@@ -148,14 +148,16 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
     placement: Placement,
     occurredAt: DateTime,
   ): Item {
-    const sameKind = this.data.placement.kind === placement.kind;
+    const currentKind = this.data.placement.kind();
+    const nextKind = placement.kind();
+    const sameKind = currentKind === nextKind;
     const sameParent = sameKind && (
-      placement.kind === "root"
-        ? this.data.placement.kind === "root"
-        : this.data.placement.kind === "item" &&
-          this.data.placement.parentId.toString() === placement.parentId.toString()
+      nextKind === "root" ? currentKind === "root" : currentKind === "item" &&
+        this.data.placement.parentId()?.toString() ===
+          placement.parentId()?.toString()
     );
-    const sameSection = this.data.placement.section.toString() === placement.section.toString();
+    const sameSection = this.data.placement.section()?.toString() ===
+      placement.section()?.toString();
     const sameRank = this.data.placement.rank.compare(placement.rank) === 0;
 
     if (sameKind && sameParent && sameSection && sameRank) {

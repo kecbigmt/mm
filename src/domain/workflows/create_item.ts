@@ -15,10 +15,9 @@ import {
 import { CalendarDay } from "../primitives/calendar_day.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
-import { createItemEdge } from "../models/edge.ts";
 import { RankService } from "../services/rank_service.ts";
 import { IdGenerationService } from "../services/id_generation_service.ts";
-import { createRootPlacement } from "../models/placement.ts";
+import { createRootPlacement, createRootPlacementBin } from "../models/placement.ts";
 
 export type CreateItemInput = Readonly<{
   title: string;
@@ -137,7 +136,20 @@ export const CreateItemWorkflow = {
     const resolvedId = id as ItemId;
     const resolvedTitle = title!;
 
-    const rankResult = deps.rankService.middleRank();
+    const siblingsResult = await deps.itemRepository.listByPlacementBin(
+      createRootPlacementBin(resolvedSection),
+    );
+    if (siblingsResult.type === "error") {
+      return Result.error(repositoryFailure(siblingsResult.error));
+    }
+
+    const siblings = siblingsResult.value;
+    const rankResult = siblings.length === 0
+      ? deps.rankService.middleRank()
+      : deps.rankService.nextRank(
+        siblings[siblings.length - 1].data.placement.rank,
+      );
+
     if (rankResult.type === "error") {
       return Result.error(invalidInput(
         rankResult.error.issues.map((issue) =>
@@ -153,7 +165,6 @@ export const CreateItemWorkflow = {
       resolvedSection,
       rankResult.value,
     );
-    const placementEdge = createItemEdge(resolvedId, rankResult.value);
 
     const trimmedBody = typeof input.body === "string" ? input.body.trim() : undefined;
     const body = trimmedBody && trimmedBody.length > 0 ? trimmedBody : undefined;
@@ -168,7 +179,7 @@ export const CreateItemWorkflow = {
       updatedAt: input.createdAt,
       body,
       context,
-    }, [placementEdge]);
+    });
 
     const saveResult = await deps.itemRepository.save(item);
     if (saveResult.type === "error") {
