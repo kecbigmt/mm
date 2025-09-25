@@ -13,8 +13,12 @@ const createMockItem = (id: string, title: string): Item => {
     title,
     icon: "note",
     status: "open",
-    container: "2024/01/01",
-    rank: "a",
+    placement: {
+      kind: "item",
+      parentId: "00000000-0000-7000-8000-000000000000",
+      section: ":2024-01-01",
+      rank: "a",
+    },
     createdAt: "2024-01-01T12:00:00Z",
     updatedAt: "2024-01-01T12:00:00Z",
   });

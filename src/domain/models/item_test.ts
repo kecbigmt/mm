@@ -1,16 +1,16 @@
 import { parseItem } from "./item.ts";
 import {
   parseAliasSlug,
-  parseContainerPath,
   parseDateTime,
   parseDuration,
   parseItemIcon,
+  parseItemId,
   parseItemRank,
   parseItemTitle,
+  parseSectionPath,
   parseTagSlug,
 } from "../primitives/mod.ts";
-
-type ItemSnapshot = Parameters<typeof parseItem>[0];
+import { createItemPlacement } from "./placement.ts";
 
 const assert = (condition: unknown, message: string): void => {
   if (!condition) {
@@ -34,13 +34,18 @@ const unwrapOk = <T, E>(
   return result.value;
 };
 
-const baseSnapshot = (overrides: Partial<ItemSnapshot> = {}): ItemSnapshot => ({
+const baseSnapshot = (
+  overrides: Partial<Parameters<typeof parseItem>[0]> = {},
+): Parameters<typeof parseItem>[0] => ({
   id: "019965a7-2789-740a-b8c1-1415904fd108",
   title: "Test item",
   icon: "note",
   status: "open",
-  container: "2024/09/20",
-  rank: "a",
+  placement: {
+    kind: "root",
+    section: ":2024-09-20",
+    rank: "a",
+  },
   createdAt: "2024-09-20T12:00:00Z",
   updatedAt: "2024-09-20T12:00:00Z",
   context: "work",
@@ -52,8 +57,11 @@ Deno.test("parseItem parses full snapshot payload", () => {
     title: "Detailed item",
     icon: "task",
     status: "closed",
-    container: "project-alpha",
-    rank: "b1",
+    placement: {
+      kind: "root",
+      section: ":2024-09-21",
+      rank: "b1",
+    },
     alias: "focus-work",
     context: "deep-work",
     body: "Example body",
@@ -74,8 +82,8 @@ Deno.test("parseItem parses full snapshot payload", () => {
   assertEquals(item.data.title.toString(), "Detailed item");
   assertEquals(item.data.icon.toString(), "task");
   assertEquals(item.data.status.toString(), "closed");
-  assertEquals(item.data.container.toString(), "project-alpha");
-  assertEquals(item.data.rank.toString(), "b1");
+  assertEquals(item.data.placement.rank.toString(), "b1");
+  assertEquals(item.data.placement.section.toString(), ":2024-09-21");
   assertEquals(item.data.alias?.toString(), "focus-work");
   assertEquals(item.data.context?.toString(), "deep-work");
   assertEquals(item.data.body, "Example body");
@@ -87,8 +95,6 @@ Deno.test("parseItem parses full snapshot payload", () => {
   assertEquals(item.data.updatedAt.toString(), "2024-09-21T14:00:00.000Z");
   assertEquals(item.edges.length, 0);
   assertEquals(item.itemEdges().length, 0);
-  assertEquals(item.containerEdges().length, 0);
-  assertEquals(item.path.toString(), item.data.id.toString());
 });
 
 Deno.test("parseItem parses edges collection", () => {
@@ -100,105 +106,31 @@ Deno.test("parseItem parses edges collection", () => {
           to: "019965a7-2789-740a-b8c1-1415904fd109",
           rank: "b1",
         },
-        {
-          kind: "ContainerEdge",
-          to: "projects/focus",
-          index: 1,
-        },
       ],
     }),
   );
 
   const item = unwrapOk(result, "parse item with edges");
-  assertEquals(item.edges.length, 2);
+  assertEquals(item.edges.length, 1);
   assertEquals(item.edges[0].kind, "ItemEdge");
-  assertEquals(item.edges[1].kind, "ContainerEdge");
   assertEquals(item.itemEdges().length, 1);
-  assertEquals(item.containerEdges().length, 1);
 
   const roundTrip = item.toJSON();
   assert(roundTrip.edges !== undefined, "edges should be serialized");
-  assertEquals(roundTrip.edges?.length, 2);
+  assertEquals(roundTrip.edges?.length, 1);
+  assert(roundTrip.placement !== undefined, "placement should be serialized");
 });
 
-Deno.test("setContext updates and normalizes context tag", () => {
-  const parseResult = parseItem(baseSnapshot());
-  if (parseResult.type !== "ok") {
-    throw new Error(`expected ok result, got error: ${parseResult.error.toString()}`);
-  }
-  const item = parseResult.value;
-
-  const focusContextResult = parseTagSlug("focus");
-  if (focusContextResult.type !== "ok") {
-    throw new Error("failed to parse focus context tag");
-  }
-  const updatedAtResult = parseDateTime("2024-09-21T09:00:00Z");
-  if (updatedAtResult.type !== "ok") {
-    throw new Error("failed to parse updatedAt timestamp");
-  }
-
-  const updated = item.setContext(focusContextResult.value, updatedAtResult.value);
-  assertEquals(updated.data.context?.toString(), "focus");
-  assert(updated.data.updatedAt.equals(updatedAtResult.value), "updatedAt should update");
-  assertEquals(item.data.context?.toString(), "work", "original item should be unchanged");
-
-  const repeat = updated.setContext(focusContextResult.value, updatedAtResult.value);
-  assertEquals(repeat, updated, "setting same context should return same instance");
-
-  const clearedAtResult = parseDateTime("2024-09-22T10:30:00Z");
-  if (clearedAtResult.type !== "ok") {
-    throw new Error("failed to parse clearedAt timestamp");
-  }
-
-  const cleared = updated.setContext(undefined, clearedAtResult.value);
-  assertEquals(cleared.data.context, undefined);
-  assert(
-    cleared.data.updatedAt.equals(clearedAtResult.value),
-    "cleared item should have new updatedAt",
-  );
-});
-
-Deno.test("parseItem rejects invalid context tag", () => {
-  const result = parseItem(baseSnapshot({ context: "Invalid Context!" }));
+Deno.test("parseItem requires placement metadata", () => {
+  const { placement: _placement, ...legacySnapshot } = baseSnapshot();
+  const result = parseItem(legacySnapshot as unknown as Parameters<typeof parseItem>[0]);
   if (result.type !== "error") {
-    throw new Error("expected parse failure for invalid context");
+    throw new Error("expected placement validation error");
   }
   assert(
-    result.error.issues.every((issue) => issue.path[0] === "context"),
-    "context validation issues should be scoped to context field",
+    result.error.issues.some((issue) => issue.path[0] === "placement"),
+    "placement issues should be reported",
   );
-  const codes = result.error.issues.map((issue) => issue.code);
-  assert(codes.includes("format"), "expected format issue for invalid characters");
-  assert(codes.includes("whitespace"), "expected whitespace issue for spaces");
-});
-
-Deno.test("parseItem aggregates validation issues", () => {
-  const snapshot = baseSnapshot({
-    id: "not-a-uuid",
-    icon: "unknown",
-    rank: "#invalid",
-    updatedAt: "invalid-date",
-  });
-
-  const result = parseItem(snapshot);
-  if (result.type !== "error") {
-    throw new Error("expected parse failure for invalid snapshot");
-  }
-
-  const codes = result.error.issues.map((issue) => issue.code).sort();
-  assert(codes.length >= 4, "expected multiple issues");
-  assert(codes.includes("format"), "should include format error");
-  assert(codes.includes("invalid_value"), "should include invalid value error");
-  assert(
-    codes.includes("invalid_datetime") || codes.includes("format"),
-    "should include datetime error",
-  );
-
-  const paths = result.error.issues.map((issue) => issue.path.join("."));
-  assert(paths.some((path) => path === "id.value"), "id issues expected");
-  assert(paths.some((path) => path === "icon.value"), "icon issues expected");
-  assert(paths.some((path) => path === "rank.value"), "rank issues expected");
-  assert(paths.some((path) => path === "updatedAt.iso"), "updatedAt issues expected");
 });
 
 Deno.test("Item.close transitions to closed state", () => {
@@ -226,17 +158,18 @@ Deno.test("Item.reopen clears closed state", () => {
   assertEquals(closed.data.status.toString(), "closed");
 });
 
-Deno.test("Item.relocate updates container and rank", () => {
+Deno.test("Item.relocate updates placement", () => {
   const base = unwrapOk(parseItem(baseSnapshot()), "parse item");
-  const targetContainer = unwrapOk(parseContainerPath("project-alpha"), "parse container");
   const targetRank = unwrapOk(parseItemRank("b1"), "parse rank");
+  const targetSection = unwrapOk(parseSectionPath(":1"), "parse section");
+  const parent = unwrapOk(parseItemId("019965a7-2789-740a-b8c1-1415904fd109"), "parse parent id");
+  const placement = createItemPlacement(parent, targetSection, targetRank);
   const relocateAt = unwrapOk(parseDateTime("2024-09-21T10:00:00Z"), "parse relocate timestamp");
 
-  const relocated = base.relocate(targetContainer, targetRank, relocateAt);
-  assertEquals(relocated.data.container.toString(), "project-alpha");
-  assertEquals(relocated.data.rank.toString(), "b1");
+  const relocated = base.relocate(placement, relocateAt);
+  assertEquals(relocated.data.placement.rank.toString(), "b1");
+  assertEquals(relocated.data.placement.section.toString(), ":1");
   assert(relocated.data.updatedAt.equals(relocateAt), "updatedAt should match relocate timestamp");
-  assertEquals(base.data.container.toString(), "2024/09/20");
 });
 
 Deno.test("Item.retitle updates title when changed", () => {
@@ -328,9 +261,11 @@ Deno.test("Item.toJSON reflects current data", () => {
   const closed = base.close(closedAt);
   const reopened = closed.reopen(reopenedAt);
 
-  const targetContainer = unwrapOk(parseContainerPath("project-alpha"), "parse container");
   const targetRank = unwrapOk(parseItemRank("b1"), "parse rank");
-  const relocated = reopened.relocate(targetContainer, targetRank, relocateAt);
+  const targetSection = unwrapOk(parseSectionPath(":1"), "parse section");
+  const parent = unwrapOk(parseItemId("019965a7-2789-740a-b8c1-1415904fd200"), "parse parent id");
+  const placement = createItemPlacement(parent, targetSection, targetRank);
+  const relocated = reopened.relocate(placement, relocateAt);
 
   const newTitle = unwrapOk(parseItemTitle("Updated item"), "parse title");
   const retitled = relocated.retitle(newTitle, retitleAt);
@@ -356,8 +291,8 @@ Deno.test("Item.toJSON reflects current data", () => {
   assertEquals(snapshot.title, "Updated item");
   assertEquals(snapshot.icon, "task");
   assertEquals(snapshot.status, "open");
-  assertEquals(snapshot.container, "project-alpha");
-  assertEquals(snapshot.rank, "b1");
+  assertEquals(snapshot.placement.rank, "b1");
+  assertEquals(snapshot.placement.section, ":1");
   assertEquals(snapshot.alias, "deep-focus");
   assertEquals(snapshot.context, "deep-work");
   assertEquals(snapshot.body, "Updated body");

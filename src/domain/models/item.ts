@@ -8,9 +8,6 @@ import {
 import {
   AliasSlug,
   AliasSlugValidationError,
-  ContainerPath,
-  containerPathFromSegments,
-  ContainerPathValidationError,
   DateTime,
   DateTimeValidationError,
   Duration,
@@ -19,8 +16,6 @@ import {
   ItemIconValidationError,
   ItemId,
   ItemIdValidationError,
-  ItemRank,
-  ItemRankValidationError,
   ItemStatus,
   itemStatusClosed,
   itemStatusOpen,
@@ -28,36 +23,30 @@ import {
   ItemTitle,
   ItemTitleValidationError,
   parseAliasSlug,
-  parseContainerPath,
   parseDateTime,
   parseDuration,
   parseItemIcon,
   parseItemId,
-  parseItemRank,
   parseItemStatus,
   parseItemTitle,
   parseTagSlug,
   TagSlug,
   TagSlugValidationError,
 } from "../primitives/mod.ts";
-import { Node } from "./node.ts";
+import { Edge, EdgeSnapshot, isItemEdge, ItemEdge, parseEdge } from "./edge.ts";
 import {
-  ContainerEdge,
-  Edge,
-  EdgeSnapshot,
-  isContainerEdge,
-  isItemEdge,
-  ItemEdge,
-  parseEdge,
-} from "./edge.ts";
+  parsePlacement,
+  Placement,
+  PlacementSnapshot,
+  PlacementValidationError,
+} from "./placement.ts";
 
 export type ItemData = Readonly<{
   readonly id: ItemId;
   readonly title: ItemTitle;
   readonly icon: ItemIcon;
   readonly status: ItemStatus;
-  readonly container: ContainerPath;
-  readonly rank: ItemRank;
+  readonly placement: Placement;
   readonly createdAt: DateTime;
   readonly updatedAt: DateTime;
   readonly closedAt?: DateTime;
@@ -69,44 +58,36 @@ export type ItemData = Readonly<{
   readonly body?: string;
 }>;
 
-export type Item =
-  & Node
-  & Readonly<{
-    readonly kind: "Item";
-    readonly data: ItemData;
-    close(closedAt: DateTime): Item;
-    reopen(reopenedAt: DateTime): Item;
-    relocate(
-      container: ContainerPath,
-      rank: ItemRank,
-      occurredAt: DateTime,
-    ): Item;
-    retitle(title: ItemTitle, updatedAt: DateTime): Item;
-    changeIcon(icon: ItemIcon, updatedAt: DateTime): Item;
-    setBody(body: string | undefined, updatedAt: DateTime): Item;
-    schedule(
-      schedule: Readonly<{
-        startAt?: DateTime;
-        duration?: Duration;
-        dueAt?: DateTime;
-      }>,
-      updatedAt: DateTime,
-    ): Item;
-    setAlias(alias: AliasSlug | undefined, updatedAt: DateTime): Item;
-    setContext(
-      context: TagSlug | undefined,
-      updatedAt: DateTime,
-    ): Item;
-    toJSON(): ItemSnapshot;
-  }>;
+export type Item = Readonly<{
+  readonly kind: "Item";
+  readonly data: ItemData;
+  readonly edges: ReadonlyArray<ItemEdge>;
+  itemEdges(): ReadonlyArray<ItemEdge>;
+  close(closedAt: DateTime): Item;
+  reopen(reopenedAt: DateTime): Item;
+  relocate(placement: Placement, occurredAt: DateTime): Item;
+  retitle(title: ItemTitle, updatedAt: DateTime): Item;
+  changeIcon(icon: ItemIcon, updatedAt: DateTime): Item;
+  setBody(body: string | undefined, updatedAt: DateTime): Item;
+  schedule(
+    schedule: Readonly<{
+      startAt?: DateTime;
+      duration?: Duration;
+      dueAt?: DateTime;
+    }>,
+    updatedAt: DateTime,
+  ): Item;
+  setAlias(alias: AliasSlug | undefined, updatedAt: DateTime): Item;
+  setContext(context: TagSlug | undefined, updatedAt: DateTime): Item;
+  toJSON(): ItemSnapshot;
+}>;
 
 export type ItemSnapshot = Readonly<{
   readonly id: string;
   readonly title: string;
   readonly icon: string;
   readonly status: string;
-  readonly container: string;
-  readonly rank: string;
+  readonly placement: PlacementSnapshot;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly closedAt?: string;
@@ -126,29 +107,17 @@ const makeData = (data: ItemData): ItemData => Object.freeze({ ...data });
 const makeEdges = (
   edges: ReadonlyArray<Edge>,
 ): Readonly<{
-  edges: ReadonlyArray<Edge>;
-  itemEdges: () => ReadonlyArray<ItemEdge>;
-  containerEdges: () => ReadonlyArray<ContainerEdge>;
+  edges: ReadonlyArray<ItemEdge>;
 }> => {
-  const frozenEdges = Object.freeze([...edges]) as ReadonlyArray<Edge>;
-  const itemEdges = Object.freeze(
-    frozenEdges.filter(isItemEdge),
-  ) as ReadonlyArray<ItemEdge>;
-  const containerEdges = Object.freeze(
-    frozenEdges.filter(isContainerEdge),
-  ) as ReadonlyArray<ContainerEdge>;
+  const itemEdges = Object.freeze(edges.filter(isItemEdge));
   return {
-    edges: frozenEdges,
-    itemEdges: () => itemEdges,
-    containerEdges: () => containerEdges,
+    edges: itemEdges,
   } as const;
 };
 
 const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
   const frozenData = makeData(data);
   const edgeAccess = makeEdges(edges);
-  const pathResult = containerPathFromSegments([frozenData.id.toString()]);
-  const selfPath = Result.unwrap(pathResult);
 
   const close = function (this: Item, closedAt: DateTime): Item {
     if (this.data.status.isClosed()) {
@@ -176,19 +145,26 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
 
   const relocate = function (
     this: Item,
-    container: ContainerPath,
-    rank: ItemRank,
+    placement: Placement,
     occurredAt: DateTime,
   ): Item {
-    const sameContainer = this.data.container.toString() === container.toString();
-    const sameRank = this.data.rank.compare(rank) === 0;
-    if (sameContainer && sameRank) {
+    const sameKind = this.data.placement.kind === placement.kind;
+    const sameParent = sameKind && (
+      placement.kind === "root"
+        ? this.data.placement.kind === "root"
+        : this.data.placement.kind === "item" &&
+          this.data.placement.parentId.toString() === placement.parentId.toString()
+    );
+    const sameSection = this.data.placement.section.toString() === placement.section.toString();
+    const sameRank = this.data.placement.rank.compare(placement.rank) === 0;
+
+    if (sameKind && sameParent && sameSection && sameRank) {
       return this;
     }
+
     return instantiate({
       ...this.data,
-      container,
-      rank,
+      placement,
       updatedAt: occurredAt,
     }, this.edges);
   };
@@ -302,8 +278,7 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
       title: this.data.title.toString(),
       icon: this.data.icon.toString(),
       status: this.data.status.toString(),
-      container: this.data.container.toString(),
-      rank: this.data.rank.toString(),
+      placement: this.data.placement.toJSON(),
       createdAt: this.data.createdAt.toString(),
       updatedAt: this.data.updatedAt.toString(),
       closedAt: this.data.closedAt?.toString(),
@@ -320,10 +295,8 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
   return Object.freeze({
     kind: "Item" as const,
     data: frozenData,
-    path: selfPath,
     edges: edgeAccess.edges,
-    itemEdges: edgeAccess.itemEdges,
-    containerEdges: edgeAccess.containerEdges,
+    itemEdges: () => edgeAccess.edges,
     close,
     reopen,
     relocate,
@@ -343,13 +316,12 @@ const prefixIssues = (
     | ItemStatusValidationError
     | ItemIconValidationError
     | AliasSlugValidationError
-    | ContainerPathValidationError
-    | ItemRankValidationError
     | ItemTitleValidationError
     | ItemIdValidationError
     | DateTimeValidationError
     | DurationValidationError
-    | TagSlugValidationError,
+    | TagSlugValidationError
+    | PlacementValidationError,
 ): ValidationIssue[] =>
   error.issues.map((issue) =>
     createValidationIssue(issue.message, {
@@ -373,8 +345,7 @@ export const parseItem = (
   const titleResult = parseItemTitle(snapshot.title);
   const iconResult = parseItemIcon(snapshot.icon);
   const statusResult = parseItemStatus(snapshot.status);
-  const containerResult = parseContainerPath(snapshot.container);
-  const rankResult = parseItemRank(snapshot.rank);
+  const placementResult = parsePlacement(snapshot.placement);
   const createdAtResult = parseDateTime(snapshot.createdAt);
   const updatedAtResult = parseDateTime(snapshot.updatedAt);
 
@@ -390,11 +361,8 @@ export const parseItem = (
   if (statusResult.type === "error") {
     issues.push(...prefixIssues("status", statusResult.error));
   }
-  if (containerResult.type === "error") {
-    issues.push(...prefixIssues("container", containerResult.error));
-  }
-  if (rankResult.type === "error") {
-    issues.push(...prefixIssues("rank", rankResult.error));
+  if (placementResult.type === "error") {
+    issues.push(...prefixIssues("placement", placementResult.error));
   }
   if (createdAtResult.type === "error") {
     issues.push(...prefixIssues("createdAt", createdAtResult.error));
@@ -489,8 +457,7 @@ export const parseItem = (
   const title = Result.unwrap(titleResult);
   const icon = Result.unwrap(iconResult);
   const status = Result.unwrap(statusResult);
-  const container = Result.unwrap(containerResult);
-  const rank = Result.unwrap(rankResult);
+  const placement = Result.unwrap(placementResult);
   const createdAt = Result.unwrap(createdAtResult);
   const updatedAt = Result.unwrap(updatedAtResult);
 
@@ -499,8 +466,7 @@ export const parseItem = (
     title,
     icon,
     status,
-    container,
-    rank,
+    placement,
     createdAt,
     updatedAt,
     closedAt,
