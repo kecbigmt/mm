@@ -41,6 +41,8 @@ tests mirroring the implementation name plus `_test`.
 - **Minimal dependencies** - Only add dependencies that provide significant value
 - **Unix philosophy** - Do one thing well, compose with other tools
 
+**This project has not yet been rolled out**, so there is no need to leave legacy code behind for backward compatibility or plan for a gradual migration.
+
 ## Design Patterns
 
 - **Domain Modeling Made Functional**: Type-safe domain models with impossible illegal states
