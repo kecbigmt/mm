@@ -8,17 +8,17 @@
 - [ ] Implement auto-alias generator (CVCV-base36 fallback) aligned with Appendix C
 - [ ] Add Section primitives (`section_path.ts`, `section_segment.ts`) with validation logic
 
-## Phase 2 — Placement & node model evolution
-- [ ] Design `Placement` type (`parentId`, `section`, `rank`) and update `ItemData`
-- [ ] Extend edge model to represent section placements and add conversion helpers for legacy container paths
-- [ ] Update `CreateItemWorkflow` and related tests to consume placement API
-- [ ] Persist current placement metadata on item records for reverse lookups (without duplicating rank authority)
+## Phase 2 — Placement-first domain model
+- [x] Remove `ContainerPath` from active item data; make `Placement` the sole logical location
+- [ ] Model section trees explicitly (sections containing subsections and item edges)
+- [x] Delete legacy container models/repositories/tests that depend on container paths
+- [ ] Update workflows and services to operate exclusively on the new placement structure
 
 ## Phase 3 — Filesystem adapters & storage layout
-- [ ] Introduce new `items/` directory structure and per-section edge storage
+- [ ] Introduce the new `items/YYYY/MM/DD/<item-id>/` layout with per-section edge directories
 - [ ] Remove short-ID index usage; persist hashed canonical alias/tag entries under `.index` and `tags`
-- [ ] Ensure item `meta.json` continues to store only raw alias while adapters read/write canonical metadata via indexes
-- [ ] Update workspace bootstrap to create new scaffold and adjust repository tests
+- [ ] Ensure item `meta.json` stores only raw alias while indexes handle canonical metadata
+- [ ] Update workspace bootstrap to create the new scaffold and refresh repository tests
 
 ## Phase 4 — Locator parsing & resolution services
 - [ ] Implement locator parser supporting dates, UUID v7, aliases, and section suffixes

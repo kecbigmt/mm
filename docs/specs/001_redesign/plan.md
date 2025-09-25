@@ -25,13 +25,14 @@
 
 ## Guiding Constraints
 
-- Preserve existing tests while introducing the new primitives; migrate callers incrementally to
-  avoid a large bang rewrite.
+- Break compatibility where it simplifies the redesign; we are still pre-release and can prefer a
+  single cut-over to the new structure.
 - Surface canonicalization and hashing through shared utilities so both aliases and tags reuse the
   same implementation.
 - Keep repositories transactional: continue using `Result` error handling and temp-file writes
   consistent with current infrastructure.
-- Plan for a one-time workspace migration that can be run via `mm doctor` once the new layout ships.
+- Document the new expectations clearly so workspaces can be recreated or migrated manually after
+  the cut-over.
 
 ## Phase Breakdown
 
@@ -47,26 +48,28 @@
 - Update alias/context model tests and repositories to exercise the new canonicalisation API while
   preserving current behaviour behind feature flags or adapters.
 
-### Phase 2 — Placement & node model evolution
+### Phase 2 — Placement-first domain model
 
-- Define a `Placement` type (`parentId`, `section`, `rank`) and update `ItemData` to adopt it,
-  keeping an adapter that can still emit legacy `container` strings until storage moves.
-- Redesign `Edge` to distinguish logical placements (parent + section) from container bookkeeping;
-  introduce a `SectionEdge` representation aligned with the redesign’s “one active placement”
-  invariant.
-- Provide conversion helpers so workflows like `CreateItemWorkflow` can target the new placement API
-  while continuing to read existing containers during the transition.
-- Add comprehensive unit tests for placement immutability and rank transitions.
+- Remove `ContainerPath` from active domain usage; make `Placement` the sole source of logical
+  location data for items and edges.
+- Introduce an explicit section tree in the domain (section nodes containing either child sections or
+  item edges) so placement context is derived from structure, not serialized onto each edge.
+- Delete the legacy container models, repositories, and conversion helpers; update tests to assert on
+  the new placement-centric shape only.
+- Add comprehensive unit tests covering placement immutability, section nesting, and LexoRank
+  transitions within sections.
 
-- Replace the `nodes/` tree with the redesign’s `items/YYYY/MM/DD/<uuid>/` structure, ensuring edges
-  nest under `edges/<section-path>/child.edge.json`.
-- Drop short-ID index files and instead persist hashed canonical alias/tag entries under
-  `.index/aliases/<hh>/<hash>.alias.json` and `tags/<hash>.tag.json`. Item `meta.json` should
-  continue to store only the raw alias string.
+### Phase 3 — Filesystem adapters & storage layout
+
+- Replace the `nodes/` storage with the redesign’s `items/YYYY/MM/DD/<item-id>/` tree and store
+  edges in per-section folders that mirror the in-memory section structure.
+- Drop short-ID index files; persist hashed canonical alias/tag entries under
+  `.index/aliases/<hh>/<hash>.alias.json` and `tags/<hash>.tag.json`. Item `meta.json` continues to
+  keep only the raw alias while indexes handle canonical metadata.
 - Update workspace bootstrap (`src/infrastructure/fileSystem/workspace_repository.ts`) to create the
-  new directory scaffold (`items/`, `.index/aliases/`, `tags/`).
-- Rewrite `FileSystemItemRepository` and related tests to read/write placements, alias metadata, and
-  edge directories atomically.
+  new scaffold (`items/`, `.index/aliases/`, `tags/`).
+- Rewrite the filesystem repositories to read/write the placement tree atomically and update all
+  integration tests accordingly.
 
 ### Phase 4 — Locator parsing & resolution services
 
@@ -98,8 +101,7 @@
 ## Testing & Tooling Strategy
 
 - Maintain parity with existing unit suites while adding coverage for canonicalisation, placement
-  invariants, and locator parsing. Ensure `deno task test` exercises both legacy compatibility
-  (until migration is complete) and the new behaviour.
+  invariants, and locator parsing. Ensure `deno task test` exercises the new behaviour end-to-end.
 - Add integration tests that create items via CLI workflows and confirm on-disk layout, using
   temporary workspace directories in `item_repository_test.ts`.
 - Leverage property-based tests where feasible (e.g. for LexoRank spacing, alias canonical
