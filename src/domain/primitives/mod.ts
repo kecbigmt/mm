@@ -74,13 +74,8 @@ export { isTagSlug, parseTagSlug, tagSlugFromString } from "./tag_slug.ts";
 export type { WorkspaceName, WorkspaceNameValidationError } from "./workspace_name.ts";
 export { isWorkspaceName, parseWorkspaceName, workspaceNameFromString } from "./workspace_name.ts";
 
-export type {
-  DateSectionSegment,
-  NumericSectionSegment,
-  SectionSegment,
-  SectionSegmentValidationError,
-} from "./section_segment.ts";
-export { isSectionSegment, parseSectionSegment } from "./section_segment.ts";
+export type { PathSegment, PathSegmentValidationError } from "./path_segment.ts";
+export { isPathSegment, parsePathSegment } from "./path_segment.ts";
 
-export type { SectionPath, SectionPathMode, SectionPathValidationError } from "./section_path.ts";
-export { isSectionPath, parseSectionPath } from "./section_path.ts";
+export type { ParsePathOptions, Path, PathRangeSegment, PathValidationError } from "./path.ts";
+export { isPath, parsePath, pathFromString } from "./path.ts";
