@@ -5,7 +5,6 @@ import { ItemRepository } from "../repositories/item_repository.ts";
 import { Result } from "../../shared/result.ts";
 import { AmbiguousShortIdError } from "../repositories/short_id_resolution_error.ts";
 import { ItemId, ItemShortId } from "../primitives/mod.ts";
-import { PlacementBin } from "../models/placement.ts";
 
 // Mock item for testing
 const createMockItem = (id: string, title: string): Item => {
@@ -14,12 +13,8 @@ const createMockItem = (id: string, title: string): Item => {
     title,
     icon: "note",
     status: "open",
-    placement: {
-      kind: "item",
-      parentId: "00000000-0000-7000-8000-000000000000",
-      section: ":2024-01-01",
-      rank: "a",
-    },
+    path: "/2024-01-01/00000000-0000-7000-8000-000000000000",
+    rank: "a",
     createdAt: "2024-01-01T12:00:00Z",
     updatedAt: "2024-01-01T12:00:00Z",
   });
@@ -37,7 +32,7 @@ const createMockRepository = (items: Item[]): ItemRepository => ({
   },
   save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
   delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
-  listByPlacementBin: (_bin: PlacementBin) => Promise.resolve(Result.ok(items)),
+  listByPath: () => Promise.resolve(Result.ok(items)),
   findByShortId: (shortId: ItemShortId) => {
     const shortIdStr = shortId.toString();
     const matching = items.filter((item) => item.data.id.toString().endsWith(shortIdStr));
