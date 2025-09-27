@@ -117,13 +117,13 @@ Deno.test({
       const metaPath = join(itemDirectory, "meta.json");
       const metaSnapshot = JSON.parse(await Deno.readTextFile(metaPath)) as {
         readonly title: string;
-        readonly placement?: { readonly kind: string; readonly section: string };
+        readonly path: string;
+        readonly rank: string;
       };
 
       assertEquals(metaSnapshot.title, "Integration note");
-      assert(metaSnapshot.placement, "placement metadata should be persisted");
-      assertEquals(metaSnapshot.placement?.kind, "root");
-      assertEquals(metaSnapshot.placement?.section, ":2024-01-05");
+      assertEquals(metaSnapshot.path, "/2024-01-05");
+      assert(metaSnapshot.rank.length > 0, "rank should be persisted");
 
       const contentPath = join(itemDirectory, "content.md");
       let contentExists = false;
