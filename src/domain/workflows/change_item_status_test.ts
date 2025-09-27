@@ -6,7 +6,8 @@ import {
   dateTimeFromDate,
   itemStatusClosed,
   itemStatusOpen,
-  parseSectionPath,
+  parsePath,
+  Path,
 } from "../primitives/mod.ts";
 import { itemIdFromString } from "../primitives/item_id.ts";
 import { itemTitleFromString } from "../primitives/item_title.ts";
@@ -18,7 +19,6 @@ import { ItemId } from "../primitives/item_id.ts";
 import { ItemShortId } from "../primitives/item_short_id.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { AmbiguousShortIdError } from "../repositories/short_id_resolution_error.ts";
-import { createRootPlacement, PlacementBin } from "../models/placement.ts";
 
 // Mock ItemRepository for testing
 class MockItemRepository implements ItemRepository {
@@ -42,14 +42,10 @@ class MockItemRepository implements ItemRepository {
     return Promise.resolve(Result.ok(undefined));
   }
 
-  listByPlacementBin(
-    bin: PlacementBin,
+  listByPath(
+    _path: Path,
   ): Promise<Result<ReadonlyArray<Item>, RepositoryError>> {
-    const items = Array.from(this.items.values())
-      .filter((item) => item.data.placement.belongsTo(bin))
-      .sort((first, second) => first.data.placement.rank.compare(second.data.placement.rank));
-
-    return Promise.resolve(Result.ok(items));
+    return Promise.resolve(Result.ok([]));
   }
 
   findByShortId(
@@ -94,8 +90,7 @@ function createTestItem(id: string, status: "open" | "closed" = "open") {
   const icon = createItemIcon("note");
   const itemStatus = status === "open" ? itemStatusOpen() : itemStatusClosed();
   const rank = Result.unwrap(itemRankFromString("a0"));
-  const section = Result.unwrap(parseSectionPath(":2024-01-01"));
-  const placement = createRootPlacement(section, rank);
+  const path = Result.unwrap(parsePath("/2024-01-01"));
   const now = Result.unwrap(dateTimeFromDate(new Date()));
 
   return createItem({
@@ -103,7 +98,8 @@ function createTestItem(id: string, status: "open" | "closed" = "open") {
     title,
     icon,
     status: itemStatus,
-    placement,
+    path,
+    rank,
     createdAt: now,
     updatedAt: now,
     closedAt: status === "closed" ? now : undefined,

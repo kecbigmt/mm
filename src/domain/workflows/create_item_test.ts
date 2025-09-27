@@ -5,7 +5,6 @@ import { ItemRepository } from "../repositories/item_repository.ts";
 import { Item } from "../models/item.ts";
 import { ItemId } from "../primitives/item_id.ts";
 import { ItemShortId } from "../primitives/item_short_id.ts";
-import { createRootPlacement, createRootPlacementBin, PlacementBin } from "../models/placement.ts";
 import { createItem } from "../models/item.ts";
 import {
   createItemIcon,
@@ -15,7 +14,8 @@ import {
   itemStatusOpen,
   itemTitleFromString,
   parseCalendarDay,
-  parseSectionPath,
+  parsePath,
+  Path,
 } from "../primitives/mod.ts";
 import { createRankService, RankGenerator, RankService } from "../services/rank_service.ts";
 import { createIdGenerationService } from "../services/id_generation_service.ts";
@@ -38,10 +38,10 @@ class InMemoryItemRepository implements ItemRepository {
     return Promise.resolve(Result.ok(undefined));
   }
 
-  listByPlacementBin(bin: PlacementBin) {
+  listByPath(path: Path) {
     const siblings = Array.from(this.items.values())
-      .filter((item) => item.data.placement.belongsTo(bin))
-      .sort((first, second) => first.data.placement.rank.compare(second.data.placement.rank));
+      .filter((item) => item.data.path.equals(path))
+      .sort((first, second) => first.data.rank.compare(second.data.rank));
 
     return Promise.resolve(Result.ok(siblings));
   }
@@ -79,9 +79,8 @@ const createExistingItem = (id: string, rank: string, section: string): Item => 
   const title = Result.unwrap(itemTitleFromString("Existing"));
   const icon = createItemIcon("note");
   const status = itemStatusOpen();
-  const sectionPath = Result.unwrap(parseSectionPath(`:${section}`));
-  const placementRank = Result.unwrap(itemRankFromString(rank));
-  const placement = createRootPlacement(sectionPath, placementRank);
+  const path = Result.unwrap(parsePath(`/${section}`));
+  const itemRank = Result.unwrap(itemRankFromString(rank));
   const createdAt = Result.unwrap(parseDateTime("2024-09-20T12:00:00Z"));
 
   return createItem({
@@ -89,7 +88,8 @@ const createExistingItem = (id: string, rank: string, section: string): Item => 
     title,
     icon,
     status,
-    placement,
+    path,
+    rank: itemRank,
     createdAt,
     updatedAt: createdAt,
   });
@@ -118,10 +118,10 @@ Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async 
     throw new Error(`expected ok result, received ${JSON.stringify(result.error)}`);
   }
 
-  assertEquals(result.value.item.data.placement.rank.toString(), "m");
+  assertEquals(result.value.item.data.rank.toString(), "m");
 
-  const listResult = await repository.listByPlacementBin(
-    createRootPlacementBin(Result.unwrap(parseSectionPath(":2024-09-20"))),
+  const listResult = await repository.listByPath(
+    Result.unwrap(parsePath("/2024-09-20")),
   );
   if (listResult.type !== "ok") {
     throw new Error(`expected ok list result, received ${JSON.stringify(listResult.error)}`);
@@ -159,17 +159,17 @@ Deno.test("CreateItemWorkflow appends rank after existing siblings", async () =>
     throw new Error(`expected ok result, received ${JSON.stringify(result.error)}`);
   }
 
-  assertEquals(result.value.item.data.placement.rank.toString(), "mn");
+  assertEquals(result.value.item.data.rank.toString(), "mn");
 
-  const listResult = await repository.listByPlacementBin(
-    createRootPlacementBin(Result.unwrap(parseSectionPath(":2024-09-20"))),
+  const listResult = await repository.listByPath(
+    Result.unwrap(parsePath("/2024-09-20")),
   );
   if (listResult.type !== "ok") {
     throw new Error(`expected ok list result, received ${JSON.stringify(listResult.error)}`);
   }
   assertEquals(listResult.value.length, 2);
   assertEquals(
-    listResult.value.map((item) => item.data.placement.rank.toString()),
+    listResult.value.map((item) => item.data.rank.toString()),
     ["m", "mn"],
   );
 });
