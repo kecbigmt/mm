@@ -58,7 +58,14 @@ Deno.test({
       const metaSnapshot = JSON.parse(await Deno.readTextFile(metaPath));
       assertEquals(metaSnapshot.schema, "mm.item/1");
       assertEquals(metaSnapshot.id, itemId);
-      assertEquals(metaSnapshot.rank, item.data.rank.toString());
+      assertEquals(metaSnapshot.rank, item.data.placement.rank.toString());
+      if (item.data.placement.section.kind === "legacy") {
+        assert(metaSnapshot.placement !== undefined, "placement metadata should be present");
+        assertEquals(
+          metaSnapshot.placement?.container,
+          item.data.placement.section.container.toString(),
+        );
+      }
 
       const content = await Deno.readTextFile(contentPath);
       assertEquals(content, "Sample body\n");

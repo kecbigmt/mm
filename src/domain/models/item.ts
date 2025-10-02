@@ -50,14 +50,22 @@ import {
   ItemEdge,
   parseEdge,
 } from "./edge.ts";
+import {
+  Placement,
+  PlacementSnapshot,
+  placementEquals,
+  placementLegacyContainer,
+  placementToSnapshot,
+  parsePlacementSnapshot,
+  PlacementValidationError,
+} from "./placement.ts";
 
 export type ItemData = Readonly<{
   readonly id: ItemId;
   readonly title: ItemTitle;
   readonly icon: ItemIcon;
   readonly status: ItemStatus;
-  readonly container: ContainerPath;
-  readonly rank: ItemRank;
+  readonly placement: Placement;
   readonly createdAt: DateTime;
   readonly updatedAt: DateTime;
   readonly closedAt?: DateTime;
@@ -77,8 +85,7 @@ export type Item =
     close(closedAt: DateTime): Item;
     reopen(reopenedAt: DateTime): Item;
     relocate(
-      container: ContainerPath,
-      rank: ItemRank,
+      placement: Placement,
       occurredAt: DateTime,
     ): Item;
     retitle(title: ItemTitle, updatedAt: DateTime): Item;
@@ -117,6 +124,7 @@ export type ItemSnapshot = Readonly<{
   readonly context?: string;
   readonly body?: string;
   readonly edges?: ReadonlyArray<EdgeSnapshot>;
+  readonly placement?: PlacementSnapshot;
 }>;
 
 export type ItemValidationError = ValidationError<"Item">;
@@ -176,19 +184,15 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
 
   const relocate = function (
     this: Item,
-    container: ContainerPath,
-    rank: ItemRank,
+    placement: Placement,
     occurredAt: DateTime,
   ): Item {
-    const sameContainer = this.data.container.toString() === container.toString();
-    const sameRank = this.data.rank.compare(rank) === 0;
-    if (sameContainer && sameRank) {
+    if (placementEquals(this.data.placement, placement)) {
       return this;
     }
     return instantiate({
       ...this.data,
-      container,
-      rank,
+      placement,
       updatedAt: occurredAt,
     }, this.edges);
   };
@@ -297,13 +301,14 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
   };
 
   const toJSON = function (this: Item): ItemSnapshot {
+    const legacyContainer = placementLegacyContainer(this.data.placement);
     return {
       id: this.data.id.toString(),
       title: this.data.title.toString(),
       icon: this.data.icon.toString(),
       status: this.data.status.toString(),
-      container: this.data.container.toString(),
-      rank: this.data.rank.toString(),
+      container: legacyContainer?.toString() ?? "",
+      rank: this.data.placement.rank.toString(),
       createdAt: this.data.createdAt.toString(),
       updatedAt: this.data.updatedAt.toString(),
       closedAt: this.data.closedAt?.toString(),
@@ -314,6 +319,7 @@ const instantiate = (data: ItemData, edges: ReadonlyArray<Edge>): Item => {
       context: this.data.context?.toString(),
       body: this.data.body,
       edges: this.edges.map((edge) => edge.toJSON()),
+      placement: placementToSnapshot(this.data.placement),
     };
   };
 
@@ -341,6 +347,7 @@ const prefixIssues = (
   field: string,
   error:
     | ItemStatusValidationError
+    | PlacementValidationError
     | ItemIconValidationError
     | AliasSlugValidationError
     | ContainerPathValidationError
@@ -375,6 +382,14 @@ export const parseItem = (
   const statusResult = parseItemStatus(snapshot.status);
   const containerResult = parseContainerPath(snapshot.container);
   const rankResult = parseItemRank(snapshot.rank);
+  const placementResult =
+    containerResult.type === "ok" && rankResult.type === "ok"
+      ? parsePlacementSnapshot(
+        snapshot.placement,
+        containerResult.value,
+        rankResult.value,
+      )
+      : undefined;
   const createdAtResult = parseDateTime(snapshot.createdAt);
   const updatedAtResult = parseDateTime(snapshot.updatedAt);
 
@@ -395,6 +410,9 @@ export const parseItem = (
   }
   if (rankResult.type === "error") {
     issues.push(...prefixIssues("rank", rankResult.error));
+  }
+  if (placementResult?.type === "error") {
+    issues.push(...placementResult.error.issues);
   }
   if (createdAtResult.type === "error") {
     issues.push(...prefixIssues("createdAt", createdAtResult.error));
@@ -493,14 +511,16 @@ export const parseItem = (
   const rank = Result.unwrap(rankResult);
   const createdAt = Result.unwrap(createdAtResult);
   const updatedAt = Result.unwrap(updatedAtResult);
+  const placement = placementResult?.type === "ok"
+    ? placementResult.value
+    : Result.unwrap(parsePlacementSnapshot(snapshot.placement, container, rank));
 
   const data: ItemData = {
     id,
     title,
     icon,
     status,
-    container,
-    rank,
+    placement,
     createdAt,
     updatedAt,
     closedAt,

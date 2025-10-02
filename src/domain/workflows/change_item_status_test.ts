@@ -1,6 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { ChangeItemStatusWorkflow } from "./change_item_status.ts";
 import { createItem } from "../models/item.ts";
+import { createLegacyPlacement } from "../models/placement.ts";
 import {
   containerPathFromSegments,
   createItemIcon,
@@ -84,6 +85,7 @@ function createTestItem(id: string, status: "open" | "closed" = "open") {
   const itemStatus = status === "open" ? itemStatusOpen() : itemStatusClosed();
   const container = Result.unwrap(containerPathFromSegments(["2024", "01", "01"]));
   const rank = Result.unwrap(itemRankFromString("a0"));
+  const placement = createLegacyPlacement(container, rank);
   const now = Result.unwrap(dateTimeFromDate(new Date()));
 
   return createItem({
@@ -91,8 +93,7 @@ function createTestItem(id: string, status: "open" | "closed" = "open") {
     title,
     icon,
     status: itemStatus,
-    container,
-    rank,
+    placement,
     createdAt: now,
     updatedAt: now,
     closedAt: status === "closed" ? now : undefined,

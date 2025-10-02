@@ -1,4 +1,5 @@
 import { parseItem } from "./item.ts";
+import { createLegacyPlacement, placementLegacyContainer } from "./placement.ts";
 import {
   parseAliasSlug,
   parseContainerPath,
@@ -74,8 +75,10 @@ Deno.test("parseItem parses full snapshot payload", () => {
   assertEquals(item.data.title.toString(), "Detailed item");
   assertEquals(item.data.icon.toString(), "task");
   assertEquals(item.data.status.toString(), "closed");
-  assertEquals(item.data.container.toString(), "project-alpha");
-  assertEquals(item.data.rank.toString(), "b1");
+  const placementContainer = placementLegacyContainer(item.data.placement);
+  assert(placementContainer !== undefined, "placement should expose legacy container");
+  assertEquals(placementContainer?.toString(), "project-alpha");
+  assertEquals(item.data.placement.rank.toString(), "b1");
   assertEquals(item.data.alias?.toString(), "focus-work");
   assertEquals(item.data.context?.toString(), "deep-work");
   assertEquals(item.data.body, "Example body");
@@ -228,11 +231,16 @@ Deno.test("Item.relocate updates container and rank", () => {
   const targetRank = unwrapOk(parseItemRank("b1"), "parse rank");
   const relocateAt = unwrapOk(parseDateTime("2024-09-21T10:00:00Z"), "parse relocate timestamp");
 
-  const relocated = base.relocate(targetContainer, targetRank, relocateAt);
-  assertEquals(relocated.data.container.toString(), "project-alpha");
-  assertEquals(relocated.data.rank.toString(), "b1");
+  const targetPlacement = createLegacyPlacement(targetContainer, targetRank);
+  const relocated = base.relocate(targetPlacement, relocateAt);
+  const relocatedContainer = placementLegacyContainer(relocated.data.placement);
+  assert(relocatedContainer !== undefined, "relocated placement should expose container");
+  assertEquals(relocatedContainer?.toString(), "project-alpha");
+  assertEquals(relocated.data.placement.rank.toString(), "b1");
   assert(relocated.data.updatedAt.equals(relocateAt), "updatedAt should match relocate timestamp");
-  assertEquals(base.data.container.toString(), "2024/09/20");
+  const originalContainer = placementLegacyContainer(base.data.placement);
+  assert(originalContainer !== undefined, "original placement should expose container");
+  assertEquals(originalContainer?.toString(), "2024/09/20");
 });
 
 Deno.test("Item.retitle updates title when changed", () => {
@@ -326,7 +334,8 @@ Deno.test("Item.toJSON reflects current data", () => {
 
   const targetContainer = unwrapOk(parseContainerPath("project-alpha"), "parse container");
   const targetRank = unwrapOk(parseItemRank("b1"), "parse rank");
-  const relocated = reopened.relocate(targetContainer, targetRank, relocateAt);
+  const targetPlacement = createLegacyPlacement(targetContainer, targetRank);
+  const relocated = reopened.relocate(targetPlacement, relocateAt);
 
   const newTitle = unwrapOk(parseItemTitle("Updated item"), "parse title");
   const retitled = relocated.retitle(newTitle, retitleAt);
@@ -354,6 +363,9 @@ Deno.test("Item.toJSON reflects current data", () => {
   assertEquals(snapshot.status, "open");
   assertEquals(snapshot.container, "project-alpha");
   assertEquals(snapshot.rank, "b1");
+  assert(snapshot.placement !== undefined, "placement snapshot should be present");
+  assertEquals(snapshot.placement?.kind ?? "legacy", "legacy");
+  assertEquals(snapshot.placement?.container, "project-alpha");
   assertEquals(snapshot.alias, "deep-focus");
   assertEquals(snapshot.context, "deep-work");
   assertEquals(snapshot.body, "Updated body");

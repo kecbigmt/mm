@@ -15,7 +15,7 @@ const EDGE_SCHEMA = "mm.edge/1";
 const sanitizeFileComponent = (value: string): string => value.replace(/[^A-Za-z0-9._-]/g, "_");
 
 const edgeFileName = (edge: Edge): string => {
-  if (edge.kind === "ItemEdge") {
+  if (edge.kind === "ItemEdge" || edge.kind === "SectionEdge") {
     return `${edge.data.to.toString()}.edge.json`;
   }
   const index = edge.data.index.value().toString().padStart(4, "0");
@@ -41,11 +41,16 @@ const readEdgeFile = async (
 
 const sortEdges = (edges: ReadonlyArray<Edge>): ReadonlyArray<Edge> => {
   const withKey = edges.map((edge) => {
-    const key = edge.kind === "ItemEdge"
-      ? `item:${edge.data.to.toString()}:${edge.data.rank.toString()}`
-      : `container:${
+    let key: string;
+    if (edge.kind === "ItemEdge") {
+      key = `item:${edge.data.to.toString()}:${edge.data.rank.toString()}`;
+    } else if (edge.kind === "SectionEdge") {
+      key = `section:${edge.data.to.toString()}:${edge.data.placement.rank.toString()}`;
+    } else {
+      key = `container:${
         edge.data.index.value().toString().padStart(4, "0")
       }:${edge.data.to.toString()}`;
+    }
     return { key, edge };
   });
   withKey.sort((a, b) => a.key.localeCompare(b.key));
@@ -53,6 +58,10 @@ const sortEdges = (edges: ReadonlyArray<Edge>): ReadonlyArray<Edge> => {
 };
 
 const edgeSnapshotKey = (snapshot: EdgeSnapshot): string => {
+  if ("rank" in snapshot && "container" in snapshot) {
+    const rank = snapshot.rank ?? "";
+    return `section:${snapshot.to}:${rank}`;
+  }
   if ("rank" in snapshot) {
     const rank = snapshot.rank ?? "";
     return `item:${snapshot.to}:${rank}`;

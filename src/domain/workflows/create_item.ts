@@ -2,6 +2,7 @@ import { Result } from "../../shared/result.ts";
 import { createValidationIssue, ValidationIssue } from "../../shared/errors.ts";
 import { Item } from "../models/item.ts";
 import { createItem } from "../models/item.ts";
+import { createLegacyPlacement } from "../models/placement.ts";
 import {
   ContainerPath,
   containerPathFromSegments,
@@ -182,13 +183,14 @@ export const CreateItemWorkflow = {
     const trimmedBody = typeof input.body === "string" ? input.body.trim() : undefined;
     const body = trimmedBody && trimmedBody.length > 0 ? trimmedBody : undefined;
 
+    const placement = createLegacyPlacement(resolvedContainerPath, rankResult.value);
+
     const item = createItem({
       id: resolvedId,
       title: resolvedTitle,
       icon: createItemIcon(input.itemType),
       status: itemStatusOpen(),
-      container: resolvedContainerPath,
-      rank: rankResult.value,
+      placement,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,
       body,
