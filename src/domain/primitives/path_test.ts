@@ -63,6 +63,45 @@ denoTest("parsePath detects range segments", () => {
   assertEquals(next.toString(), "/2024-09-21/4");
 });
 
+denoTest("parsePath resolves td keyword", () => {
+  const today = new Date(Date.UTC(2024, 8, 21));
+  const base = parsePath("/");
+  if (base.type !== "ok") {
+    throw new Error("expected base path");
+  }
+  const result = parsePath("td", { today, cwd: base.value });
+  if (result.type !== "ok") {
+    throw new Error(`expected ok, received ${JSON.stringify(result.error)}`);
+  }
+  assertEquals(result.value.toString(), "/2024-09-21");
+});
+
+denoTest("parsePath resolves relative period tokens", () => {
+  const today = new Date(Date.UTC(2024, 8, 18));
+  const base = parsePath("/");
+  if (base.type !== "ok") {
+    throw new Error("expected base path");
+  }
+  const result = parsePath("+2d", { today, cwd: base.value });
+  if (result.type !== "ok") {
+    throw new Error(`expected ok, received ${JSON.stringify(result.error)}`);
+  }
+  assertEquals(result.value.toString(), "/2024-09-20");
+});
+
+denoTest("parsePath resolves relative weekday tokens", () => {
+  const today = new Date(Date.UTC(2024, 8, 18)); // Wednesday
+  const base = parsePath("/");
+  if (base.type !== "ok") {
+    throw new Error("expected base path");
+  }
+  const result = parsePath("+fri", { today, cwd: base.value });
+  if (result.type !== "ok") {
+    throw new Error(`expected ok, received ${JSON.stringify(result.error)}`);
+  }
+  assertEquals(result.value.toString(), "/2024-09-20");
+});
+
 function denoTest(name: string, fn: () => void): void {
   Deno.test(name, fn);
 }

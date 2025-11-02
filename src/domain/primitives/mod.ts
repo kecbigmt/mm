@@ -1,9 +1,6 @@
 export type { ItemId, ItemIdValidationError } from "./item_id.ts";
 export { isItemId, itemIdFromString, parseItemId } from "./item_id.ts";
 
-export type { ItemShortId, ItemShortIdValidationError } from "./item_short_id.ts";
-export { isItemShortId, parseItemShortId } from "./item_short_id.ts";
-
 export type { ItemTitle, ItemTitleValidationError } from "./item_title.ts";
 export { isItemTitle, itemTitleFromString, parseItemTitle } from "./item_title.ts";
 
@@ -79,3 +76,12 @@ export { isPathSegment, parsePathSegment } from "./path_segment.ts";
 
 export type { ParsePathOptions, Path, PathRangeSegment, PathValidationError } from "./path.ts";
 export { isPath, parsePath, pathFromString } from "./path.ts";
+
+export type {
+  Locator,
+  LocatorRange,
+  LocatorRangeKind,
+  LocatorValidationError,
+  ParseLocatorOptions,
+} from "./locator.ts";
+export { isLocator, parseLocator } from "./locator.ts";

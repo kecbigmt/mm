@@ -86,34 +86,136 @@ const buildError = (
   issues: ReadonlyArray<ValidationIssue>,
 ): Result<Path, PathValidationError> => Result.error(createValidationError(PATH_KIND, issues));
 
-const resolveRelativeDate = (
+type RelativeResolution =
+  | { readonly kind: "none" }
+  | { readonly kind: "resolved"; readonly value: string }
+  | { readonly kind: "error"; readonly message: string; readonly code: string };
+
+const RELATIVE_DAY_KEYWORDS = new Map<string, number>([
+  ["today", 0],
+  ["td", 0],
+  ["tomorrow", 1],
+  ["tm", 1],
+  ["yesterday", -1],
+  ["yd", -1],
+]);
+
+const RELATIVE_PERIOD_REGEX = /^([~+])(\d+)([dwmy])$/u;
+const RELATIVE_WEEKDAY_REGEX = /^([~+])(mon|tue|wed|thu|fri|sat|sun)$/u;
+
+const WEEKDAY_INDEX: Record<string, number> = {
+  sun: 0,
+  mon: 1,
+  tue: 2,
+  wed: 3,
+  thu: 4,
+  fri: 5,
+  sat: 6,
+};
+
+const startOfUtcDay = (date: Date): Date =>
+  new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+
+const formatIsoDate = (date: Date): string => date.toISOString().slice(0, 10);
+
+const adjustDays = (base: Date, offset: number): Date => {
+  const adjusted = new Date(base);
+  adjusted.setUTCDate(adjusted.getUTCDate() + offset);
+  return adjusted;
+};
+
+const adjustMonths = (base: Date, offset: number): Date => {
+  const adjusted = new Date(base);
+  adjusted.setUTCMonth(adjusted.getUTCMonth() + offset);
+  return adjusted;
+};
+
+const adjustYears = (base: Date, offset: number): Date => {
+  const adjusted = new Date(base);
+  adjusted.setUTCFullYear(adjusted.getUTCFullYear() + offset);
+  return adjusted;
+};
+
+const resolveRelativeToken = (
   raw: string,
   today?: Date,
-): string | undefined => {
-  if (!today) {
-    return undefined;
-  }
-  const midnight = new Date(Date.UTC(
-    today.getUTCFullYear(),
-    today.getUTCMonth(),
-    today.getUTCDate(),
-  ));
-  switch (raw) {
-    case "today":
-      return midnight.toISOString().slice(0, 10);
-    case "tomorrow": {
-      const next = new Date(midnight);
-      next.setUTCDate(next.getUTCDate() + 1);
-      return next.toISOString().slice(0, 10);
+): RelativeResolution => {
+  const normalized = raw.trim().toLowerCase();
+  const keywordOffset = RELATIVE_DAY_KEYWORDS.get(normalized);
+  if (keywordOffset !== undefined) {
+    if (!today) {
+      return {
+        kind: "error",
+        message: `relative token '${raw}' requires a reference date`,
+        code: "relative_requires_today",
+      };
     }
-    case "yesterday": {
-      const prev = new Date(midnight);
-      prev.setUTCDate(prev.getUTCDate() - 1);
-      return prev.toISOString().slice(0, 10);
-    }
-    default:
-      return undefined;
+    const base = startOfUtcDay(today);
+    return { kind: "resolved", value: formatIsoDate(adjustDays(base, keywordOffset)) };
   }
+
+  const periodMatch = normalized.match(RELATIVE_PERIOD_REGEX);
+  if (periodMatch) {
+    if (!today) {
+      return {
+        kind: "error",
+        message: `relative token '${raw}' requires a reference date`,
+        code: "relative_requires_today",
+      };
+    }
+    const [, operator, magnitudeRaw, unit] = periodMatch;
+    const magnitude = Number.parseInt(magnitudeRaw, 10);
+    if (!Number.isFinite(magnitude) || magnitude <= 0) {
+      return {
+        kind: "error",
+        message: "relative period must use a positive integer",
+        code: "relative_invalid_magnitude",
+      };
+    }
+    const direction = operator === "+" ? 1 : -1;
+    const base = startOfUtcDay(today);
+    switch (unit) {
+      case "d":
+        return { kind: "resolved", value: formatIsoDate(adjustDays(base, direction * magnitude)) };
+      case "w":
+        return { kind: "resolved", value: formatIsoDate(adjustDays(base, direction * magnitude * 7)) };
+      case "m":
+        return { kind: "resolved", value: formatIsoDate(adjustMonths(base, direction * magnitude)) };
+      case "y":
+        return { kind: "resolved", value: formatIsoDate(adjustYears(base, direction * magnitude)) };
+      default:
+        return { kind: "none" };
+    }
+  }
+
+  const weekdayMatch = normalized.match(RELATIVE_WEEKDAY_REGEX);
+  if (weekdayMatch) {
+    if (!today) {
+      return {
+        kind: "error",
+        message: `relative token '${raw}' requires a reference date`,
+        code: "relative_requires_today",
+      };
+    }
+    const [, operator, weekdayRaw] = weekdayMatch;
+    const targetIndex = WEEKDAY_INDEX[weekdayRaw];
+    const base = startOfUtcDay(today);
+    const baseIndex = base.getUTCDay();
+    if (operator === "+") {
+      let delta = (targetIndex - baseIndex + 7) % 7;
+      if (delta === 0) {
+        delta = 7;
+      }
+      return { kind: "resolved", value: formatIsoDate(adjustDays(base, delta)) };
+    }
+    let delta = (baseIndex - targetIndex + 7) % 7;
+    if (delta === 0) {
+      delta = 7;
+    }
+    return { kind: "resolved", value: formatIsoDate(adjustDays(base, -delta)) };
+  }
+
+  return { kind: "none" };
 };
 
 const splitRange = (
@@ -132,6 +234,9 @@ const splitRange = (
 
 const parseRangeSegment = (
   raw: string,
+  options: {
+    readonly today?: Date;
+  },
 ): Result<PathRangeSegment, PathValidationError> => {
   const rangeError = (
     issues: ReadonlyArray<ValidationIssue>,
@@ -148,7 +253,18 @@ const parseRangeSegment = (
     ]);
   }
 
-  const startResult = parsePathSegment(range.start);
+  const startResolution = resolveRelativeToken(range.start, options.today);
+  if (startResolution.kind === "error") {
+    return rangeError([
+      createValidationIssue(startResolution.message, {
+        code: startResolution.code,
+        path: ["range", "start", "value"],
+      }),
+    ]);
+  }
+
+  const startInput = startResolution.kind === "resolved" ? startResolution.value : range.start;
+  const startResult = parsePathSegment(startInput);
   if (startResult.type === "error") {
     return rangeError(
       startResult.error.issues.map((issue) =>
@@ -160,7 +276,18 @@ const parseRangeSegment = (
     );
   }
 
-  const endResult = parsePathSegment(range.end);
+  const endResolution = resolveRelativeToken(range.end, options.today);
+  if (endResolution.kind === "error") {
+    return rangeError([
+      createValidationIssue(endResolution.message, {
+        code: endResolution.code,
+        path: ["range", "end", "value"],
+      }),
+    ]);
+  }
+
+  const endInput = endResolution.kind === "resolved" ? endResolution.value : range.end;
+  const endResult = parsePathSegment(endInput);
   if (endResult.type === "error") {
     return rangeError(
       endResult.error.issues.map((issue) =>
@@ -266,36 +393,33 @@ export const parsePath = (
       continue;
     }
 
+    let segmentInput = token;
     if (!resolvedHead) {
-      const resolved = resolveRelativeDate(token, today ?? undefined);
-      if (resolved) {
-        const segmentResult = parsePathSegment(resolved);
-        if (segmentResult.type === "error") {
-          return buildError(
-            segmentResult.error.issues.map((issue) =>
-              createValidationIssue(issue.message, {
-                code: issue.code,
-                path: [index, ...issue.path],
-              })
-            ),
-          );
-        }
-        stack.push(segmentResult.value);
-        resolvedHead = true;
-        continue;
+      const resolution = resolveRelativeToken(token, today);
+      if (resolution.kind === "error") {
+        return buildError([
+          createValidationIssue(resolution.message, {
+            code: resolution.code,
+            path: [index, "value"],
+          }),
+        ]);
+      }
+      if (resolution.kind === "resolved") {
+        segmentInput = resolution.value;
       }
     }
 
     if (lastSegmentIsRangeCandidate(index, tokens)) {
-      const rangeResult = parseRangeSegment(token);
+      const rangeResult = parseRangeSegment(token, { today });
       if (rangeResult.type === "error") {
         return rangeResult;
       }
       stack.push(rangeResult.value);
+      resolvedHead = true;
       continue;
     }
 
-    const segmentResult = parsePathSegment(token);
+    const segmentResult = parsePathSegment(segmentInput);
     if (segmentResult.type === "error") {
       return buildError(
         segmentResult.error.issues.map((issue) =>

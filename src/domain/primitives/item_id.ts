@@ -4,7 +4,6 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
-import { ItemShortId, parseItemShortId } from "./item_short_id.ts";
 import { createStringPrimitiveFactory, StringPrimitive } from "./string_primitive.ts";
 
 const ITEM_ID_KIND = "ItemId" as const;
@@ -19,25 +18,15 @@ export type ItemId = StringPrimitive<
   string,
   string,
   true,
-  false,
-  { toShortId(): ItemShortId }
+  false
 >;
 
-const toShortId = function (this: ItemId): ItemShortId {
-  const shortIdString = this.data.value.slice(-7);
-  const result = parseItemShortId(shortIdString);
-  if (result.type === "error") {
-    throw new Error(`Failed to create short ID from valid ItemId: ${result.error.message}`);
-  }
-  return result.value;
-};
-
-const instantiate = (value: string): ItemId => itemIdFactory.instantiate(value, { toShortId });
+const instantiate = (value: string): ItemId => itemIdFactory.instantiate(value);
 
 export type ItemIdValidationError = ValidationError<typeof ITEM_ID_KIND>;
 
 export const isItemId = (value: unknown): value is ItemId =>
-  itemIdFactory.is<{ toShortId(): ItemShortId }>(value);
+  itemIdFactory.is(value);
 
 export const parseItemId = (
   input: unknown,
