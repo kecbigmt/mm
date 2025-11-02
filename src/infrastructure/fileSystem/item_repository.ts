@@ -2,16 +2,15 @@ import { join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { ItemRepository } from "../../domain/repositories/item_repository.ts";
 import { Item, ItemSnapshot, parseItem } from "../../domain/models/item.ts";
-import { ItemId, ItemShortId } from "../../domain/primitives/mod.ts";
+import { ItemId, Path } from "../../domain/primitives/mod.ts";
 import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
 import {
-  AmbiguousShortIdError,
-  createAmbiguousShortIdError,
-} from "../../domain/repositories/short_id_resolution_error.ts";
-import { type PlacementTreeSnapshot, readPlacementTree, writePlacementTree } from "./edge_store.ts";
-import { PlacementBin } from "../../domain/models/placement.ts";
+  type EdgeCollectionSnapshot,
+  readEdgeCollection,
+  writeEdgeCollection,
+} from "./edge_store.ts";
 
 export type FileSystemItemRepositoryDependencies = Readonly<{
   readonly root: string;
@@ -21,10 +20,8 @@ export type FileSystemItemRepositoryDependencies = Readonly<{
 type LoadResult = Result<Item | undefined, RepositoryError>;
 type SaveResult = Result<void, RepositoryError>;
 type DeleteResult = Result<void, RepositoryError>;
-type ListByPlacementBinResult = Result<ReadonlyArray<Item>, RepositoryError>;
-type FindByShortIdResult = Result<Item | undefined, RepositoryError | AmbiguousShortIdError>;
-
-type ItemMetaSnapshot = Omit<ItemSnapshot, "body" | "edges" | "sections">;
+type listByPathResult = Result<ReadonlyArray<Item>, RepositoryError>;
+type ItemMetaSnapshot = Omit<ItemSnapshot, "body" | "edges">;
 
 type ItemDirectoryRecord = Readonly<{
   readonly id: string;
@@ -156,12 +153,11 @@ const readBody = async (
 const combineSnapshot = (
   meta: ItemMetaSnapshot,
   body: string | undefined,
-  placement: PlacementTreeSnapshot,
+  edges: EdgeCollectionSnapshot,
 ): ItemSnapshot => ({
   ...meta,
   body,
-  edges: placement.edges.length > 0 ? placement.edges : undefined,
-  sections: placement.sections,
+  edges: edges.edges.length > 0 ? edges.edges : undefined,
 });
 
 const parseSnapshot = (
@@ -186,7 +182,6 @@ const writeMeta = async (
   const {
     body: _body,
     edges: _edges,
-    sections: _sections,
     ...meta
   } = snapshot;
   const payload = JSON.stringify({ schema: ITEM_SCHEMA, ...meta }, null, 2);
@@ -256,15 +251,15 @@ const loadItemFromDirectory = async (
     return bodyResult;
   }
 
-  const placementResult = await readPlacementTree({
+  const edgesResult = await readEdgeCollection({
     directory: edgesDirectory(directory),
     identifier: id,
   });
-  if (placementResult.type === "error") {
-    return placementResult;
+  if (edgesResult.type === "error") {
+    return edgesResult;
   }
 
-  const snapshot = combineSnapshot(meta, bodyResult.value, placementResult.value);
+  const snapshot = combineSnapshot(meta, bodyResult.value, edgesResult.value);
   return parseSnapshot(snapshot);
 };
 
@@ -438,12 +433,12 @@ export const createFileSystemItemRepository = (
       return contentResult;
     }
 
-    const treeResult = await writePlacementTree(item.edges, item.sections(), {
+    const edgesResult = await writeEdgeCollection(item.edges, {
       directory: edgesDirectory(directory),
       identifier: snapshot.id,
     });
-    if (treeResult.type === "error") {
-      return treeResult;
+    if (edgesResult.type === "error") {
+      return edgesResult;
     }
 
     return Result.ok(undefined);
@@ -477,9 +472,9 @@ export const createFileSystemItemRepository = (
     return Result.ok(undefined);
   };
 
-  const listByPlacementBin = async (
-    bin: PlacementBin,
-  ): Promise<ListByPlacementBinResult> => {
+  const listByPath = async (
+    path: Path,
+  ): Promise<listByPathResult> => {
     const directoriesResult = await collectItemDirectories(dependencies.root);
     if (directoriesResult.type === "error") {
       return directoriesResult;
@@ -502,56 +497,20 @@ export const createFileSystemItemRepository = (
         );
       }
 
-      if (item.data.placement.belongsTo(bin)) {
+      if (item.data.path.equals(path)) {
         items.push(item);
       }
     }
 
-    items.sort((first, second) => first.data.placement.rank.compare(second.data.placement.rank));
+    items.sort((first, second) => first.data.rank.compare(second.data.rank));
 
     return Result.ok(items);
-  };
-
-  const findByShortId = async (shortId: ItemShortId): Promise<FindByShortIdResult> => {
-    const directoriesResult = await collectItemDirectories(dependencies.root);
-    if (directoriesResult.type === "error") {
-      return directoriesResult;
-    }
-
-    const shortIdStr = shortId.toString();
-    const matches = directoriesResult.value.filter((record) => record.id.endsWith(shortIdStr));
-
-    if (matches.length === 0) {
-      return Result.ok(undefined);
-    }
-
-    if (matches.length > 1) {
-      return Result.error(createAmbiguousShortIdError(shortIdStr, matches.length));
-    }
-
-    const [match] = matches;
-    const itemResult = await loadItemFromDirectory(match.directory, match.id);
-    if (itemResult.type === "error") {
-      return itemResult;
-    }
-
-    const item = itemResult.value;
-    if (!item) {
-      return Result.error(
-        createRepositoryError("item", "findByShortId", "item metadata is missing", {
-          identifier: match.id,
-        }),
-      );
-    }
-
-    return Result.ok(item);
   };
 
   return {
     load,
     save,
     delete: remove,
-    listByPlacementBin,
-    findByShortId,
+    listByPath,
   };
 };

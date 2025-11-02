@@ -28,12 +28,12 @@
 
 ## Phase 4 — Locator parsing & resolution services
 
-- [ ] Implement locator parser supporting dates, UUID v7, aliases, and section suffixes
-- [ ] Replace `ItemResolutionService` usage with new `LocatorResolutionService`; remove short-ID
+- [x] Implement locator parser supporting dates, UUID v7, aliases, and section suffixes
+- [x] Replace `ItemResolutionService` usage with new `LocatorResolutionService`; remove short-ID
       branches
-- [ ] Delete short-ID primitives, repository methods, and CLI affordances once new locator
+- [x] Delete short-ID primitives, repository methods, and CLI affordances once new locator
       resolution is in place
-- [ ] Add parser and resolution tests covering relative tokens and range validation
+- [x] Add parser and resolution tests covering relative tokens and range validation
 
 ## Phase 5 — Workflows & CLI experience
 

@@ -1,334 +1,251 @@
-# **mm: A Unix‑Native Knowledge Operating System**
+# **mm: A Personal Knowledge Operating System**
 
-_A whitepaper for the Item/Section model with logical navigation, Git‑friendly storage, and
-deterministic ordering._
+*A whitepaper for a path‑centric Item/Section model with logical navigation, Git‑friendly storage, and deterministic ordering.*
 
-**Version:** 1.0 (design draft, updated) **Audience:** engineers, product designers, contributors
+**Version:** 1.0 (design draft, updated)
+**Audience:** engineers, product designers, contributors
 **Scope:** system design; no concrete implementation code beyond high‑level interface sketches
 
 ---
 
-## Table of Contents
+## 1) Summary
 
-1. [Summary](#summary)
-2. [Goals & Non‑Goals](#goals--non-goals)
-3. [Core Concepts](#core-concepts)
-4. [Identifiers & Resolution](#identifiers--resolution)
-5. [Logical Navigation (Unix semantics)](#logical-navigation-unix-semantics)
-6. [On‑Disk Layout](#on-disk-layout)
-7. [Deterministic Ordering (LexoRank)](#deterministic-ordering-lexorank)
-8. [Create / Move / List Semantics](#create--move--list-semantics)
-9. [Time & Ranges](#time--ranges)
-10. [Validation & Doctor](#validation--doctor)
-11. [MCP Server & Interfaces (sketch)](#mcp-server--interfaces-sketch)
-12. [Concurrency, Git, and Conflict Strategy](#concurrency-git-and-conflict-strategy)
-13. [Security & Integrity](#security--integrity)
-14. [Appendix A — CLI Surface](#appendix-a--cli-surface)
-15. [Appendix B — Token Grammar (EBNF)](#appendix-b--token-grammar-ebnf)
-16. [Appendix C — Alias Autogeneration](#appendix-c--alias-autogeneration)
-
----
-
-## Summary
-
-**mm** is a personal knowledge **Operating System** that exposes a logical, filesystem‑like
-navigation layer for a knowledge graph while keeping human‑editable content in plain text with
-Git‑friendly diffs.
+**mm** is a personal knowledge operating system that exposes a Unix‑like path over a knowledge graph while keeping human‑editable content in plain text with Git‑friendly diffs.
 
 The system is built from **two primitives**:
 
-- **Item** — an addressable entity (note, task, event, concept). Items can have children.
-- **Section** — a numbered (or dated) _shelf_ under a parent Item, written as a path like `:3-2`
-  (numeric) or `:2025-09-22` (date).
+* **Item** — an addressable entity (note, task, event, concept). Items can have children.
+* **Section** — a numbered (or dated) *shelf* under a parent, addressing a **bucket of siblings**.
 
-Each Item has **exactly one active placement**: _(parent Item, Section path, rank)_. Moving an Item
-updates **edges only**; physical files never move.
+Each Item has **exactly one active placement**: *(parent Item or top‑level date, Section path, rank)*. Moving an Item updates **edges only**; physical files never move.
 
-Navigation adopts Unix semantics (`cd`, `ls`, `pwd`, relative `.`/`..`/`-`) and a Git‑inspired
-relative notation for neighbors (`~N` = N steps back, `+N` = N steps forward). The workspace time
-zone is fixed.
+Navigation adopts Unix semantics (`cd`, `ls`, `pwd`) with `.` and `..` that work **across both node and section levels**. A single `/` separator is used everywhere. The workspace time zone is **fixed**.
 
 ---
 
-## Goals & Non‑Goals
+## 2) Goals & Non‑Goals
 
 ### Goals
 
-- **Simple diffs, conflict‑resistant Git workflow.**
-- **One mental model**: Items placed under Items, split by **Sections**; one active placement per
-  Item.
-- **Fast navigation** by dates, aliases, or IDs; _logical CWD_ to reduce typing.
-- **Deterministic ordering** via **LexoRank** (stable inserts).
-- **Fixed workspace TZ** for all date math.
+* **Simple diffs, conflict‑resistant Git workflow.**
+* **One mental model**: Items placed under Items, split by **Sections**; one active placement per Item.
+* **Fast navigation** by dates, aliases, or IDs; **path‑first** UX with logical CWD.
+* **Deterministic ordering** via **LexoRank**.
+* **Fixed workspace TZ** for all date math; **relative dates are always “today”‑relative**.
 
 ### Non‑Goals
 
-- **Multi‑placement** (no simultaneous presence in multiple parents).
-- Filesystem symlink semantics.
-- Time‑zone migrations (changing TZ would require a full re‑partition).
+* Multi‑placement (no simultaneous presence in multiple parents).
+* Filesystem symlink semantics.
+* Time‑zone migrations (changing TZ requires a full re‑partition).
 
 ---
 
-## Core Concepts
+## 3) Core Concepts
 
-### Item
+### 3.1 Item
 
-- Identity: **UUID v7** (timestamp‑embedded).
-- Content: `content.md` (human‑editable, title in Markdown H1).
-- Metadata: `meta.json` (status, timestamps, alias, etc.; _no title_).
-- Exactly **one active placement** in the logical graph.
+* **Identity**: UUID v7 (timestamp‑embedded).
+* **Content**: `content.md` (human‑editable; title is the first Markdown H1).
+* **Metadata**: `meta.json` (status, timestamps, alias, etc.; **no title**).
+* Exactly **one active placement** in the logical graph.
 
-### Section
+### 3.2 Section
 
-- A **path** of segments under a parent Item:
+* A **hierarchical numeric path** under a parent Item:
+  `…/1`, `…/1/2`, `…/3/2/1`, …
+* A **date section** exists **only at the head of a path**:
+  `YYYY‑MM‑DD`, `today|tomorrow|yesterday|td|tm|yd`, `+2w`, `~fri`, etc.
+  (Relative forms are **always evaluated from “today”** in the workspace TZ.)
 
-  - **Numeric**: `:1`, `:1-2`, `:3-2-1`, …
-  - **Date** _(root only)_: `:YYYY-MM-DD`.
-- Sections partition a parent’s children (e.g., a book’s chapter/page).
+### 3.3 Implicit Root (no `root/` token)
 
-### Root & Date Sections
+* There is a single **workspace root** (conceptual origin) that is **not** spelled in paths.
+* A path **starts** either with:
 
-- `root:` is the global origin.
-- **Date Sections are valid only under `root:`.**
-- Input like `2025-04-01/...` is sugar for `root:2025-04-01/...` (internally normalized to `root:`).
+  * a **date section** (top‑level “day shelf”), or
+  * a **node reference** (alias or UUID), or
+  * `.` / `..` (relative).
 
-### Invariants
+### 3.4 Invariants
 
-- **Single parent** (active placement): an Item cannot be in two places at once.
-- **No cycles**: an Item cannot be a descendant of itself.
-- **No duplicate edges** (same parent + same section + same child).
-- **Physical immobility**: files reside under their **creation date** forever; moves update only
-  edges.
-
----
-
-## Identifiers & Resolution
-
-### Tokens
-
-- **Dates / relative dates**: `2025-09-22`, `today`, `td`, `next-monday`, `+mon`, `last-friday`,
-  `~fri`, `+2w`, `~1m`, `+7d`, `~10d`, `+1y`, `~2y`, etc. _Relative weekdays and periods are valid
-  only under `root:` (date Sections)._
-- **IDs**: full **UUID v7** (short IDs are not used).
-- **Aliases**: _Unicode slug_ (letters/numbers/marks from any script, plus `_` `-` `.`; no
-  whitespace or control chars). Length: **1–64 code points**. Uniqueness is evaluated on a
-  **canonical key** (see below). **Reserved shapes** (not allowed as aliases):
-
-  - Absolute dates: `YYYY‑MM‑DD`
-  - Numeric‑section shapes: `^\d+(?:-\d+)+$` (e.g., `1-2`, `12-3-4`)
-  - Relative step: `^[~+]\d+$`
-  - Relative weekday: `^[~+](mon|tue|wed|thu|fri|sat|sun)$`
-  - Relative period: `^[~+]\d+[dwmy]$`
-- **Aliases (auto‑generated fallback)**: unchanged CVCV‑base36 (ASCII) pattern from Appendix C.
-  Users may later override with a Unicode alias; uniqueness still checked on the canonical key.
-- **Section path** (numeric): `:<n>` or `:<n>-<m>-…` (numbers only). _Date Sections (`:YYYY-MM-DD`)
-  are valid only under `root:`._
-
-### Resolution Priority
-
-1. **Date / relative date** → normalized as `root:YYYY-MM-DD`
-2. **ID** (UUID v7)
-3. **Alias**
-
-**Section parsing occurs after** resolving the left token (e.g., `book-ppo:3-2`).
-
-**Path chaining:** you may descend through Items with `/`, e.g.:
-
-```
-root:2025-04-01/bugi-j1a:1-2/pako-9rw
-root:today/book-professional-product-owner:1-2/pako-9rw
-2025-04-01/bugi-j1a:1-2/pako-9rw         # 'root:' omitted (sugar)
-```
-
-If a UUID/alias is ambiguous (alias must be unique; UUID must be full), mm returns a **clear error**
-with candidates.
-
-**Alias/Tag canonicalization**
-
-- **Canonicalization**: when storing/searching aliases and tags, mm computes a **canonical key** as
-  **NFKC normalization + casefold** (future room for UTS#39 confusable skeleton if needed).
-- **Two‑field model**: store both **raw** (as entered/displayed) and **canonical\_key** (for
-  matching/uniqueness).
-- All lookups and indexes use **canonical\_key**; all UI displays use **raw**.
-- User‑provided aliases may include non‑ASCII: e.g., `要約`, `設計メモ`, `메모-1`.
-
-### **Parent‑anchored range locators**
-
-A range **must** be expressed as a **single parent anchor** followed by a **Section range**:
-
-```
-<parent : section_start .. section_end>
-```
-
-- The **right‑hand side MUST NOT repeat the parent**. ❌ `root:2025-09-01..root:2025-09-07`
-  (invalid) ✅ `root:2025-09-01..2025-09-07` ✅ `root:~mon..+fri` ✅ `book-ppo:1-2..1-5`
-
-- **Numeric Section ranges**: both ends must have the **same depth and lineage** (same prefix), and
-  the final segment must be **non‑decreasing**. ✅ `book-ppo:1-2..1-5` ❌ `book-ppo:1-2..1-1`
-  (reverse order) ❌ `book-ppo:1-2..2-1` (crossing branches / different lineage)
-
-- **Date Section ranges (under `root:`)**: both ends must resolve to dates; mixing absolute and
-  relative forms is allowed. ✅ `root:2025-09-01..2025-09-07` ✅ `root:2025-09-01..+2w` ✅
-  `root:~mon..+fri`
-
-> Sugar: when the left side is an absolute date without `root:`, mm treats it as `root:<date>`.
-> Example: `2025-09-01..+2w` ⇒ `root:2025-09-01..+2w`.
-
-Invalid forms yield clear errors (e.g., repeated parent, reversed numeric range, lineage mismatch).
+* **Single parent** (active placement): an Item cannot be in two places at once.
+* **No cycles**: an Item cannot be a descendant of itself.
+* **No duplicate edges** within the same (parent, section).
+* **Physical immobility**: files live under their **creation date** forever; moves update only edges.
 
 ---
 
-## Logical Navigation (Unix semantics)
+## 4) Path, Identifiers & Resolution
 
-mm maintains a **logical CWD** (current working directory) in the graph.
+### 4.1 Path Model
 
-### Commands
+A **path** is a `/`‑separated sequence of **segments**. Each segment is either:
 
-- `cd <locator>` — move CWD to an Item (optionally with Section).
-- `pwd` — print the normalized locator.
-- `ls [<locator>|<range>]` — list current location or a target location without changing CWD.
+* a **node**: `.` | `..` | **UUID v7** | **alias**
+* a **section**: a **number** (numeric section) or a **date** (date section)
 
-### Relative tokens
+> **Date sections** are valid **only as the head** of a path. After a date head, you can descend into nodes and further numeric sections:
+> `2025-09-01/book/1/3`
 
-- `.` — current location
-- `..` — logical parent (from `:3-2` to `:3`; from an Item to its parent)
-- `-` — previous location
+### 4.2 `.` and `..`
 
-### Git‑like relative steps (Section‑relative, not index‑relative)
+* `.`: stay at the **current node/section**.
+* `..`: go **up one segment** (whether the current segment is a node or a section).
+  From `2025-09-01/book/1/3`, `../2` → `2025-09-01/book/1/2`.
 
-- `~N` — N steps **back** in the **last Section segment**
-- `+N` — N steps **forward** in the **last Section segment**
+Top‑level `..` remains at the top‑level.
 
-Examples:
+### 4.3 Ranges (final segment only)
 
-```
-# CWD: root:2025-09-08
-cd ~7        # -> root:2025-09-01
-cd +3        # -> root:2025-09-11
+A **range** is an operator on the **final** section segment:
 
-# CWD: bugi-j1a:1-4
-cd ~2        # -> bugi-j1a:1-2
-cd +5        # -> bugi-j1a:1-9
-```
+* **Numeric range**: `…/prefix/x..y`
+  Valid iff `x` and `y` share the same numeric **prefix** and **depth**, and `x ≤ y`.
+* **Date range** (head only): `YYYY‑MM‑DD..YYYY‑MM‑DD`, `~mon..+fri`, `2025‑09‑01..+2w`, etc.
+  All relative forms are **expanded from “today”** to absolute dates before comparison.
 
-> If CWD has **no Section** (direct under an Item), `~N`/`+N` is invalid.
+Ranges are **inclusive**. If a path ends in a range, it’s a **selector for `ls`**, not a location for `cd`.
 
-### Ranges
+### 4.4 Identifiers
 
-Ranges are **inclusive** and must be **parent‑anchored**:
+* **IDs**: full UUID v7 (no shortened IDs).
+* **Aliases**: Unicode slug: letters/numbers/marks from any script plus `_` `-` `.`; no whitespace/control; length 1–64 code points.
+  **Reserved / disallowed as aliases** (canonical key; see below):
 
-```
-mm ls root:~mon..+fri               # date range under root
-mm ls root:2025-09-01..2025-09-07   # absolute date span
-mm ls book-ppo:1-2..1-5             # numeric Section span under the same parent
-```
+  * `.` and `..`
+  * **pure digits**: `^\d+$`
+  * **absolute dates**: `^\d{4}-\d{2}-\d{2}$`
+  * **relative date tokens**: `^(today|tomorrow|yesterday|td|tm|yd)$`
+  * **relative date ops**: `^[~+](?:\d+[dwmy]|mon|tue|wed|thu|fri|sat|sun)$`
+  * Strings containing `..` (to avoid confusion with ranges)
 
-Invalid examples:
+**Canonicalization**: `canonical_key := NFKC + casefold`. Store **raw** and **canonical_key**; uniqueness & lookups use **canonical_key** only.
 
-```
-mm ls root:2025-09-01..root:2025-09-07   # ❌ repeated parent on the right
-mm ls book-ppo:1-2..1-1                  # ❌ reversed order
-mm ls book-ppo:1-2..2-1                  # ❌ crossing hierarchy
-```
+### 4.5 Resolution Priority (per node segment)
 
-`~N` / `+N` remain **Section‑relative** (last segment only). Relative weekdays (`+mon`, `~fri`) and
-periods (`+2w`, `~1m`, `+7d`, `~1y`) are **date‑relative** and valid only under `root:`.
+1. **UUID v7** → Item
+2. **Alias** → Item
+3. `.` / `..` relative
+   If a token is a **date** and appears at the **head**, it selects the date section (top‑level day shelf).
 
-### State
-
-- Session env var `MM_CWD`. A helper subcommand can print `export MM_CWD=...` for shell eval.
-- Workspace default stored in `~/.mm/<workspace>/.state.json`.
-- When CWD becomes invalid (deleted/renamed), mm falls back to the nearest valid ancestor, then to
-  `root:`.
+Ambiguities (e.g., missing nodes) return a clear error with candidates and hints.
 
 ---
 
-## On‑Disk Layout
+## 5) Logical Navigation (Unix semantics)
+
+### 5.1 Commands
+
+* `cd <path>` — move CWD to a **single** location (no ranges).
+* `pwd` — print the normalized path.
+* `ls [<path>]` — list CWD or a target (path may end with a **range**).
+
+### 5.2 Behavior & Examples
+
+* From `2025-09-01/book/1/3`:
+
+  * `cd ../2` → `2025-09-01/book/1/2`
+  * `cd ../../quote` → `2025-09-01/book/quote`
+* Date heads:
+
+  * `cd today` → top‑level **today** section
+  * `ls ~mon..+fri` → list from last Monday through next Friday (**today**‑relative)
+* Numeric ranges:
+
+  * `ls book/1/1..5` → pages 1..5 under chapter 1
+* **Invalid**:
+
+  * `cd book/1/1..5` → error (“`cd` accepts a single location; use `ls` for ranges”)
+  * `book/today` → error (date sections only valid at the head)
+
+### 5.3 State
+
+* Session env var `MM_CWD`. A helper prints `export MM_CWD=...` for shell eval.
+* Workspace default in `~/.mm/<workspace>/.state.json` (e.g., default CWD = `today`).
+* If CWD becomes invalid, mm falls back to the nearest valid ancestor; if none, to **today**.
+
+---
+
+## 6) On‑Disk Layout
 
 ```
 ~/.mm/
-  <workspace-root>/
-    .gitignore           # ignores .state.json, .index/ (and other local caches)
-    .state.json          # { "default_cwd": "<normalized locator>" }
-    workspace.json       # { "timezone": "Asia/Tokyo" }
+  <workspace>/
+    .gitignore             # ignores .state.json, .index/ and other local caches
+    .state.json            # { "default_cwd": "<normalized path>" }
+    workspace.json         # { "timezone": "Asia/Tokyo" }
 
     items/
       YYYY/
         MM/
           DD/
             <uuidv7>/
-              content.md                  # Markdown (title = first H1)
-              meta.json                   # { schema, id, status, created_at, alias?, ... }
-              edges/
-                <child-uuid>.edge.json    # direct section (rank only)
-                0001/                     # numeric Section "1"
-                  <child-uuid>.edge.json  # { schema, rank }
-                  0002/                   # numeric Section "1-2"
+              content.md                    # Markdown (title = first H1)
+              meta.json                     # { schema, id, status, created_at, alias?, parent_hint?, ... }
+              edges/                        # numeric Section edges (authoritative ordering is here)
+                1/
+                  <child-uuid>.edge.json    # { schema, rank }
+                  2/
+                    <child-uuid>.edge.json  # corresponds to /1/2
+                3/
+                  1/
                     <child-uuid>.edge.json
-                0002/
-                  <child-uuid>.edge.json
 
-          # Root’s date Sections:
-          edges/
-            2025-04-01/
-              <child-uuid>.edge.json      # Item placed under root:2025-04-01 (rank only)
-            2025-04-02/
-              <child-uuid>.edge.json
+    edges.top/                               # edges for top‑level date sections (“head” dates)
+      dates/
+        2025-04-01/
+          <child-uuid>.edge.json            # Item placed under the 2025-04-01 day shelf (rank only)
+        2025-04-02/
+          <child-uuid>.edge.json
 
     tags/
-      <hash>.tag.json                       # hash(canonical_key); { schema, raw, canonical_key, created_at, description? }
+      <hash>.tag.json                        # { schema, raw, canonical_key, created_at, description? }
 
     .index/
       aliases/
-        <hh>/                               # shard by first 2 hex of hash(canonical_key)
-          <hash>.alias.json                 # hash(canonical_key); { schema, raw, canonical_key, created_at }
+        <hh>/
+          <hash>.alias.json                  # { schema, raw, canonical_key, created_at }
 ```
 
 **Notes**
 
-- **Authoritative ordering** lives in the **parent’s** `edges/` (for root date Sections, under
-  `items/YYYY/MM/DD/edges/YYYY-MM-DD/` as shown above).
-- Child Items may cache their current placement (parent id + Section) in `meta.json` for reverse
-  lookup (rank remains authoritative on the parent side).
-- The **title** is not in `meta.json`. It is the first non‑empty Markdown H1 in `content.md`. If no
-  H1 is found, the Item is treated as **Untitled**. For performance, title lookup streams the file
-  until the first non‑blank line.
-- Using a **hash of the canonical key** in filenames avoids filesystem normalization issues across
-  OSes and prevents collisions with special characters.
+* **Authoritative ordering** for a given (parent, section) lives in the **parent’s `edges/`** (for top‑level days, in `edges.top/dates/<YYYY-MM-DD>/`).
+* Child Items may cache their **current placement** (parent id + numeric section path or head date) in `meta.json` (for reverse lookups). **Rank** remains authoritative on the parent side.
+* The **title** is the first non‑empty H1 in `content.md`. If no H1 is found, the Item is **Untitled** (title lookup streams until the first non‑blank line).
+* Filenames for alias/tag indexes use **hash(canonical_key)** to avoid Unicode normalization pitfalls.
 
 ---
 
-## Deterministic Ordering (LexoRank)
+## 7) Deterministic Ordering (LexoRank)
 
-- Siblings in the same `(parent, section)` are ordered by **LexoRank** (string).
-- Insert modes:
+* Siblings in the same (parent, section) are ordered by **LexoRank** (string).
+* Insert modes:
 
-  - `head`, `tail`
-  - `before:<sibling-id>`, `after:<sibling-id>`
-- Rebalancing:
-
-  - `mm doctor --reindex` (when density becomes high).
-- Stable display tiebreak: `created_at` ascending.
+  * `head`, `tail`
+  * `before:<sibling-id>`, `after:<sibling-id>`
+* Rebalancing: `mm doctor --reindex` when density gets high.
+* Stable display tiebreak: `created_at` ascending.
 
 ---
 
-## Create / Move / List Semantics
+## 8) Create / Move / List Semantics
 
-### Create
+### 8.1 Create
 
-- Default creates at **CWD tail**:
+* Default: create at **CWD tail**:
 
-  ```
+  ```bash
   mm n "some note"
   ```
-- Explicit parent & Section:
+* Explicit parent & Section:
 
+  ```bash
+  mm n "quote" --parent book/3
   ```
-  mm n "quote" --parent book-ppo:3
-  ```
-- Physical path is always `items/<creation-date>/<uuid>/…`.
+* Physical path is always `items/<creation-date>/<uuid>/…`.
 
-### Move (placement)
+### 8.2 Move (placement)
 
 ```
 mm mv <id> <placement>
@@ -336,131 +253,119 @@ mm mv <id> <placement>
 
 **Placement forms**
 
-- **Placement bin** — notation `<parent[:section]>` describing a parent Item (or `root`) and the
-  Section bucket that placement edges share. Bins are reusable anywhere a placement target is
-  needed.
-- **Explicit location (parent + Section):**
+* **Placement bin** (`<path>` describing a parent and (optionally) a numeric section or head date):
 
-  - `head:<parent[:section]>`
-  - `tail:<parent[:section]>`
-  - `<parent[:section]>` (same as `tail:<parent[:section]>`)
-- **Relative to a sibling (adopts sibling’s parent + Section):**
+  * `head:<path>`
+  * `tail:<path>`
+  * `<path>` (same as `tail:<path>`)
+* **Relative to a sibling** (adopts sibling’s parent + section):
 
-  - `after:<id2>`
-  - `before:<id2>`
+  * `after:<id2>`
+  * `before:<id2>`
 
-> Physical files do not move.
+> Physical files do not move; only edges change.
 
-### List
+### 8.3 List
 
-- `mm ls` lists CWD by **rank asc**, then **created\_at asc**.
-- `mm ls <locator | range>` lists a target without changing CWD.
-- **Calendar day lists exclude** Items that have been moved away (the day is birthplace, not current
-  placement).
+* `mm ls` lists the CWD by **rank asc**, then **created_at asc**.
+* `mm ls <path>` lists a target without changing CWD.
+* **A day shelf list** excludes Items that have been moved away (the day shelf is birthplace, not current placement).
 
-### Inspect
+### 8.4 Inspect
 
-- `mm where <id>` prints **Logical** (parent + Section + rank) and **Physical** (filesystem path).
+* `mm where <id>` prints **Logical** path and **Physical** path (filesystem path).
 
 ---
 
-## Time & Ranges
+## 9) Time & Ranges
 
-- The workspace time zone is fixed (e.g., `"Asia/Tokyo"`).
-- **Relative weekdays**: `+mon|tue|…|sun`, `~mon|…|sun` (next/previous weekday). _Valid only under
-  `root:`._
-- **Relative periods**: `±Nd`, `±Nw`, `±Nm`, `±Ny` (days, weeks, months, years). _Valid only under
-  `root:`._
-- **Parent‑anchored ranges**:
+* Workspace time zone is fixed (e.g., `"Asia/Tokyo"`).
+* **Relative weekdays**: `+mon|tue|…|sun`, `~mon|…|sun` — always **relative to today** (strict next/previous even if today is that weekday).
+* **Relative periods**: `±Nd`, `±Nw`, `±Nm`, `±Ny` — always **relative to today**.
+* **Ranges**:
 
-  - **Dates** (under `root:`): `root:<dateA>..<dateB>` | `root:<dateA>..+<period>` |
-    `root:~<weekday>..+<period>` | `root:~<weekday>..+<weekday>` …
-  - **Numeric Sections** (under any Item): `<alias|id> : <a-b-…-x> .. <a-b-…-y>`, with **same
-    prefix** and **x ≤ y**.
+  * **Date (head only)**: `dateA..dateB`, `dateA..+period`, `~weekday..+period`, `~weekday..+weekday`, …
+  * **Numeric (under any Item)**: `…/a/b/…/x..y` with the **same prefix & depth** and **x ≤ y**.
 
 Prohibited:
 
-- Repeating the parent on the right side: `X:S..X:T` (**invalid**).
-- Reversed numeric ranges (`…x..y` with `x > y`).
-- Crossing hierarchy (`1-2..2-1`, differing prefixes/depths).
+* Ranges anywhere except the **final segment**.
+* Date sections outside the **head** of a path.
+* Reversed numeric ranges (`…/x..y` with `x > y`) or crossing prefixes.
 
 ---
 
-## Validation & Doctor
+## 10) Validation & Doctor
 
-Pre‑save / maintenance checks:
+**Pre‑save / maintenance checks**
 
-- Every `*.edge.json` points to an existing **Item** (no edge→edge).
-- No duplicates within the same `(parent, section)`.
-- No cycles in the parent/child graph.
-- JSON schema version matches; UTF‑8 (NFC), LF newlines.
-- Aliases are unique (index enforces uniqueness).
+* Every `*.edge.json` points to an existing **Item** (no edge→edge).
+* No duplicates within the same (parent, section).
+* No cycles in the parent/child graph.
+* JSON schema version matches; UTF‑8 (NFC), LF newlines.
+* Aliases are unique (index enforces uniqueness).
+* Date heads are valid, ranges are semantically valid (order, depth/prefix).
 
-Maintenance:
+**Maintenance**
 
-- `mm doctor --reindex` (rank compaction).
-- `mm doctor --fix` (conservative safe fixes).
+* `mm doctor --reindex` (rank compaction).
+* `mm doctor --fix` (conservative safe fixes).
 
 ---
 
-## MCP Server & Interfaces (sketch)
+## 11) MCP Server & Interfaces (sketch)
 
-A thin **MCP** surface mirrors CLI semantics 1:1.
+The MCP surface mirrors CLI semantics 1:1.
 
 **Capabilities (illustrative)**
 
-- `resolve(token) → Locator`
-- `cwd.get() → Locator` / `cwd.set(Locator)`
-- `items.get(id) → Item`
-- `items.list(parent: Locator) → [Child]`
-- `items.create(title, parent?: Locator, insertion?: {mode, refId?}) → {item, placement}`
-- `items.move(id, placement: { head|tail:<locator> | after|before:<id2> })`
-- `items.close(id)` / `items.reopen(id)`
-- `inspect.where(id) → { logical: Placement, physical: FsPath }`
+* `resolve(path) → { kind: "single" | "range", head, steps }`
+* `cwd.get() → Path` / `cwd.set(Path)`
+* `items.get(id) → Item`
+* `items.list(parent_path) → [Child]`     // accepts head or final‑range
+* `items.create(title, parent_path?, insertion?) → { item, placement }`
+* `items.move(id, placement: { head|tail:<path> | after|before:<id2> })`
+* `items.close(id)` / `items.reopen(id)`
+* `inspect.where(id) → { logical: Placement, physical: FsPath }`
 
-> Wire formats and authentication are out of scope here.
-
----
-
-## Concurrency, Git, and Conflict Strategy
-
-- Writes are **atomic** (temp file + rename).
-- The system is **append‑oriented** on edges; merges are typically line‑local.
-- Rank collisions surface as small JSON diffs and are resolved by reindexing.
-- Competing moves on the same Item -> last‑writer wins at edge level (content is unaffected).
+> Wire formats and authentication are out of scope.
 
 ---
 
-## Security & Integrity
+## 12) Concurrency, Git, and Conflict Strategy
 
-- Everything is plain text; no hidden binaries in core storage.
-- Optional hardening (e.g., signed commits) can be layered externally.
-- Sensitive data policy remains the workspace owner’s responsibility.
-- Indexing with **hashed canonical keys** avoids platform‑dependent Unicode normalization pitfalls
-  in filenames and reduces spoofing via look‑alike characters (further hardening possible by adding
-  UTS#39 confusable checks later).
+* Writes are **atomic** (temp file + rename).
+* The system is **append‑oriented** on edges; merges are typically line‑local.
+* Rank collisions surface as small JSON diffs and are resolved by reindexing.
+* Competing moves on the same Item → last‑writer wins at the edge level (content unaffected).
 
 ---
 
-## Appendix A — CLI Surface
+## 13) Security & Integrity
+
+* Everything is plain text; no hidden binaries in core storage.
+* Optional hardening (e.g., signed commits) can be layered externally.
+* Sensitive data policy remains the workspace owner’s responsibility.
+* Indexing with **hashed canonical keys** avoids platform‑dependent Unicode normalization pitfalls and reduces spoofing via look‑alike characters (room for UTS#39 confusable checks later).
+
+---
+
+## 14) Appendix A — CLI Surface
 
 ### Navigation
 
 ```bash
 mm pwd
-mm cd <locator>        # e.g., root:2025-09-22, book-ppo:3, 2025-09-22/book-ppo:3
-mm cd ..               # logical parent
-mm cd -                # previous location
-mm cd ~7               # back 7 in the last Section segment
-mm cd +3               # forward 3 in the last Section segment
-mm ls                  # list CWD
-mm ls <locator|range>  # list without changing CWD; e.g., ls ~7..+7
+mm cd <path>            # e.g., 2025-09-22, book/3, 2025-09-22/book/3, ../2, ../../alias
+mm cd ..                # up one segment (node or section)
+mm ls                   # list CWD
+mm ls <path>            # list a target; final segment may be a range
 ```
 
 ### Create / Edit / State
 
 ```bash
-mm n|note|task|event "title" [--parent <parent[:section]>] [--context <tag>...]
+mm n|note|task|event "title" [--parent <path>] [--context <tag>...]
 mm edit|e <id>
 mm close|cl <ids...>
 mm reopen|op <ids...>
@@ -469,8 +374,8 @@ mm reopen|op <ids...>
 ### Move / Remove
 
 ```bash
-mm mv <id> head:<parent[:section]>
-mm mv <id> [tail:]<parent[:section]>
+mm mv <id> head:<path>
+mm mv <id> [tail:]<path>
 mm mv <id> after:<id2>
 mm mv <id> before:<id2>
 mm remove|rm <ids...>
@@ -482,49 +387,49 @@ mm remove|rm <ids...>
 mm where <id>          # prints Logical (parent, section, rank) & Physical FS path
 ```
 
+Examples:
+
+```bash
+# From 2025-09-01/book/1/3
+mm cd ../2             # -> 2025-09-01/book/1/2
+mm ls 2025-09-01..+2w  # head date range (today-relative expansion on the right)
+mm ls book/1/1..5      # numeric range under the same parent + prefix
+```
+
 ---
 
-## Appendix B — Token Grammar (EBNF)
+## 15) Appendix B — Token Grammar (EBNF)
 
 ```ebnf
-locator           = parent , ":" , section
-                  | date-section                       (* sugar for root:<date-section> *)
-                  | section ;                          (* sugar for <cwd>:<section> *)
+path              = head , { "/" , segment } ;
 
-range             = parent , ":" , section , ".." , section
-                  | date-section , ".." , date-section (* sugar for root:<date-section>..<date-section> *)
-                  | section, "..", section ;           (* sugar for <cwd>:<section>..<section> *)
+head              = date-head | segment ;
 
-parent            = "root"
-                  | id-token
-                  | alias-token ;
+date-head         = date-section ;                      (* head-only date selector *)
 
-section           = numeric-section
-                  | date-section
-                  | relstep ;
+segment         = node | section | range-section ;    (* range allowed only as final segment *)
 
-numeric-section   = num , { "-" , num } ;           (* e.g., 1-2-3 *)
+node              = "." | ".." | id-token | alias-token ;
 
-absdate           = yyyy , "-" , mm , "-" , dd ;    (* valid only with parent = root *)
+section           = numeric-section | date-section ;    (* date-section is head-only *)
 
-relstep           = "~" , integer
-                  | "+" , integer ;                 (* section-relative *)
+range-section     = section , ".." , section ;          (* final segment only *)
 
-relperiod         = "~" , integer , period-unit
-                  | "+" , integer , period-unit ;   (* date-relative, root only *)
-
-relweekday        = "~" , weekday
-                  | "+" , weekday ;                 (* date-relative, root only *)
+numeric-section   = num ;                               (* 1,2,3,... chained as /1/3/5 *)
 
 date-section      = absdate
-                  | "today" | "td" | "tomorrow" | "tm" | "yesterday" | "yd"
-                  | relweekday | relperiod ;        (* root only *)
+                  | date-keyword
+                  | relperiod                           (* today-relative: ±Nd/Nw/Nm/Ny *)
+                  | relweekday ;                        (* today-relative: ~mon/+fri *)
 
+date-keyword      = "today" | "td" | "tomorrow" | "tm" | "yesterday" | "yd" ;
+
+relperiod         = ("~" | "+") , integer , ("d" | "w" | "m" | "y") ;
+relweekday        = ("~" | "+") , ("mon"|"tue"|"wed"|"thu"|"fri"|"sat"|"sun") ;
+
+absdate           = yyyy , "-" , mm , "-" , dd ;
 id-token          = uuidv7 ;
-alias-token       = unicode-slug ;  (* Unicode letters/numbers/marks plus '_' '-' '.'; no spaces *)
-
-weekday           = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun" ;
-period-unit       = "d" | "w" | "m" | "y" ;
+alias-token       = unicode-slug    (* disallow: "." ".." pure-digits YYYY-MM-DD today/tm/yd etc., and ".." substring *)
 
 num               = digit , { digit } ;
 yyyy              = digit , digit , digit , digit ;
@@ -532,59 +437,31 @@ mm                = digit , digit ;
 dd                = digit , digit ;
 ```
 
-## Semantic constraints (not expressible in EBNF)
+### Semantic constraints (not expressible in EBNF)
 
-1. **Numeric ranges**
+1. **Date sections are head‑only.**
+   If a date token appears outside the head position, it is invalid.
 
-   - In `range` with numeric Sections, both ends must share the **same prefix** and **same depth**.
-   - The final numeric segment must be **non-decreasing** (`x ≤ y`).
-   - Example: `book-ppo:1-2..1-5` is valid.
-   - Example: `book-ppo:1-2..1-1` (reverse) and `book-ppo:1-2..2-1` (cross-hierarchy) are invalid.
+2. **Ranges are final‑segment only.**
+   If `..` appears before the final segment, it is invalid.
 
-2. **Date ranges**
+3. **Numeric ranges**
+   Both ends must share the **same prefix and depth**; the final segment must be **non‑decreasing**.
 
-   - In `range` with date Sections (parent = `root`), both ends must resolve to valid dates.
-   - Absolute (`YYYY-MM-DD`) and relative (`+2w`, `~mon`) forms may be mixed.
-   - Example: `root:2025-09-01..+2w` is valid.
+4. **Date ranges**
+   Both ends must normalize to valid dates; relative forms are expanded **from “today”** first.
 
-3. **No repeated parent**
+5. **Alias canonicalization & reservations**
 
-   - In `range`, the right side must **not repeat the parent**.
-   - Example: `X:S..X:T` is invalid.
-   - Example: `root:2025-09-01..root:2025-09-07` is invalid; use `root:2025-09-01..2025-09-07`
-     without repeating `root:` on the right.
+   * `canonical_key := NFKC + casefold`.
+   * Uniqueness and search operate on `canonical_key`.
+   * Aliases cannot be `.`, `..`, pure digits, absolute dates, or relative date tokens/ops; aliases cannot contain `..`.
 
-4. **Date sections are root-only**
+---
 
-   - `date-section` (absolute, relative day, relative period, relative weekday) is valid **only when
-     parent = root**.
-   - Example: `root:today` is valid, `book-ppo:today` is invalid.
+## 16) Appendix C — Alias Autogeneration
 
-5. **Relative steps under CWD**
-
-   - If a `locator` or `range` begins with a bare `section` (no parent), the current working
-     directory (CWD) provides the parent.
-   - If the token matches `date-section`, normalize to `root:<date-section>`.
-   - Otherwise treat it as `<cwd>:<section>`.
-   - If CWD is not defined or is not a Section context, relative steps like `~N` / `+N` are invalid.
-
-6. **Alias disambiguation**
-
-   - Aliases must not lexically collide with reserved forms: absolute dates (`YYYY-MM-DD`), numeric
-     sections (`1-2-3`), or relative tokens (`~N`, `+N`, `~mon`, `+2w`, etc.).
-
-7. **Alias/Tag canonicalization**
-
-- `canonical_key := NFKC(raw) → casefold(raw)`; all uniqueness/searching uses `canonical_key`.
-- **Reserved shapes** (as listed above) must be rejected for aliases/tags.
-- **Filenames** for `.index/aliases/*` and `tags/*` MUST use `hash(canonical_key)` (not the raw
-  string).
-- **Display vs. key**: mm always displays `raw`, never `canonical_key`.
-
-## Appendix C — Alias Autogeneration
-
-When an Item is created without an explicit alias, mm generates a **pronounceable slug** of the
-form:
+When an Item is created without an explicit alias, mm generates a **pronounceable slug**:
 
 ```
 auto_alias := C V C V "-" base36^3
@@ -595,12 +472,17 @@ base36 := [0-9a-z]
 
 **Examples:** `bugi-j1a`, `pako-9rw`
 
-- Auto aliases are lowercase ASCII.
-- Auto aliases are **fallbacks** only. A user may set a Unicode alias later; **uniqueness is
-  evaluated against `canonical_key`**.
-- Uniqueness is enforced via an alias index (`.index/aliases/…`).
-- Once assigned, an alias is persisted with the Item (renaming is allowed by explicit user action
-  only).
+* Auto aliases are lowercase ASCII.
+* Users may later set a Unicode alias; **uniqueness is evaluated against `canonical_key`**.
+* The alias index (`.index/aliases/…`) enforces uniqueness.
+
+---
+
+## Notes on eliminating `root/`
+
+* The **conceptual root** still exists (it’s where **day shelves** live), but it is **implicit**.
+* **Date sections** serve as **head selectors** for those day shelves; path heads like `today`, `2025-09-22`, `~mon` directly address them.
+* All earlier rules that depended on `root/` map cleanly to **“head‑only date sections”** in the rootless syntax.
 
 ---
 

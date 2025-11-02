@@ -16,6 +16,8 @@ import {
   ItemIconValidationError,
   ItemId,
   ItemIdValidationError,
+  ItemRank,
+  ItemRankValidationError,
   ItemStatus,
   itemStatusClosed,
   itemStatusOpen,
@@ -27,33 +29,25 @@ import {
   parseDuration,
   parseItemIcon,
   parseItemId,
+  parseItemRank,
   parseItemStatus,
   parseItemTitle,
+  parsePath,
   parseTagSlug,
+  Path,
+  PathValidationError,
   TagSlug,
   TagSlugValidationError,
 } from "../primitives/mod.ts";
 import { Edge, EdgeSnapshot, isItemEdge, ItemEdge, parseEdge } from "./edge.ts";
-import {
-  parsePlacement,
-  Placement,
-  PlacementSnapshot,
-  PlacementValidationError,
-} from "./placement.ts";
-import {
-  createSectionTree,
-  parseSectionTree,
-  SectionTree,
-  SectionTreeSnapshot,
-  SectionTreeValidationError,
-} from "./section_tree.ts";
 
 export type ItemData = Readonly<{
   readonly id: ItemId;
   readonly title: ItemTitle;
   readonly icon: ItemIcon;
   readonly status: ItemStatus;
-  readonly placement: Placement;
+  readonly path: Path;
+  readonly rank: ItemRank;
   readonly createdAt: DateTime;
   readonly updatedAt: DateTime;
   readonly closedAt?: DateTime;
@@ -70,10 +64,9 @@ export type Item = Readonly<{
   readonly data: ItemData;
   readonly edges: ReadonlyArray<ItemEdge>;
   itemEdges(): ReadonlyArray<ItemEdge>;
-  sections(): SectionTree;
   close(closedAt: DateTime): Item;
   reopen(reopenedAt: DateTime): Item;
-  relocate(placement: Placement, occurredAt: DateTime): Item;
+  relocate(path: Path, rank: ItemRank, occurredAt: DateTime): Item;
   retitle(title: ItemTitle, updatedAt: DateTime): Item;
   changeIcon(icon: ItemIcon, updatedAt: DateTime): Item;
   setBody(body: string | undefined, updatedAt: DateTime): Item;
@@ -95,7 +88,8 @@ export type ItemSnapshot = Readonly<{
   readonly title: string;
   readonly icon: string;
   readonly status: string;
-  readonly placement: PlacementSnapshot;
+  readonly path: string;
+  readonly rank: string;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly closedAt?: string;
@@ -106,7 +100,6 @@ export type ItemSnapshot = Readonly<{
   readonly context?: string;
   readonly body?: string;
   readonly edges?: ReadonlyArray<EdgeSnapshot>;
-  readonly sections?: SectionTreeSnapshot;
 }>;
 
 export type ItemValidationError = ValidationError<"Item">;
@@ -127,11 +120,9 @@ const makeEdges = (
 const instantiate = (
   data: ItemData,
   edges: ReadonlyArray<Edge>,
-  sectionTree: SectionTree,
 ): Item => {
   const frozenData = makeData(data);
   const edgeAccess = makeEdges(edges);
-  const tree = sectionTree;
 
   const close = function (this: Item, closedAt: DateTime): Item {
     if (this.data.status.isClosed()) {
@@ -145,7 +136,6 @@ const instantiate = (
         updatedAt: closedAt,
       },
       this.edges,
-      tree,
     );
   };
 
@@ -161,39 +151,28 @@ const instantiate = (
         updatedAt: reopenedAt,
       },
       this.edges,
-      tree,
     );
   };
 
   const relocate = function (
     this: Item,
-    placement: Placement,
+    path: Path,
+    rank: ItemRank,
     occurredAt: DateTime,
   ): Item {
-    const currentKind = this.data.placement.kind();
-    const nextKind = placement.kind();
-    const sameKind = currentKind === nextKind;
-    const sameParent = sameKind && (
-      nextKind === "root" ? currentKind === "root" : currentKind === "item" &&
-        this.data.placement.parentId()?.toString() ===
-          placement.parentId()?.toString()
-    );
-    const sameSection = this.data.placement.section()?.toString() ===
-      placement.section()?.toString();
-    const sameRank = this.data.placement.rank.compare(placement.rank) === 0;
-
-    if (sameKind && sameParent && sameSection && sameRank) {
+    const samePath = this.data.path.equals(path);
+    const sameRank = this.data.rank.compare(rank) === 0;
+    if (samePath && sameRank) {
       return this;
     }
-
     return instantiate(
       {
         ...this.data,
-        placement,
+        path,
+        rank,
         updatedAt: occurredAt,
       },
       this.edges,
-      tree,
     );
   };
 
@@ -212,7 +191,6 @@ const instantiate = (
         updatedAt,
       },
       this.edges,
-      tree,
     );
   };
 
@@ -231,7 +209,6 @@ const instantiate = (
         updatedAt,
       },
       this.edges,
-      tree,
     );
   };
 
@@ -255,7 +232,6 @@ const instantiate = (
         updatedAt,
       },
       this.edges,
-      tree,
     );
   };
 
@@ -275,7 +251,7 @@ const instantiate = (
       dueAt: schedule.dueAt,
       updatedAt,
     } as ItemData;
-    return instantiate(next, this.edges, tree);
+    return instantiate(next, this.edges);
   };
 
   const setAlias = function (
@@ -295,7 +271,6 @@ const instantiate = (
         updatedAt,
       },
       this.edges,
-      tree,
     );
   };
 
@@ -316,17 +291,18 @@ const instantiate = (
         updatedAt,
       },
       this.edges,
-      tree,
     );
   };
 
   const toJSON = function (this: Item): ItemSnapshot {
+    const edgesSnapshot = this.edges.map((edge) => edge.toJSON());
     return {
       id: this.data.id.toString(),
       title: this.data.title.toString(),
       icon: this.data.icon.toString(),
       status: this.data.status.toString(),
-      placement: this.data.placement.toJSON(),
+      path: this.data.path.toString(),
+      rank: this.data.rank.toString(),
       createdAt: this.data.createdAt.toString(),
       updatedAt: this.data.updatedAt.toString(),
       closedAt: this.data.closedAt?.toString(),
@@ -336,8 +312,7 @@ const instantiate = (
       alias: this.data.alias?.toString(),
       context: this.data.context?.toString(),
       body: this.data.body,
-      edges: this.edges.map((edge) => edge.toJSON()),
-      sections: tree.isEmpty() ? undefined : tree.toJSON(),
+      edges: edgesSnapshot.length > 0 ? edgesSnapshot : undefined,
     };
   };
 
@@ -346,7 +321,6 @@ const instantiate = (
     data: frozenData,
     edges: edgeAccess.edges,
     itemEdges: () => edgeAccess.edges,
-    sections: () => tree,
     close,
     reopen,
     relocate,
@@ -371,8 +345,8 @@ const prefixIssues = (
     | DateTimeValidationError
     | DurationValidationError
     | TagSlugValidationError
-    | PlacementValidationError
-    | SectionTreeValidationError,
+    | ItemRankValidationError
+    | PathValidationError,
 ): ValidationIssue[] =>
   error.issues.map((issue) =>
     createValidationIssue(issue.message, {
@@ -385,14 +359,8 @@ export const createItem = (
   data: ItemData,
   options: Readonly<{
     edges?: ReadonlyArray<Edge>;
-    sectionTree?: SectionTree;
   }> = {},
-): Item =>
-  instantiate(
-    data,
-    options.edges ?? [],
-    options.sectionTree ?? createSectionTree(),
-  );
+): Item => instantiate(data, options.edges ?? []);
 
 export const parseItem = (
   snapshot: ItemSnapshot,
@@ -404,8 +372,8 @@ export const parseItem = (
   const titleResult = parseItemTitle(snapshot.title);
   const iconResult = parseItemIcon(snapshot.icon);
   const statusResult = parseItemStatus(snapshot.status);
-  const placementResult = parsePlacement(snapshot.placement);
-  const sectionTreeResult = parseSectionTree(snapshot.sections);
+  const pathResult = parsePath(snapshot.path);
+  const rankResult = parseItemRank(snapshot.rank);
   const createdAtResult = parseDateTime(snapshot.createdAt);
   const updatedAtResult = parseDateTime(snapshot.updatedAt);
 
@@ -421,11 +389,11 @@ export const parseItem = (
   if (statusResult.type === "error") {
     issues.push(...prefixIssues("status", statusResult.error));
   }
-  if (placementResult.type === "error") {
-    issues.push(...prefixIssues("placement", placementResult.error));
+  if (pathResult.type === "error") {
+    issues.push(...prefixIssues("path", pathResult.error));
   }
-  if (sectionTreeResult.type === "error") {
-    issues.push(...prefixIssues("sections", sectionTreeResult.error));
+  if (rankResult.type === "error") {
+    issues.push(...prefixIssues("rank", rankResult.error));
   }
   if (createdAtResult.type === "error") {
     issues.push(...prefixIssues("createdAt", createdAtResult.error));
@@ -520,8 +488,8 @@ export const parseItem = (
   const title = Result.unwrap(titleResult);
   const icon = Result.unwrap(iconResult);
   const status = Result.unwrap(statusResult);
-  const placement = Result.unwrap(placementResult);
-  const sectionTree = Result.unwrap(sectionTreeResult);
+  const path = Result.unwrap(pathResult);
+  const rank = Result.unwrap(rankResult);
   const createdAt = Result.unwrap(createdAtResult);
   const updatedAt = Result.unwrap(updatedAtResult);
 
@@ -530,7 +498,8 @@ export const parseItem = (
     title,
     icon,
     status,
-    placement,
+    path,
+    rank,
     createdAt,
     updatedAt,
     closedAt,
@@ -542,5 +511,5 @@ export const parseItem = (
     body: snapshot.body?.trim() ?? undefined,
   };
 
-  return Result.ok(instantiate(data, edges, sectionTree));
+  return Result.ok(instantiate(data, edges));
 };

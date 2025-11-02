@@ -4,7 +4,8 @@ import { ChangeItemStatusWorkflow } from "../../../domain/workflows/change_item_
 import { dateTimeFromDate } from "../../../domain/primitives/date_time.ts";
 import { Item } from "../../../domain/models/item.ts";
 
-const formatShortId = (item: Item): string => item.data.id.toShortId().toString();
+const formatItemLabel = (item: Item): string =>
+  item.data.alias ? item.data.alias.toString() : item.data.id.toString();
 
 export function createCloseCommand() {
   return new Command()
@@ -43,6 +44,7 @@ export function createCloseCommand() {
         occurredAt: occurredAtResult.value,
       }, {
         itemRepository: deps.itemRepository,
+        aliasRepository: deps.aliasRepository,
       });
 
       if (workflowResult.type === "error") {
@@ -56,13 +58,13 @@ export function createCloseCommand() {
       if (succeeded.length > 0) {
         if (succeeded.length === 1) {
           const item = succeeded[0];
-          const shortId = formatShortId(item);
-          console.log(`✅ Closed [${shortId}] ${item.data.title.toString()}`);
+          const label = formatItemLabel(item);
+          console.log(`✅ Closed [${label}] ${item.data.title.toString()}`);
         } else {
           console.log(`✅ Closed ${succeeded.length} item(s):`);
           for (const item of succeeded) {
-            const shortId = formatShortId(item);
-            console.log(`  [${shortId}] ${item.data.title.toString()}`);
+            const label = formatItemLabel(item);
+            console.log(`  [${label}] ${item.data.title.toString()}`);
           }
         }
       }

@@ -7,8 +7,8 @@ import {
   ItemId,
   itemStatusOpen,
   itemTitleFromString,
-  parseSectionPath,
-  SectionPath,
+  parsePath,
+  Path,
   TagSlug,
   tagSlugFromString,
 } from "../primitives/mod.ts";
@@ -17,7 +17,6 @@ import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { RankService } from "../services/rank_service.ts";
 import { IdGenerationService } from "../services/id_generation_service.ts";
-import { createRootPlacement, createRootPlacementBin } from "../models/placement.ts";
 
 export type CreateItemInput = Readonly<{
   title: string;
@@ -101,15 +100,14 @@ export const CreateItemWorkflow = {
       }
     }
 
-    const daySegments = input.day.toString().split("-");
-    const sectionResult = parseSectionPath(`:${daySegments.join("-")}`);
-    const section = sectionResult.type === "ok" ? sectionResult.value : undefined;
-    if (sectionResult.type === "error") {
+    const pathResult = parsePath(`/${input.day.toString()}`);
+    const path = pathResult.type === "ok" ? pathResult.value : undefined;
+    if (pathResult.type === "error") {
       issues.push(
-        ...sectionResult.error.issues.map((issue) =>
+        ...pathResult.error.issues.map((issue) =>
           createValidationIssue(issue.message, {
             code: issue.code,
-            path: ["placement", "section", ...issue.path],
+            path: ["path", ...issue.path],
           })
         ),
       );
@@ -132,12 +130,12 @@ export const CreateItemWorkflow = {
       return Result.error(invalidInput(issues));
     }
 
-    const resolvedSection = section as SectionPath;
+    const resolvedPath = path as Path;
     const resolvedId = id as ItemId;
     const resolvedTitle = title!;
 
-    const siblingsResult = await deps.itemRepository.listByPlacementBin(
-      createRootPlacementBin(resolvedSection),
+    const siblingsResult = await deps.itemRepository.listByPath(
+      resolvedPath,
     );
     if (siblingsResult.type === "error") {
       return Result.error(repositoryFailure(siblingsResult.error));
@@ -147,7 +145,7 @@ export const CreateItemWorkflow = {
     const rankResult = siblings.length === 0
       ? deps.rankService.middleRank()
       : deps.rankService.nextRank(
-        siblings[siblings.length - 1].data.placement.rank,
+        siblings[siblings.length - 1].data.rank,
       );
 
     if (rankResult.type === "error") {
@@ -161,11 +159,6 @@ export const CreateItemWorkflow = {
       ));
     }
 
-    const placement = createRootPlacement(
-      resolvedSection,
-      rankResult.value,
-    );
-
     const trimmedBody = typeof input.body === "string" ? input.body.trim() : undefined;
     const body = trimmedBody && trimmedBody.length > 0 ? trimmedBody : undefined;
 
@@ -174,7 +167,8 @@ export const CreateItemWorkflow = {
       title: resolvedTitle,
       icon: createItemIcon(input.itemType),
       status: itemStatusOpen(),
-      placement,
+      path: resolvedPath,
+      rank: rankResult.value,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,
       body,

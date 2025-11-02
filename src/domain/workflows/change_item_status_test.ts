@@ -6,85 +6,16 @@ import {
   dateTimeFromDate,
   itemStatusClosed,
   itemStatusOpen,
-  parseSectionPath,
+  parsePath,
 } from "../primitives/mod.ts";
 import { itemIdFromString } from "../primitives/item_id.ts";
 import { itemTitleFromString } from "../primitives/item_title.ts";
 import { itemRankFromString } from "../primitives/item_rank.ts";
 import { Result } from "../../shared/result.ts";
-import { ItemRepository } from "../repositories/item_repository.ts";
-import { Item } from "../models/item.ts";
-import { ItemId } from "../primitives/item_id.ts";
-import { ItemShortId } from "../primitives/item_short_id.ts";
-import { RepositoryError } from "../repositories/repository_error.ts";
-import { AmbiguousShortIdError } from "../repositories/short_id_resolution_error.ts";
-import { createRootPlacement, PlacementBin } from "../models/placement.ts";
+import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.ts";
+import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
 
-// Mock ItemRepository for testing
-class MockItemRepository implements ItemRepository {
-  private items = new Map<string, Item>();
-
-  load(id: ItemId): Promise<Result<Item | undefined, RepositoryError>> {
-    const item = this.items.get(id.toString());
-    if (!item) {
-      return Promise.resolve(Result.ok(undefined));
-    }
-    return Promise.resolve(Result.ok(item));
-  }
-
-  save(item: Item): Promise<Result<void, RepositoryError>> {
-    this.items.set(item.data.id.toString(), item);
-    return Promise.resolve(Result.ok(undefined));
-  }
-
-  delete(id: ItemId): Promise<Result<void, RepositoryError>> {
-    this.items.delete(id.toString());
-    return Promise.resolve(Result.ok(undefined));
-  }
-
-  listByPlacementBin(
-    bin: PlacementBin,
-  ): Promise<Result<ReadonlyArray<Item>, RepositoryError>> {
-    const items = Array.from(this.items.values())
-      .filter((item) => item.data.placement.belongsTo(bin))
-      .sort((first, second) => first.data.placement.rank.compare(second.data.placement.rank));
-
-    return Promise.resolve(Result.ok(items));
-  }
-
-  findByShortId(
-    shortId: ItemShortId,
-  ): Promise<Result<Item | undefined, RepositoryError | AmbiguousShortIdError>> {
-    const shortIdStr = shortId.toString();
-    const matchingItems: Item[] = [];
-
-    for (const item of this.items.values()) {
-      if (item.data.id.toString().endsWith(shortIdStr)) {
-        matchingItems.push(item);
-      }
-    }
-
-    if (matchingItems.length === 0) {
-      return Promise.resolve(Result.ok(undefined));
-    }
-
-    if (matchingItems.length > 1) {
-      return Promise.resolve(Result.error({
-        kind: "ambiguous_short_id",
-        shortId: shortIdStr,
-        foundCount: matchingItems.length,
-        message: `Short ID '${shortIdStr}' is ambiguous: found ${matchingItems.length} items`,
-      }));
-    }
-
-    return Promise.resolve(Result.ok(matchingItems[0]));
-  }
-
-  // Helper method for tests
-  setItem(item: Item) {
-    this.items.set(item.data.id.toString(), item);
-  }
-}
+const createAliasRepository = (): InMemoryAliasRepository => new InMemoryAliasRepository();
 
 function createTestItem(id: string, status: "open" | "closed" = "open") {
   // Use actual UUID v7 format for testing
@@ -94,8 +25,7 @@ function createTestItem(id: string, status: "open" | "closed" = "open") {
   const icon = createItemIcon("note");
   const itemStatus = status === "open" ? itemStatusOpen() : itemStatusClosed();
   const rank = Result.unwrap(itemRankFromString("a0"));
-  const section = Result.unwrap(parseSectionPath(":2024-01-01"));
-  const placement = createRootPlacement(section, rank);
+  const path = Result.unwrap(parsePath("/2024-01-01"));
   const now = Result.unwrap(dateTimeFromDate(new Date()));
 
   return createItem({
@@ -103,7 +33,8 @@ function createTestItem(id: string, status: "open" | "closed" = "open") {
     title,
     icon,
     status: itemStatus,
-    placement,
+    path,
+    rank,
     createdAt: now,
     updatedAt: now,
     closedAt: status === "closed" ? now : undefined,
@@ -111,9 +42,9 @@ function createTestItem(id: string, status: "open" | "closed" = "open") {
 }
 
 Deno.test("ChangeItemStatusWorkflow - close single open item", async () => {
-  const repository = new MockItemRepository();
+  const repository = new InMemoryItemRepository();
   const item = createTestItem("0001", "open");
-  repository.setItem(item);
+  repository.set(item);
 
   const now = Result.unwrap(dateTimeFromDate(new Date()));
 
@@ -123,6 +54,7 @@ Deno.test("ChangeItemStatusWorkflow - close single open item", async () => {
     occurredAt: now,
   }, {
     itemRepository: repository,
+    aliasRepository: createAliasRepository(),
   });
 
   assertEquals(result.type, "ok");
@@ -134,9 +66,9 @@ Deno.test("ChangeItemStatusWorkflow - close single open item", async () => {
 });
 
 Deno.test("ChangeItemStatusWorkflow - reopen single closed item", async () => {
-  const repository = new MockItemRepository();
+  const repository = new InMemoryItemRepository();
   const item = createTestItem("0002", "closed");
-  repository.setItem(item);
+  repository.set(item);
 
   const now = Result.unwrap(dateTimeFromDate(new Date()));
 
@@ -146,6 +78,7 @@ Deno.test("ChangeItemStatusWorkflow - reopen single closed item", async () => {
     occurredAt: now,
   }, {
     itemRepository: repository,
+    aliasRepository: createAliasRepository(),
   });
 
   assertEquals(result.type, "ok");
@@ -157,11 +90,11 @@ Deno.test("ChangeItemStatusWorkflow - reopen single closed item", async () => {
 });
 
 Deno.test("ChangeItemStatusWorkflow - close multiple items", async () => {
-  const repository = new MockItemRepository();
+  const repository = new InMemoryItemRepository();
   const item1 = createTestItem("0003", "open");
   const item2 = createTestItem("0004", "open");
-  repository.setItem(item1);
-  repository.setItem(item2);
+  repository.set(item1);
+  repository.set(item2);
 
   const now = Result.unwrap(dateTimeFromDate(new Date()));
 
@@ -171,6 +104,7 @@ Deno.test("ChangeItemStatusWorkflow - close multiple items", async () => {
     occurredAt: now,
   }, {
     itemRepository: repository,
+    aliasRepository: createAliasRepository(),
   });
 
   assertEquals(result.type, "ok");
@@ -183,9 +117,9 @@ Deno.test("ChangeItemStatusWorkflow - close multiple items", async () => {
 });
 
 Deno.test("ChangeItemStatusWorkflow - idempotent close", async () => {
-  const repository = new MockItemRepository();
+  const repository = new InMemoryItemRepository();
   const item = createTestItem("0005", "closed");
-  repository.setItem(item);
+  repository.set(item);
 
   const now = Result.unwrap(dateTimeFromDate(new Date()));
 
@@ -195,6 +129,7 @@ Deno.test("ChangeItemStatusWorkflow - idempotent close", async () => {
     occurredAt: now,
   }, {
     itemRepository: repository,
+    aliasRepository: createAliasRepository(),
   });
 
   assertEquals(result.type, "ok");
@@ -206,9 +141,9 @@ Deno.test("ChangeItemStatusWorkflow - idempotent close", async () => {
 });
 
 Deno.test("ChangeItemStatusWorkflow - partial failure", async () => {
-  const repository = new MockItemRepository();
+  const repository = new InMemoryItemRepository();
   const item1 = createTestItem("0006", "open");
-  repository.setItem(item1);
+  repository.set(item1);
   // Second item doesn't exist
 
   const now = Result.unwrap(dateTimeFromDate(new Date()));
@@ -220,6 +155,7 @@ Deno.test("ChangeItemStatusWorkflow - partial failure", async () => {
     occurredAt: now,
   }, {
     itemRepository: repository,
+    aliasRepository: createAliasRepository(),
   });
 
   assertEquals(result.type, "ok");
@@ -232,7 +168,7 @@ Deno.test("ChangeItemStatusWorkflow - partial failure", async () => {
 });
 
 Deno.test("ChangeItemStatusWorkflow - empty item list", async () => {
-  const repository = new MockItemRepository();
+  const repository = new InMemoryItemRepository();
   const now = Result.unwrap(dateTimeFromDate(new Date()));
 
   const result = await ChangeItemStatusWorkflow.execute({
@@ -241,6 +177,7 @@ Deno.test("ChangeItemStatusWorkflow - empty item list", async () => {
     occurredAt: now,
   }, {
     itemRepository: repository,
+    aliasRepository: createAliasRepository(),
   });
 
   assertEquals(result.type, "error");
