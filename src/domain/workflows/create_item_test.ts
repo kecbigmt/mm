@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { CreateItemWorkflow } from "./create_item.ts";
 import { Result } from "../../shared/result.ts";
-import { Item, createItem } from "../models/item.ts";
+import { createItem, Item } from "../models/item.ts";
 import {
   createItemIcon,
   dateTimeFromDate,

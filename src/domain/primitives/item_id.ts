@@ -25,8 +25,7 @@ const instantiate = (value: string): ItemId => itemIdFactory.instantiate(value);
 
 export type ItemIdValidationError = ValidationError<typeof ITEM_ID_KIND>;
 
-export const isItemId = (value: unknown): value is ItemId =>
-  itemIdFactory.is(value);
+export const isItemId = (value: unknown): value is ItemId => itemIdFactory.is(value);
 
 export const parseItemId = (
   input: unknown,

@@ -5,7 +5,7 @@ import {
   ValidationError,
   ValidationIssue,
 } from "../../shared/errors.ts";
-import { ParsePathOptions, Path, PathRangeSegment, parsePath } from "./path.ts";
+import { parsePath, ParsePathOptions, Path, PathRangeSegment } from "./path.ts";
 import { PathSegment } from "./path_segment.ts";
 
 const LOCATOR_KIND = "Locator" as const;

@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { LocatorResolutionService } from "./locator_resolution_service.ts";
 import { Result } from "../../shared/result.ts";
-import { Item, createItem } from "../models/item.ts";
+import { createItem, Item } from "../models/item.ts";
 import { Alias, createAlias } from "../models/alias.ts";
 import {
   aliasSlugFromString,

@@ -178,9 +178,15 @@ const resolveRelativeToken = (
       case "d":
         return { kind: "resolved", value: formatIsoDate(adjustDays(base, direction * magnitude)) };
       case "w":
-        return { kind: "resolved", value: formatIsoDate(adjustDays(base, direction * magnitude * 7)) };
+        return {
+          kind: "resolved",
+          value: formatIsoDate(adjustDays(base, direction * magnitude * 7)),
+        };
       case "m":
-        return { kind: "resolved", value: formatIsoDate(adjustMonths(base, direction * magnitude)) };
+        return {
+          kind: "resolved",
+          value: formatIsoDate(adjustMonths(base, direction * magnitude)),
+        };
       case "y":
         return { kind: "resolved", value: formatIsoDate(adjustYears(base, direction * magnitude)) };
       default:

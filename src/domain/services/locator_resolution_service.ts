@@ -5,12 +5,12 @@ import {
   ValidationError,
 } from "../../shared/errors.ts";
 import {
-  Locator,
-  LocatorValidationError,
-  ParseLocatorOptions,
   AliasSlug,
   ItemId,
+  Locator,
+  LocatorValidationError,
   parseLocator,
+  ParseLocatorOptions,
 } from "../primitives/mod.ts";
 import { Item } from "../models/item.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
@@ -30,15 +30,16 @@ export type ResolveLocatorOptions = ParseLocatorOptions;
 
 const mapParseError = (
   error: LocatorValidationError,
-): ValidationError<"LocatorResolution"> =>
-  createValidationError("LocatorResolution", error.issues);
+): ValidationError<"LocatorResolution"> => createValidationError("LocatorResolution", error.issues);
 
 const invalidLocator = (message: string): ValidationError<"LocatorResolution"> =>
   createValidationError("LocatorResolution", [
     createValidationIssue(message, { code: "invalid_locator", path: ["value"] }),
   ]);
 
-const ensureSingleLocator = (locator: Locator): ValidationError<"LocatorResolution"> | undefined => {
+const ensureSingleLocator = (
+  locator: Locator,
+): ValidationError<"LocatorResolution"> | undefined => {
   if (locator.isRange()) {
     return createValidationError("LocatorResolution", [
       createValidationIssue("locator ranges are not supported for item resolution", {
