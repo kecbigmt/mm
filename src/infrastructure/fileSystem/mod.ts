@@ -11,3 +11,4 @@ export { createFileSystemItemRepository } from "./item_repository.ts";
 export type { FileSystemItemRepositoryDependencies } from "./item_repository.ts";
 
 export { createFileSystemConfigRepository } from "./config_repository.ts";
+export { createFileSystemStateRepository } from "./state_repository.ts";

@@ -5,6 +5,11 @@ import { createNoteCommand } from "./presentation/cli/commands/note.ts";
 import { createCloseCommand } from "./presentation/cli/commands/close.ts";
 import { createReopenCommand } from "./presentation/cli/commands/reopen.ts";
 import { createWorkspaceCommand } from "./presentation/cli/commands/workspace.ts";
+import { createCdCommand } from "./presentation/cli/commands/cd.ts";
+import { createPwdCommand } from "./presentation/cli/commands/pwd.ts";
+import { createLsCommand } from "./presentation/cli/commands/ls.ts";
+import { createWhereCommand } from "./presentation/cli/commands/where.ts";
+import { createMvCommand } from "./presentation/cli/commands/mv.ts";
 
 async function main() {
   const cli = new Command()
@@ -14,7 +19,12 @@ async function main() {
     .command("note", createNoteCommand().description("Create a new note")).alias("n")
     .command("close", createCloseCommand().description("Close items"))
     .command("reopen", createReopenCommand().description("Reopen closed items"))
-    .command("workspace", createWorkspaceCommand().description("Workspace management")).alias("ws");
+    .command("workspace", createWorkspaceCommand().description("Workspace management")).alias("ws")
+    .command("cd", createCdCommand().description("Change current working directory"))
+    .command("pwd", createPwdCommand().description("Print current working directory"))
+    .command("ls", createLsCommand().description("List items"))
+    .command("where", createWhereCommand().description("Show logical and physical paths for an item"))
+    .command("mv", createMvCommand().description("Move item to a new placement"));
 
   await cli.parse(Deno.args);
 }

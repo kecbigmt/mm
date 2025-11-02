@@ -21,6 +21,8 @@ import {
 import { createUuidV7Generator } from "../../infrastructure/uuid/generator.ts";
 import { WorkspaceName, workspaceNameFromString } from "../../domain/primitives/workspace_name.ts";
 import { createFileSystemConfigRepository } from "../../infrastructure/fileSystem/config_repository.ts";
+import { createFileSystemStateRepository } from "../../infrastructure/fileSystem/state_repository.ts";
+import { StateRepository } from "../../domain/repositories/state_repository.ts";
 
 export type CliDependencies = Readonly<{
   readonly root: string;
@@ -29,6 +31,7 @@ export type CliDependencies = Readonly<{
   readonly itemRepository: ItemRepository;
   readonly aliasRepository: AliasRepository;
   readonly workspaceRepository: WorkspaceRepository;
+  readonly stateRepository: StateRepository;
   readonly rankService: RankService;
   readonly idGenerationService: IdGenerationService;
 }>;
@@ -215,6 +218,7 @@ export const loadCliDependencies = async (
   const itemRepository = createFileSystemItemRepository({ root, timezone });
   const hashingService = createSha256HashingService();
   const aliasRepository = createFileSystemAliasRepository({ root, hashingService });
+  const stateRepository = createFileSystemStateRepository({ workspaceRoot: root });
   const rankService = createRankService(createLexoRankGenerator());
   const idGenerationService = createIdGenerationService(createUuidV7Generator());
 
@@ -225,6 +229,7 @@ export const loadCliDependencies = async (
     itemRepository,
     aliasRepository,
     workspaceRepository,
+    stateRepository,
     rankService,
     idGenerationService,
   });
