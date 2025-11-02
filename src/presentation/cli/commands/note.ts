@@ -1,8 +1,8 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { parseDateArgument } from "../utils/date.ts";
-import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
+import { dateTimeFromDate, parseLocator } from "../../../domain/primitives/mod.ts";
 import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
+import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 
 const formatShortId = (id: string): string => id.slice(-7);
 
@@ -21,9 +21,8 @@ export function createNoteCommand() {
     .arguments("[title:string]")
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .option("-b, --body <body:string>", "Body text")
-    .option("-p, --project <project:string>", "Project tag")
+    .option("-p, --parent <parent:string>", "Parent locator (e.g., /2025-11-03, /alias, ./1)")
     .option("-c, --context <context:string>", "Context tag")
-    .option("-d, --date <date:string>", "Note date (flexible: YYYY-MM-DD, today, tomorrow, etc.)")
     .option("-e, --edit", "Open editor after creation")
     .action(async (options: Record<string, unknown>, title?: string) => {
       const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
@@ -43,17 +42,49 @@ export function createNoteCommand() {
         : "Untitled";
 
       const now = new Date();
-      const dateArg = typeof options.date === "string" ? options.date : undefined;
-      const dateResult = parseDateArgument(dateArg, deps.timezone, now);
-      if (dateResult.type === "error") {
-        console.error(dateResult.error.message);
+      const parentArg = typeof options.parent === "string" ? options.parent : undefined;
+
+      const cwdResult = await CwdResolutionService.getCwd(
+        {
+          stateRepository: deps.stateRepository,
+          itemRepository: deps.itemRepository,
+          aliasRepository: deps.aliasRepository,
+        },
+        now,
+      );
+      if (cwdResult.type === "error") {
+        console.error(cwdResult.error.message);
         return;
       }
-      if (dateResult.value.length !== 1) {
-        console.error("note creation accepts a single target date");
+
+      const parentPath = (() => {
+        if (!parentArg) {
+          return cwdResult.value;
+        }
+
+        const locatorResult = parseLocator(parentArg, {
+          today: now,
+          cwd: cwdResult.value,
+        });
+        if (locatorResult.type === "error") {
+          console.error(
+            "Invalid parent locator:",
+            locatorResult.error.issues.map((i) => i.message).join(", "),
+          );
+          return undefined;
+        }
+
+        if (locatorResult.value.path.isRange()) {
+          console.error("Parent path cannot be a range");
+          return undefined;
+        }
+
+        return locatorResult.value.path;
+      })();
+
+      if (!parentPath) {
         return;
       }
-      const day = dateResult.value[0];
 
       const createdAtResult = dateTimeFromDate(now);
       if (createdAtResult.type === "error") {
@@ -69,7 +100,7 @@ export function createNoteCommand() {
         itemType: "note",
         body: bodyOption,
         context: contextOption,
-        day,
+        parentPath,
         createdAt: createdAtResult.value,
       }, {
         itemRepository: deps.itemRepository,
@@ -89,7 +120,9 @@ export function createNoteCommand() {
 
       const item = workflowResult.value.item;
       const shortId = formatShortId(item.data.id.toString());
-      console.log(`✅ Created note [${shortId}] ${item.data.title.toString()} (${day.toString()})`);
+      console.log(
+        `✅ Created note [${shortId}] ${item.data.title.toString()} at ${parentPath.toString()}`,
+      );
 
       if (options.edit === true) {
         console.warn("Editor integration not implemented yet");
