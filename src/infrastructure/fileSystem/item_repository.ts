@@ -2,14 +2,10 @@ import { join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { ItemRepository } from "../../domain/repositories/item_repository.ts";
 import { Item, ItemSnapshot, parseItem } from "../../domain/models/item.ts";
-import { ItemId, ItemShortId, Path } from "../../domain/primitives/mod.ts";
+import { ItemId, Path } from "../../domain/primitives/mod.ts";
 import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
-import {
-  AmbiguousShortIdError,
-  createAmbiguousShortIdError,
-} from "../../domain/repositories/short_id_resolution_error.ts";
 import {
   type EdgeCollectionSnapshot,
   readEdgeCollection,
@@ -25,8 +21,6 @@ type LoadResult = Result<Item | undefined, RepositoryError>;
 type SaveResult = Result<void, RepositoryError>;
 type DeleteResult = Result<void, RepositoryError>;
 type listByPathResult = Result<ReadonlyArray<Item>, RepositoryError>;
-type FindByShortIdResult = Result<Item | undefined, RepositoryError | AmbiguousShortIdError>;
-
 type ItemMetaSnapshot = Omit<ItemSnapshot, "body" | "edges">;
 
 type ItemDirectoryRecord = Readonly<{
@@ -513,46 +507,10 @@ export const createFileSystemItemRepository = (
     return Result.ok(items);
   };
 
-  const findByShortId = async (shortId: ItemShortId): Promise<FindByShortIdResult> => {
-    const directoriesResult = await collectItemDirectories(dependencies.root);
-    if (directoriesResult.type === "error") {
-      return directoriesResult;
-    }
-
-    const shortIdStr = shortId.toString();
-    const matches = directoriesResult.value.filter((record) => record.id.endsWith(shortIdStr));
-
-    if (matches.length === 0) {
-      return Result.ok(undefined);
-    }
-
-    if (matches.length > 1) {
-      return Result.error(createAmbiguousShortIdError(shortIdStr, matches.length));
-    }
-
-    const [match] = matches;
-    const itemResult = await loadItemFromDirectory(match.directory, match.id);
-    if (itemResult.type === "error") {
-      return itemResult;
-    }
-
-    const item = itemResult.value;
-    if (!item) {
-      return Result.error(
-        createRepositoryError("item", "findByShortId", "item metadata is missing", {
-          identifier: match.id,
-        }),
-      );
-    }
-
-    return Result.ok(item);
-  };
-
   return {
     load,
     save,
     delete: remove,
     listByPath,
-    findByShortId,
   };
 };

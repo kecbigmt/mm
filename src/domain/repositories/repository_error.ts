@@ -13,8 +13,7 @@ export type RepositoryOperation =
   | "delete"
   | "list"
   | "replace"
-  | "ensure"
-  | "findByShortId";
+  | "ensure";
 
 export type RepositoryError = Readonly<
   & BaseError<"RepositoryError">
