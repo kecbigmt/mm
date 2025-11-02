@@ -14,33 +14,33 @@ import type { StateRepository } from "../repositories/state_repository.ts";
 import { Result } from "../../shared/result.ts";
 
 const createMockItemRepository = (items: Map<string, ReturnType<typeof createItem>>): ItemRepository => ({
-  load: async (id) => {
+  load: (id) => {
     const item = items.get(id.toString());
-    return Result.ok(item);
+    return Promise.resolve(Result.ok(item));
   },
-  save: async () => Result.ok(undefined),
-  delete: async () => Result.ok(undefined),
-  listByPath: async () => Result.ok([]),
+  save: () => Promise.resolve(Result.ok(undefined)),
+  delete: () => Promise.resolve(Result.ok(undefined)),
+  listByPath: () => Promise.resolve(Result.ok([])),
 });
 
 const createMockAliasRepository = (): AliasRepository => ({
-  load: async () => Result.ok(undefined),
-  save: async () => Result.ok(undefined),
-  delete: async () => Result.ok(undefined),
-  list: async () => Result.ok([]),
+  load: () => Promise.resolve(Result.ok(undefined)),
+  save: () => Promise.resolve(Result.ok(undefined)),
+  delete: () => Promise.resolve(Result.ok(undefined)),
+  list: () => Promise.resolve(Result.ok([])),
 });
 
 const createMockStateRepository = (
   storedCwd?: string,
   shouldSave: boolean = true,
 ): StateRepository => ({
-  loadCwd: async () => {
-    if (!storedCwd) return Result.ok(undefined);
+  loadCwd: () => {
+    if (!storedCwd) return Promise.resolve(Result.ok(undefined));
     const parsed = parsePath(storedCwd);
-    if (parsed.type === "error") return Result.ok(undefined);
-    return Result.ok(parsed.value);
+    if (parsed.type === "error") return Promise.resolve(Result.ok(undefined));
+    return Promise.resolve(Result.ok(parsed.value));
   },
-  saveCwd: async () => shouldSave ? Result.ok(undefined) : Result.ok(undefined),
+  saveCwd: () => shouldSave ? Promise.resolve(Result.ok(undefined)) : Promise.resolve(Result.ok(undefined)),
 });
 
 Deno.test("CwdResolutionService.getCwd returns default today path when nothing is stored", async () => {

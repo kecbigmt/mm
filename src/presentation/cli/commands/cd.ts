@@ -2,7 +2,6 @@ import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { parseLocator } from "../../../domain/primitives/locator.ts";
-import { parsePath } from "../../../domain/primitives/path.ts";
 
 export function createCdCommand() {
   return new Command()

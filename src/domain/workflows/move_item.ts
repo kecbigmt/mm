@@ -7,7 +7,7 @@ import {
 import { Item } from "../models/item.ts";
 import { DateTime } from "../primitives/date_time.ts";
 import { Path, parsePath } from "../primitives/path.ts";
-import { Locator, parseLocator, ParseLocatorOptions } from "../primitives/locator.ts";
+import { ParseLocatorOptions } from "../primitives/locator.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
