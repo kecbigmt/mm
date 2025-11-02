@@ -1,11 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { CreateItemWorkflow } from "./create_item.ts";
 import { Result } from "../../shared/result.ts";
-import { ItemRepository } from "../repositories/item_repository.ts";
-import { Item } from "../models/item.ts";
-import { ItemId } from "../primitives/item_id.ts";
-import { ItemShortId } from "../primitives/item_short_id.ts";
-import { createItem } from "../models/item.ts";
+import { Item, createItem } from "../models/item.ts";
 import {
   createItemIcon,
   dateTimeFromDate,
@@ -15,45 +11,11 @@ import {
   itemTitleFromString,
   parseCalendarDay,
   parsePath,
-  Path,
 } from "../primitives/mod.ts";
 import { createRankService, RankGenerator, RankService } from "../services/rank_service.ts";
 import { createIdGenerationService } from "../services/id_generation_service.ts";
 import { parseDateTime } from "../primitives/date_time.ts";
-
-class InMemoryItemRepository implements ItemRepository {
-  private readonly items = new Map<string, Item>();
-
-  load(id: ItemId) {
-    return Promise.resolve(Result.ok(this.items.get(id.toString())));
-  }
-
-  save(item: Item) {
-    this.items.set(item.data.id.toString(), item);
-    return Promise.resolve(Result.ok(undefined));
-  }
-
-  delete(id: ItemId) {
-    this.items.delete(id.toString());
-    return Promise.resolve(Result.ok(undefined));
-  }
-
-  listByPath(path: Path) {
-    const siblings = Array.from(this.items.values())
-      .filter((item) => item.data.path.equals(path))
-      .sort((first, second) => first.data.rank.compare(second.data.rank));
-
-    return Promise.resolve(Result.ok(siblings));
-  }
-
-  findByShortId(_shortId: ItemShortId) {
-    return Promise.resolve(Result.ok(undefined));
-  }
-
-  set(item: Item) {
-    this.items.set(item.data.id.toString(), item);
-  }
-}
+import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
 
 const createTestRankService = (): RankService => {
   const generator: RankGenerator = {
