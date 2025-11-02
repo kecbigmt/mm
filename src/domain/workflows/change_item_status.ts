@@ -8,10 +8,10 @@ import { Item } from "../models/item.ts";
 import { DateTime } from "../primitives/date_time.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import {
-  ItemResolutionDependencies,
-  ItemResolutionError,
-  ItemResolutionService,
-} from "../services/item_resolution_service.ts";
+  LocatorResolutionDependencies,
+  LocatorResolutionError,
+  LocatorResolutionService,
+} from "../services/locator_resolution_service.ts";
 
 export type StatusAction = "close" | "reopen";
 
@@ -21,13 +21,13 @@ export type ChangeItemStatusInput = Readonly<{
   occurredAt: DateTime;
 }>;
 
-export type ChangeItemStatusDependencies = ItemResolutionDependencies;
+export type ChangeItemStatusDependencies = LocatorResolutionDependencies;
 
 export type ChangeItemStatusValidationError = ValidationError<"ChangeItemStatus">;
 
 export type ChangeItemStatusError =
   | ChangeItemStatusValidationError
-  | ItemResolutionError
+  | LocatorResolutionError
   | RepositoryError;
 
 export type ChangeItemStatusResult = Readonly<{
@@ -61,7 +61,10 @@ export const ChangeItemStatusWorkflow = {
     }> = [];
 
     for (const itemId of input.itemIds) {
-      const resolutionResult = await ItemResolutionService.resolveItemId(itemId, deps);
+      const resolutionResult = await LocatorResolutionService.resolveItem(
+        itemId,
+        deps,
+      );
       if (resolutionResult.type === "error") {
         failed.push({
           itemId,
