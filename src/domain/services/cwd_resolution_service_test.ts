@@ -13,7 +13,9 @@ import type { AliasRepository } from "../repositories/alias_repository.ts";
 import type { StateRepository } from "../repositories/state_repository.ts";
 import { Result } from "../../shared/result.ts";
 
-const createMockItemRepository = (items: Map<string, ReturnType<typeof createItem>>): ItemRepository => ({
+const createMockItemRepository = (
+  items: Map<string, ReturnType<typeof createItem>>,
+): ItemRepository => ({
   load: (id) => {
     const item = items.get(id.toString());
     return Promise.resolve(Result.ok(item));
@@ -40,7 +42,8 @@ const createMockStateRepository = (
     if (parsed.type === "error") return Promise.resolve(Result.ok(undefined));
     return Promise.resolve(Result.ok(parsed.value));
   },
-  saveCwd: () => shouldSave ? Promise.resolve(Result.ok(undefined)) : Promise.resolve(Result.ok(undefined)),
+  saveCwd: () =>
+    shouldSave ? Promise.resolve(Result.ok(undefined)) : Promise.resolve(Result.ok(undefined)),
 });
 
 Deno.test("CwdResolutionService.getCwd returns default today path when nothing is stored", async () => {
@@ -114,7 +117,11 @@ Deno.test("CwdResolutionService.getCwd returns stored date path without overwrit
   );
 
   assert(result.type === "ok", "operation should succeed");
-  assertEquals(result.value.toString(), "/2024-06-15", "stored date path should be returned as-is, not overwritten with today");
+  assertEquals(
+    result.value.toString(),
+    "/2024-06-15",
+    "stored date path should be returned as-is, not overwritten with today",
+  );
 });
 
 Deno.test("CwdResolutionService.getCwd falls back to today when stored item not found", async () => {
@@ -216,4 +223,3 @@ Deno.test("CwdResolutionService.setCwd allows valid item paths", async () => {
     assertEquals(result.value.toString(), `/${item.data.id.toString()}`);
   }
 });
-

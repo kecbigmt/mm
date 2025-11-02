@@ -6,4 +6,3 @@ export interface StateRepository {
   loadCwd(): Promise<Result<Path | undefined, RepositoryError>>;
   saveCwd(path: Path): Promise<Result<void, RepositoryError>>;
 }
-

@@ -6,7 +6,7 @@ import {
 } from "../../shared/errors.ts";
 import { Item } from "../models/item.ts";
 import { DateTime } from "../primitives/date_time.ts";
-import { Path, parsePath } from "../primitives/path.ts";
+import { parsePath, Path } from "../primitives/path.ts";
 import { ParseLocatorOptions } from "../primitives/locator.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
@@ -216,7 +216,9 @@ const calculateRankForPlacement = async (
       }
 
       const siblings = siblingsResult.value;
-      const targetIndex = siblings.findIndex((item) => item.data.id.toString() === targetItem.data.id.toString());
+      const targetIndex = siblings.findIndex((item) =>
+        item.data.id.toString() === targetItem.data.id.toString()
+      );
       if (targetIndex === -1) {
         return Result.error(
           createValidationError("MoveItem", [
@@ -283,7 +285,9 @@ const calculateRankForPlacement = async (
       }
 
       const siblings = siblingsResult.value;
-      const targetIndex = siblings.findIndex((item) => item.data.id.toString() === targetItem.data.id.toString());
+      const targetIndex = siblings.findIndex((item) =>
+        item.data.id.toString() === targetItem.data.id.toString()
+      );
       if (targetIndex === -1) {
         return Result.error(
           createValidationError("MoveItem", [
@@ -387,4 +391,3 @@ export const MoveItemWorkflow = {
     return Result.ok({ item: updatedItem });
   },
 };
-

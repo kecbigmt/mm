@@ -5,7 +5,7 @@ import {
   ValidationError,
 } from "../../shared/errors.ts";
 import { Item } from "../models/item.ts";
-import { Path, parsePath } from "../primitives/path.ts";
+import { parsePath, Path } from "../primitives/path.ts";
 import { parseLocator, ParseLocatorOptions } from "../primitives/locator.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
@@ -118,7 +118,9 @@ export const ListItemsWorkflow = {
           if (lastSeg.start.kind === "Date" && lastSeg.end.kind === "Date") {
             const baseSegments = path.segments.slice(0, -1);
             const basePath = parsePath(
-              baseSegments.length === 0 ? "/" : `/${baseSegments.map((s) => s.toString()).join("/")}`,
+              baseSegments.length === 0
+                ? "/"
+                : `/${baseSegments.map((s) => s.toString()).join("/")}`,
               options,
             );
             if (basePath.type === "error") {
@@ -135,9 +137,7 @@ export const ListItemsWorkflow = {
             }
 
             return expandDateRange(basePath.value, endDatePath.value, deps).then((result) =>
-              result.type === "ok"
-                ? Result.ok({ items: result.value })
-                : result
+              result.type === "ok" ? Result.ok({ items: result.value }) : result
             );
           }
         }
@@ -191,4 +191,3 @@ export const ListItemsWorkflow = {
     return Result.ok({ items });
   },
 };
-

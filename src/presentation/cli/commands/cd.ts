@@ -36,8 +36,8 @@ export function createCdCommand() {
           console.error(cwdResult.error.message);
           return;
         }
-      console.log(cwdResult.value.toString());
-      return;
+        console.log(cwdResult.value.toString());
+        return;
       }
 
       const locatorResult = parseLocator(pathArg, {
@@ -80,4 +80,3 @@ export function createCdCommand() {
       console.log(setResult.value.toString());
     });
 }
-

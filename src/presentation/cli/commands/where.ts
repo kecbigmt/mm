@@ -3,8 +3,9 @@ import { loadCliDependencies } from "../dependencies.ts";
 import { LocatorResolutionService } from "../../../domain/services/locator_resolution_service.ts";
 import { join } from "@std/path";
 
-const formatItemLabel = (item: { data: { id: { toString(): string }; alias?: { toString(): string } } }): string =>
-  item.data.alias ? item.data.alias.toString() : item.data.id.toString().slice(-7);
+const formatItemLabel = (
+  item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
+): string => item.data.alias ? item.data.alias.toString() : item.data.id.toString().slice(-7);
 
 const formatSegmentForTimezone = (
   date: Date,
@@ -18,7 +19,8 @@ const formatSegmentForTimezone = (
   });
   const parts = formatter.formatToParts(date);
   const year = parts.find((p) => p.type === "year")?.value ?? String(date.getFullYear());
-  const month = parts.find((p) => p.type === "month")?.value ?? String(date.getMonth() + 1).padStart(2, "0");
+  const month = parts.find((p) => p.type === "month")?.value ??
+    String(date.getMonth() + 1).padStart(2, "0");
   const day = parts.find((p) => p.type === "day")?.value ?? String(date.getDate()).padStart(2, "0");
   return [year, month, day];
 };
@@ -84,4 +86,3 @@ export function createWhereCommand() {
       }
     });
 }
-

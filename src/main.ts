@@ -23,7 +23,10 @@ async function main() {
     .command("cd", createCdCommand().description("Change current working directory"))
     .command("pwd", createPwdCommand().description("Print current working directory"))
     .command("ls", createLsCommand().description("List items"))
-    .command("where", createWhereCommand().description("Show logical and physical paths for an item"))
+    .command(
+      "where",
+      createWhereCommand().description("Show logical and physical paths for an item"),
+    )
     .command("mv", createMvCommand().description("Move item to a new placement"));
 
   await cli.parse(Deno.args);

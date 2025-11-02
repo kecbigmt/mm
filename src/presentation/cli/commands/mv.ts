@@ -4,8 +4,9 @@ import { MoveItemWorkflow } from "../../../domain/workflows/move_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
 
-const formatItemLabel = (item: { data: { id: { toString(): string }; alias?: { toString(): string } } }): string =>
-  item.data.alias ? item.data.alias.toString() : item.data.id.toString().slice(-7);
+const formatItemLabel = (
+  item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
+): string => item.data.alias ? item.data.alias.toString() : item.data.id.toString().slice(-7);
 
 export function createMvCommand() {
   return new Command()
@@ -69,7 +70,8 @@ export function createMvCommand() {
 
       const { item } = workflowResult.value;
       const label = formatItemLabel(item);
-      console.log(`✅ Moved [${label}] ${item.data.title.toString()} to ${item.data.path.toString()}`);
+      console.log(
+        `✅ Moved [${label}] ${item.data.title.toString()} to ${item.data.path.toString()}`,
+      );
     });
 }
-

@@ -4,7 +4,7 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
-import { Path, parsePath } from "../primitives/path.ts";
+import { parsePath, Path } from "../primitives/path.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
@@ -46,7 +46,9 @@ const resolvePathToItem = async (
 
   const first = path.segments[0];
   if (first.kind === "ItemId") {
-    const loadResult = await deps.itemRepository.load(first.value as import("../primitives/item_id.ts").ItemId);
+    const loadResult = await deps.itemRepository.load(
+      first.value as import("../primitives/item_id.ts").ItemId,
+    );
     if (loadResult.type === "ok" && loadResult.value) {
       return loadResult.value;
     }
@@ -156,4 +158,3 @@ export const CwdResolutionService = {
     return Result.ok(target);
   },
 };
-

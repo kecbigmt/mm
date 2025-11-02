@@ -3,7 +3,7 @@ import { Result } from "../../shared/result.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
 import { StateRepository } from "../../domain/repositories/state_repository.ts";
-import { Path, parsePath } from "../../domain/primitives/mod.ts";
+import { parsePath, Path } from "../../domain/primitives/mod.ts";
 
 const STATE_FILE_NAME = ".state.json";
 
@@ -109,4 +109,3 @@ export const createFileSystemStateRepository = (
     saveCwd,
   };
 };
-

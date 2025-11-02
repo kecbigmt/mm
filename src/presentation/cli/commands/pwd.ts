@@ -38,4 +38,3 @@ export function createPwdCommand() {
       console.log(cwdResult.value.toString());
     });
 }
-

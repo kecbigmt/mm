@@ -3,7 +3,15 @@ import { loadCliDependencies } from "../dependencies.ts";
 import { ListItemsWorkflow } from "../../../domain/workflows/list_items.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 
-const formatItem = (item: { data: { id: { toString(): string }; title: { toString(): string }; alias?: { toString(): string } } }): string => {
+const formatItem = (
+  item: {
+    data: {
+      id: { toString(): string };
+      title: { toString(): string };
+      alias?: { toString(): string };
+    };
+  },
+): string => {
   const id = item.data.id.toString().slice(-7);
   const alias = item.data.alias?.toString();
   const label = alias || id;
@@ -74,4 +82,3 @@ export function createLsCommand() {
       }
     });
 }
-
