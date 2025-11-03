@@ -501,6 +501,8 @@ export const createFileSystemItemRepository = (
   const listByPath = async (
     path: Path,
   ): Promise<listByPathResult> => {
+    // Note: Path normalization should be done in the workflow layer before calling this method
+    // This method expects a normalized path (aliases already resolved)
     const directoriesResult = await collectItemDirectories(dependencies.root);
     if (directoriesResult.type === "error") {
       return directoriesResult;
