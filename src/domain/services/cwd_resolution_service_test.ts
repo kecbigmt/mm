@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { CwdResolutionService } from "./cwd_resolution_service.ts";
 import { createItem } from "../models/item.ts";
+import { createAlias } from "../models/alias.ts";
 import { itemTitleFromString } from "../primitives/item_title.ts";
 import { dateTimeFromDate } from "../primitives/date_time.ts";
 import { itemIdFromString } from "../primitives/item_id.ts";
@@ -8,9 +9,11 @@ import { parsePath } from "../primitives/path.ts";
 import { itemRankFromString } from "../primitives/item_rank.ts";
 import { createItemStatus } from "../primitives/item_status.ts";
 import { createItemIcon } from "../primitives/item_icon.ts";
+import { aliasSlugFromString } from "../primitives/alias_slug.ts";
 import type { ItemRepository } from "../repositories/item_repository.ts";
 import type { AliasRepository } from "../repositories/alias_repository.ts";
 import type { StateRepository } from "../repositories/state_repository.ts";
+import type { Alias } from "../models/alias.ts";
 import { Result } from "../../shared/result.ts";
 
 const createMockItemRepository = (
@@ -25,8 +28,11 @@ const createMockItemRepository = (
   listByPath: () => Promise.resolve(Result.ok([])),
 });
 
-const createMockAliasRepository = (): AliasRepository => ({
-  load: () => Promise.resolve(Result.ok(undefined)),
+const createMockAliasRepository = (aliases?: Map<string, Alias>): AliasRepository => ({
+  load: (slug) => {
+    const alias = aliases?.get(slug.toString());
+    return Promise.resolve(Result.ok(alias));
+  },
   save: () => Promise.resolve(Result.ok(undefined)),
   delete: () => Promise.resolve(Result.ok(undefined)),
   list: () => Promise.resolve(Result.ok([])),
@@ -221,5 +227,63 @@ Deno.test("CwdResolutionService.setCwd allows valid item paths", async () => {
   assert(result.type === "ok", "operation should succeed");
   if (result.type === "ok") {
     assertEquals(result.value.toString(), `/${item.data.id.toString()}`);
+  }
+});
+
+Deno.test("CwdResolutionService.setCwd allows paths with numeric sections", async () => {
+  const itemId = itemIdFromString("019965a7-2789-740a-b8c1-1415904fd108");
+  assert(itemId.type === "ok");
+
+  const title = itemTitleFromString("Chapter 1");
+  assert(title.type === "ok");
+
+  const createdAt = dateTimeFromDate(new Date("2024-01-01"));
+  assert(createdAt.type === "ok");
+
+  const path = parsePath("/2024-01-01");
+  assert(path.type === "ok");
+
+  const rank = itemRankFromString("a0");
+  assert(rank.type === "ok");
+
+  const aliasSlug = aliasSlugFromString("chapter1");
+  assert(aliasSlug.type === "ok");
+
+  const item = createItem({
+    id: itemId.value,
+    title: title.value,
+    icon: createItemIcon("note"),
+    path: path.value,
+    rank: rank.value,
+    status: createItemStatus("open"),
+    createdAt: createdAt.value,
+    updatedAt: createdAt.value,
+    alias: aliasSlug.value,
+  });
+
+  const alias = createAlias({
+    slug: aliasSlug.value,
+    itemId: itemId.value,
+    createdAt: createdAt.value,
+  });
+
+  const items = new Map([[item.data.id.toString(), item]]);
+  const aliases = new Map([[alias.data.slug.toString(), alias]]);
+  const stateRepo = createMockStateRepository();
+  const itemRepo = createMockItemRepository(items);
+  const aliasRepo = createMockAliasRepository(aliases);
+
+  // Path with numeric section: item ID + numeric section
+  const pathWithSection = parsePath(`/${item.data.id.toString()}/1`);
+  assert(pathWithSection.type === "ok");
+
+  const result = await CwdResolutionService.setCwd(
+    pathWithSection.value,
+    { stateRepository: stateRepo, itemRepository: itemRepo, aliasRepository: aliasRepo },
+  );
+
+  assert(result.type === "ok", "setCwd should accept paths with numeric sections");
+  if (result.type === "ok") {
+    assertEquals(result.value.toString(), `/${item.data.id.toString()}/1`);
   }
 });

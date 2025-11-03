@@ -137,16 +137,54 @@ export const CwdResolutionService = {
 
     const isDatePath = target.segments.length > 0 && target.segments[0].kind === "Date";
     if (!isDatePath) {
-      const item = await resolvePathToItem(target, deps);
-      if (item === undefined && target.segments.length > 0) {
-        return Result.error(
-          createValidationError("CwdResolution", [
-            createValidationIssue("target path does not resolve to a valid item", {
-              code: "invalid_target",
-              path: ["value"],
-            }),
-          ]),
-        );
+      // Check if path ends with numeric sections
+      // If so, validate that the item path (without numeric sections) resolves to a valid item
+      let lastItemIndex = -1;
+      for (let i = target.segments.length - 1; i >= 0; i -= 1) {
+        const segment = target.segments[i];
+        if (segment.kind === "Numeric") {
+          continue;
+        }
+        if (segment.kind === "ItemAlias" || segment.kind === "ItemId") {
+          lastItemIndex = i;
+          break;
+        }
+        // If we hit a Date segment, stop (date segments are only at head)
+        if (segment.kind === "Date") {
+          break;
+        }
+      }
+
+      if (lastItemIndex >= 0) {
+        // Path ends with numeric sections; validate the item path
+        const itemPathSegments = target.segments.slice(0, lastItemIndex + 1);
+        const itemPath = parsePath(`/${itemPathSegments.map((s) => s.toString()).join("/")}`);
+        if (itemPath.type === "ok") {
+          const item = await resolvePathToItem(itemPath.value, deps);
+          if (item === undefined) {
+            return Result.error(
+              createValidationError("CwdResolution", [
+                createValidationIssue("target path does not resolve to a valid item", {
+                  code: "invalid_target",
+                  path: ["value"],
+                }),
+              ]),
+            );
+          }
+        }
+      } else {
+        // Path doesn't end with numeric sections; validate entire path resolves to an item
+        const item = await resolvePathToItem(target, deps);
+        if (item === undefined && target.segments.length > 0) {
+          return Result.error(
+            createValidationError("CwdResolution", [
+              createValidationIssue("target path does not resolve to a valid item", {
+                code: "invalid_target",
+                path: ["value"],
+              }),
+            ]),
+          );
+        }
       }
     }
 
