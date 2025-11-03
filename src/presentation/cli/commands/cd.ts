@@ -1,7 +1,9 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
+import { LocatorResolutionService } from "../../../domain/services/locator_resolution_service.ts";
 import { parseLocator } from "../../../domain/primitives/locator.ts";
+import { parsePath } from "../../../domain/primitives/path.ts";
 
 export function createCdCommand() {
   return new Command()
@@ -63,8 +65,39 @@ export function createCdCommand() {
         return;
       }
 
+      // If the path resolves to an item (e.g., via alias), build full path with alias
+      let finalPath = targetPath;
+      if (targetPath.segments.length > 0) {
+        const firstSegment = targetPath.segments[0];
+        if (firstSegment.kind === "ItemAlias" || firstSegment.kind === "ItemId") {
+          const resolveResult = await LocatorResolutionService.resolveItem(
+            pathArg,
+            {
+              itemRepository: deps.itemRepository,
+              aliasRepository: deps.aliasRepository,
+            },
+            {
+              today: now,
+            },
+          );
+          if (resolveResult.type === "ok" && resolveResult.value) {
+            const item = resolveResult.value;
+            // Build path with alias if present
+            if (item.data.alias) {
+              const fullPathStr = `${item.data.path.toString()}/${item.data.alias.toString()}`;
+              const parsedFullPath = parsePath(fullPathStr);
+              if (parsedFullPath.type === "ok") {
+                finalPath = parsedFullPath.value;
+              }
+            } else {
+              finalPath = item.data.path;
+            }
+          }
+        }
+      }
+
       const setResult = await CwdResolutionService.setCwd(
-        targetPath,
+        finalPath,
         {
           stateRepository: deps.stateRepository,
           itemRepository: deps.itemRepository,

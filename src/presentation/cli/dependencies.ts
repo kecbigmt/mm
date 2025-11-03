@@ -23,6 +23,11 @@ import { WorkspaceName, workspaceNameFromString } from "../../domain/primitives/
 import { createFileSystemConfigRepository } from "../../infrastructure/fileSystem/config_repository.ts";
 import { createFileSystemStateRepository } from "../../infrastructure/fileSystem/state_repository.ts";
 import { StateRepository } from "../../domain/repositories/state_repository.ts";
+import {
+  AliasAutoGenerator,
+  createAliasAutoGenerator,
+} from "../../domain/services/alias_auto_generator.ts";
+import { createCryptoRandomSource } from "../../infrastructure/random/crypto_random_source.ts";
 
 export type CliDependencies = Readonly<{
   readonly root: string;
@@ -30,6 +35,7 @@ export type CliDependencies = Readonly<{
   readonly timezone: TimezoneIdentifier;
   readonly itemRepository: ItemRepository;
   readonly aliasRepository: AliasRepository;
+  readonly aliasAutoGenerator: AliasAutoGenerator;
   readonly workspaceRepository: WorkspaceRepository;
   readonly stateRepository: StateRepository;
   readonly rankService: RankService;
@@ -218,6 +224,7 @@ export const loadCliDependencies = async (
   const itemRepository = createFileSystemItemRepository({ root, timezone });
   const hashingService = createSha256HashingService();
   const aliasRepository = createFileSystemAliasRepository({ root, hashingService });
+  const aliasAutoGenerator = createAliasAutoGenerator(createCryptoRandomSource());
   const stateRepository = createFileSystemStateRepository({ workspaceRoot: root });
   const rankService = createRankService(createLexoRankGenerator());
   const idGenerationService = createIdGenerationService(createUuidV7Generator());
@@ -228,6 +235,7 @@ export const loadCliDependencies = async (
     timezone,
     itemRepository,
     aliasRepository,
+    aliasAutoGenerator,
     workspaceRepository,
     stateRepository,
     rankService,

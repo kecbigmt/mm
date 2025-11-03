@@ -15,6 +15,12 @@ import { createRankService, RankGenerator, RankService } from "../services/rank_
 import { createIdGenerationService } from "../services/id_generation_service.ts";
 import { parseDateTime } from "../primitives/date_time.ts";
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
+import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.ts";
+import {
+  AliasAutoGenerator,
+  createAliasAutoGenerator,
+  RandomSource,
+} from "../services/alias_auto_generator.ts";
 
 const createTestRankService = (): RankService => {
   const generator: RankGenerator = {
@@ -34,6 +40,13 @@ const createFixedIdService = (id: string) =>
   createIdGenerationService({
     generate: () => id,
   });
+
+const createTestAliasAutoGenerator = (): AliasAutoGenerator => {
+  const random: RandomSource = {
+    nextInt: (max) => Math.floor(Math.random() * max),
+  };
+  return createAliasAutoGenerator(random);
+};
 
 const createExistingItem = (id: string, rank: string, section: string): Item => {
   const itemId = Result.unwrap(itemIdFromString(id));
@@ -64,6 +77,9 @@ Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async 
   const parentPath = Result.unwrap(parsePath("/2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+
   const result = await CreateItemWorkflow.execute({
     title: "New note",
     itemType: "note",
@@ -71,6 +87,8 @@ Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async 
     createdAt,
   }, {
     itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
     rankService,
     idGenerationService: idService,
   });
@@ -105,6 +123,9 @@ Deno.test("CreateItemWorkflow appends rank after existing siblings", async () =>
   const parentPath = Result.unwrap(parsePath("/2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T13:00:00Z")));
 
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+
   const result = await CreateItemWorkflow.execute({
     title: "Follow-up",
     itemType: "note",
@@ -112,6 +133,8 @@ Deno.test("CreateItemWorkflow appends rank after existing siblings", async () =>
     createdAt,
   }, {
     itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
     rankService,
     idGenerationService: idService,
   });

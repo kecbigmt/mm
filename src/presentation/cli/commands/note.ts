@@ -23,6 +23,7 @@ export function createNoteCommand() {
     .option("-b, --body <body:string>", "Body text")
     .option("-p, --parent <parent:string>", "Parent locator (e.g., /2025-11-03, /alias, ./1)")
     .option("-c, --context <context:string>", "Context tag")
+    .option("-a, --alias <alias:string>", "Alias for the item")
     .option("-e, --edit", "Open editor after creation")
     .action(async (options: Record<string, unknown>, title?: string) => {
       const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
@@ -95,15 +96,20 @@ export function createNoteCommand() {
       const bodyOption = typeof options.body === "string" ? options.body : undefined;
       const contextOption = typeof options.context === "string" ? options.context : undefined;
 
+      const aliasOption = typeof options.alias === "string" ? options.alias : undefined;
+
       const workflowResult = await CreateItemWorkflow.execute({
         title: resolvedTitle,
         itemType: "note",
         body: bodyOption,
         context: contextOption,
+        alias: aliasOption,
         parentPath,
         createdAt: createdAtResult.value,
       }, {
         itemRepository: deps.itemRepository,
+        aliasRepository: deps.aliasRepository,
+        aliasAutoGenerator: deps.aliasAutoGenerator,
         rankService: deps.rankService,
         idGenerationService: deps.idGenerationService,
       });

@@ -69,7 +69,12 @@ export function createWhereCommand() {
 
       const label = formatItemLabel(item);
       console.log(`Item [${label}]:`);
-      console.log(`  Logical:  ${item.data.path.toString()}`);
+
+      // Build logical path with alias if present
+      const logicalPath = item.data.alias
+        ? `${item.data.path.toString()}/${item.data.alias.toString()}`
+        : item.data.path.toString();
+      console.log(`  Logical:  ${logicalPath}`);
       console.log(`  Rank:     ${item.data.rank.toString()}`);
 
       const idStr = item.data.id.toString();

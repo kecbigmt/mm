@@ -18,6 +18,7 @@ import { AliasRepository } from "../repositories/alias_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { RankService } from "../services/rank_service.ts";
 import { IdGenerationService } from "../services/id_generation_service.ts";
+import { AliasAutoGenerator } from "../services/alias_auto_generator.ts";
 import { createAlias } from "../models/alias.ts";
 
 export type CreateItemInput = Readonly<{
@@ -33,6 +34,7 @@ export type CreateItemInput = Readonly<{
 export type CreateItemDependencies = Readonly<{
   itemRepository: ItemRepository;
   aliasRepository: AliasRepository;
+  aliasAutoGenerator: AliasAutoGenerator;
   rankService: RankService;
   idGenerationService: IdGenerationService;
 }>;
@@ -119,6 +121,31 @@ export const CreateItemWorkflow = {
       } else {
         alias = aliasResult.value;
       }
+    } else {
+      // Generate automatic alias if not provided
+      // Try up to 10 times to find a unique alias
+      const MAX_RETRIES = 10;
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        const autoAliasResult = deps.aliasAutoGenerator.generate();
+        if (autoAliasResult.type === "error") {
+          // If generation fails, continue without alias
+          break;
+        }
+        const candidateAlias = autoAliasResult.value;
+        // Check if alias already exists
+        const existingAliasResult = await deps.aliasRepository.load(candidateAlias);
+        if (existingAliasResult.type === "error") {
+          // If load fails, we can't verify uniqueness, so skip auto-generation
+          break;
+        }
+        if (existingAliasResult.value === undefined) {
+          // Alias is available, use it
+          alias = candidateAlias;
+          break;
+        }
+        // Alias exists, try again
+      }
+      // If no unique alias found after retries, continue without alias
     }
 
     if (input.parentPath.isRange()) {
@@ -191,7 +218,7 @@ export const CreateItemWorkflow = {
       context,
     });
 
-    // Set alias if provided
+    // Set alias if provided or auto-generated
     if (alias) {
       item = item.setAlias(alias, input.createdAt);
     }
@@ -201,7 +228,7 @@ export const CreateItemWorkflow = {
       return Result.error(repositoryFailure(saveResult.error));
     }
 
-    // Save alias to alias repository if provided
+    // Save alias to alias repository if provided or auto-generated
     if (alias) {
       const aliasModel = createAlias({
         slug: alias,
