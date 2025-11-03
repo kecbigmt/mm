@@ -28,12 +28,14 @@ is under `docs/`, with detailed product steerage in `docs/steering/design.md`.
 
 Follow Deno formatting via `deno fmt` (2-space indent, 100 column width) and lint with `deno lint`.
 Keep modules small, prefer named exports, and organise imports `@std` → external → relative. Use
-branded types and smart constructors (`parseX`) to “parse, don’t validate”. Models should be
+branded types and smart constructors (`parseX`) to "parse, don't validate". Models should be
 immutable; expose methods on frozen records (`Object.freeze`). Name files in `kebab_case.ts`, with
 tests mirroring the implementation name plus `_test`.
 
 - **Deno standards first** - Follow Deno conventions for naming, imports, and structure
-- **No comments unless explicitly requested** - Keep code self-documenting
+- **Code comments** - Keep code self-documenting through clear naming and structure. Write comments 
+  in English to explain **why** (intent, design decisions, constraints) rather than **what** 
+  (implementation details). Document purpose, rationale, and edge cases; avoid restating obvious logic
 - **Latest jsr:@std packages** - Use official Deno standard library packages
 - **Test files alongside implementation** - Use `_test.ts` suffix following Deno conventions
 - **Pure functions** - Prefer immutable data and pure functions in functional core
