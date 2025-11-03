@@ -247,8 +247,10 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
   }
 
   assertEquals(secondResult.error.kind, "validation");
-  assertEquals(
-    secondResult.error.issues.some((issue) => issue.message.includes("already exists")),
-    true,
-  );
+  if (secondResult.error.kind === "validation") {
+    assertEquals(
+      secondResult.error.issues.some((issue) => issue.message.includes("already exists")),
+      true,
+    );
+  }
 });
