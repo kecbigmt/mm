@@ -176,9 +176,17 @@ export const parseLocator = (
   const candidate = (() => {
     if (typeof input === "string") {
       const trimmed = input.trim();
-      if (trimmed.startsWith("/")) {
+      // Don't add leading slash for relative paths (., .., or starting with . or ..)
+      if (trimmed.startsWith("/") || trimmed.startsWith(".") || trimmed.startsWith("..")) {
         return trimmed;
       }
+      // Check if it's a pure numeric section (1-9 followed by digits only) - treat as relative
+      // This allows "cd 1" to work relative to CWD
+      // But exclude dates (YYYY-MM-DD format) which should be absolute
+      if (/^[1-9]\d*$/.test(trimmed) && !/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        return trimmed;
+      }
+      // For other paths, make them absolute by adding leading slash
       return `/${trimmed}`;
     }
     return input;
