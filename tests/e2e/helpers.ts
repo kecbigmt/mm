@@ -184,3 +184,35 @@ export const findPreviousWeekday = (dateStr: string, weekday: string): string =>
   date.setUTCDate(date.getUTCDate() - delta);
   return date.toISOString().split("T")[0];
 };
+
+/**
+ * Gets the first item ID from the filesystem for a given date.
+ * Assumes exactly one item exists for the date. Use this after creating a single item.
+ * @param testHome - Test environment home directory
+ * @param workspaceName - Workspace name
+ * @param dateStr - Date string (YYYY-MM-DD), defaults to today
+ * @returns The item ID (UUID)
+ */
+export const getLatestItemId = async (
+  testHome: string,
+  workspaceName: string,
+  dateStr?: string,
+): Promise<string> => {
+  const date = dateStr || getTodayString();
+  const [year, month, day] = date.split("-");
+  const workspaceDir = getWorkspacePath(testHome, workspaceName);
+  const itemsBaseDir = join(workspaceDir, "items", year, month, day);
+
+  const itemDirs: string[] = [];
+  for await (const entry of Deno.readDir(itemsBaseDir)) {
+    if (entry.isDirectory) {
+      itemDirs.push(entry.name);
+    }
+  }
+
+  if (itemDirs.length === 0) {
+    throw new Error(`No items found for date ${date}`);
+  }
+
+  return itemDirs[0];
+};
