@@ -216,3 +216,65 @@ export const getLatestItemId = async (
 
   return itemDirs[0];
 };
+
+/**
+ * Gets item IDs from a date directory, ordered by creation (directory name is UUID).
+ * Returns an array of item IDs in creation order.
+ */
+export const getItemIdsFromDate = async (
+  testHome: string,
+  workspaceName: string,
+  dateStr: string,
+): Promise<string[]> => {
+  const workspaceDir = getWorkspacePath(testHome, workspaceName);
+  const [year, month, day] = dateStr.split("-");
+  const itemsBaseDir = join(workspaceDir, "items", year, month, day);
+
+  try {
+    const itemDirs: string[] = [];
+    for await (const entry of Deno.readDir(itemsBaseDir)) {
+      if (entry.isDirectory) {
+        itemDirs.push(entry.name);
+      }
+    }
+    // Sort by directory name (UUID) to get consistent order
+    // UUID v7 has timestamp prefix, so sorting gives creation order
+    return itemDirs.sort();
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Gets an item ID by title from ls output or filesystem.
+ * If title is provided, searches ls output; otherwise uses filesystem order.
+ */
+export const getItemIdByTitle = async (
+  testHome: string,
+  workspaceName: string,
+  dateStr: string,
+  title: string,
+): Promise<string | null> => {
+  const workspaceDir = getWorkspacePath(testHome, workspaceName);
+  const [year, month, day] = dateStr.split("-");
+  const itemsBaseDir = join(workspaceDir, "items", year, month, day);
+
+  try {
+    for await (const entry of Deno.readDir(itemsBaseDir)) {
+      if (entry.isDirectory) {
+        const contentMd = join(itemsBaseDir, entry.name, "content.md");
+        try {
+          const content = await Deno.readTextFile(contentMd);
+          if (content.includes(title)) {
+            return entry.name;
+          }
+        } catch {
+          // Skip if content.md doesn't exist or can't be read
+        }
+      }
+    }
+  } catch {
+    // Directory doesn't exist
+  }
+  return null;
+};

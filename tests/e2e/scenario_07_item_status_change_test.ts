@@ -222,4 +222,3 @@ describe("Scenario 7: Item status change", () => {
     assertEquals(reopenResult.success, true, `Reopen should succeed (idempotent)`);
   });
 });
-

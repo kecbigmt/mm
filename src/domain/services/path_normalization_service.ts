@@ -4,7 +4,7 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
-import { Path, parsePath } from "../primitives/path.ts";
+import { parsePath, Path } from "../primitives/path.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
 import { LocatorResolutionService } from "./locator_resolution_service.ts";
@@ -139,4 +139,3 @@ export const PathNormalizationService = {
     return Result.ok(basePath);
   },
 };
-
