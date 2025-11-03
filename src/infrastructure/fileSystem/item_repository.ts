@@ -164,11 +164,11 @@ const readContent = async (
     const text = await Deno.readTextFile(join(directory, "content.md"));
     const normalized = text.replace(/\r\n/g, "\n");
     const withoutTrailingNewline = normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized;
-    
+
     if (withoutTrailingNewline.trim() === "") {
       return Result.ok({ title: undefined, body: undefined });
     }
-    
+
     const parts = extractTitleAndBody(withoutTrailingNewline);
     return Result.ok(parts);
   } catch (error) {
@@ -239,14 +239,12 @@ const writeBody = async (
   snapshot: ItemSnapshot,
 ): Promise<Result<void, RepositoryError>> => {
   const path = join(directory, "content.md");
-  
+
   const title = snapshot.title;
   const body = snapshot.body;
-  
+
   const titleLine = `# ${title}`;
-  const content = body && body.trim() !== "" 
-    ? `${titleLine}\n\n${body}` 
-    : titleLine;
+  const content = body && body.trim() !== "" ? `${titleLine}\n\n${body}` : titleLine;
 
   try {
     await Deno.writeTextFile(path, `${content}\n`);
