@@ -114,3 +114,73 @@ export const parseAliasFromOutput = (output: string): string | null => {
   const match = output.match(/Alias: ([a-z0-9-]+)/);
   return match ? match[1] : null;
 };
+
+/**
+ * Calculates a date string by adding days to a base date.
+ * Useful for testing relative date operations.
+ */
+export const addDaysToString = (dateStr: string, days: number): string => {
+  const date = new Date(dateStr + "T00:00:00Z");
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().split("T")[0];
+};
+
+/**
+ * Finds the next occurrence of a weekday from a given date.
+ * Returns the date string (YYYY-MM-DD) of the next occurrence.
+ * If today is the target weekday, returns next week's occurrence.
+ */
+export const findNextWeekday = (dateStr: string, weekday: string): string => {
+  const WEEKDAY_INDEX: Record<string, number> = {
+    sun: 0,
+    mon: 1,
+    tue: 2,
+    wed: 3,
+    thu: 4,
+    fri: 5,
+    sat: 6,
+  };
+  const targetIndex = WEEKDAY_INDEX[weekday.toLowerCase()];
+  if (targetIndex === undefined) {
+    throw new Error(`Invalid weekday: ${weekday}`);
+  }
+
+  const date = new Date(dateStr + "T00:00:00Z");
+  const baseIndex = date.getUTCDay();
+  let delta = (targetIndex - baseIndex + 7) % 7;
+  if (delta === 0) {
+    delta = 7; // Next week if today is the target weekday
+  }
+  date.setUTCDate(date.getUTCDate() + delta);
+  return date.toISOString().split("T")[0];
+};
+
+/**
+ * Finds the previous occurrence of a weekday from a given date.
+ * Returns the date string (YYYY-MM-DD) of the previous occurrence.
+ * If today is the target weekday, returns last week's occurrence.
+ */
+export const findPreviousWeekday = (dateStr: string, weekday: string): string => {
+  const WEEKDAY_INDEX: Record<string, number> = {
+    sun: 0,
+    mon: 1,
+    tue: 2,
+    wed: 3,
+    thu: 4,
+    fri: 5,
+    sat: 6,
+  };
+  const targetIndex = WEEKDAY_INDEX[weekday.toLowerCase()];
+  if (targetIndex === undefined) {
+    throw new Error(`Invalid weekday: ${weekday}`);
+  }
+
+  const date = new Date(dateStr + "T00:00:00Z");
+  const baseIndex = date.getUTCDay();
+  let delta = (baseIndex - targetIndex + 7) % 7;
+  if (delta === 0) {
+    delta = 7; // Last week if today is the target weekday
+  }
+  date.setUTCDate(date.getUTCDate() - delta);
+  return date.toISOString().split("T")[0];
+};
