@@ -3,6 +3,7 @@ import { CreateItemWorkflow } from "./create_item.ts";
 import { Result } from "../../shared/result.ts";
 import { createItem, Item } from "../models/item.ts";
 import {
+  aliasSlugFromString,
   createItemIcon,
   dateTimeFromDate,
   itemIdFromString,
@@ -71,14 +72,13 @@ const createExistingItem = (id: string, rank: string, section: string): Item => 
 
 Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async () => {
   const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
   const rankService = createTestRankService();
   const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
 
   const parentPath = Result.unwrap(parsePath("/2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
-
-  const aliasRepository = new InMemoryAliasRepository();
-  const aliasAutoGenerator = createTestAliasAutoGenerator();
 
   const result = await CreateItemWorkflow.execute({
     title: "New note",
@@ -110,6 +110,8 @@ Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async 
 
 Deno.test("CreateItemWorkflow appends rank after existing siblings", async () => {
   const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
   const rankService = createTestRankService();
   const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd121");
 
@@ -122,9 +124,6 @@ Deno.test("CreateItemWorkflow appends rank after existing siblings", async () =>
 
   const parentPath = Result.unwrap(parsePath("/2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T13:00:00Z")));
-
-  const aliasRepository = new InMemoryAliasRepository();
-  const aliasAutoGenerator = createTestAliasAutoGenerator();
 
   const result = await CreateItemWorkflow.execute({
     title: "Follow-up",
@@ -155,5 +154,101 @@ Deno.test("CreateItemWorkflow appends rank after existing siblings", async () =>
   assertEquals(
     listResult.value.map((item) => item.data.rank.toString()),
     ["m", "mn"],
+  );
+});
+
+Deno.test("CreateItemWorkflow saves alias when provided", async () => {
+  const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+  const rankService = createTestRankService();
+  const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
+
+  const parentPath = Result.unwrap(parsePath("/2024-09-20"));
+  const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
+
+  const result = await CreateItemWorkflow.execute({
+    title: "Chapter 1",
+    itemType: "note",
+    alias: "chapter1",
+    parentPath,
+    createdAt,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService,
+  });
+
+  if (result.type !== "ok") {
+    throw new Error(`expected ok result, received ${JSON.stringify(result.error)}`);
+  }
+
+  // Verify alias is set on item
+  assertEquals(result.value.item.data.alias?.toString(), "chapter1");
+
+  // Verify alias is saved in repository
+  const aliasSlug = Result.unwrap(aliasSlugFromString("chapter1"));
+  const aliasResult = await aliasRepository.load(aliasSlug);
+  if (aliasResult.type !== "ok" || !aliasResult.value) {
+    throw new Error("alias should be saved");
+  }
+  assertEquals(aliasResult.value.data.itemId.toString(), "019965a7-2789-740a-b8c1-1415904fd120");
+});
+
+Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
+  const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+  const rankService = createTestRankService();
+  const idService1 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
+  const idService2 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd121");
+
+  const parentPath = Result.unwrap(parsePath("/2024-09-20"));
+  const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
+
+  // Create first item with alias
+  const firstResult = await CreateItemWorkflow.execute({
+    title: "First",
+    itemType: "note",
+    alias: "chapter1",
+    parentPath,
+    createdAt,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService1,
+  });
+
+  if (firstResult.type !== "ok") {
+    throw new Error(`first item creation should succeed`);
+  }
+
+  // Try to create second item with same alias
+  const secondResult = await CreateItemWorkflow.execute({
+    title: "Second",
+    itemType: "note",
+    alias: "chapter1",
+    parentPath,
+    createdAt,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService2,
+  });
+
+  if (secondResult.type === "ok") {
+    throw new Error("should reject duplicate alias");
+  }
+
+  assertEquals(secondResult.error.kind, "validation");
+  assertEquals(
+    secondResult.error.issues.some((issue) => issue.message.includes("already exists")),
+    true,
   );
 });

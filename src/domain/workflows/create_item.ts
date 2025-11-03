@@ -205,7 +205,29 @@ export const CreateItemWorkflow = {
     const trimmedBody = typeof input.body === "string" ? input.body.trim() : undefined;
     const body = trimmedBody && trimmedBody.length > 0 ? trimmedBody : undefined;
 
-    let item = createItem({
+    // Check for alias conflicts if alias is provided (manual or auto-generated)
+    if (alias) {
+      const existingAliasResult = await deps.aliasRepository.load(alias);
+      if (existingAliasResult.type === "error") {
+        return Result.error(repositoryFailure(existingAliasResult.error));
+      }
+      if (existingAliasResult.value) {
+        // This shouldn't happen for auto-generated aliases (we check before using),
+        // but can happen for manual aliases if there's a race condition
+        issues.push(
+          createValidationIssue(
+            `alias '${alias.toString()}' already exists`,
+            {
+              code: "alias_conflict",
+              path: ["alias"],
+            },
+          ),
+        );
+        return Result.error(invalidInput(issues));
+      }
+    }
+
+    const item = createItem({
       id: resolvedId,
       title: resolvedTitle,
       icon: createItemIcon(input.itemType),
@@ -216,12 +238,8 @@ export const CreateItemWorkflow = {
       updatedAt: input.createdAt,
       body,
       context,
+      alias,
     });
-
-    // Set alias if provided or auto-generated
-    if (alias) {
-      item = item.setAlias(alias, input.createdAt);
-    }
 
     const saveResult = await deps.itemRepository.save(item);
     if (saveResult.type === "error") {
