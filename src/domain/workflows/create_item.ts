@@ -2,31 +2,37 @@ import { Result } from "../../shared/result.ts";
 import { createValidationIssue, ValidationIssue } from "../../shared/errors.ts";
 import { createItem, Item } from "../models/item.ts";
 import {
+  AliasSlug,
   createItemIcon,
   DateTime,
   ItemId,
   itemStatusOpen,
   itemTitleFromString,
+  parseAliasSlug,
   Path,
   TagSlug,
   tagSlugFromString,
 } from "../primitives/mod.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
+import { AliasRepository } from "../repositories/alias_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { RankService } from "../services/rank_service.ts";
 import { IdGenerationService } from "../services/id_generation_service.ts";
+import { createAlias } from "../models/alias.ts";
 
 export type CreateItemInput = Readonly<{
   title: string;
   itemType: "note" | "task" | "event";
   body?: string;
   context?: string;
+  alias?: string;
   parentPath: Path;
   createdAt: DateTime;
 }>;
 
 export type CreateItemDependencies = Readonly<{
   itemRepository: ItemRepository;
+  aliasRepository: AliasRepository;
   rankService: RankService;
   idGenerationService: IdGenerationService;
 }>;
@@ -98,6 +104,23 @@ export const CreateItemWorkflow = {
       }
     }
 
+    let alias: AliasSlug | undefined;
+    if (typeof input.alias === "string") {
+      const aliasResult = parseAliasSlug(input.alias);
+      if (aliasResult.type === "error") {
+        issues.push(
+          ...aliasResult.error.issues.map((issue) =>
+            createValidationIssue(issue.message, {
+              code: issue.code,
+              path: ["alias", ...issue.path],
+            })
+          ),
+        );
+      } else {
+        alias = aliasResult.value;
+      }
+    }
+
     if (input.parentPath.isRange()) {
       issues.push(
         createValidationIssue("parent path cannot be a range", {
@@ -155,7 +178,7 @@ export const CreateItemWorkflow = {
     const trimmedBody = typeof input.body === "string" ? input.body.trim() : undefined;
     const body = trimmedBody && trimmedBody.length > 0 ? trimmedBody : undefined;
 
-    const item = createItem({
+    let item = createItem({
       id: resolvedId,
       title: resolvedTitle,
       icon: createItemIcon(input.itemType),
@@ -168,9 +191,27 @@ export const CreateItemWorkflow = {
       context,
     });
 
+    // Set alias if provided
+    if (alias) {
+      item = item.setAlias(alias, input.createdAt);
+    }
+
     const saveResult = await deps.itemRepository.save(item);
     if (saveResult.type === "error") {
       return Result.error(repositoryFailure(saveResult.error));
+    }
+
+    // Save alias to alias repository if provided
+    if (alias) {
+      const aliasModel = createAlias({
+        slug: alias,
+        itemId: resolvedId,
+        createdAt: input.createdAt,
+      });
+      const aliasSaveResult = await deps.aliasRepository.save(aliasModel);
+      if (aliasSaveResult.type === "error") {
+        return Result.error(repositoryFailure(aliasSaveResult.error));
+      }
     }
 
     return Result.ok({ item });
