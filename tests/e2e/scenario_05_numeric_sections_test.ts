@@ -19,11 +19,10 @@
  *   and section 5 (Logical Navigation)
  */
 
-import { assertEquals, assertExists } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
-  getTodayString,
   initWorkspace,
   runCommand,
   setupTestEnvironment,
@@ -198,8 +197,6 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
   });
 
   it("executes full flow: create hierarchy → navigate → list", async () => {
-    const today = getTodayString();
-
     // Step 1: Navigate to today
     await runCommand(ctx.testHome, ["cd", "today"]);
 
