@@ -116,16 +116,10 @@ export const ListItemsWorkflow = {
         const lastSeg = path.segments[path.segments.length - 1];
         if (lastSeg && lastSeg.kind === "range") {
           if (lastSeg.start.kind === "Date" && lastSeg.end.kind === "Date") {
-            const baseSegments = path.segments.slice(0, -1);
-            const basePath = parsePath(
-              baseSegments.length === 0
-                ? "/"
-                : `/${baseSegments.map((s) => s.toString()).join("/")}`,
-              options,
-            );
-            if (basePath.type === "error") {
+            const startDatePath = parsePath(`/${lastSeg.start.toString()}`, options);
+            if (startDatePath.type === "error") {
               return Result.error(
-                createValidationError("ListItems", basePath.error.issues),
+                createValidationError("ListItems", startDatePath.error.issues),
               );
             }
 
@@ -136,8 +130,8 @@ export const ListItemsWorkflow = {
               );
             }
 
-            return expandDateRange(basePath.value, endDatePath.value, deps).then((result) =>
-              result.type === "ok" ? Result.ok({ items: result.value }) : result
+            return expandDateRange(startDatePath.value, endDatePath.value, deps).then(
+              (result) => result.type === "ok" ? Result.ok({ items: result.value }) : result,
             );
           }
         }
