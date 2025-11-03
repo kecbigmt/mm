@@ -7,12 +7,10 @@ import {
   ItemId,
   itemStatusOpen,
   itemTitleFromString,
-  parsePath,
   Path,
   TagSlug,
   tagSlugFromString,
 } from "../primitives/mod.ts";
-import { CalendarDay } from "../primitives/calendar_day.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { RankService } from "../services/rank_service.ts";
@@ -23,7 +21,7 @@ export type CreateItemInput = Readonly<{
   itemType: "note" | "task" | "event";
   body?: string;
   context?: string;
-  day: CalendarDay;
+  parentPath: Path;
   createdAt: DateTime;
 }>;
 
@@ -100,16 +98,12 @@ export const CreateItemWorkflow = {
       }
     }
 
-    const pathResult = parsePath(`/${input.day.toString()}`);
-    const path = pathResult.type === "ok" ? pathResult.value : undefined;
-    if (pathResult.type === "error") {
+    if (input.parentPath.isRange()) {
       issues.push(
-        ...pathResult.error.issues.map((issue) =>
-          createValidationIssue(issue.message, {
-            code: issue.code,
-            path: ["path", ...issue.path],
-          })
-        ),
+        createValidationIssue("parent path cannot be a range", {
+          code: "range_not_allowed",
+          path: ["parentPath"],
+        }),
       );
     }
 
@@ -130,12 +124,11 @@ export const CreateItemWorkflow = {
       return Result.error(invalidInput(issues));
     }
 
-    const resolvedPath = path as Path;
     const resolvedId = id as ItemId;
     const resolvedTitle = title!;
 
     const siblingsResult = await deps.itemRepository.listByPath(
-      resolvedPath,
+      input.parentPath,
     );
     if (siblingsResult.type === "error") {
       return Result.error(repositoryFailure(siblingsResult.error));
@@ -167,7 +160,7 @@ export const CreateItemWorkflow = {
       title: resolvedTitle,
       icon: createItemIcon(input.itemType),
       status: itemStatusOpen(),
-      path: resolvedPath,
+      path: input.parentPath,
       rank: rankResult.value,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,

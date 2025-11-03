@@ -37,11 +37,11 @@
 
 ## Phase 5 — Workflows & CLI experience
 
-- [ ] Update create/move/list workflows to operate on placements and new locator semantics
-- [ ] Extend CLI commands (`mm cd`, `mm ls`, `mm where`, `mm mv`, etc.) to use locator parsing and
+- [x] Update create/move/list workflows to operate on placements and new locator semantics
+- [x] Extend CLI commands (`mm cd`, `mm ls`, `mm where`, `mm mv`, etc.) to use locator parsing and
       section ranges
-- [ ] Manage logical CWD state (`MM_CWD`, ancestor fallback) and expose helper subcommands
-- [ ] Add fixtures/snapshot tests demonstrating logical navigation and range handling
+- [x] Manage logical CWD state (`MM_CWD`, ancestor fallback) and expose helper subcommands
+- [x] Add fixtures/snapshot tests demonstrating logical navigation and range handling
 
 ## Phase 6 — Migration & doctor tooling
 

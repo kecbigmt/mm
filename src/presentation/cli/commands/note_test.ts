@@ -62,8 +62,8 @@ Deno.test({
         await buildCli().parse([
           "note",
           "Integration note",
-          "--date",
-          "2024-01-05",
+          "--parent",
+          "/2024-01-05",
           "--workspace",
           workspace,
         ]);

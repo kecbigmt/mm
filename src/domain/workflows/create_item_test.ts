@@ -9,7 +9,6 @@ import {
   itemRankFromString,
   itemStatusOpen,
   itemTitleFromString,
-  parseCalendarDay,
   parsePath,
 } from "../primitives/mod.ts";
 import { createRankService, RankGenerator, RankService } from "../services/rank_service.ts";
@@ -62,13 +61,13 @@ Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async 
   const rankService = createTestRankService();
   const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
 
-  const day = Result.unwrap(parseCalendarDay("2024-09-20"));
+  const parentPath = Result.unwrap(parsePath("/2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
   const result = await CreateItemWorkflow.execute({
     title: "New note",
     itemType: "note",
-    day,
+    parentPath,
     createdAt,
   }, {
     itemRepository: repository,
@@ -103,13 +102,13 @@ Deno.test("CreateItemWorkflow appends rank after existing siblings", async () =>
   );
   Result.unwrap(await repository.save(existing));
 
-  const day = Result.unwrap(parseCalendarDay("2024-09-20"));
+  const parentPath = Result.unwrap(parsePath("/2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T13:00:00Z")));
 
   const result = await CreateItemWorkflow.execute({
     title: "Follow-up",
     itemType: "note",
-    day,
+    parentPath,
     createdAt,
   }, {
     itemRepository: repository,
