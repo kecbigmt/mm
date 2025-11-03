@@ -10,6 +10,7 @@ import { parseLocator, ParseLocatorOptions } from "../primitives/locator.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
+import { PathNormalizationService } from "../services/path_normalization_service.ts";
 
 export type ListItemsInput = Readonly<{
   locator?: string;
@@ -167,7 +168,28 @@ export const ListItemsWorkflow = {
       );
     }
 
-    const listResult = await deps.itemRepository.listByPath(targetPath);
+    // Normalize path before querying repository
+    const normalizedResult = await PathNormalizationService.normalize(
+      targetPath,
+      {
+        itemRepository: deps.itemRepository,
+        aliasRepository: deps.aliasRepository,
+      },
+      { preserveAlias: false },
+    );
+
+    if (normalizedResult.type === "error") {
+      // Map PathNormalizationError to ListItemsError
+      if (normalizedResult.error.kind === "ValidationError") {
+        return Result.error(
+          createValidationError("ListItems", normalizedResult.error.issues),
+        );
+      }
+      return Result.error(normalizedResult.error);
+    }
+
+    const normalizedPath = normalizedResult.value;
+    const listResult = await deps.itemRepository.listByPath(normalizedPath);
     if (listResult.type === "error") {
       return Result.error(listResult.error);
     }

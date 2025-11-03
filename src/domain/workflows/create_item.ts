@@ -1,5 +1,9 @@
 import { Result } from "../../shared/result.ts";
-import { createValidationIssue, ValidationIssue } from "../../shared/errors.ts";
+import {
+  createValidationError,
+  createValidationIssue,
+  ValidationIssue,
+} from "../../shared/errors.ts";
 import { createItem, Item } from "../models/item.ts";
 import {
   AliasSlug,
@@ -19,6 +23,7 @@ import { RepositoryError } from "../repositories/repository_error.ts";
 import { RankService } from "../services/rank_service.ts";
 import { IdGenerationService } from "../services/id_generation_service.ts";
 import { AliasAutoGenerator } from "../services/alias_auto_generator.ts";
+import { PathNormalizationService } from "../services/path_normalization_service.ts";
 import { createAlias } from "../models/alias.ts";
 
 export type CreateItemInput = Readonly<{
@@ -177,8 +182,27 @@ export const CreateItemWorkflow = {
     const resolvedId = id as ItemId;
     const resolvedTitle = title!;
 
-    const siblingsResult = await deps.itemRepository.listByPath(
+    // Normalize parent path before querying repository
+    const normalizedResult = await PathNormalizationService.normalize(
       input.parentPath,
+      {
+        itemRepository: deps.itemRepository,
+        aliasRepository: deps.aliasRepository,
+      },
+      { preserveAlias: false },
+    );
+
+    if (normalizedResult.type === "error") {
+      // Map PathNormalizationError to CreateItemError
+      if (normalizedResult.error.kind === "ValidationError") {
+        return Result.error(invalidInput(normalizedResult.error.issues));
+      }
+      return Result.error(repositoryFailure(normalizedResult.error));
+    }
+
+    const normalizedParentPath = normalizedResult.value;
+    const siblingsResult = await deps.itemRepository.listByPath(
+      normalizedParentPath,
     );
     if (siblingsResult.type === "error") {
       return Result.error(repositoryFailure(siblingsResult.error));

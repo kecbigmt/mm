@@ -12,6 +12,7 @@ import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
 import { LocatorResolutionService } from "../services/locator_resolution_service.ts";
+import { PathNormalizationService } from "../services/path_normalization_service.ts";
 import { RankService } from "../services/rank_service.ts";
 import { ItemRank } from "../primitives/item_rank.ts";
 
@@ -158,7 +159,27 @@ const calculateRankForPlacement = async (
       return Result.ok({ path: target.path, rank: minRankResult.value });
     }
     case "tail": {
-      const siblingsResult = await deps.itemRepository.listByPath(target.path);
+      // Normalize target path before querying repository
+      const normalizedResult = await PathNormalizationService.normalize(
+        target.path,
+        {
+          itemRepository: deps.itemRepository,
+          aliasRepository: deps.aliasRepository,
+        },
+        { preserveAlias: false },
+      );
+
+      if (normalizedResult.type === "error") {
+        if (normalizedResult.error.kind === "ValidationError") {
+          return Result.error(
+            createValidationError("MoveItem", normalizedResult.error.issues),
+          );
+        }
+        return Result.error(normalizedResult.error);
+      }
+
+      const normalizedPath = normalizedResult.value;
+      const siblingsResult = await deps.itemRepository.listByPath(normalizedPath);
       if (siblingsResult.type === "error") {
         return Result.error(siblingsResult.error);
       }
@@ -191,7 +212,7 @@ const calculateRankForPlacement = async (
           ]),
         );
       }
-      return Result.ok({ path: target.path, rank: nextRankResult.value });
+      return Result.ok({ path: normalizedPath, rank: nextRankResult.value });
     }
     case "after": {
       const targetItemResult = await resolveTargetItem(target.itemId, deps, options);
