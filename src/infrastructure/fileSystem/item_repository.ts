@@ -127,19 +127,53 @@ const readMetaSnapshot = async (
   }
 };
 
-const readBody = async (
+type ContentParts = Readonly<{
+  title: string | undefined;
+  body: string | undefined;
+}>;
+
+const extractTitleAndBody = (content: string): ContentParts => {
+  const lines = content.split("\n");
+  let titleLine: string | undefined;
+  const bodyLines: string[] = [];
+  let foundTitle = false;
+
+  for (const line of lines) {
+    if (!foundTitle && line.trim().startsWith("# ")) {
+      titleLine = line.trim().slice(2).trim();
+      foundTitle = true;
+      continue;
+    }
+    if (foundTitle) {
+      bodyLines.push(line);
+    }
+  }
+
+  const bodyText = bodyLines.join("\n").trim();
+  return {
+    title: titleLine,
+    body: bodyText === "" ? undefined : bodyText,
+  };
+};
+
+const readContent = async (
   directory: string,
   id: string,
-): Promise<Result<string | undefined, RepositoryError>> => {
+): Promise<Result<ContentParts, RepositoryError>> => {
   try {
     const text = await Deno.readTextFile(join(directory, "content.md"));
     const normalized = text.replace(/\r\n/g, "\n");
     const withoutTrailingNewline = normalized.endsWith("\n") ? normalized.slice(0, -1) : normalized;
-    const body = withoutTrailingNewline.trim() === "" ? undefined : withoutTrailingNewline;
-    return Result.ok(body);
+    
+    if (withoutTrailingNewline.trim() === "") {
+      return Result.ok({ title: undefined, body: undefined });
+    }
+    
+    const parts = extractTitleAndBody(withoutTrailingNewline);
+    return Result.ok(parts);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
-      return Result.ok(undefined);
+      return Result.ok({ title: undefined, body: undefined });
     }
     return Result.error(
       createRepositoryError("item", "load", "failed to read item content", {
@@ -152,11 +186,12 @@ const readBody = async (
 
 const combineSnapshot = (
   meta: ItemMetaSnapshot,
-  body: string | undefined,
+  contentParts: ContentParts,
   edges: EdgeCollectionSnapshot,
 ): ItemSnapshot => ({
   ...meta,
-  body,
+  title: contentParts.title || meta.title || "Untitled",
+  body: contentParts.body,
   edges: edges.edges.length > 0 ? edges.edges : undefined,
 });
 
@@ -182,6 +217,7 @@ const writeMeta = async (
   const {
     body: _body,
     edges: _edges,
+    title: _title,
     ...meta
   } = snapshot;
   const payload = JSON.stringify({ schema: ITEM_SCHEMA, ...meta }, null, 2);
@@ -203,25 +239,17 @@ const writeBody = async (
   snapshot: ItemSnapshot,
 ): Promise<Result<void, RepositoryError>> => {
   const path = join(directory, "content.md");
+  
+  const title = snapshot.title;
   const body = snapshot.body;
-  if (!body || body.trim() === "") {
-    try {
-      await Deno.remove(path);
-    } catch (error) {
-      if (!(error instanceof Deno.errors.NotFound)) {
-        return Result.error(
-          createRepositoryError("item", "save", "failed to remove item content", {
-            identifier: snapshot.id,
-            cause: error,
-          }),
-        );
-      }
-    }
-    return Result.ok(undefined);
-  }
+  
+  const titleLine = `# ${title}`;
+  const content = body && body.trim() !== "" 
+    ? `${titleLine}\n\n${body}` 
+    : titleLine;
 
   try {
-    await Deno.writeTextFile(path, `${body}\n`);
+    await Deno.writeTextFile(path, `${content}\n`);
     return Result.ok(undefined);
   } catch (error) {
     return Result.error(
@@ -246,9 +274,9 @@ const loadItemFromDirectory = async (
     return Result.ok(undefined);
   }
 
-  const bodyResult = await readBody(directory, id);
-  if (bodyResult.type === "error") {
-    return bodyResult;
+  const contentResult = await readContent(directory, id);
+  if (contentResult.type === "error") {
+    return contentResult;
   }
 
   const edgesResult = await readEdgeCollection({
@@ -259,7 +287,7 @@ const loadItemFromDirectory = async (
     return edgesResult;
   }
 
-  const snapshot = combineSnapshot(meta, bodyResult.value, edgesResult.value);
+  const snapshot = combineSnapshot(meta, contentResult.value, edgesResult.value);
   return parseSnapshot(snapshot);
 };
 

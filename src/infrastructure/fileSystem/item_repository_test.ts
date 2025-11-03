@@ -87,9 +87,10 @@ Deno.test({
       assertEquals(metaSnapshot.id, itemId);
       assertEquals(metaSnapshot.path, "/2024-09-20");
       assertEquals(metaSnapshot.rank, "a1");
+      assertEquals(metaSnapshot.title, undefined, "title should not be in meta.json");
 
       const content = await Deno.readTextFile(contentPath);
-      assertEquals(content, "Sample body\n");
+      assertEquals(content, "# Sample\n\nSample body\n");
 
       const edgeFiles: string[] = [];
       for await (const entry of Deno.readDir(edgesDirectory)) {
