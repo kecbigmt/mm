@@ -1,8 +1,9 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { dateTimeFromDate, parseLocator } from "../../../domain/primitives/mod.ts";
+import { dateTimeFromDate, parseLocator, Path } from "../../../domain/primitives/mod.ts";
 import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
+import { PathNormalizationService } from "../../../domain/services/path_normalization_service.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -60,7 +61,7 @@ export function createNoteCommand() {
         return;
       }
 
-      const parentPath = (() => {
+      const parentPath = (async () => {
         if (!parentArg) {
           return cwdResult.value;
         }
@@ -82,10 +83,27 @@ export function createNoteCommand() {
           return undefined;
         }
 
-        return locatorResult.value.path;
+        // Normalize path for display (preserves aliases in the path)
+        // CreateItemWorkflow will normalize again for comparison purposes
+        const normalizedResult = await PathNormalizationService.normalize(
+          locatorResult.value.path,
+          {
+            itemRepository: deps.itemRepository,
+            aliasRepository: deps.aliasRepository,
+          },
+          { preserveAlias: true },
+        );
+
+        if (normalizedResult.type === "error") {
+          console.error(normalizedResult.error.message);
+          return undefined;
+        }
+
+        return normalizedResult.value;
       })();
 
-      if (!parentPath) {
+      const resolvedParentPath = await parentPath;
+      if (!resolvedParentPath) {
         return;
       }
 
@@ -105,7 +123,7 @@ export function createNoteCommand() {
         body: bodyOption,
         context: contextOption,
         alias: aliasOption,
-        parentPath,
+        parentPath: resolvedParentPath,
         createdAt: createdAtResult.value,
       }, {
         itemRepository: deps.itemRepository,
@@ -128,7 +146,7 @@ export function createNoteCommand() {
       const item = workflowResult.value.item;
       const label = formatItemLabel(item);
       console.log(
-        `✅ Created note [${label}] ${item.data.title.toString()} at ${parentPath.toString()}`,
+        `✅ Created note [${label}] ${item.data.title.toString()} at ${resolvedParentPath.toString()}`,
       );
 
       if (options.edit === true) {
