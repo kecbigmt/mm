@@ -4,7 +4,9 @@ import { dateTimeFromDate, parseLocator } from "../../../domain/primitives/mod.t
 import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 
-const formatShortId = (id: string): string => id.slice(-7);
+const formatItemLabel = (
+  item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
+): string => item.data.alias ? item.data.alias.toString() : item.data.id.toString();
 
 const reportValidationIssues = (
   issues: ReadonlyArray<{ path: ReadonlyArray<string | number>; message: string }>,
@@ -125,9 +127,9 @@ export function createNoteCommand() {
       }
 
       const item = workflowResult.value.item;
-      const shortId = formatShortId(item.data.id.toString());
+      const label = formatItemLabel(item);
       console.log(
-        `✅ Created note [${shortId}] ${item.data.title.toString()} at ${parentPath.toString()}`,
+        `✅ Created note [${label}] ${item.data.title.toString()} at ${parentPath.toString()}`,
       );
 
       if (options.edit === true) {
