@@ -174,7 +174,7 @@ describe("Scenario 2: Item creation and listing", () => {
     const metaJson = join(itemDir, "meta.json");
     const metaContent = await Deno.readTextFile(metaJson);
     const meta = JSON.parse(metaContent);
-    
+
     assertEquals(meta.schema, "mm.item/1");
     assertEquals(typeof meta.id, "string");
     assertEquals(meta.title, undefined, "title should not be in meta.json");
