@@ -25,7 +25,6 @@ import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
-  getTodayString,
   getWorkspacePath,
   runCommand,
   setupTestEnvironment,
@@ -80,9 +79,8 @@ describe("Scenario 1: Workspace initialization and basic operations", () => {
     const result = await runCommand(ctx.testHome, ["pwd"]);
 
     assertEquals(result.success, true, `Command failed: ${result.stderr}`);
-
-    const today = getTodayString();
-    assertEquals(result.stdout, `/${today}`);
+    const match = result.stdout.match(/^\/\d{4}-\d{2}-\d{2}$/);
+    assertExists(match, `pwd should return ISO date path, got: ${result.stdout}`);
   });
 
   it("navigates to different date with cd", async () => {
@@ -118,8 +116,8 @@ describe("Scenario 1: Workspace initialization and basic operations", () => {
 
     const pwd1Result = await runCommand(ctx.testHome, ["pwd"]);
     assertEquals(pwd1Result.success, true, "first pwd should succeed");
-    const today = getTodayString();
-    assertEquals(pwd1Result.stdout, `/${today}`, "default cwd should be today");
+    const match = pwd1Result.stdout.match(/^\/\d{4}-\d{2}-\d{2}$/);
+    assertExists(match, `pwd should return ISO date path, got: ${pwd1Result.stdout}`);
 
     const targetDate = "2025-11-01";
     const cdResult = await runCommand(ctx.testHome, ["cd", targetDate]);

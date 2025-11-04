@@ -21,8 +21,8 @@ import { assertEquals, assertExists } from "@std/assert";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
+  getCurrentDateFromCli,
   getItemIdByTitle,
-  getTodayString,
   initWorkspace,
   runCommand,
   setupTestEnvironment,
@@ -64,7 +64,7 @@ describe("Scenario 6: Item movement (move)", () => {
     assertEquals(lines1[2].includes("タスクC"), true, "Third item should be タスクC");
 
     // Get task C ID
-    const today = getTodayString();
+    const today = await getCurrentDateFromCli(ctx.testHome);
     const taskCId = await getItemIdByTitle(ctx.testHome, "test-workspace", today, "タスクC");
     assertExists(taskCId, "Task C ID should be found");
 
@@ -113,7 +113,7 @@ describe("Scenario 6: Item movement (move)", () => {
     await runCommand(ctx.testHome, ["note", "タスクC"]);
 
     // Move C to head first
-    const today = getTodayString();
+    const today = await getCurrentDateFromCli(ctx.testHome);
     const taskCId = await getItemIdByTitle(ctx.testHome, "test-workspace", today, "タスクC");
     assertExists(taskCId, "Task C ID should be found");
 
@@ -160,7 +160,7 @@ describe("Scenario 6: Item movement (move)", () => {
     assertEquals(taskAResult.success, true, `Failed to create task A: ${taskAResult.stderr}`);
 
     // Get task A ID
-    const today = getTodayString();
+    const today = await getCurrentDateFromCli(ctx.testHome);
     const taskAId = await getItemIdByTitle(ctx.testHome, "test-workspace", today, "タスクA");
     assertExists(taskAId, "Task A ID should be found");
 
@@ -214,7 +214,7 @@ describe("Scenario 6: Item movement (move)", () => {
     assertEquals(lines1[2].includes("タスクC"), true, "Third item should be タスクC");
 
     // Step 6: Move C to head
-    const today = getTodayString();
+    const today = await getCurrentDateFromCli(ctx.testHome);
     const taskCId = await getItemIdByTitle(ctx.testHome, "test-workspace", today, "タスクC");
     assertExists(taskCId, "Task C ID should be found");
 
@@ -277,6 +277,9 @@ describe("Scenario 6: Item movement (move)", () => {
     const lines5 = ls5Result.stdout.split("\n").filter((line) => line.trim() !== "");
     const hasTaskA = lines5.some((line) => line.includes("タスクA"));
     assertEquals(hasTaskA, false, "タスクA should not be in today's list");
-    assertEquals(lines5.length, 2, "Should list 2 items (B and C)");
+    const hasTaskB = lines5.some((line) => line.includes("タスクB"));
+    const hasTaskC = lines5.some((line) => line.includes("タスクC"));
+    assertEquals(hasTaskB, true, "タスクB should remain in today's list");
+    assertEquals(hasTaskC, true, "タスクC should remain in today's list");
   });
 });

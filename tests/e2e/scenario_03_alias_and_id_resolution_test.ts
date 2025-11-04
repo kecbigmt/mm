@@ -22,7 +22,7 @@ import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
-  getTodayString,
+  getCurrentDateFromCli,
   getWorkspacePath,
   initWorkspace,
   runCommand,
@@ -66,7 +66,7 @@ describe("Scenario 3: Alias and ID resolution", () => {
     const whereResult = await runCommand(ctx.testHome, ["where", "important-memo"]);
     assertEquals(whereResult.success, true, `where command failed: ${whereResult.stderr}`);
 
-    const today = getTodayString();
+    const today = await getCurrentDateFromCli(ctx.testHome);
     assertEquals(
       whereResult.stdout.includes(`Logical:  /${today}/important-memo`),
       true,
@@ -87,7 +87,7 @@ describe("Scenario 3: Alias and ID resolution", () => {
 
     // Extract UUID from output or from file system
     const workspaceDir = getWorkspacePath(ctx.testHome, "test-workspace");
-    const today = getTodayString();
+    const today = await getCurrentDateFromCli(ctx.testHome);
     const [year, month, day] = today.split("-");
     const itemsBaseDir = join(workspaceDir, "items", year, month, day);
 
@@ -103,7 +103,7 @@ describe("Scenario 3: Alias and ID resolution", () => {
     const whereResult = await runCommand(ctx.testHome, ["where", itemId]);
     assertEquals(whereResult.success, true, `where command failed: ${whereResult.stderr}`);
 
-    const todayPath = getTodayString();
+    const todayPath = await getCurrentDateFromCli(ctx.testHome);
     assertEquals(
       whereResult.stdout.includes(`Logical:  /${todayPath}/important-memo`),
       true,
@@ -120,10 +120,10 @@ describe("Scenario 3: Alias and ID resolution", () => {
       "important-memo",
     ]);
 
+    const today = await getCurrentDateFromCli(ctx.testHome);
     const cdResult = await runCommand(ctx.testHome, ["cd", "important-memo"]);
     assertEquals(cdResult.success, true, `cd command failed: ${cdResult.stderr}`);
 
-    const today = getTodayString();
     assertEquals(
       cdResult.stdout,
       `/${today}/important-memo`,
@@ -148,7 +148,7 @@ describe("Scenario 3: Alias and ID resolution", () => {
     ]);
 
     const workspaceDir = getWorkspacePath(ctx.testHome, "test-workspace");
-    const today = getTodayString();
+    const today = await getCurrentDateFromCli(ctx.testHome);
     const [year, month, day] = today.split("-");
     const itemsBaseDir = join(workspaceDir, "items", year, month, day);
 
@@ -225,7 +225,7 @@ describe("Scenario 3: Alias and ID resolution", () => {
 
     // Check that an alias was generated and stored
     const workspaceDir = getWorkspacePath(ctx.testHome, "test-workspace");
-    const today = getTodayString();
+    const today = await getCurrentDateFromCli(ctx.testHome);
     const [year, month, day] = today.split("-");
     const itemsBaseDir = join(workspaceDir, "items", year, month, day);
 

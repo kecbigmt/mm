@@ -24,9 +24,9 @@ import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
+  findItemDirectoryById,
+  getCurrentDateFromCli,
   getLatestItemId,
-  getTodayString,
-  getWorkspacePath,
   initWorkspace,
   runCommand,
   setupTestEnvironment,
@@ -72,7 +72,8 @@ describe("Scenario 7: Item status change", () => {
     ]);
     assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
 
-    const itemId = await getLatestItemId(ctx.testHome, "test-workspace");
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
 
     const closeResult = await runCommand(ctx.testHome, ["close", itemId]);
     assertEquals(closeResult.success, true, `close failed: ${closeResult.stderr}`);
@@ -83,12 +84,9 @@ describe("Scenario 7: Item status change", () => {
     );
 
     // Verify status in meta.json
-    const workspaceDir = getWorkspacePath(ctx.testHome, "test-workspace");
-    const today = getTodayString();
-    const [year, month, day] = today.split("-");
-    const itemsBaseDir = join(workspaceDir, "items", year, month, day);
-    const itemDir = join(itemsBaseDir, itemId);
-    const metaJson = join(itemDir, "meta.json");
+    const itemDir = await findItemDirectoryById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemDir, "Item directory should exist");
+    const metaJson = join(itemDir!, "meta.json");
     const metaContent = await Deno.readTextFile(metaJson);
     const meta = JSON.parse(metaContent);
 
@@ -105,7 +103,8 @@ describe("Scenario 7: Item status change", () => {
     ]);
     assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
 
-    const itemId = await getLatestItemId(ctx.testHome, "test-workspace");
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
 
     // Close the item first
     const closeResult = await runCommand(ctx.testHome, ["close", itemId]);
@@ -121,12 +120,9 @@ describe("Scenario 7: Item status change", () => {
     );
 
     // Verify status in meta.json
-    const workspaceDir = getWorkspacePath(ctx.testHome, "test-workspace");
-    const today = getTodayString();
-    const [year, month, day] = today.split("-");
-    const itemsBaseDir = join(workspaceDir, "items", year, month, day);
-    const itemDir = join(itemsBaseDir, itemId);
-    const metaJson = join(itemDir, "meta.json");
+    const itemDir = await findItemDirectoryById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemDir, "Item directory should exist");
+    const metaJson = join(itemDir!, "meta.json");
     const metaContent = await Deno.readTextFile(metaJson);
     const meta = JSON.parse(metaContent);
 
@@ -160,12 +156,9 @@ describe("Scenario 7: Item status change", () => {
     assertEquals(closeResult.success, true, `close failed: ${closeResult.stderr}`);
 
     // Verify status changed to closed in meta.json
-    const workspaceDir = getWorkspacePath(ctx.testHome, "test-workspace");
-    const today = getTodayString();
-    const [year, month, day] = today.split("-");
-    const itemsBaseDir = join(workspaceDir, "items", year, month, day);
-    const itemDir = join(itemsBaseDir, itemId);
-    const metaJsonAfterClose = join(itemDir, "meta.json");
+    const itemDir = await findItemDirectoryById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemDir, "Item directory should exist");
+    const metaJsonAfterClose = join(itemDir!, "meta.json");
     const metaAfterClose = JSON.parse(await Deno.readTextFile(metaJsonAfterClose));
     assertEquals(metaAfterClose.status, "closed", "Status should be closed");
 

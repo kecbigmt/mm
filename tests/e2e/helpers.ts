@@ -37,6 +37,10 @@ export const cleanupTestEnvironment = async (ctx: TestContext): Promise<void> =>
   } else {
     Deno.env.delete("MM_HOME");
   }
+  if (Deno.env.get("MM_E2E_KEEP") === "1") {
+    console.warn(`MM_E2E_KEEP=1 set; preserving test home at ${ctx.testHome}`);
+    return;
+  }
   await Deno.remove(ctx.testHome, { recursive: true });
 };
 
@@ -67,12 +71,20 @@ export const runCommand = async (
 
   const process = command.spawn();
   const { success, stdout, stderr } = await process.output();
-
   return {
     success,
     stdout: new TextDecoder().decode(stdout).trim(),
     stderr: new TextDecoder().decode(stderr).trim(),
   };
+};
+
+export const getCurrentDateFromCli = async (testHome: string): Promise<string> => {
+  const pwdResult = await runCommand(testHome, ["pwd"]);
+  if (!pwdResult.success) {
+    throw new Error(`Failed to resolve current date from pwd: ${pwdResult.stderr}`);
+  }
+  const match = pwdResult.stdout.match(/^\/(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : getTodayString();
 };
 
 /**
@@ -198,23 +210,14 @@ export const getLatestItemId = async (
   workspaceName: string,
   dateStr?: string,
 ): Promise<string> => {
-  const date = dateStr || getTodayString();
-  const [year, month, day] = date.split("-");
   const workspaceDir = getWorkspacePath(testHome, workspaceName);
-  const itemsBaseDir = join(workspaceDir, "items", year, month, day);
-
-  const itemDirs: string[] = [];
-  for await (const entry of Deno.readDir(itemsBaseDir)) {
-    if (entry.isDirectory) {
-      itemDirs.push(entry.name);
-    }
+  const candidates = await collectItemDirectories(workspaceDir, dateStr);
+  if (candidates.length === 0) {
+    throw new Error(`No items found${dateStr ? ` for date ${dateStr}` : ""}`);
   }
 
-  if (itemDirs.length === 0) {
-    throw new Error(`No items found for date ${date}`);
-  }
-
-  return itemDirs[0];
+  const sorted = candidates.map((candidate) => candidate.id).sort();
+  return sorted[0];
 };
 
 /**
@@ -256,25 +259,98 @@ export const getItemIdByTitle = async (
   title: string,
 ): Promise<string | null> => {
   const workspaceDir = getWorkspacePath(testHome, workspaceName);
-  const [year, month, day] = dateStr.split("-");
-  const itemsBaseDir = join(workspaceDir, "items", year, month, day);
+  const candidates = await collectItemDirectories(workspaceDir, dateStr);
 
+  for (const candidate of candidates) {
+    const contentMd = join(candidate.directory, "content.md");
+    try {
+      const content = await Deno.readTextFile(contentMd);
+      if (content.includes(title)) {
+        return candidate.id;
+      }
+    } catch {
+      // Skip if content.md doesn't exist or can't be read
+    }
+  }
+  return null;
+};
+
+export const findItemDirectoryById = async (
+  testHome: string,
+  workspaceName: string,
+  itemId: string,
+): Promise<string | null> => {
+  const workspaceDir = getWorkspacePath(testHome, workspaceName);
+  const candidates = await collectItemDirectories(workspaceDir);
+  const match = candidates.find((candidate) => candidate.id === itemId);
+  return match?.directory ?? null;
+};
+
+type ItemDirectoryEntry = Readonly<{
+  id: string;
+  directory: string;
+}>;
+
+const collectItemDirectories = async (
+  workspaceDir: string,
+  dateStr?: string,
+): Promise<ItemDirectoryEntry[]> => {
+  const itemsRoot = join(workspaceDir, "items");
+
+  const gatherFromPath = async (baseDir: string): Promise<ItemDirectoryEntry[]> => {
+    const entries: ItemDirectoryEntry[] = [];
+    try {
+      for await (const entry of Deno.readDir(baseDir)) {
+        if (entry.isDirectory) {
+          entries.push({ id: entry.name, directory: join(baseDir, entry.name) });
+        }
+      }
+    } catch {
+      // ignore missing directories
+    }
+    return entries;
+  };
+
+  if (dateStr) {
+    const [year, month, day] = dateStr.split("-");
+    const dateDir = join(itemsRoot, year, month, day);
+    const entries = await gatherFromPath(dateDir);
+    if (entries.length > 0) {
+      return entries;
+    }
+  }
+
+  const allEntries: ItemDirectoryEntry[] = [];
   try {
-    for await (const entry of Deno.readDir(itemsBaseDir)) {
-      if (entry.isDirectory) {
-        const contentMd = join(itemsBaseDir, entry.name, "content.md");
-        try {
-          const content = await Deno.readTextFile(contentMd);
-          if (content.includes(title)) {
-            return entry.name;
+    for await (const yearEntry of Deno.readDir(itemsRoot)) {
+      if (!yearEntry.isDirectory || yearEntry.name.startsWith(".")) {
+        continue;
+      }
+      const yearDir = join(itemsRoot, yearEntry.name);
+      for await (const monthEntry of Deno.readDir(yearDir)) {
+        if (!monthEntry.isDirectory || monthEntry.name.startsWith(".")) {
+          continue;
+        }
+        const monthDir = join(yearDir, monthEntry.name);
+        for await (const dayEntry of Deno.readDir(monthDir)) {
+          if (!dayEntry.isDirectory || dayEntry.name.startsWith(".")) {
+            continue;
           }
-        } catch {
-          // Skip if content.md doesn't exist or can't be read
+          if (dayEntry.name === "edges") {
+            continue;
+          }
+          const dayDir = join(monthDir, dayEntry.name);
+          for await (const itemEntry of Deno.readDir(dayDir)) {
+            if (itemEntry.isDirectory && !itemEntry.name.startsWith(".")) {
+              allEntries.push({ id: itemEntry.name, directory: join(dayDir, itemEntry.name) });
+            }
+          }
         }
       }
     }
   } catch {
-    // Directory doesn't exist
+    // ignore missing trees
   }
-  return null;
+
+  return allEntries;
 };

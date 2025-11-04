@@ -26,7 +26,7 @@ import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
-  getTodayString,
+  getCurrentDateFromCli,
   getWorkspacePath,
   initWorkspace,
   runCommand,
@@ -106,7 +106,7 @@ describe("Scenario 2: Item creation and listing", () => {
     assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
 
     const workspaceDir = getWorkspacePath(ctx.testHome, "test-workspace");
-    const today = getTodayString();
+    const today = await getCurrentDateFromCli(ctx.testHome);
     const [year, month, day] = today.split("-");
 
     const itemsBaseDir = join(workspaceDir, "items", year, month, day);
@@ -157,7 +157,7 @@ describe("Scenario 2: Item creation and listing", () => {
     assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
 
     const workspaceDir = getWorkspacePath(ctx.testHome, "test-workspace");
-    const today = getTodayString();
+    const today = await getCurrentDateFromCli(ctx.testHome);
     const [year, month, day] = today.split("-");
 
     const itemsBaseDir = join(workspaceDir, "items", year, month, day);
