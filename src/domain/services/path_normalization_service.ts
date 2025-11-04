@@ -55,87 +55,116 @@ export const PathNormalizationService = {
   ): Promise<Result<Path, PathNormalizationError>> {
     const preserveAlias = options.preserveAlias ?? false;
 
-    // If path starts with a date, check if normalization is needed
-    if (path.segments.length > 0 && path.segments[0].kind === "Date") {
-      // Check if there are any alias segments after the date
-      let needsNormalization = false;
-      for (let i = 1; i < path.segments.length; i += 1) {
-        const segment = path.segments[i];
-        if (segment.kind === "ItemAlias") {
-          needsNormalization = true;
-          break;
-        }
-      }
-      if (!needsNormalization) {
-        return Result.ok(path);
-      }
-    }
-
-    // If path doesn't start with an item alias or ID, return as-is
     if (path.segments.length === 0) {
       return Result.ok(path);
     }
 
-    const firstSegment = path.segments[0];
-    if (firstSegment.kind !== "ItemAlias" && firstSegment.kind !== "ItemId") {
-      return Result.ok(path);
-    }
+    const canonicalSegments: string[] = [];
+    const displaySegments: string[] = [];
 
-    // Resolve the item
-    const itemIdentifier = firstSegment.toString();
-    const resolveResult = await LocatorResolutionService.resolveItem(
-      itemIdentifier,
-      deps,
-    );
-
-    if (resolveResult.type === "error") {
-      // Map LocatorResolutionError to PathNormalizationError
-      if (resolveResult.error.kind === "ValidationError") {
-        return Result.error(
-          createValidationError("PathNormalization", resolveResult.error.issues),
-        );
-      }
-      // RepositoryError can be passed through
-      return Result.error(resolveResult.error);
-    }
-
-    if (!resolveResult.value) {
-      // Item not found, but return the original path
-      // (let the caller handle the error)
-      return Result.ok(path);
-    }
-
-    const item = resolveResult.value;
-    const remainingSegments = path.segments.slice(1);
-
-    // Build base path
-    let basePath: Path;
-    if (preserveAlias && item.data.alias) {
-      // Preserve alias: item path + alias
-      const basePathStr = `${item.data.path.toString()}/${item.data.alias.toString()}`;
-      const basePathResult = parsePath(basePathStr);
-      if (basePathResult.type === "ok") {
-        basePath = basePathResult.value;
-      } else {
-        // Fallback to item path if parsing fails
-        basePath = item.data.path;
-      }
-    } else {
-      // Resolve alias: use item path only (without alias)
-      basePath = item.data.path;
-    }
-
-    // Append remaining segments (numeric sections, etc.)
-    if (remainingSegments.length > 0) {
-      let builtPath = basePath;
-      for (const segment of remainingSegments) {
-        if (segment.kind !== "range") {
-          builtPath = builtPath.appendSegment(segment);
+    const ensurePrefix = (targetSegments: string[]): Result<void, PathNormalizationError> => {
+      for (let index = 0; index < targetSegments.length; index += 1) {
+        const expected = targetSegments[index];
+        if (canonicalSegments[index] === undefined) {
+          canonicalSegments.push(expected);
+          displaySegments.push(expected);
+        } else if (canonicalSegments[index] !== expected) {
+          return Result.error(
+            createValidationError("PathNormalization", [
+              createValidationIssue("alias path does not match item placement", {
+                code: "alias_context_mismatch",
+                path: ["value"],
+              }),
+            ]),
+          );
         }
       }
-      return Result.ok(builtPath);
+      canonicalSegments.length = targetSegments.length;
+      displaySegments.length = targetSegments.length;
+      return Result.ok(undefined);
+    };
+
+    for (const segment of path.segments) {
+      switch (segment.kind) {
+        case "Date":
+        case "Numeric": {
+          canonicalSegments.push(segment.toString());
+          displaySegments.push(segment.toString());
+          break;
+        }
+        case "ItemId": {
+          canonicalSegments.push(segment.toString());
+          displaySegments.push(segment.toString());
+          break;
+        }
+        case "ItemAlias": {
+          const resolveResult = await LocatorResolutionService.resolveItem(
+            segment.toString(),
+            deps,
+          );
+
+          if (resolveResult.type === "error") {
+            if (resolveResult.error.kind === "ValidationError") {
+              return Result.error(
+                createValidationError("PathNormalization", resolveResult.error.issues),
+              );
+            }
+            return Result.error(resolveResult.error);
+          }
+
+          const item = resolveResult.value;
+          if (!item) {
+            return Result.error(
+              createValidationError("PathNormalization", [
+                createValidationIssue(`alias not found: ${segment.toString()}`, {
+                  code: "alias_not_found",
+                  path: ["value"],
+                }),
+              ]),
+            );
+          }
+
+          const parentSegments = item.data.path.segments.map((seg) => seg.toString());
+          const prefixResult = ensurePrefix(parentSegments);
+          if (prefixResult.type === "error") {
+            return prefixResult;
+          }
+
+          canonicalSegments.push(item.data.id.toString());
+          if (preserveAlias && item.data.alias) {
+            displaySegments.push(item.data.alias.toString());
+          } else {
+            displaySegments.push(item.data.id.toString());
+          }
+          break;
+        }
+        default: {
+          return Result.error(
+            createValidationError("PathNormalization", [
+              createValidationIssue("unsupported segment in path", {
+                code: "unsupported_segment",
+                path: ["value"],
+              }),
+            ]),
+          );
+        }
+      }
     }
 
-    return Result.ok(basePath);
+    const toPath = (segments: string[]): Result<Path, PathNormalizationError> => {
+      const value = segments.length === 0 ? "/" : `/${segments.join("/")}`;
+      const parsedResult = parsePath(value);
+      if (parsedResult.type === "error") {
+        return Result.error(
+          createValidationError("PathNormalization", parsedResult.error.issues),
+        );
+      }
+      return Result.ok(parsedResult.value);
+    };
+
+    if (preserveAlias) {
+      return toPath(displaySegments.length > 0 ? displaySegments : canonicalSegments);
+    }
+    return toPath(canonicalSegments);
   },
 };

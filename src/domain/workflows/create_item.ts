@@ -1,6 +1,5 @@
 import { Result } from "../../shared/result.ts";
 import {
-  createValidationError,
   createValidationIssue,
   ValidationIssue,
 } from "../../shared/errors.ts";
@@ -256,7 +255,7 @@ export const CreateItemWorkflow = {
       title: resolvedTitle,
       icon: createItemIcon(input.itemType),
       status: itemStatusOpen(),
-      path: input.parentPath,
+      path: normalizedParentPath,
       rank: rankResult.value,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,

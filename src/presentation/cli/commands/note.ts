@@ -1,6 +1,6 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { dateTimeFromDate, parseLocator, Path } from "../../../domain/primitives/mod.ts";
+import { dateTimeFromDate, parseLocator } from "../../../domain/primitives/mod.ts";
 import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { PathNormalizationService } from "../../../domain/services/path_normalization_service.ts";
