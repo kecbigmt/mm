@@ -1,8 +1,5 @@
 import { Result } from "../../shared/result.ts";
-import {
-  createValidationIssue,
-  ValidationIssue,
-} from "../../shared/errors.ts";
+import { createValidationIssue, ValidationIssue } from "../../shared/errors.ts";
 import { createItem, Item } from "../models/item.ts";
 import {
   AliasSlug,
