@@ -91,6 +91,67 @@ const expandDateRange = async (
   return Result.ok(allItems);
 };
 
+const expandNumericRange = async (
+  parentPath: Path,
+  startNum: number,
+  endNum: number,
+  deps: ListItemsDependencies,
+  options: ParseLocatorOptions,
+): Promise<Result<ReadonlyArray<Item>, ListItemsError>> => {
+  // Normalize parent path first
+  const normalizedResult = await PathNormalizationService.normalize(
+    parentPath,
+    {
+      itemRepository: deps.itemRepository,
+      aliasRepository: deps.aliasRepository,
+    },
+    { preserveAlias: false },
+  );
+
+  if (normalizedResult.type === "error") {
+    if (normalizedResult.error.kind === "ValidationError") {
+      return Result.error(
+        createValidationError("ListItems", normalizedResult.error.issues),
+      );
+    }
+    return Result.error(normalizedResult.error);
+  }
+
+  const normalizedParent = normalizedResult.value;
+  const allItems: Item[] = [];
+
+  // Iterate through numeric sections from startNum to endNum (inclusive)
+  for (let num = startNum; num <= endNum; num++) {
+    // Build path with numeric section
+    const sectionPathStr = `${normalizedParent.toString()}/${num}`;
+    const sectionPathResult = parsePath(sectionPathStr, options);
+    if (sectionPathResult.type === "error") {
+      continue;
+    }
+
+    const listResult = await deps.itemRepository.listByPath(sectionPathResult.value);
+    if (listResult.type === "error") {
+      // Continue to next section if one fails (section might not exist)
+      continue;
+    }
+
+    allItems.push(...listResult.value);
+  }
+
+  // Sort all items by rank, then by created_at
+  allItems.sort((a, b) => {
+    const rankCompare = a.data.rank.compare(b.data.rank);
+    if (rankCompare !== 0) {
+      return rankCompare;
+    }
+    const aMs = a.data.createdAt.data.epochMilliseconds;
+    const bMs = b.data.createdAt.data.epochMilliseconds;
+    return aMs - bMs;
+  });
+
+  return Result.ok(allItems);
+};
+
 export const ListItemsWorkflow = {
   execute: async (
     input: ListItemsInput,
@@ -116,6 +177,7 @@ export const ListItemsWorkflow = {
         const path = locator.path;
         const lastSeg = path.segments[path.segments.length - 1];
         if (lastSeg && lastSeg.kind === "range") {
+          // Handle date ranges
           if (lastSeg.start.kind === "Date" && lastSeg.end.kind === "Date") {
             const startDatePath = parsePath(`/${lastSeg.start.toString()}`, options);
             if (startDatePath.type === "error") {
@@ -132,6 +194,70 @@ export const ListItemsWorkflow = {
             }
 
             return expandDateRange(startDatePath.value, endDatePath.value, deps).then(
+              (result) => result.type === "ok" ? Result.ok({ items: result.value }) : result,
+            );
+          }
+
+          // Handle numeric section ranges
+          if (lastSeg.start.kind === "Numeric" && lastSeg.end.kind === "Numeric") {
+            // TypeScript needs explicit type narrowing for union types
+            const startNum = typeof lastSeg.start.value === "number" ? lastSeg.start.value : null;
+            const endNum = typeof lastSeg.end.value === "number" ? lastSeg.end.value : null;
+
+            if (startNum === null || endNum === null) {
+              return Result.error(
+                createValidationError("ListItems", [
+                  createValidationIssue("numeric range segments must have numeric values", {
+                    code: "invalid_numeric_range",
+                    path: ["locator"],
+                  }),
+                ]),
+              );
+            }
+
+            // Build parent path (all segments except the last range segment)
+            const parentSegments = path.segments.slice(0, -1);
+            let parentPath: Path;
+
+            if (parentSegments.length > 0) {
+              // Parent path has segments, use them
+              const parentPathResult = parsePath(
+                `/${parentSegments.map((s) => s.toString()).join("/")}`,
+                options,
+              );
+              if (parentPathResult.type === "error") {
+                return Result.error(
+                  createValidationError("ListItems", parentPathResult.error.issues),
+                );
+              }
+              parentPath = parentPathResult.value;
+            } else {
+              // No parent segments, use CWD as parent
+              if (!input.cwd) {
+                // Fallback to today if no CWD
+                const today = input.today ?? new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, "0");
+                const day = String(today.getDate()).padStart(2, "0");
+                const defaultPathResult = parsePath(`/${year}-${month}-${day}`, options);
+                if (defaultPathResult.type === "error") {
+                  return Result.error(
+                    createValidationError("ListItems", defaultPathResult.error.issues),
+                  );
+                }
+                parentPath = defaultPathResult.value;
+              } else {
+                parentPath = input.cwd;
+              }
+            }
+
+            return expandNumericRange(
+              parentPath,
+              startNum,
+              endNum,
+              deps,
+              options,
+            ).then(
               (result) => result.type === "ok" ? Result.ok({ items: result.value }) : result,
             );
           }
