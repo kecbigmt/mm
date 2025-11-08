@@ -551,6 +551,62 @@ export const createFileSystemItemRepository = (
       // Path format: /date/parent-id/section1/section2/.../this-item
       // We need to save edge in parent-id's edges/section1/section2/... directory
       const pathSegments = item.data.path.segments;
+
+      // Delete old parent edge if path changed from non-top-level parent
+      if (existingItem && !oldPathIsTopLevel) {
+        const oldPathSegments = existingItem.data.path.segments;
+        if (oldPathSegments.length >= 2 && oldPathSegments[1].kind === "ItemId") {
+          const oldParentId = oldPathSegments[1].value as ItemId;
+          const oldSectionSegments = oldPathSegments.slice(2);
+          const oldSectionPath = oldSectionSegments
+            .filter((seg) => seg.kind !== "range")
+            .map((seg) => seg.toString())
+            .join("/");
+
+          // Check if parent or section changed
+          const newParentId = pathSegments.length >= 2 && pathSegments[1].kind === "ItemId"
+            ? pathSegments[1].value as ItemId
+            : null;
+          const newSectionSegments = pathSegments.slice(2);
+          const newSectionPath = newSectionSegments
+            .filter((seg) => seg.kind !== "range")
+            .map((seg) => seg.toString())
+            .join("/");
+
+          const parentChanged = !newParentId || oldParentId.toString() !== newParentId.toString();
+          const sectionChanged = oldSectionPath !== newSectionPath;
+
+          if (parentChanged || sectionChanged) {
+            // Load old parent to get its physical directory
+            const oldParentResult = await load(oldParentId);
+            if (oldParentResult.type === "ok" && oldParentResult.value) {
+              const oldParentSnapshot = oldParentResult.value.toJSON();
+              const oldParentDirectory = itemDirectoryFromSnapshot(dependencies, oldParentSnapshot);
+
+              const oldEdgeDir = oldSectionPath
+                ? join(oldParentDirectory, "edges", oldSectionPath)
+                : join(oldParentDirectory, "edges");
+              const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
+
+              // Delete old edge file
+              try {
+                await Deno.remove(oldEdgeFilePath);
+              } catch (error) {
+                if (!(error instanceof Deno.errors.NotFound)) {
+                  return Result.error(
+                    createRepositoryError("item", "save", "failed to delete old parent edge file", {
+                      identifier: snapshot.id,
+                      cause: error,
+                    }),
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Save new parent edge file
       if (pathSegments.length >= 2) {
         // First segment is date, second is parent ID
         const parentSegment = pathSegments[1];
