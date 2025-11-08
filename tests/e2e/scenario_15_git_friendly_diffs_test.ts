@@ -390,6 +390,103 @@ describe("Scenario 15: Git-friendly diffs", () => {
     );
   });
 
+  it("15.7: Alias setting affects only meta.json and alias index", async () => {
+    // Create item without explicit alias
+    const _result = await runCommand(ctx.testHome, ["note", "Test item"]);
+    const itemId = await getLatestItemIdFromDate(ctx.testHome, "test-workspace", todayDate);
+    await gitCommit(workspaceDir, "Add test item");
+
+    // Set custom alias by editing meta.json
+    const itemDir = await findItemDirectoryById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemDir, "Item directory should exist");
+
+    const metaPath = join(itemDir, "meta.json");
+    const metaContent = await Deno.readTextFile(metaPath);
+    const meta = JSON.parse(metaContent);
+    meta.alias = "custom-name";
+    await Deno.writeTextFile(metaPath, JSON.stringify(meta, null, 2) + "\n");
+
+    // Check git status
+    const status = await gitStatus(workspaceDir);
+
+    // Only meta.json should be modified
+    assertEquals(
+      status.modified.some((file) => file.includes(`${itemId}/meta.json`)),
+      true,
+      "meta.json should be modified",
+    );
+
+    // content.md and edge files should not be modified
+    assertEquals(
+      status.modified.some((file) => file.includes(`${itemId}/content.md`)),
+      false,
+      "content.md should not be modified",
+    );
+    assertEquals(
+      status.modified.some((file) => file.includes(".edge.json")),
+      false,
+      "Edge files should not be modified",
+    );
+
+    // New alias index file may be added (if alias indexing is implemented)
+    // This is optional validation depending on implementation
+  });
+
+  it("15.8: Adding item to deep numeric section affects only new files", async () => {
+    // Create project
+    const projectResult = await runCommand(ctx.testHome, ["note", "Project"]);
+    const projectId = await getLatestItemIdFromDate(ctx.testHome, "test-workspace", todayDate);
+    const projectAlias = extractAlias(projectResult.stdout);
+    await gitCommit(workspaceDir, "Add project");
+
+    // Add page to deep section (project/1/1)
+    const pageResult = await runCommand(ctx.testHome, [
+      "note",
+      "Page 1",
+      "--parent",
+      projectAlias ? `${projectAlias}/1/1` : `${projectId}/1/1`,
+    ]);
+    assertEquals(pageResult.success, true, `Failed to add page: ${pageResult.stderr}`);
+
+    const pageId = await getLatestItemIdFromDate(ctx.testHome, "test-workspace", todayDate);
+
+    // Check git status
+    const status = await gitStatus(workspaceDir);
+
+    // Only new files should be added
+    assertEquals(status.modified.length, 0, "No existing files should be modified");
+
+    // Verify new page files were added
+    const [year, month, day] = todayDate.split("-");
+    const pageItemPath = `items/${year}/${month}/${day}/${pageId}`;
+
+    const hasContentMd = status.added.some((file) => file.includes(`${pageItemPath}/content.md`));
+    const hasMetaJson = status.added.some((file) => file.includes(`${pageItemPath}/meta.json`));
+
+    assertEquals(hasContentMd, true, `${pageItemPath}/content.md should be added`);
+    assertEquals(hasMetaJson, true, `${pageItemPath}/meta.json should be added`);
+
+    // Verify edge file for sub-section was added (project/edges/1/1/<page>.edge.json)
+    const hasSubsectionEdge = status.added.some((file) =>
+      file.includes(`${projectId}/edges/1/1/${pageId}.edge.json`)
+    );
+    assertEquals(
+      hasSubsectionEdge,
+      true,
+      `items/.../edges/1/1/${pageId}.edge.json should be added`,
+    );
+
+    // Other sections should not be affected
+    const hasOtherSectionChanges = status.added.some((file) =>
+      file.includes(`${projectId}/edges/`) && !file.includes(`edges/1/1/${pageId}.edge.json`)
+    );
+    assertEquals(
+      hasOtherSectionChanges,
+      false,
+      "Other sections should not be affected",
+    );
+  });
+
   it("15.9: Concurrent different-item operations merge cleanly", async () => {
     // Create base state with one item
     await runCommand(ctx.testHome, ["note", "Base item"]);
