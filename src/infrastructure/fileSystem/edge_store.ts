@@ -3,6 +3,8 @@ import { Result } from "../../shared/result.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
 import type { Edge, EdgeSnapshot } from "../../domain/models/edge.ts";
+import type { ItemId } from "../../domain/primitives/item_id.ts";
+import type { ItemRank } from "../../domain/primitives/item_rank.ts";
 
 const EDGE_SCHEMA = "mm.edge/1";
 const EDGE_FILE_SUFFIX = ".edge.json";
@@ -171,6 +173,84 @@ export const readEdgeCollection = async (
     return Result.error(
       createRepositoryError("item", "load", "failed to read edges directory", {
         identifier: options.identifier,
+        cause: error,
+      }),
+    );
+  }
+};
+
+/**
+ * Placement edge (top-level date sections)
+ * Stores rank for items placed directly under date sections
+ */
+export type PlacementEdgeSnapshot = Readonly<{
+  schema: string;
+  rank: string;
+}>;
+
+/**
+ * Save a placement edge for an item at a top-level date section
+ */
+export const savePlacementEdge = async (
+  workspaceRoot: string,
+  dateStr: string,
+  itemId: ItemId,
+  rank: ItemRank,
+): Promise<Result<void, RepositoryError>> => {
+  const directory = join(workspaceRoot, "edges.top", "dates", dateStr);
+  const filePath = join(directory, `${itemId.toString()}${EDGE_FILE_SUFFIX}`);
+
+  const ensureResult = await ensureDirectory(directory, itemId.toString());
+  if (ensureResult.type === "error") {
+    return ensureResult;
+  }
+
+  const snapshot: PlacementEdgeSnapshot = {
+    schema: EDGE_SCHEMA,
+    rank: rank.toString(),
+  };
+
+  const payload = JSON.stringify(snapshot, null, 2);
+
+  try {
+    await Deno.writeTextFile(filePath, `${payload}\n`);
+    return Result.ok(undefined);
+  } catch (error) {
+    return Result.error(
+      createRepositoryError("item", "save", "failed to write placement edge", {
+        identifier: itemId.toString(),
+        cause: error,
+      }),
+    );
+  }
+};
+
+/**
+ * Delete a placement edge for an item
+ */
+export const deletePlacementEdge = async (
+  workspaceRoot: string,
+  dateStr: string,
+  itemId: ItemId,
+): Promise<Result<void, RepositoryError>> => {
+  const filePath = join(
+    workspaceRoot,
+    "edges.top",
+    "dates",
+    dateStr,
+    `${itemId.toString()}${EDGE_FILE_SUFFIX}`,
+  );
+
+  try {
+    await Deno.remove(filePath);
+    return Result.ok(undefined);
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      return Result.ok(undefined);
+    }
+    return Result.error(
+      createRepositoryError("item", "delete", "failed to delete placement edge", {
+        identifier: itemId.toString(),
         cause: error,
       }),
     );
