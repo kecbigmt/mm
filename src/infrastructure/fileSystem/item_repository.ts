@@ -7,8 +7,10 @@ import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
 import {
+  deletePlacementEdge,
   type EdgeCollectionSnapshot,
   readEdgeCollection,
+  savePlacementEdge,
   writeEdgeCollection,
 } from "./edge_store.ts";
 
@@ -93,6 +95,18 @@ const itemDirectoryFromSnapshot = (
 };
 
 const edgesDirectory = (directory: string): string => join(directory, "edges");
+
+/**
+ * Check if a path represents a top-level date section
+ * A top-level date path has exactly one segment that is a date
+ */
+const isTopLevelDatePath = (path: Path): boolean => {
+  if (path.segments.length !== 1) {
+    return false;
+  }
+  const segment = path.segments[0];
+  return segment.kind === "Date";
+};
 
 const readMetaSnapshot = async (
   directory: string,
@@ -436,6 +450,14 @@ export const createFileSystemItemRepository = (
     const snapshot = item.toJSON();
     const directory = itemDirectoryFromSnapshot(dependencies, snapshot);
 
+    // Load existing item to check if path changed (for edge file cleanup)
+    const existingResult = await load(item.data.id);
+    if (existingResult.type === "error") {
+      // If error is not "not found", propagate it
+      // Otherwise, this is a new item, continue
+    }
+    const existingItem = existingResult.type === "ok" ? existingResult.value : undefined;
+
     try {
       await Deno.mkdir(directory, { recursive: true });
     } catch (error) {
@@ -459,12 +481,71 @@ export const createFileSystemItemRepository = (
       return contentResult;
     }
 
+    // Save child edges (items under this item)
     const edgesResult = await writeEdgeCollection(item.edges, {
       directory: edgesDirectory(directory),
       identifier: snapshot.id,
     });
     if (edgesResult.type === "error") {
       return edgesResult;
+    }
+
+    // Handle top-level edge file updates
+    const newPathIsTopLevel = isTopLevelDatePath(item.data.path);
+    const oldPathIsTopLevel = existingItem ? isTopLevelDatePath(existingItem.data.path) : false;
+
+    // If path changed from top-level to non-top-level, delete old top-level edge
+    if (existingItem && oldPathIsTopLevel && !newPathIsTopLevel) {
+      const oldDateSegment = existingItem.data.path.segments[0];
+      if (oldDateSegment.kind === "Date") {
+        const oldDateStr = oldDateSegment.value.toString();
+        const deleteResult = await deletePlacementEdge(
+          dependencies.root,
+          oldDateStr,
+          item.data.id,
+        );
+        if (deleteResult.type === "error") {
+          return deleteResult;
+        }
+      }
+    }
+
+    // If path changed between different top-level dates, delete old and create new
+    if (existingItem && oldPathIsTopLevel && newPathIsTopLevel) {
+      const oldDateSegment = existingItem.data.path.segments[0];
+      const newDateSegment = item.data.path.segments[0];
+      if (
+        oldDateSegment.kind === "Date" &&
+        newDateSegment.kind === "Date" &&
+        oldDateSegment.value.toString() !== newDateSegment.value.toString()
+      ) {
+        const oldDateStr = oldDateSegment.value.toString();
+        const deleteResult = await deletePlacementEdge(
+          dependencies.root,
+          oldDateStr,
+          item.data.id,
+        );
+        if (deleteResult.type === "error") {
+          return deleteResult;
+        }
+      }
+    }
+
+    // Save top-level placement edge if this item is placed under a date section
+    if (newPathIsTopLevel) {
+      const dateSegment = item.data.path.segments[0];
+      if (dateSegment.kind === "Date") {
+        const dateStr = dateSegment.value.toString(); // YYYY-MM-DD format
+        const topLevelResult = await savePlacementEdge(
+          dependencies.root,
+          dateStr,
+          item.data.id,
+          item.data.rank,
+        );
+        if (topLevelResult.type === "error") {
+          return topLevelResult;
+        }
+      }
     }
 
     return Result.ok(undefined);
@@ -480,6 +561,30 @@ export const createFileSystemItemRepository = (
     const directory = directoryResult.value;
     if (!directory) {
       return Result.ok(undefined);
+    }
+
+    // Load item to get its path for top-level edge cleanup
+    const itemResult = await loadItemFromDirectory(directory, idStr);
+    if (itemResult.type === "error") {
+      return itemResult;
+    }
+
+    const item = itemResult.value;
+
+    // Delete top-level edge if item was placed under a date section
+    if (item && isTopLevelDatePath(item.data.path)) {
+      const dateSegment = item.data.path.segments[0];
+      if (dateSegment.kind === "Date") {
+        const dateStr = dateSegment.value.toString();
+        const topLevelResult = await deletePlacementEdge(
+          dependencies.root,
+          dateStr,
+          id,
+        );
+        if (topLevelResult.type === "error") {
+          return topLevelResult;
+        }
+      }
     }
 
     try {
