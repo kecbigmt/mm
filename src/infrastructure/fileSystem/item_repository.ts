@@ -7,8 +7,10 @@ import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
 import {
+  deletePlacementEdge,
   type EdgeCollectionSnapshot,
   readEdgeCollection,
+  savePlacementEdge,
   writeEdgeCollection,
 } from "./edge_store.ts";
 
@@ -93,6 +95,18 @@ const itemDirectoryFromSnapshot = (
 };
 
 const edgesDirectory = (directory: string): string => join(directory, "edges");
+
+/**
+ * Check if a path represents a top-level date section
+ * A top-level date path has exactly one segment that is a date
+ */
+const isTopLevelDatePath = (path: Path): boolean => {
+  if (path.segments.length !== 1) {
+    return false;
+  }
+  const segment = path.segments[0];
+  return segment.kind === "Date";
+};
 
 const readMetaSnapshot = async (
   directory: string,
@@ -436,6 +450,15 @@ export const createFileSystemItemRepository = (
     const snapshot = item.toJSON();
     const directory = itemDirectoryFromSnapshot(dependencies, snapshot);
 
+    // Load existing item to check if path changed (for edge file cleanup)
+    const existingResult = await load(item.data.id);
+    if (existingResult.type === "error") {
+      // Propagate errors (IO, deserialization, etc.)
+      // Note: load() returns Result.ok(undefined) for NotFound, so errors here are real failures
+      return existingResult;
+    }
+    const existingItem = existingResult.value;
+
     try {
       await Deno.mkdir(directory, { recursive: true });
     } catch (error) {
@@ -459,12 +482,234 @@ export const createFileSystemItemRepository = (
       return contentResult;
     }
 
+    // Save child edges (items under this item)
     const edgesResult = await writeEdgeCollection(item.edges, {
       directory: edgesDirectory(directory),
       identifier: snapshot.id,
     });
     if (edgesResult.type === "error") {
       return edgesResult;
+    }
+
+    // Handle top-level edge file updates
+    const newPathIsTopLevel = isTopLevelDatePath(item.data.path);
+    const oldPathIsTopLevel = existingItem ? isTopLevelDatePath(existingItem.data.path) : false;
+
+    // If path changed from top-level to non-top-level, delete old top-level edge
+    if (existingItem && oldPathIsTopLevel && !newPathIsTopLevel) {
+      const oldDateSegment = existingItem.data.path.segments[0];
+      if (oldDateSegment.kind === "Date") {
+        const oldDateStr = oldDateSegment.value.toString();
+        const deleteResult = await deletePlacementEdge(
+          dependencies.root,
+          oldDateStr,
+          item.data.id,
+        );
+        if (deleteResult.type === "error") {
+          return deleteResult;
+        }
+      }
+    }
+
+    // If path changed between different top-level dates, delete old and create new
+    if (existingItem && oldPathIsTopLevel && newPathIsTopLevel) {
+      const oldDateSegment = existingItem.data.path.segments[0];
+      const newDateSegment = item.data.path.segments[0];
+      if (
+        oldDateSegment.kind === "Date" &&
+        newDateSegment.kind === "Date" &&
+        oldDateSegment.value.toString() !== newDateSegment.value.toString()
+      ) {
+        const oldDateStr = oldDateSegment.value.toString();
+        const deleteResult = await deletePlacementEdge(
+          dependencies.root,
+          oldDateStr,
+          item.data.id,
+        );
+        if (deleteResult.type === "error") {
+          return deleteResult;
+        }
+      }
+    }
+
+    // If path changed from non-top-level to top-level, delete old parent edge
+    if (existingItem && !oldPathIsTopLevel && newPathIsTopLevel) {
+      const oldPathSegments = existingItem.data.path.segments;
+      if (oldPathSegments.length >= 2 && oldPathSegments[1].kind === "ItemId") {
+        const oldParentId = oldPathSegments[1].value as ItemId;
+        const oldSectionSegments = oldPathSegments.slice(2);
+        const oldSectionPath = oldSectionSegments
+          .filter((seg) => seg.kind !== "range")
+          .map((seg) => seg.toString())
+          .join("/");
+
+        // Load old parent to get its physical directory
+        const oldParentResult = await load(oldParentId);
+        if (oldParentResult.type === "ok" && oldParentResult.value) {
+          const oldParentSnapshot = oldParentResult.value.toJSON();
+          const oldParentDirectory = itemDirectoryFromSnapshot(dependencies, oldParentSnapshot);
+
+          const oldEdgeDir = oldSectionPath
+            ? join(oldParentDirectory, "edges", oldSectionPath)
+            : join(oldParentDirectory, "edges");
+          const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
+
+          // Delete old edge file
+          try {
+            await Deno.remove(oldEdgeFilePath);
+          } catch (error) {
+            if (!(error instanceof Deno.errors.NotFound)) {
+              return Result.error(
+                createRepositoryError("item", "save", "failed to delete old parent edge file", {
+                  identifier: snapshot.id,
+                  cause: error,
+                }),
+              );
+            }
+          }
+        }
+      }
+    }
+
+    // Save top-level placement edge if this item is placed under a date section
+    if (newPathIsTopLevel) {
+      const dateSegment = item.data.path.segments[0];
+      if (dateSegment.kind === "Date") {
+        const dateStr = dateSegment.value.toString(); // YYYY-MM-DD format
+        const topLevelResult = await savePlacementEdge(
+          dependencies.root,
+          dateStr,
+          item.data.id,
+          item.data.rank,
+        );
+        if (topLevelResult.type === "error") {
+          return topLevelResult;
+        }
+      }
+    } else {
+      // If not top-level, save edge file in parent item's edges directory
+      // Path format: /date/parent-id/section1/section2/.../this-item
+      // We need to save edge in parent-id's edges/section1/section2/... directory
+      const pathSegments = item.data.path.segments;
+
+      // Delete old parent edge if path changed from non-top-level parent
+      if (existingItem && !oldPathIsTopLevel) {
+        const oldPathSegments = existingItem.data.path.segments;
+        if (oldPathSegments.length >= 2 && oldPathSegments[1].kind === "ItemId") {
+          const oldParentId = oldPathSegments[1].value as ItemId;
+          const oldSectionSegments = oldPathSegments.slice(2);
+          const oldSectionPath = oldSectionSegments
+            .filter((seg) => seg.kind !== "range")
+            .map((seg) => seg.toString())
+            .join("/");
+
+          // Check if parent or section changed
+          const newParentId = pathSegments.length >= 2 && pathSegments[1].kind === "ItemId"
+            ? pathSegments[1].value as ItemId
+            : null;
+          const newSectionSegments = pathSegments.slice(2);
+          const newSectionPath = newSectionSegments
+            .filter((seg) => seg.kind !== "range")
+            .map((seg) => seg.toString())
+            .join("/");
+
+          const parentChanged = !newParentId || oldParentId.toString() !== newParentId.toString();
+          const sectionChanged = oldSectionPath !== newSectionPath;
+
+          if (parentChanged || sectionChanged) {
+            // Load old parent to get its physical directory
+            const oldParentResult = await load(oldParentId);
+            if (oldParentResult.type === "ok" && oldParentResult.value) {
+              const oldParentSnapshot = oldParentResult.value.toJSON();
+              const oldParentDirectory = itemDirectoryFromSnapshot(dependencies, oldParentSnapshot);
+
+              const oldEdgeDir = oldSectionPath
+                ? join(oldParentDirectory, "edges", oldSectionPath)
+                : join(oldParentDirectory, "edges");
+              const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
+
+              // Delete old edge file
+              try {
+                await Deno.remove(oldEdgeFilePath);
+              } catch (error) {
+                if (!(error instanceof Deno.errors.NotFound)) {
+                  return Result.error(
+                    createRepositoryError("item", "save", "failed to delete old parent edge file", {
+                      identifier: snapshot.id,
+                      cause: error,
+                    }),
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Save new parent edge file
+      if (pathSegments.length >= 2) {
+        // First segment is date, second is parent ID
+        const parentSegment = pathSegments[1];
+        if (parentSegment.kind === "ItemId") {
+          const parentId = parentSegment.value;
+
+          // Load parent item to get its physical directory
+          const parentResult = await load(parentId as ItemId);
+          if (parentResult.type === "ok" && parentResult.value) {
+            const parentSnapshot = parentResult.value.toJSON();
+            const parentDirectory = itemDirectoryFromSnapshot(dependencies, parentSnapshot);
+
+            // Build section path from remaining segments
+            const sectionSegments = pathSegments.slice(2); // Skip date and parent
+            const sectionPath = sectionSegments
+              .filter((seg) => seg.kind !== "range")
+              .map((seg) => seg.toString())
+              .join("/");
+
+            // Edge directory: parent/edges/section1/section2/...
+            const edgeDir = sectionPath
+              ? join(parentDirectory, "edges", sectionPath)
+              : join(parentDirectory, "edges");
+
+            // Create edge file for this item in parent's edge directory
+            const edgeFilePath = join(edgeDir, `${item.data.id.toString()}.edge.json`);
+
+            // Ensure edge directory exists
+            try {
+              await Deno.mkdir(edgeDir, { recursive: true });
+            } catch (error) {
+              if (!(error instanceof Deno.errors.AlreadyExists)) {
+                return Result.error(
+                  createRepositoryError("item", "save", "failed to create edge directory", {
+                    identifier: snapshot.id,
+                    cause: error,
+                  }),
+                );
+              }
+            }
+
+            // Write edge file
+            const edgeSnapshot = {
+              schema: "mm.edge/1",
+              from: parentId.toString(),
+              to: item.data.id.toString(),
+              rank: item.data.rank.toString(),
+            };
+            const edgePayload = JSON.stringify(edgeSnapshot, null, 2);
+
+            try {
+              await Deno.writeTextFile(edgeFilePath, `${edgePayload}\n`);
+            } catch (error) {
+              return Result.error(
+                createRepositoryError("item", "save", "failed to write parent edge file", {
+                  identifier: snapshot.id,
+                  cause: error,
+                }),
+              );
+            }
+          }
+        }
+      }
     }
 
     return Result.ok(undefined);
@@ -480,6 +725,71 @@ export const createFileSystemItemRepository = (
     const directory = directoryResult.value;
     if (!directory) {
       return Result.ok(undefined);
+    }
+
+    // Load item to get its path for top-level edge cleanup
+    const itemResult = await loadItemFromDirectory(directory, idStr);
+    if (itemResult.type === "error") {
+      return itemResult;
+    }
+
+    const item = itemResult.value;
+
+    if (item) {
+      const pathIsTopLevel = isTopLevelDatePath(item.data.path);
+
+      // Delete top-level edge if item was placed under a date section
+      if (pathIsTopLevel) {
+        const dateSegment = item.data.path.segments[0];
+        if (dateSegment.kind === "Date") {
+          const dateStr = dateSegment.value.toString();
+          const topLevelResult = await deletePlacementEdge(
+            dependencies.root,
+            dateStr,
+            id,
+          );
+          if (topLevelResult.type === "error") {
+            return topLevelResult;
+          }
+        }
+      } else {
+        // Delete parent edge if item was placed under a parent
+        const pathSegments = item.data.path.segments;
+        if (pathSegments.length >= 2 && pathSegments[1].kind === "ItemId") {
+          const parentId = pathSegments[1].value as ItemId;
+          const sectionSegments = pathSegments.slice(2);
+          const sectionPath = sectionSegments
+            .filter((seg) => seg.kind !== "range")
+            .map((seg) => seg.toString())
+            .join("/");
+
+          // Load parent to get its physical directory
+          const parentResult = await load(parentId);
+          if (parentResult.type === "ok" && parentResult.value) {
+            const parentSnapshot = parentResult.value.toJSON();
+            const parentDirectory = itemDirectoryFromSnapshot(dependencies, parentSnapshot);
+
+            const edgeDir = sectionPath
+              ? join(parentDirectory, "edges", sectionPath)
+              : join(parentDirectory, "edges");
+            const edgeFilePath = join(edgeDir, `${id.toString()}.edge.json`);
+
+            // Delete parent edge file
+            try {
+              await Deno.remove(edgeFilePath);
+            } catch (error) {
+              if (!(error instanceof Deno.errors.NotFound)) {
+                return Result.error(
+                  createRepositoryError("item", "delete", "failed to delete parent edge file", {
+                    identifier: idStr,
+                    cause: error,
+                  }),
+                );
+              }
+            }
+          }
+        }
+      }
     }
 
     try {
