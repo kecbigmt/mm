@@ -272,38 +272,86 @@ describe("Scenario 15: Git-friendly diffs", () => {
     );
     assertExists(physicalPathBefore, "Item should exist before move");
 
-    // Move item1 under project
-    const mvResult = await runCommand(ctx.testHome, [
+    // Part 1: Move item1 from top-level to under project
+    const mvResult1 = await runCommand(ctx.testHome, [
       "mv",
       item1Id,
       projectAlias ? `${projectAlias}/1` : `${projectId}/1`,
     ]);
-    assertEquals(mvResult.success, true, `Move failed: ${mvResult.stderr}`);
+    assertEquals(mvResult1.success, true, `Move to parent failed: ${mvResult1.stderr}`);
 
-    // Check git status
-    const status = await gitStatus(workspaceDir);
+    // Check git status after moving to parent
+    const status1 = await gitStatus(workspaceDir);
 
     // Verify content.md was not modified
-    const hasContentChanges = status.modified.some((file) =>
-      file.includes(`${item1Id}/content.md`)
+    assertEquals(
+      status1.modified.some((file) => file.includes(`${item1Id}/content.md`)),
+      false,
+      "content.md should not be modified when moving to parent",
     );
-    assertEquals(hasContentChanges, false, "content.md should not be modified");
 
-    // Verify edge files changed (top-level edge deleted, parent edge added)
-    const hasEdgeChanges = status.added.some((file) => file.includes(".edge.json")) ||
-      status.deleted.some((file) => file.includes(".edge.json"));
-    assertEquals(hasEdgeChanges, true, "Edge files should be changed");
+    // Verify top-level edge deleted and parent edge added
+    const hasTopLevelEdgeDeleted = status1.deleted.some((file) =>
+      file.includes(`edges.top/dates/${todayDate}/${item1Id}.edge.json`)
+    );
+    const hasParentEdgeAdded = status1.added.some((file) =>
+      file.includes(`${projectId}/edges/1/${item1Id}.edge.json`)
+    );
+    assertEquals(hasTopLevelEdgeDeleted, true, "Top-level edge should be deleted");
+    assertEquals(hasParentEdgeAdded, true, "Parent edge should be added");
 
     // Verify physical location unchanged
-    const physicalPathAfter = await findItemDirectoryById(
+    const physicalPathAfterMove1 = await findItemDirectoryById(
       ctx.testHome,
       "test-workspace",
       item1Id,
     );
     assertEquals(
-      physicalPathAfter,
+      physicalPathAfterMove1,
       physicalPathBefore,
-      "Physical path should not change after move",
+      "Physical path should not change after move to parent",
+    );
+
+    await gitCommit(workspaceDir, "Move item under project");
+
+    // Part 2: Move item1 back to top-level
+    const mvResult2 = await runCommand(ctx.testHome, [
+      "mv",
+      item1Id,
+      `head:today`,
+    ]);
+    assertEquals(mvResult2.success, true, `Move to top-level failed: ${mvResult2.stderr}`);
+
+    // Check git status after moving back to top-level
+    const status2 = await gitStatus(workspaceDir);
+
+    // Verify content.md was not modified
+    assertEquals(
+      status2.modified.some((file) => file.includes(`${item1Id}/content.md`)),
+      false,
+      "content.md should not be modified when moving to top-level",
+    );
+
+    // Verify parent edge deleted and top-level edge added
+    const hasParentEdgeDeleted = status2.deleted.some((file) =>
+      file.includes(`${projectId}/edges/1/${item1Id}.edge.json`)
+    );
+    const hasTopLevelEdgeAdded = status2.added.some((file) =>
+      file.includes(`edges.top/dates/${todayDate}/${item1Id}.edge.json`)
+    );
+    assertEquals(hasParentEdgeDeleted, true, "Parent edge should be deleted");
+    assertEquals(hasTopLevelEdgeAdded, true, "Top-level edge should be added");
+
+    // Verify physical location still unchanged
+    const physicalPathAfterMove2 = await findItemDirectoryById(
+      ctx.testHome,
+      "test-workspace",
+      item1Id,
+    );
+    assertEquals(
+      physicalPathAfterMove2,
+      physicalPathBefore,
+      "Physical path should not change after move to top-level",
     );
   });
 
