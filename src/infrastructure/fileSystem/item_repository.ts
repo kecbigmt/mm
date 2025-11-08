@@ -531,6 +531,45 @@ export const createFileSystemItemRepository = (
       }
     }
 
+    // If path changed from non-top-level to top-level, delete old parent edge
+    if (existingItem && !oldPathIsTopLevel && newPathIsTopLevel) {
+      const oldPathSegments = existingItem.data.path.segments;
+      if (oldPathSegments.length >= 2 && oldPathSegments[1].kind === "ItemId") {
+        const oldParentId = oldPathSegments[1].value as ItemId;
+        const oldSectionSegments = oldPathSegments.slice(2);
+        const oldSectionPath = oldSectionSegments
+          .filter((seg) => seg.kind !== "range")
+          .map((seg) => seg.toString())
+          .join("/");
+
+        // Load old parent to get its physical directory
+        const oldParentResult = await load(oldParentId);
+        if (oldParentResult.type === "ok" && oldParentResult.value) {
+          const oldParentSnapshot = oldParentResult.value.toJSON();
+          const oldParentDirectory = itemDirectoryFromSnapshot(dependencies, oldParentSnapshot);
+
+          const oldEdgeDir = oldSectionPath
+            ? join(oldParentDirectory, "edges", oldSectionPath)
+            : join(oldParentDirectory, "edges");
+          const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
+
+          // Delete old edge file
+          try {
+            await Deno.remove(oldEdgeFilePath);
+          } catch (error) {
+            if (!(error instanceof Deno.errors.NotFound)) {
+              return Result.error(
+                createRepositoryError("item", "save", "failed to delete old parent edge file", {
+                  identifier: snapshot.id,
+                  cause: error,
+                }),
+              );
+            }
+          }
+        }
+      }
+    }
+
     // Save top-level placement edge if this item is placed under a date section
     if (newPathIsTopLevel) {
       const dateSegment = item.data.path.segments[0];
