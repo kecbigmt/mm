@@ -734,18 +734,59 @@ export const createFileSystemItemRepository = (
 
     const item = itemResult.value;
 
-    // Delete top-level edge if item was placed under a date section
-    if (item && isTopLevelDatePath(item.data.path)) {
-      const dateSegment = item.data.path.segments[0];
-      if (dateSegment.kind === "Date") {
-        const dateStr = dateSegment.value.toString();
-        const topLevelResult = await deletePlacementEdge(
-          dependencies.root,
-          dateStr,
-          id,
-        );
-        if (topLevelResult.type === "error") {
-          return topLevelResult;
+    if (item) {
+      const pathIsTopLevel = isTopLevelDatePath(item.data.path);
+
+      // Delete top-level edge if item was placed under a date section
+      if (pathIsTopLevel) {
+        const dateSegment = item.data.path.segments[0];
+        if (dateSegment.kind === "Date") {
+          const dateStr = dateSegment.value.toString();
+          const topLevelResult = await deletePlacementEdge(
+            dependencies.root,
+            dateStr,
+            id,
+          );
+          if (topLevelResult.type === "error") {
+            return topLevelResult;
+          }
+        }
+      } else {
+        // Delete parent edge if item was placed under a parent
+        const pathSegments = item.data.path.segments;
+        if (pathSegments.length >= 2 && pathSegments[1].kind === "ItemId") {
+          const parentId = pathSegments[1].value as ItemId;
+          const sectionSegments = pathSegments.slice(2);
+          const sectionPath = sectionSegments
+            .filter((seg) => seg.kind !== "range")
+            .map((seg) => seg.toString())
+            .join("/");
+
+          // Load parent to get its physical directory
+          const parentResult = await load(parentId);
+          if (parentResult.type === "ok" && parentResult.value) {
+            const parentSnapshot = parentResult.value.toJSON();
+            const parentDirectory = itemDirectoryFromSnapshot(dependencies, parentSnapshot);
+
+            const edgeDir = sectionPath
+              ? join(parentDirectory, "edges", sectionPath)
+              : join(parentDirectory, "edges");
+            const edgeFilePath = join(edgeDir, `${id.toString()}.edge.json`);
+
+            // Delete parent edge file
+            try {
+              await Deno.remove(edgeFilePath);
+            } catch (error) {
+              if (!(error instanceof Deno.errors.NotFound)) {
+                return Result.error(
+                  createRepositoryError("item", "delete", "failed to delete parent edge file", {
+                    identifier: idStr,
+                    cause: error,
+                  }),
+                );
+              }
+            }
+          }
         }
       }
     }
