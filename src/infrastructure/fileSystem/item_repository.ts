@@ -453,10 +453,11 @@ export const createFileSystemItemRepository = (
     // Load existing item to check if path changed (for edge file cleanup)
     const existingResult = await load(item.data.id);
     if (existingResult.type === "error") {
-      // If error is not "not found", propagate it
-      // Otherwise, this is a new item, continue
+      // Propagate errors (IO, deserialization, etc.)
+      // Note: load() returns Result.ok(undefined) for NotFound, so errors here are real failures
+      return existingResult;
     }
-    const existingItem = existingResult.type === "ok" ? existingResult.value : undefined;
+    const existingItem = existingResult.value;
 
     try {
       await Deno.mkdir(directory, { recursive: true });
