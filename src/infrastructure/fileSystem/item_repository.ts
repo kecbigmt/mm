@@ -546,6 +546,74 @@ export const createFileSystemItemRepository = (
           return topLevelResult;
         }
       }
+    } else {
+      // If not top-level, save edge file in parent item's edges directory
+      // Path format: /date/parent-id/section1/section2/.../this-item
+      // We need to save edge in parent-id's edges/section1/section2/... directory
+      const pathSegments = item.data.path.segments;
+      if (pathSegments.length >= 2) {
+        // First segment is date, second is parent ID
+        const parentSegment = pathSegments[1];
+        if (parentSegment.kind === "ItemId") {
+          const parentId = parentSegment.value;
+
+          // Load parent item to get its physical directory
+          const parentResult = await load(parentId as ItemId);
+          if (parentResult.type === "ok" && parentResult.value) {
+            const parentSnapshot = parentResult.value.toJSON();
+            const parentDirectory = itemDirectoryFromSnapshot(dependencies, parentSnapshot);
+
+            // Build section path from remaining segments
+            const sectionSegments = pathSegments.slice(2); // Skip date and parent
+            const sectionPath = sectionSegments
+              .filter((seg) => seg.kind !== "range")
+              .map((seg) => seg.toString())
+              .join("/");
+
+            // Edge directory: parent/edges/section1/section2/...
+            const edgeDir = sectionPath
+              ? join(parentDirectory, "edges", sectionPath)
+              : join(parentDirectory, "edges");
+
+            // Create edge file for this item in parent's edge directory
+            const edgeFilePath = join(edgeDir, `${item.data.id.toString()}.edge.json`);
+
+            // Ensure edge directory exists
+            try {
+              await Deno.mkdir(edgeDir, { recursive: true });
+            } catch (error) {
+              if (!(error instanceof Deno.errors.AlreadyExists)) {
+                return Result.error(
+                  createRepositoryError("item", "save", "failed to create edge directory", {
+                    identifier: snapshot.id,
+                    cause: error,
+                  }),
+                );
+              }
+            }
+
+            // Write edge file
+            const edgeSnapshot = {
+              schema: "mm.edge/1",
+              from: parentId.toString(),
+              to: item.data.id.toString(),
+              rank: item.data.rank.toString(),
+            };
+            const edgePayload = JSON.stringify(edgeSnapshot, null, 2);
+
+            try {
+              await Deno.writeTextFile(edgeFilePath, `${edgePayload}\n`);
+            } catch (error) {
+              return Result.error(
+                createRepositoryError("item", "save", "failed to write parent edge file", {
+                  identifier: snapshot.id,
+                  cause: error,
+                }),
+              );
+            }
+          }
+        }
+      }
     }
 
     return Result.ok(undefined);
