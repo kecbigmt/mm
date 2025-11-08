@@ -60,3 +60,43 @@ denoTest("parseLocator rejects date ranges outside head", () => {
     throw new Error("expected error for date range outside head");
   }
 });
+
+denoTest("parseLocator preserves relative paths like ..", () => {
+  const cwd = parsePath("/2024-09-21/chapter1/1");
+  if (cwd.type !== "ok") {
+    throw new Error("expected cwd path");
+  }
+
+  const result = parseLocator("../", { cwd: cwd.value });
+  if (result.type !== "ok") {
+    throw new Error(`expected ok, received ${JSON.stringify(result.error)}`);
+  }
+  assertEquals(result.value.path.toString(), "/2024-09-21/chapter1");
+});
+
+denoTest("parseLocator preserves relative numeric section paths", () => {
+  const cwd = parsePath("/2024-09-21/chapter1");
+  if (cwd.type !== "ok") {
+    throw new Error("expected cwd path");
+  }
+
+  const result = parseLocator("1", { cwd: cwd.value });
+  if (result.type !== "ok") {
+    throw new Error(`expected ok, received ${JSON.stringify(result.error)}`);
+  }
+  assertEquals(result.value.path.toString(), "/2024-09-21/chapter1/1");
+  assert(!result.value.isRange());
+});
+
+denoTest("parseLocator handles relative path with multiple .. segments", () => {
+  const cwd = parsePath("/2024-09-21/chapter1/1/2");
+  if (cwd.type !== "ok") {
+    throw new Error("expected cwd path");
+  }
+
+  const result = parseLocator("../../", { cwd: cwd.value });
+  if (result.type !== "ok") {
+    throw new Error(`expected ok, received ${JSON.stringify(result.error)}`);
+  }
+  assertEquals(result.value.path.toString(), "/2024-09-21/chapter1");
+});

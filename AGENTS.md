@@ -28,12 +28,15 @@ is under `docs/`, with detailed product steerage in `docs/steering/design.md`.
 
 Follow Deno formatting via `deno fmt` (2-space indent, 100 column width) and lint with `deno lint`.
 Keep modules small, prefer named exports, and organise imports `@std` → external → relative. Use
-branded types and smart constructors (`parseX`) to “parse, don’t validate”. Models should be
+branded types and smart constructors (`parseX`) to "parse, don't validate". Models should be
 immutable; expose methods on frozen records (`Object.freeze`). Name files in `kebab_case.ts`, with
 tests mirroring the implementation name plus `_test`.
 
 - **Deno standards first** - Follow Deno conventions for naming, imports, and structure
-- **No comments unless explicitly requested** - Keep code self-documenting
+- **Code comments** - Keep code self-documenting through clear naming and structure. Write comments
+  in English to explain **why** (intent, design decisions, constraints) rather than **what**
+  (implementation details). Document purpose, rationale, and edge cases; avoid restating obvious
+  logic
 - **Latest jsr:@std packages** - Use official Deno standard library packages
 - **Test files alongside implementation** - Use `_test.ts` suffix following Deno conventions
 - **Pure functions** - Prefer immutable data and pure functions in functional core
@@ -41,7 +44,8 @@ tests mirroring the implementation name plus `_test`.
 - **Minimal dependencies** - Only add dependencies that provide significant value
 - **Unix philosophy** - Do one thing well, compose with other tools
 
-**This project has not yet been rolled out**, so there is no need to leave legacy code behind for backward compatibility or plan for a gradual migration.
+**This project has not yet been rolled out**, so there is no need to leave legacy code behind for
+backward compatibility or plan for a gradual migration.
 
 ## Design Patterns
 
@@ -67,6 +71,9 @@ workspace fixtures.
 - All tests must pass before commits: `deno task test`
 
 ## Commit & Pull Request Guidelines
+
+**Before every commit, run `deno lint` and `deno fmt`** to ensure code quality and consistency. All
+code must pass linting and formatting checks before being committed.
 
 Adopt Conventional Commits (`feat: add node relocation workflow`). Keep each commit small, with
 passing tests. Pull requests should summarize domain impact, list affected modules, and include

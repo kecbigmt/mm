@@ -1,6 +1,7 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
+import { PathNormalizationService } from "../../../domain/services/path_normalization_service.ts";
 import { parseLocator } from "../../../domain/primitives/locator.ts";
 
 export function createCdCommand() {
@@ -63,8 +64,24 @@ export function createCdCommand() {
         return;
       }
 
-      const setResult = await CwdResolutionService.setCwd(
+      // Normalize path for display (preserves aliases in the path for user-friendly CWD)
+      const normalizedResult = await PathNormalizationService.normalize(
         targetPath,
+        {
+          itemRepository: deps.itemRepository,
+          aliasRepository: deps.aliasRepository,
+        },
+        { preserveAlias: true },
+      );
+
+      if (normalizedResult.type === "error") {
+        console.error(normalizedResult.error.message);
+        return;
+      }
+
+      const normalizedPath = normalizedResult.value;
+      const setResult = await CwdResolutionService.setCwd(
+        normalizedPath,
         {
           stateRepository: deps.stateRepository,
           itemRepository: deps.itemRepository,

@@ -2,31 +2,40 @@ import { Result } from "../../shared/result.ts";
 import { createValidationIssue, ValidationIssue } from "../../shared/errors.ts";
 import { createItem, Item } from "../models/item.ts";
 import {
+  AliasSlug,
   createItemIcon,
   DateTime,
   ItemId,
   itemStatusOpen,
   itemTitleFromString,
+  parseAliasSlug,
   Path,
   TagSlug,
   tagSlugFromString,
 } from "../primitives/mod.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
+import { AliasRepository } from "../repositories/alias_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { RankService } from "../services/rank_service.ts";
 import { IdGenerationService } from "../services/id_generation_service.ts";
+import { AliasAutoGenerator } from "../services/alias_auto_generator.ts";
+import { PathNormalizationService } from "../services/path_normalization_service.ts";
+import { createAlias } from "../models/alias.ts";
 
 export type CreateItemInput = Readonly<{
   title: string;
   itemType: "note" | "task" | "event";
   body?: string;
   context?: string;
+  alias?: string;
   parentPath: Path;
   createdAt: DateTime;
 }>;
 
 export type CreateItemDependencies = Readonly<{
   itemRepository: ItemRepository;
+  aliasRepository: AliasRepository;
+  aliasAutoGenerator: AliasAutoGenerator;
   rankService: RankService;
   idGenerationService: IdGenerationService;
 }>;
@@ -98,6 +107,48 @@ export const CreateItemWorkflow = {
       }
     }
 
+    let alias: AliasSlug | undefined;
+    if (typeof input.alias === "string") {
+      const aliasResult = parseAliasSlug(input.alias);
+      if (aliasResult.type === "error") {
+        issues.push(
+          ...aliasResult.error.issues.map((issue) =>
+            createValidationIssue(issue.message, {
+              code: issue.code,
+              path: ["alias", ...issue.path],
+            })
+          ),
+        );
+      } else {
+        alias = aliasResult.value;
+      }
+    } else {
+      // Generate automatic alias if not provided
+      // Try up to 10 times to find a unique alias
+      const MAX_RETRIES = 10;
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        const autoAliasResult = deps.aliasAutoGenerator.generate();
+        if (autoAliasResult.type === "error") {
+          // If generation fails, continue without alias
+          break;
+        }
+        const candidateAlias = autoAliasResult.value;
+        // Check if alias already exists
+        const existingAliasResult = await deps.aliasRepository.load(candidateAlias);
+        if (existingAliasResult.type === "error") {
+          // If load fails, we can't verify uniqueness, so skip auto-generation
+          break;
+        }
+        if (existingAliasResult.value === undefined) {
+          // Alias is available, use it
+          alias = candidateAlias;
+          break;
+        }
+        // Alias exists, try again
+      }
+      // If no unique alias found after retries, continue without alias
+    }
+
     if (input.parentPath.isRange()) {
       issues.push(
         createValidationIssue("parent path cannot be a range", {
@@ -127,8 +178,27 @@ export const CreateItemWorkflow = {
     const resolvedId = id as ItemId;
     const resolvedTitle = title!;
 
-    const siblingsResult = await deps.itemRepository.listByPath(
+    // Normalize parent path before querying repository
+    const normalizedResult = await PathNormalizationService.normalize(
       input.parentPath,
+      {
+        itemRepository: deps.itemRepository,
+        aliasRepository: deps.aliasRepository,
+      },
+      { preserveAlias: false },
+    );
+
+    if (normalizedResult.type === "error") {
+      // Map PathNormalizationError to CreateItemError
+      if (normalizedResult.error.kind === "ValidationError") {
+        return Result.error(invalidInput(normalizedResult.error.issues));
+      }
+      return Result.error(repositoryFailure(normalizedResult.error));
+    }
+
+    const normalizedParentPath = normalizedResult.value;
+    const siblingsResult = await deps.itemRepository.listByPath(
+      normalizedParentPath,
     );
     if (siblingsResult.type === "error") {
       return Result.error(repositoryFailure(siblingsResult.error));
@@ -155,22 +225,58 @@ export const CreateItemWorkflow = {
     const trimmedBody = typeof input.body === "string" ? input.body.trim() : undefined;
     const body = trimmedBody && trimmedBody.length > 0 ? trimmedBody : undefined;
 
+    // Check for alias conflicts if alias is provided (manual or auto-generated)
+    if (alias) {
+      const existingAliasResult = await deps.aliasRepository.load(alias);
+      if (existingAliasResult.type === "error") {
+        return Result.error(repositoryFailure(existingAliasResult.error));
+      }
+      if (existingAliasResult.value) {
+        // This shouldn't happen for auto-generated aliases (we check before using),
+        // but can happen for manual aliases if there's a race condition
+        issues.push(
+          createValidationIssue(
+            `alias '${alias.toString()}' already exists`,
+            {
+              code: "alias_conflict",
+              path: ["alias"],
+            },
+          ),
+        );
+        return Result.error(invalidInput(issues));
+      }
+    }
+
     const item = createItem({
       id: resolvedId,
       title: resolvedTitle,
       icon: createItemIcon(input.itemType),
       status: itemStatusOpen(),
-      path: input.parentPath,
+      path: normalizedParentPath,
       rank: rankResult.value,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,
       body,
       context,
+      alias,
     });
 
     const saveResult = await deps.itemRepository.save(item);
     if (saveResult.type === "error") {
       return Result.error(repositoryFailure(saveResult.error));
+    }
+
+    // Save alias to alias repository if provided or auto-generated
+    if (alias) {
+      const aliasModel = createAlias({
+        slug: alias,
+        itemId: resolvedId,
+        createdAt: input.createdAt,
+      });
+      const aliasSaveResult = await deps.aliasRepository.save(aliasModel);
+      if (aliasSaveResult.type === "error") {
+        return Result.error(repositoryFailure(aliasSaveResult.error));
+      }
     }
 
     return Result.ok({ item });

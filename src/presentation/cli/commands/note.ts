@@ -3,8 +3,11 @@ import { loadCliDependencies } from "../dependencies.ts";
 import { dateTimeFromDate, parseLocator } from "../../../domain/primitives/mod.ts";
 import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
+import { PathNormalizationService } from "../../../domain/services/path_normalization_service.ts";
 
-const formatShortId = (id: string): string => id.slice(-7);
+const formatItemLabel = (
+  item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
+): string => item.data.alias ? item.data.alias.toString() : item.data.id.toString();
 
 const reportValidationIssues = (
   issues: ReadonlyArray<{ path: ReadonlyArray<string | number>; message: string }>,
@@ -23,6 +26,7 @@ export function createNoteCommand() {
     .option("-b, --body <body:string>", "Body text")
     .option("-p, --parent <parent:string>", "Parent locator (e.g., /2025-11-03, /alias, ./1)")
     .option("-c, --context <context:string>", "Context tag")
+    .option("-a, --alias <alias:string>", "Alias for the item")
     .option("-e, --edit", "Open editor after creation")
     .action(async (options: Record<string, unknown>, title?: string) => {
       const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
@@ -57,7 +61,7 @@ export function createNoteCommand() {
         return;
       }
 
-      const parentPath = (() => {
+      const parentPath = (async () => {
         if (!parentArg) {
           return cwdResult.value;
         }
@@ -79,10 +83,27 @@ export function createNoteCommand() {
           return undefined;
         }
 
-        return locatorResult.value.path;
+        // Normalize path for display (preserves aliases in the path)
+        // CreateItemWorkflow will normalize again for comparison purposes
+        const normalizedResult = await PathNormalizationService.normalize(
+          locatorResult.value.path,
+          {
+            itemRepository: deps.itemRepository,
+            aliasRepository: deps.aliasRepository,
+          },
+          { preserveAlias: true },
+        );
+
+        if (normalizedResult.type === "error") {
+          console.error(normalizedResult.error.message);
+          return undefined;
+        }
+
+        return normalizedResult.value;
       })();
 
-      if (!parentPath) {
+      const resolvedParentPath = await parentPath;
+      if (!resolvedParentPath) {
         return;
       }
 
@@ -94,16 +115,20 @@ export function createNoteCommand() {
 
       const bodyOption = typeof options.body === "string" ? options.body : undefined;
       const contextOption = typeof options.context === "string" ? options.context : undefined;
+      const aliasOption = typeof options.alias === "string" ? options.alias : undefined;
 
       const workflowResult = await CreateItemWorkflow.execute({
         title: resolvedTitle,
         itemType: "note",
         body: bodyOption,
         context: contextOption,
-        parentPath,
+        alias: aliasOption,
+        parentPath: resolvedParentPath,
         createdAt: createdAtResult.value,
       }, {
         itemRepository: deps.itemRepository,
+        aliasRepository: deps.aliasRepository,
+        aliasAutoGenerator: deps.aliasAutoGenerator,
         rankService: deps.rankService,
         idGenerationService: deps.idGenerationService,
       });
@@ -119,9 +144,9 @@ export function createNoteCommand() {
       }
 
       const item = workflowResult.value.item;
-      const shortId = formatShortId(item.data.id.toString());
+      const label = formatItemLabel(item);
       console.log(
-        `✅ Created note [${shortId}] ${item.data.title.toString()} at ${parentPath.toString()}`,
+        `✅ Created note [${label}] ${item.data.title.toString()} at ${resolvedParentPath.toString()}`,
       );
 
       if (options.edit === true) {

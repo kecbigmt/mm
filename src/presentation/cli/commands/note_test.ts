@@ -116,30 +116,19 @@ Deno.test({
 
       const metaPath = join(itemDirectory, "meta.json");
       const metaSnapshot = JSON.parse(await Deno.readTextFile(metaPath)) as {
-        readonly title: string;
+        readonly title?: string;
         readonly path: string;
         readonly rank: string;
       };
 
-      assertEquals(metaSnapshot.title, "Integration note");
+      assertEquals(metaSnapshot.title, undefined, "title should not be in meta.json");
       assertEquals(metaSnapshot.path, "/2024-01-05");
       assert(metaSnapshot.rank.length > 0, "rank should be persisted");
 
       const contentPath = join(itemDirectory, "content.md");
-      let contentExists = false;
-      try {
-        await Deno.stat(contentPath);
-        contentExists = true;
-      } catch (error) {
-        if (!(error instanceof Deno.errors.NotFound)) {
-          throw error;
-        }
-      }
-
-      if (contentExists) {
-        const body = await Deno.readTextFile(contentPath);
-        assertEquals(body.trim(), "Integration note");
-      }
+      const content = await Deno.readTextFile(contentPath);
+      assert(content.startsWith("# Integration note"), "content.md should start with H1 title");
+      assertEquals(content.trim(), "# Integration note");
     } finally {
       await Deno.remove(workspace, { recursive: true });
     }
