@@ -147,9 +147,14 @@ describe("Scenario 2: Item creation and listing", () => {
     assertEquals(typeof meta.createdAt, "string", "meta.json should have createdAt");
     assertEquals(typeof meta.updatedAt, "string", "meta.json should have updatedAt");
 
-    const edgesDir = join(itemDir, "edges");
+    // Verify child edges directory exists in .index/graph/parents
+    const edgesDir = join(workspaceDir, ".index", "graph", "parents", itemDirs[0]);
     const edgesDirStat = await Deno.stat(edgesDir);
-    assertEquals(edgesDirStat.isDirectory, true, "edges directory should exist");
+    assertEquals(
+      edgesDirStat.isDirectory,
+      true,
+      "edges index directory should exist in .index/graph/parents",
+    );
   });
 
   it("stores item metadata correctly", async () => {

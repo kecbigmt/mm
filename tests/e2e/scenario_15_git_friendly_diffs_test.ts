@@ -212,16 +212,26 @@ describe("Scenario 15: Git-friendly diffs", () => {
 
     const hasContentMd = status.added.some((file) => file.includes(`${itemPath}/content.md`));
     const hasMetaJson = status.added.some((file) => file.includes(`${itemPath}/meta.json`));
-    const hasTopLevelEdge = status.added.some((file) =>
-      file.includes(`edges.top/dates/${todayDate}/${itemId}.edge.json`)
-    );
 
     assertEquals(hasContentMd, true, `${itemPath}/content.md should be added`);
     assertEquals(hasMetaJson, true, `${itemPath}/meta.json should be added`);
+
+    // .index is gitignored, so verify edge file existence in filesystem
+    const edgeFilePath = join(
+      workspaceDir,
+      ".index",
+      "graph",
+      "dates",
+      todayDate,
+      `${itemId}.edge.json`,
+    );
+    const edgeFileExists = await Deno.stat(edgeFilePath)
+      .then(() => true)
+      .catch(() => false);
     assertEquals(
-      hasTopLevelEdge,
+      edgeFileExists,
       true,
-      `edges.top/dates/${todayDate}/${itemId}.edge.json should be added`,
+      `.index/graph/dates/${todayDate}/${itemId}.edge.json should exist in filesystem`,
     );
 
     // Commit
@@ -290,15 +300,35 @@ describe("Scenario 15: Git-friendly diffs", () => {
       "content.md should not be modified when moving to parent",
     );
 
-    // Verify top-level edge deleted and parent edge added
-    const hasTopLevelEdgeDeleted = status1.deleted.some((file) =>
-      file.includes(`edges.top/dates/${todayDate}/${item1Id}.edge.json`)
+    // .index is gitignored, so verify edge files in filesystem
+    // Top-level edge should be deleted
+    const topLevelEdgePath = join(
+      workspaceDir,
+      ".index",
+      "graph",
+      "dates",
+      todayDate,
+      `${item1Id}.edge.json`,
     );
-    const hasParentEdgeAdded = status1.added.some((file) =>
-      file.includes(`${projectId}/edges/1/${item1Id}.edge.json`)
+    const topLevelEdgeExists = await Deno.stat(topLevelEdgePath)
+      .then(() => true)
+      .catch(() => false);
+    assertEquals(topLevelEdgeExists, false, "Top-level edge should be deleted");
+
+    // Parent edge should be added
+    const parentEdgePath = join(
+      workspaceDir,
+      ".index",
+      "graph",
+      "parents",
+      projectId,
+      "1",
+      `${item1Id}.edge.json`,
     );
-    assertEquals(hasTopLevelEdgeDeleted, true, "Top-level edge should be deleted");
-    assertEquals(hasParentEdgeAdded, true, "Parent edge should be added");
+    const parentEdgeExists = await Deno.stat(parentEdgePath)
+      .then(() => true)
+      .catch(() => false);
+    assertEquals(parentEdgeExists, true, "Parent edge should be added");
 
     // Verify physical location unchanged
     const physicalPathAfterMove1 = await findItemDirectoryById(
@@ -332,15 +362,35 @@ describe("Scenario 15: Git-friendly diffs", () => {
       "content.md should not be modified when moving to top-level",
     );
 
-    // Verify parent edge deleted and top-level edge added
-    const hasParentEdgeDeleted = status2.deleted.some((file) =>
-      file.includes(`${projectId}/edges/1/${item1Id}.edge.json`)
+    // .index is gitignored, so verify edge files in filesystem
+    // Parent edge should be deleted
+    const parentEdgePathAfter = join(
+      workspaceDir,
+      ".index",
+      "graph",
+      "parents",
+      projectId,
+      "1",
+      `${item1Id}.edge.json`,
     );
-    const hasTopLevelEdgeAdded = status2.added.some((file) =>
-      file.includes(`edges.top/dates/${todayDate}/${item1Id}.edge.json`)
+    const parentEdgeExistsAfter = await Deno.stat(parentEdgePathAfter)
+      .then(() => true)
+      .catch(() => false);
+    assertEquals(parentEdgeExistsAfter, false, "Parent edge should be deleted");
+
+    // Top-level edge should be added
+    const topLevelEdgePathAfter = join(
+      workspaceDir,
+      ".index",
+      "graph",
+      "dates",
+      todayDate,
+      `${item1Id}.edge.json`,
     );
-    assertEquals(hasParentEdgeDeleted, true, "Parent edge should be deleted");
-    assertEquals(hasTopLevelEdgeAdded, true, "Top-level edge should be added");
+    const topLevelEdgeExistsAfter = await Deno.stat(topLevelEdgePathAfter)
+      .then(() => true)
+      .catch(() => false);
+    assertEquals(topLevelEdgeExistsAfter, true, "Top-level edge should be added");
 
     // Verify physical location still unchanged
     const physicalPathAfterMove2 = await findItemDirectoryById(
@@ -399,15 +449,28 @@ describe("Scenario 15: Git-friendly diffs", () => {
     // Check git status
     const status = await gitStatus(workspaceDir);
 
-    // Only edge file should be modified (rank is stored in edge file per design spec)
-    const edgeFileModified = status.modified.some((file) =>
-      file.includes(`edges.top/dates/${todayDate}/${item1Id}.edge.json`)
-    );
-    assertEquals(edgeFileModified, true, "Edge file should be modified");
+    // Rank is stored in meta.json (per new design: meta.json is source of truth)
+    // meta.json should be modified
+    const metaModified = status.modified.some((file) => file.includes(`${item1Id}/meta.json`));
+    assertEquals(metaModified, true, "meta.json should be modified for rank change");
 
     // content.md should not be modified
     const contentModified = status.modified.some((file) => file.includes(`${item1Id}/content.md`));
     assertEquals(contentModified, false, "content.md should not be modified");
+
+    // .index is gitignored, but edge file should exist in filesystem with updated rank
+    const edgeFilePath = join(
+      workspaceDir,
+      ".index",
+      "graph",
+      "dates",
+      todayDate,
+      `${item1Id}.edge.json`,
+    );
+    const edgeFileExists = await Deno.stat(edgeFilePath)
+      .then(() => true)
+      .catch(() => false);
+    assertEquals(edgeFileExists, true, "Edge file should exist in filesystem");
   });
 
   it("15.6: Status change affects only meta.json", async () => {
@@ -514,19 +577,30 @@ describe("Scenario 15: Git-friendly diffs", () => {
     assertEquals(hasContentMd, true, `${pageItemPath}/content.md should be added`);
     assertEquals(hasMetaJson, true, `${pageItemPath}/meta.json should be added`);
 
-    // Verify edge file for sub-section was added (project/edges/1/1/<page>.edge.json)
-    const hasSubsectionEdge = status.added.some((file) =>
-      file.includes(`${projectId}/edges/1/1/${pageId}.edge.json`)
+    // .index is gitignored, so verify edge file in filesystem
+    const subsectionEdgePath = join(
+      workspaceDir,
+      ".index",
+      "graph",
+      "parents",
+      projectId,
+      "1",
+      "1",
+      `${pageId}.edge.json`,
     );
+    const subsectionEdgeExists = await Deno.stat(subsectionEdgePath)
+      .then(() => true)
+      .catch(() => false);
     assertEquals(
-      hasSubsectionEdge,
+      subsectionEdgeExists,
       true,
-      `items/.../edges/1/1/${pageId}.edge.json should be added`,
+      `.index/graph/parents/${projectId}/1/1/${pageId}.edge.json should exist in filesystem`,
     );
 
     // Other sections should not be affected
     const hasOtherSectionChanges = status.added.some((file) =>
-      file.includes(`${projectId}/edges/`) && !file.includes(`edges/1/1/${pageId}.edge.json`)
+      file.includes(`.index/graph/parents/${projectId}/`) &&
+      !file.includes(`/1/1/${pageId}.edge.json`)
     );
     assertEquals(
       hasOtherSectionChanges,
