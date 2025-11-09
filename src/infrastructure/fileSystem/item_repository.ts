@@ -94,7 +94,8 @@ const itemDirectoryFromSnapshot = (
   return join(itemsDirectory(dependencies.root), year, month, day, snapshot.id);
 };
 
-const edgesDirectory = (directory: string): string => join(directory, "edges");
+const edgesDirectory = (workspaceRoot: string, itemId: string): string =>
+  join(workspaceRoot, ".index", "graph", "parents", itemId);
 
 /**
  * Check if a path represents a top-level date section
@@ -292,7 +293,7 @@ const loadItemFromDirectory = async (
   }
 
   const edgesResult = await readEdgeCollection({
-    directory: edgesDirectory(directory),
+    directory: edgesDirectory(dependencies.root, id),
     identifier: id,
   });
   if (edgesResult.type === "error") {
@@ -484,7 +485,7 @@ export const createFileSystemItemRepository = (
 
     // Save child edges (items under this item)
     const edgesResult = await writeEdgeCollection(item.edges, {
-      directory: edgesDirectory(directory),
+      directory: edgesDirectory(dependencies.root, snapshot.id),
       identifier: snapshot.id,
     });
     if (edgesResult.type === "error") {
@@ -543,29 +544,22 @@ export const createFileSystemItemRepository = (
           .map((seg) => seg.toString())
           .join("/");
 
-        // Load old parent to get its physical directory
-        const oldParentResult = await load(oldParentId);
-        if (oldParentResult.type === "ok" && oldParentResult.value) {
-          const oldParentSnapshot = oldParentResult.value.toJSON();
-          const oldParentDirectory = itemDirectoryFromSnapshot(dependencies, oldParentSnapshot);
+        const oldEdgeDir = oldSectionPath
+          ? join(dependencies.root, ".index", "graph", "parents", oldParentId.toString(), oldSectionPath)
+          : join(dependencies.root, ".index", "graph", "parents", oldParentId.toString());
+        const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
 
-          const oldEdgeDir = oldSectionPath
-            ? join(oldParentDirectory, "edges", oldSectionPath)
-            : join(oldParentDirectory, "edges");
-          const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
-
-          // Delete old edge file
-          try {
-            await Deno.remove(oldEdgeFilePath);
-          } catch (error) {
-            if (!(error instanceof Deno.errors.NotFound)) {
-              return Result.error(
-                createRepositoryError("item", "save", "failed to delete old parent edge file", {
-                  identifier: snapshot.id,
-                  cause: error,
-                }),
-              );
-            }
+        // Delete old edge file
+        try {
+          await Deno.remove(oldEdgeFilePath);
+        } catch (error) {
+          if (!(error instanceof Deno.errors.NotFound)) {
+            return Result.error(
+              createRepositoryError("item", "save", "failed to delete old parent edge file", {
+                identifier: snapshot.id,
+                cause: error,
+              }),
+            );
           }
         }
       }
@@ -617,29 +611,22 @@ export const createFileSystemItemRepository = (
           const sectionChanged = oldSectionPath !== newSectionPath;
 
           if (parentChanged || sectionChanged) {
-            // Load old parent to get its physical directory
-            const oldParentResult = await load(oldParentId);
-            if (oldParentResult.type === "ok" && oldParentResult.value) {
-              const oldParentSnapshot = oldParentResult.value.toJSON();
-              const oldParentDirectory = itemDirectoryFromSnapshot(dependencies, oldParentSnapshot);
+            const oldEdgeDir = oldSectionPath
+              ? join(dependencies.root, ".index", "graph", "parents", oldParentId.toString(), oldSectionPath)
+              : join(dependencies.root, ".index", "graph", "parents", oldParentId.toString());
+            const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
 
-              const oldEdgeDir = oldSectionPath
-                ? join(oldParentDirectory, "edges", oldSectionPath)
-                : join(oldParentDirectory, "edges");
-              const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
-
-              // Delete old edge file
-              try {
-                await Deno.remove(oldEdgeFilePath);
-              } catch (error) {
-                if (!(error instanceof Deno.errors.NotFound)) {
-                  return Result.error(
-                    createRepositoryError("item", "save", "failed to delete old parent edge file", {
-                      identifier: snapshot.id,
-                      cause: error,
-                    }),
-                  );
-                }
+            // Delete old edge file
+            try {
+              await Deno.remove(oldEdgeFilePath);
+            } catch (error) {
+              if (!(error instanceof Deno.errors.NotFound)) {
+                return Result.error(
+                  createRepositoryError("item", "save", "failed to delete old parent edge file", {
+                    identifier: snapshot.id,
+                    cause: error,
+                  }),
+                );
               }
             }
           }
@@ -653,60 +640,53 @@ export const createFileSystemItemRepository = (
         if (parentSegment.kind === "ItemId") {
           const parentId = parentSegment.value;
 
-          // Load parent item to get its physical directory
-          const parentResult = await load(parentId as ItemId);
-          if (parentResult.type === "ok" && parentResult.value) {
-            const parentSnapshot = parentResult.value.toJSON();
-            const parentDirectory = itemDirectoryFromSnapshot(dependencies, parentSnapshot);
+          // Build section path from remaining segments
+          const sectionSegments = pathSegments.slice(2); // Skip date and parent
+          const sectionPath = sectionSegments
+            .filter((seg) => seg.kind !== "range")
+            .map((seg) => seg.toString())
+            .join("/");
 
-            // Build section path from remaining segments
-            const sectionSegments = pathSegments.slice(2); // Skip date and parent
-            const sectionPath = sectionSegments
-              .filter((seg) => seg.kind !== "range")
-              .map((seg) => seg.toString())
-              .join("/");
+          // Edge directory: .index/graph/parents/<parentId>/section1/section2/...
+          const edgeDir = sectionPath
+            ? join(dependencies.root, ".index", "graph", "parents", parentId.toString(), sectionPath)
+            : join(dependencies.root, ".index", "graph", "parents", parentId.toString());
 
-            // Edge directory: parent/edges/section1/section2/...
-            const edgeDir = sectionPath
-              ? join(parentDirectory, "edges", sectionPath)
-              : join(parentDirectory, "edges");
+          // Create edge file for this item in parent's edge directory
+          const edgeFilePath = join(edgeDir, `${item.data.id.toString()}.edge.json`);
 
-            // Create edge file for this item in parent's edge directory
-            const edgeFilePath = join(edgeDir, `${item.data.id.toString()}.edge.json`);
-
-            // Ensure edge directory exists
-            try {
-              await Deno.mkdir(edgeDir, { recursive: true });
-            } catch (error) {
-              if (!(error instanceof Deno.errors.AlreadyExists)) {
-                return Result.error(
-                  createRepositoryError("item", "save", "failed to create edge directory", {
-                    identifier: snapshot.id,
-                    cause: error,
-                  }),
-                );
-              }
-            }
-
-            // Write edge file
-            const edgeSnapshot = {
-              schema: "mm.edge/1",
-              from: parentId.toString(),
-              to: item.data.id.toString(),
-              rank: item.data.rank.toString(),
-            };
-            const edgePayload = JSON.stringify(edgeSnapshot, null, 2);
-
-            try {
-              await Deno.writeTextFile(edgeFilePath, `${edgePayload}\n`);
-            } catch (error) {
+          // Ensure edge directory exists
+          try {
+            await Deno.mkdir(edgeDir, { recursive: true });
+          } catch (error) {
+            if (!(error instanceof Deno.errors.AlreadyExists)) {
               return Result.error(
-                createRepositoryError("item", "save", "failed to write parent edge file", {
+                createRepositoryError("item", "save", "failed to create edge directory", {
                   identifier: snapshot.id,
                   cause: error,
                 }),
               );
             }
+          }
+
+          // Write edge file
+          const edgeSnapshot = {
+            schema: "mm.edge/1",
+            from: parentId.toString(),
+            to: item.data.id.toString(),
+            rank: item.data.rank.toString(),
+          };
+          const edgePayload = JSON.stringify(edgeSnapshot, null, 2);
+
+          try {
+            await Deno.writeTextFile(edgeFilePath, `${edgePayload}\n`);
+          } catch (error) {
+            return Result.error(
+              createRepositoryError("item", "save", "failed to write parent edge file", {
+                identifier: snapshot.id,
+                cause: error,
+              }),
+            );
           }
         }
       }
@@ -763,29 +743,22 @@ export const createFileSystemItemRepository = (
             .map((seg) => seg.toString())
             .join("/");
 
-          // Load parent to get its physical directory
-          const parentResult = await load(parentId);
-          if (parentResult.type === "ok" && parentResult.value) {
-            const parentSnapshot = parentResult.value.toJSON();
-            const parentDirectory = itemDirectoryFromSnapshot(dependencies, parentSnapshot);
+          const edgeDir = sectionPath
+            ? join(dependencies.root, ".index", "graph", "parents", parentId.toString(), sectionPath)
+            : join(dependencies.root, ".index", "graph", "parents", parentId.toString());
+          const edgeFilePath = join(edgeDir, `${id.toString()}.edge.json`);
 
-            const edgeDir = sectionPath
-              ? join(parentDirectory, "edges", sectionPath)
-              : join(parentDirectory, "edges");
-            const edgeFilePath = join(edgeDir, `${id.toString()}.edge.json`);
-
-            // Delete parent edge file
-            try {
-              await Deno.remove(edgeFilePath);
-            } catch (error) {
-              if (!(error instanceof Deno.errors.NotFound)) {
-                return Result.error(
-                  createRepositoryError("item", "delete", "failed to delete parent edge file", {
-                    identifier: idStr,
-                    cause: error,
-                  }),
-                );
-              }
+          // Delete parent edge file
+          try {
+            await Deno.remove(edgeFilePath);
+          } catch (error) {
+            if (!(error instanceof Deno.errors.NotFound)) {
+              return Result.error(
+                createRepositoryError("item", "delete", "failed to delete parent edge file", {
+                  identifier: idStr,
+                  cause: error,
+                }),
+              );
             }
           }
         }

@@ -197,7 +197,7 @@ export const savePlacementEdge = async (
   itemId: ItemId,
   rank: ItemRank,
 ): Promise<Result<void, RepositoryError>> => {
-  const directory = join(workspaceRoot, "edges.top", "dates", dateStr);
+  const directory = join(workspaceRoot, ".index", "graph", "dates", dateStr);
   const filePath = join(directory, `${itemId.toString()}${EDGE_FILE_SUFFIX}`);
 
   const ensureResult = await ensureDirectory(directory, itemId.toString());
@@ -235,7 +235,8 @@ export const deletePlacementEdge = async (
 ): Promise<Result<void, RepositoryError>> => {
   const filePath = join(
     workspaceRoot,
-    "edges.top",
+    ".index",
+    "graph",
     "dates",
     dateStr,
     `${itemId.toString()}${EDGE_FILE_SUFFIX}`,

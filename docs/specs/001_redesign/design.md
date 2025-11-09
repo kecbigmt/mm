@@ -182,27 +182,25 @@ Ambiguities (e.g., missing nodes) return a clear error with candidates and hints
           DD/
             <uuidv7>/
               content.md                    # Markdown (title = first H1)
-              meta.json                     # { schema, id, status, created_at, alias?, parent_hint?, ... }
-              edges/                        # numeric Section edges (authoritative ordering is here)
-                1/
-                  <child-uuid>.edge.json    # { schema, rank }
-                  2/
-                    <child-uuid>.edge.json  # corresponds to /1/2
-                3/
-                  1/
-                    <child-uuid>.edge.json
-
-    edges.top/                               # edges for top‑level date sections (“head” dates)
-      dates/
-        2025-04-01/
-          <child-uuid>.edge.json            # Item placed under the 2025-04-01 day shelf (rank only)
-        2025-04-02/
-          <child-uuid>.edge.json
+              meta.json                     # { schema, id, status, created_at, alias?, path, rank, ... }
 
     tags/
       <hash>.tag.json                        # { schema, raw, canonical_key, created_at, description? }
 
-    .index/
+    .index/                                  # Cache/index directory (Git-ignored, rebuildable)
+      graph/                                 # Graph index (rebuildable from meta.json)
+        dates/                               # Top-level date section edges
+          2025-04-01/
+            <child-uuid>.edge.json           # { schema, to, rank }
+          2025-04-02/
+            <child-uuid>.edge.json
+        parents/                             # Parent item edges
+          <parent-uuid>/
+            <child-uuid>.edge.json           # Direct child: { schema, to, rank }
+            1/                               # Numeric section 1
+              <child-uuid>.edge.json
+              3/                             # Nested section 1/3
+                <child-uuid>.edge.json
       aliases/
         <hh>/
           <hash>.alias.json                  # { schema, raw, canonical_key, created_at }
@@ -210,8 +208,17 @@ Ambiguities (e.g., missing nodes) return a clear error with candidates and hints
 
 **Notes**
 
-* **Authoritative ordering** for a given (parent, section) lives in the **parent’s `edges/`** (for top‑level days, in `edges.top/dates/<YYYY-MM-DD>/`).
-* Child Items may cache their **current placement** (parent id + numeric section path or head date) in `meta.json` (for reverse lookups). **Rank** remains authoritative on the parent side.
+* **Authoritative placement**: The **single source of truth** for an Item's logical placement is:
+  * `meta.json` → `path` (normalized logical path, e.g., `/2025-01-09/<itemId>/1/3`)
+  * `meta.json` → `rank` (LexoRank string for ordering)
+* **Graph index (`.index/graph`)**: Edge files are **purely derived index/cache**:
+  * They mirror the placement information from `meta.json` for efficient graph traversal.
+  * They can be **completely rebuilt** from `meta.json` using `mm doctor --rebuild-index`.
+  * This directory is **Git-ignored** (`.gitignore` includes `.index/`).
+* **Edge file locations**:
+  * **Date sections**: `.index/graph/dates/<YYYY-MM-DD>/<childId>.edge.json` for items placed directly under a date.
+  * **Parent sections**: `.index/graph/parents/<parentId>/<section-path>/<childId>.edge.json` for items placed under a parent Item's section.
+    * Example: Item at `/2025-09-01/<parentId>/1/3` → edge at `.index/graph/parents/<parentId>/1/3/<childId>.edge.json`
 * The **title** is the first non‑empty H1 in `content.md`. If no H1 is found, the Item is **Untitled** (title lookup streams until the first non‑blank line).
 * Filenames for alias/tag indexes use **hash(canonical_key)** to avoid Unicode normalization pitfalls.
 
@@ -308,8 +315,17 @@ Prohibited:
 
 **Maintenance**
 
-* `mm doctor --reindex` (rank compaction).
-* `mm doctor --fix` (conservative safe fixes).
+* `mm doctor --rebuild-index`: Rebuild `.index/graph` from `meta.json`. Use when:
+  * Cloning workspace on a new machine (`.index/` is Git-ignored)
+  * Index becomes corrupted or out-of-sync
+  * After version updates that change index format
+  * Process:
+    1. Scan all `items/**/meta.json` files
+    2. Parse each `path` to extract (date-head or parentId, numeric section path)
+    3. Group children by (parent, section) and sort by `rank`
+    4. Write edge files to `.index/graph/dates/` and `.index/graph/parents/`
+* `mm doctor --reindex`: Rank compaction (rebalances LexoRank values).
+* `mm doctor --fix`: Conservative safe fixes for data integrity issues.
 
 ---
 
@@ -335,9 +351,19 @@ The MCP surface mirrors CLI semantics 1:1.
 ## 12) Concurrency, Git, and Conflict Strategy
 
 * Writes are **atomic** (temp file + rename).
-* The system is **append‑oriented** on edges; merges are typically line‑local.
-* Rank collisions surface as small JSON diffs and are resolved by reindexing.
-* Competing moves on the same Item → last‑writer wins at the edge level (content unaffected).
+* **Git-managed files**:
+  * `items/**/content.md` — Item content
+  * `items/**/meta.json` — Item metadata (includes authoritative `path` and `rank`)
+  * `workspace.json`, `tags/*.tag.json`, and other config files
+* **Git-ignored files** (`.gitignore` includes `.index/`):
+  * `.index/graph/**` — Graph index (edge files)
+  * `.state.json` — Local session state
+  * Edge files are **rebuildable** from `meta.json` via `mm doctor --rebuild-index`
+* **Conflict resolution**:
+  * Changes to `meta.json` are typically line‑local (path, rank, status fields).
+  * Rank collisions surface as small JSON diffs and are resolved by reindexing.
+  * Competing moves on the same Item → last‑writer wins at the `meta.json` level (content unaffected).
+  * After `git pull`, if `.index/graph` is out-of-sync, run `mm doctor --rebuild-index` to regenerate the index from merged `meta.json` files.
 
 ---
 

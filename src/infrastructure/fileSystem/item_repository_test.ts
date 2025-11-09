@@ -76,7 +76,7 @@ Deno.test({
       const itemDirectory = directoryForId(root, itemId);
       const metaPath = join(itemDirectory, "meta.json");
       const contentPath = join(itemDirectory, "content.md");
-      const edgesDirectory = join(itemDirectory, "edges");
+      const edgesDirectory = join(root, ".index", "graph", "parents", itemId);
       const edgeFile = join(edgesDirectory, "019965a7-2789-740a-b8c1-1415904fd109.edge.json");
 
       const itemInfo = await Deno.stat(itemDirectory);
