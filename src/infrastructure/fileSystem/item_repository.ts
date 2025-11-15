@@ -1,4 +1,4 @@
-import { join } from "@std/path";
+import { dirname, join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { ItemRepository } from "../../domain/repositories/item_repository.ts";
 import { Item, ItemSnapshot, parseItem } from "../../domain/models/item.ts";
@@ -445,7 +445,7 @@ export const createFileSystemItemRepository = (
     const existingItem = existingResult.value;
 
     // Ensure parent directory exists
-    const parentDir = filePath.substring(0, filePath.lastIndexOf("/"));
+    const parentDir = dirname(filePath);
     try {
       await Deno.mkdir(parentDir, { recursive: true });
     } catch (error) {
