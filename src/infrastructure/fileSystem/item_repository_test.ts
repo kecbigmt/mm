@@ -20,7 +20,7 @@ const timezone = unwrapOk(
   "parse timezone",
 );
 
-const directoryForId = (root: string, id: string): string => {
+const filePathForId = (root: string, id: string): string => {
   const normalized = id.replace(/-/g, "").toLowerCase();
   const millisecondsHex = normalized.slice(0, 12);
   const timestamp = Number.parseInt(millisecondsHex, 16);
@@ -39,7 +39,7 @@ const directoryForId = (root: string, id: string): string => {
   if (!year || !month || !day) {
     throw new Error("failed to resolve directory segments from UUID");
   }
-  return join(root, "items", year, month, day, id);
+  return join(root, "items", year, month, day, `${id}.md`);
 };
 
 const sampleItemSnapshot = () => ({
@@ -73,25 +73,39 @@ Deno.test({
       unwrapOk(await repository.save(item), "save item");
 
       const itemId = item.data.id.toString();
-      const itemDirectory = directoryForId(root, itemId);
-      const metaPath = join(itemDirectory, "meta.json");
-      const contentPath = join(itemDirectory, "content.md");
+      const itemFilePath = filePathForId(root, itemId);
       const edgesDirectory = join(root, ".index", "graph", "parents", itemId);
       const edgeFile = join(edgesDirectory, "019965a7-2789-740a-b8c1-1415904fd109.edge.json");
 
-      const itemInfo = await Deno.stat(itemDirectory);
-      assert(itemInfo.isDirectory, "item directory should exist");
+      // Verify .md file exists
+      const itemInfo = await Deno.stat(itemFilePath);
+      assert(itemInfo.isFile, "item file should exist");
 
-      const metaSnapshot = JSON.parse(await Deno.readTextFile(metaPath));
-      assertEquals(metaSnapshot.schema, "mm.item/1");
-      assertEquals(metaSnapshot.id, itemId);
-      assertEquals(metaSnapshot.path, "/2024-09-20");
-      assertEquals(metaSnapshot.rank, "a1");
-      assertEquals(metaSnapshot.title, undefined, "title should not be in meta.json");
+      // Read and verify file content (frontmatter + body)
+      const content = await Deno.readTextFile(itemFilePath);
 
-      const content = await Deno.readTextFile(contentPath);
-      assertEquals(content, "# Sample\n\nSample body\n");
+      // Verify frontmatter structure
+      assert(content.startsWith("---\n"), "file should start with frontmatter delimiter");
+      assert(content.includes("\n---\n"), "frontmatter should be closed");
 
+      // Parse frontmatter
+      const frontmatterEnd = content.indexOf("\n---\n", 4);
+      const yamlContent = content.slice(4, frontmatterEnd);
+      assert(yamlContent.includes(`id: ${itemId}`), "frontmatter should contain id");
+      assert(yamlContent.includes("path: /2024-09-20"), "frontmatter should contain path");
+      assert(yamlContent.includes("rank: a1"), "frontmatter should contain rank");
+      assert(yamlContent.includes("icon: note"), "frontmatter should contain icon");
+      assert(
+        yamlContent.includes("schema: mm.item.frontmatter/1"),
+        "frontmatter should contain schema",
+      );
+
+      // Verify body content
+      const bodyStart = frontmatterEnd + 5;
+      const bodyContent = content.slice(bodyStart).trim();
+      assertEquals(bodyContent, "# Sample\n\nSample body", "body should contain title and content");
+
+      // Verify edge files
       const edgeFiles: string[] = [];
       for await (const entry of Deno.readDir(edgesDirectory)) {
         if (entry.isFile) {
@@ -105,6 +119,7 @@ Deno.test({
       assertEquals(edgeSnapshot.to, "019965a7-2789-740a-b8c1-1415904fd109");
       assertEquals(edgeSnapshot.rank, "b1");
 
+      // Verify load functionality
       const loadResult = await repository.load(item.data.id);
       const loaded = unwrapOk(loadResult, "load item");
 
@@ -139,9 +154,9 @@ Deno.test({
       }
 
       const itemId = item.data.id.toString();
-      const itemDirectory = directoryForId(root, itemId);
+      const itemFilePath = filePathForId(root, itemId);
 
-      await assertRejects(() => Deno.stat(itemDirectory), Deno.errors.NotFound);
+      await assertRejects(() => Deno.stat(itemFilePath), Deno.errors.NotFound);
     } finally {
       await Deno.remove(root, { recursive: true });
     }

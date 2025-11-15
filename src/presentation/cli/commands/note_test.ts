@@ -79,7 +79,7 @@ Deno.test({
       assert(successLine, "note command did not report created note");
 
       const itemsDirectory = join(workspace, "items");
-      const itemDirectories: Array<{ id: string; path: string }> = [];
+      const itemFiles: Array<{ id: string; path: string }> = [];
       for await (const yearEntry of Deno.readDir(itemsDirectory)) {
         if (!yearEntry.isDirectory || yearEntry.name.startsWith(".")) {
           continue;
@@ -94,41 +94,46 @@ Deno.test({
             if (!dayEntry.isDirectory || dayEntry.name.startsWith(".")) {
               continue;
             }
-            if (dayEntry.name === "edges") {
-              continue;
-            }
             const dayPath = join(monthPath, dayEntry.name);
-            for await (const itemEntry of Deno.readDir(dayPath)) {
-              if (!itemEntry.isDirectory || itemEntry.name.startsWith(".")) {
+            // Scan files in day directory
+            for await (const fileEntry of Deno.readDir(dayPath)) {
+              // Skip directories and non-.md files
+              if (fileEntry.isDirectory || !fileEntry.name.endsWith(".md")) {
                 continue;
               }
-              if (itemEntry.name === "edges") {
-                continue;
-              }
-              itemDirectories.push({ id: itemEntry.name, path: join(dayPath, itemEntry.name) });
+              const filePath = join(dayPath, fileEntry.name);
+              const itemId = fileEntry.name.slice(0, -3); // Remove .md extension
+              itemFiles.push({ id: itemId, path: filePath });
             }
           }
         }
       }
 
-      assertEquals(itemDirectories.length, 1, "expected exactly one item directory");
-      const [{ path: itemDirectory }] = itemDirectories;
+      assertEquals(itemFiles.length, 1, "expected exactly one item file");
+      const [{ path: itemFilePath }] = itemFiles;
 
-      const metaPath = join(itemDirectory, "meta.json");
-      const metaSnapshot = JSON.parse(await Deno.readTextFile(metaPath)) as {
-        readonly title?: string;
-        readonly path: string;
-        readonly rank: string;
-      };
+      // Read and verify .md file with frontmatter
+      const fileContent = await Deno.readTextFile(itemFilePath);
 
-      assertEquals(metaSnapshot.title, undefined, "title should not be in meta.json");
-      assertEquals(metaSnapshot.path, "/2024-01-05");
-      assert(metaSnapshot.rank.length > 0, "rank should be persisted");
+      // Verify frontmatter structure
+      assert(fileContent.startsWith("---\n"), "file should start with frontmatter delimiter");
+      assert(fileContent.includes("\n---\n"), "frontmatter should be closed");
 
-      const contentPath = join(itemDirectory, "content.md");
-      const content = await Deno.readTextFile(contentPath);
-      assert(content.startsWith("# Integration note"), "content.md should start with H1 title");
-      assertEquals(content.trim(), "# Integration note");
+      // Parse frontmatter
+      const frontmatterEnd = fileContent.indexOf("\n---\n", 4);
+      const yamlContent = fileContent.slice(4, frontmatterEnd);
+      assert(yamlContent.includes("path: /2024-01-05"), "frontmatter should contain path");
+      assert(yamlContent.includes("rank:"), "frontmatter should contain rank");
+      assert(
+        yamlContent.includes("schema: mm.item.frontmatter/1"),
+        "frontmatter should contain schema",
+      );
+
+      // Verify body content
+      const bodyStart = frontmatterEnd + 5;
+      const bodyContent = fileContent.slice(bodyStart).trim();
+      assert(bodyContent.startsWith("# Integration note"), "body should start with H1 title");
+      assertEquals(bodyContent, "# Integration note");
     } finally {
       await Deno.remove(workspace, { recursive: true });
     }
