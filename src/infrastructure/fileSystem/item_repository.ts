@@ -34,7 +34,7 @@ type ItemFrontmatter = Readonly<{
   icon: string;
   kind?: string;
   status: string;
-  path: string;
+  placement: string;
   rank: string;
   created_at: string;
   updated_at: string;
@@ -145,11 +145,15 @@ const writeItemFile = async (
   snapshot: ItemSnapshot,
 ): Promise<Result<void, RepositoryError>> => {
   // Build frontmatter from snapshot
+  // Convert path (with leading /) to placement (without leading /)
+  const pathStr = snapshot.path;
+  const placementStr = pathStr.startsWith("/") ? pathStr.slice(1) : pathStr;
+
   const frontmatter: ItemFrontmatter & { schema?: string } = {
     id: snapshot.id,
     icon: snapshot.icon,
     status: snapshot.status,
-    path: snapshot.path,
+    placement: placementStr,
     rank: snapshot.rank,
     created_at: snapshot.createdAt,
     updated_at: snapshot.updatedAt,
@@ -159,7 +163,7 @@ const writeItemFile = async (
     due_at: snapshot.dueAt,
     alias: snapshot.alias,
     context: snapshot.context,
-    schema: "mm.item.frontmatter/1",
+    schema: "mm.item.frontmatter/2",
   };
 
   // Build body (title + content)
@@ -263,12 +267,16 @@ const loadItemFromFile = async (
     return edgesResult;
   }
 
+  // Convert placement (without leading /) to path (with leading /)
+  const placementStr = frontmatter.placement;
+  const pathStr = placementStr.startsWith("/") ? placementStr : `/${placementStr}`;
+
   // Combine into ItemSnapshot
   const snapshot: ItemSnapshot = {
     id: frontmatter.id,
     icon: frontmatter.icon,
     status: frontmatter.status,
-    path: frontmatter.path,
+    path: pathStr,
     rank: frontmatter.rank,
     createdAt: frontmatter.created_at,
     updatedAt: frontmatter.updated_at,
