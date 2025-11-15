@@ -211,7 +211,7 @@ export const getLatestItemId = async (
   dateStr?: string,
 ): Promise<string> => {
   const workspaceDir = getWorkspacePath(testHome, workspaceName);
-  const candidates = await collectItemDirectories(workspaceDir, dateStr);
+  const candidates = await collectItemFiles(workspaceDir, dateStr);
   if (candidates.length === 0) {
     throw new Error(`No items found${dateStr ? ` for date ${dateStr}` : ""}`);
   }
@@ -221,7 +221,7 @@ export const getLatestItemId = async (
 };
 
 /**
- * Gets item IDs from a date directory, ordered by creation (directory name is UUID).
+ * Gets item IDs from a date directory, ordered by creation (filename is <uuid>.md).
  * Returns an array of item IDs in creation order.
  */
 export const getItemIdsFromDate = async (
@@ -234,15 +234,17 @@ export const getItemIdsFromDate = async (
   const itemsBaseDir = join(workspaceDir, "items", year, month, day);
 
   try {
-    const itemDirs: string[] = [];
+    const itemIds: string[] = [];
     for await (const entry of Deno.readDir(itemsBaseDir)) {
-      if (entry.isDirectory) {
-        itemDirs.push(entry.name);
+      if (entry.isFile && entry.name.endsWith(".md")) {
+        // Extract UUID from filename (remove .md extension)
+        const id = entry.name.slice(0, -3);
+        itemIds.push(id);
       }
     }
-    // Sort by directory name (UUID) to get consistent order
+    // Sort by UUID to get consistent order
     // UUID v7 has timestamp prefix, so sorting gives creation order
-    return itemDirs.sort();
+    return itemIds.sort();
   } catch {
     return [];
   }
@@ -259,50 +261,51 @@ export const getItemIdByTitle = async (
   title: string,
 ): Promise<string | null> => {
   const workspaceDir = getWorkspacePath(testHome, workspaceName);
-  const candidates = await collectItemDirectories(workspaceDir, dateStr);
+  const candidates = await collectItemFiles(workspaceDir, dateStr);
 
   for (const candidate of candidates) {
-    const contentMd = join(candidate.directory, "content.md");
     try {
-      const content = await Deno.readTextFile(contentMd);
+      const content = await Deno.readTextFile(candidate.filePath);
       if (content.includes(title)) {
         return candidate.id;
       }
     } catch {
-      // Skip if content.md doesn't exist or can't be read
+      // Skip if file doesn't exist or can't be read
     }
   }
   return null;
 };
 
-export const findItemDirectoryById = async (
+export const findItemFileById = async (
   testHome: string,
   workspaceName: string,
   itemId: string,
 ): Promise<string | null> => {
   const workspaceDir = getWorkspacePath(testHome, workspaceName);
-  const candidates = await collectItemDirectories(workspaceDir);
+  const candidates = await collectItemFiles(workspaceDir);
   const match = candidates.find((candidate) => candidate.id === itemId);
-  return match?.directory ?? null;
+  return match?.filePath ?? null;
 };
 
-type ItemDirectoryEntry = Readonly<{
+type ItemFileEntry = Readonly<{
   id: string;
-  directory: string;
+  filePath: string;
 }>;
 
-const collectItemDirectories = async (
+const collectItemFiles = async (
   workspaceDir: string,
   dateStr?: string,
-): Promise<ItemDirectoryEntry[]> => {
+): Promise<ItemFileEntry[]> => {
   const itemsRoot = join(workspaceDir, "items");
 
-  const gatherFromPath = async (baseDir: string): Promise<ItemDirectoryEntry[]> => {
-    const entries: ItemDirectoryEntry[] = [];
+  const gatherFromPath = async (baseDir: string): Promise<ItemFileEntry[]> => {
+    const entries: ItemFileEntry[] = [];
     try {
       for await (const entry of Deno.readDir(baseDir)) {
-        if (entry.isDirectory) {
-          entries.push({ id: entry.name, directory: join(baseDir, entry.name) });
+        if (entry.isFile && entry.name.endsWith(".md")) {
+          // Extract UUID from filename (remove .md extension)
+          const id = entry.name.slice(0, -3);
+          entries.push({ id, filePath: join(baseDir, entry.name) });
         }
       }
     } catch {
@@ -320,7 +323,7 @@ const collectItemDirectories = async (
     }
   }
 
-  const allEntries: ItemDirectoryEntry[] = [];
+  const allEntries: ItemFileEntry[] = [];
   try {
     for await (const yearEntry of Deno.readDir(itemsRoot)) {
       if (!yearEntry.isDirectory || yearEntry.name.startsWith(".")) {
@@ -341,8 +344,10 @@ const collectItemDirectories = async (
           }
           const dayDir = join(monthDir, dayEntry.name);
           for await (const itemEntry of Deno.readDir(dayDir)) {
-            if (itemEntry.isDirectory && !itemEntry.name.startsWith(".")) {
-              allEntries.push({ id: itemEntry.name, directory: join(dayDir, itemEntry.name) });
+            if (itemEntry.isFile && itemEntry.name.endsWith(".md")) {
+              // Extract UUID from filename (remove .md extension)
+              const id = itemEntry.name.slice(0, -3);
+              allEntries.push({ id, filePath: join(dayDir, itemEntry.name) });
             }
           }
         }
