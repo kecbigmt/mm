@@ -29,6 +29,7 @@ import {
   setupTestEnvironment,
   type TestContext,
 } from "./helpers.ts";
+import { parseFrontmatter } from "../../src/infrastructure/fileSystem/frontmatter.ts";
 
 describe("Scenario 3: Alias and ID resolution", () => {
   let ctx: TestContext;
@@ -85,21 +86,21 @@ describe("Scenario 3: Alias and ID resolution", () => {
 
     assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
 
-    // Extract UUID from output or from file system
+    // Extract UUID from file system
     const workspaceDir = getWorkspacePath(ctx.testHome, "test-workspace");
     const today = await getCurrentDateFromCli(ctx.testHome);
     const [year, month, day] = today.split("-");
     const itemsBaseDir = join(workspaceDir, "items", year, month, day);
 
-    const itemDirs: string[] = [];
+    const itemFiles: string[] = [];
     for await (const entry of Deno.readDir(itemsBaseDir)) {
-      if (entry.isDirectory) {
-        itemDirs.push(entry.name);
+      if (entry.isFile && entry.name.endsWith(".md")) {
+        itemFiles.push(entry.name);
       }
     }
-    assertEquals(itemDirs.length, 1, "Should have exactly one item directory");
+    assertEquals(itemFiles.length, 1, "Should have exactly one item file");
 
-    const itemId = itemDirs[0];
+    const itemId = itemFiles[0].slice(0, -3); // Remove .md extension
     const whereResult = await runCommand(ctx.testHome, ["where", itemId]);
     assertEquals(whereResult.success, true, `where command failed: ${whereResult.stderr}`);
 
@@ -152,20 +153,26 @@ describe("Scenario 3: Alias and ID resolution", () => {
     const [year, month, day] = today.split("-");
     const itemsBaseDir = join(workspaceDir, "items", year, month, day);
 
-    const itemDirs: string[] = [];
+    const itemFiles: string[] = [];
     for await (const entry of Deno.readDir(itemsBaseDir)) {
-      if (entry.isDirectory) {
-        itemDirs.push(entry.name);
+      if (entry.isFile && entry.name.endsWith(".md")) {
+        itemFiles.push(entry.name);
       }
     }
-    assertEquals(itemDirs.length, 1, "Should have exactly one item directory");
+    assertEquals(itemFiles.length, 1, "Should have exactly one item file");
 
-    const itemDir = join(itemsBaseDir, itemDirs[0]);
-    const metaJson = join(itemDir, "meta.json");
-    const metaContent = await Deno.readTextFile(metaJson);
-    const meta = JSON.parse(metaContent);
+    const itemFilePath = join(itemsBaseDir, itemFiles[0]);
+    const fileContent = await Deno.readTextFile(itemFilePath);
+    const parseResult = parseFrontmatter<{ alias: string }>(fileContent);
 
-    assertEquals(meta.alias, "important-memo", "meta.json should contain alias");
+    assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
+    if (parseResult.type === "error") return;
+
+    assertEquals(
+      parseResult.value.frontmatter.alias,
+      "important-memo",
+      "Frontmatter should contain alias",
+    );
   });
 
   it("stores alias in alias index", async () => {
@@ -229,27 +236,31 @@ describe("Scenario 3: Alias and ID resolution", () => {
     const [year, month, day] = today.split("-");
     const itemsBaseDir = join(workspaceDir, "items", year, month, day);
 
-    const itemDirs: string[] = [];
+    const itemFiles: string[] = [];
     for await (const entry of Deno.readDir(itemsBaseDir)) {
-      if (entry.isDirectory) {
-        itemDirs.push(entry.name);
+      if (entry.isFile && entry.name.endsWith(".md")) {
+        itemFiles.push(entry.name);
       }
     }
-    assertEquals(itemDirs.length, 1, "Should have exactly one item directory");
+    assertEquals(itemFiles.length, 1, "Should have exactly one item file");
 
-    const itemDir = join(itemsBaseDir, itemDirs[0]);
-    const metaJson = join(itemDir, "meta.json");
-    const metaContent = await Deno.readTextFile(metaJson);
-    const meta = JSON.parse(metaContent);
+    const itemFilePath = join(itemsBaseDir, itemFiles[0]);
+    const fileContent = await Deno.readTextFile(itemFilePath);
+    const parseResult = parseFrontmatter<{ alias: string }>(fileContent);
 
-    assertExists(meta.alias, "meta.json should contain auto-generated alias");
+    assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
+    if (parseResult.type === "error") return;
+
+    const alias = parseResult.value.frontmatter.alias;
+
+    assertExists(alias, "Frontmatter should contain auto-generated alias");
     // Auto-generated alias should match pattern: CVCV-base36^3 (e.g., bugi-j1a)
     const aliasPattern =
       /^[bcdfghjklmnpqrstvwxyz][aeiou][bcdfghjklmnpqrstvwxyz][aeiou]-[0-9a-z]{3}$/;
     assertEquals(
-      aliasPattern.test(meta.alias),
+      aliasPattern.test(alias),
       true,
-      `Auto-generated alias should match pattern CVCV-base36^3, got: ${meta.alias}`,
+      `Auto-generated alias should match pattern CVCV-base36^3, got: ${alias}`,
     );
 
     // Verify alias is stored in alias index
@@ -272,7 +283,7 @@ describe("Scenario 3: Alias and ID resolution", () => {
         if (entry.isFile && entry.name.endsWith(".alias.json")) {
           const aliasContent = await Deno.readTextFile(join(prefixPath, entry.name));
           const aliasData = JSON.parse(aliasContent);
-          if (aliasData.raw === meta.alias) {
+          if (aliasData.raw === alias) {
             aliasFound = true;
             break;
           }

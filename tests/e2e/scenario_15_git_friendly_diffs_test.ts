@@ -11,11 +11,11 @@
  *
  *   Tests verify that:
  *   - Item creation adds only new files (no modifications to existing)
- *   - Item moves update only edge files (physical files stay immutable)
- *   - Content edits affect only content.md
- *   - Status changes affect only meta.json
+ *   - Item moves update frontmatter (path, rank) and edge files (physical location stays immutable)
+ *   - Content edits affect only the .md file body (frontmatter unchanged)
+ *   - Status changes affect only the .md file frontmatter
  *   - Concurrent operations on different items merge cleanly
- *   - Physical immobility: files stay in creation-date directory
+ *   - Physical location immobility: files stay in creation-date directory forever
  *
  * Design Reference:
  *   - Physical immobility (design.md § 3.4 Invariants)
@@ -28,7 +28,7 @@ import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
-  findItemDirectoryById,
+  findItemFileById,
   getCurrentDateFromCli,
   getItemIdsFromDate,
   getWorkspacePath,
@@ -37,6 +37,10 @@ import {
   setupTestEnvironment,
   type TestContext,
 } from "./helpers.ts";
+import {
+  parseFrontmatter,
+  serializeFrontmatter,
+} from "../../src/infrastructure/fileSystem/frontmatter.ts";
 
 /**
  * Git helper: Initialize a git repository
@@ -206,15 +210,13 @@ describe("Scenario 15: Git-friendly diffs", () => {
     assertEquals(status.modified.length, 0, "No files should be modified");
     assertEquals(status.deleted.length, 0, "No files should be deleted");
 
-    // Verify expected files were added per design spec
+    // Verify expected .md file was added per design spec
     const [year, month, day] = todayDate.split("-");
-    const itemPath = `items/${year}/${month}/${day}/${itemId}`;
+    const itemPath = `items/${year}/${month}/${day}/${itemId}.md`;
 
-    const hasContentMd = status.added.some((file) => file.includes(`${itemPath}/content.md`));
-    const hasMetaJson = status.added.some((file) => file.includes(`${itemPath}/meta.json`));
+    const hasItemMd = status.added.some((file) => file.includes(itemPath));
 
-    assertEquals(hasContentMd, true, `${itemPath}/content.md should be added`);
-    assertEquals(hasMetaJson, true, `${itemPath}/meta.json should be added`);
+    assertEquals(hasItemMd, true, `${itemPath} should be added`);
 
     // .index is gitignored, so verify edge file existence in filesystem
     const edgeFilePath = join(
@@ -263,7 +265,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
     assertEquals(hasSecondItemChanges, true, "Second item files should be in changes");
   });
 
-  it("15.3: Item move updates only edge files (physical immobility)", async () => {
+  it("15.3: Item move updates frontmatter and edge files (physical location immobility)", async () => {
     // Create items
     const _result1 = await runCommand(ctx.testHome, ["note", "Item to move"]);
     const item1Id = await getLatestItemIdFromDate(ctx.testHome, "test-workspace", todayDate);
@@ -275,7 +277,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
     await gitCommit(workspaceDir, "Add items");
 
     // Get physical location before move
-    const physicalPathBefore = await findItemDirectoryById(
+    const physicalPathBefore = await findItemFileById(
       ctx.testHome,
       "test-workspace",
       item1Id,
@@ -293,11 +295,13 @@ describe("Scenario 15: Git-friendly diffs", () => {
     // Check git status after moving to parent
     const status1 = await gitStatus(workspaceDir);
 
-    // Verify content.md was not modified
+    // In the new design, .md file will be modified because rank and path are in frontmatter
+    // This is expected behavior - frontmatter contains path and rank which change on move
+    const mdModified = status1.modified.some((file) => file.includes(`${item1Id}.md`));
     assertEquals(
-      status1.modified.some((file) => file.includes(`${item1Id}/content.md`)),
-      false,
-      "content.md should not be modified when moving to parent",
+      mdModified,
+      true,
+      ".md file should be modified when moving (frontmatter path/rank changes)",
     );
 
     // .index is gitignored, so verify edge files in filesystem
@@ -331,7 +335,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
     assertEquals(parentEdgeExists, true, "Parent edge should be added");
 
     // Verify physical location unchanged
-    const physicalPathAfterMove1 = await findItemDirectoryById(
+    const physicalPathAfterMove1 = await findItemFileById(
       ctx.testHome,
       "test-workspace",
       item1Id,
@@ -355,11 +359,12 @@ describe("Scenario 15: Git-friendly diffs", () => {
     // Check git status after moving back to top-level
     const status2 = await gitStatus(workspaceDir);
 
-    // Verify content.md was not modified
+    // In the new design, .md file will be modified because rank and path are in frontmatter
+    const md2Modified = status2.modified.some((file) => file.includes(`${item1Id}.md`));
     assertEquals(
-      status2.modified.some((file) => file.includes(`${item1Id}/content.md`)),
-      false,
-      "content.md should not be modified when moving to top-level",
+      md2Modified,
+      true,
+      ".md file should be modified when moving to top-level (frontmatter path/rank changes)",
     );
 
     // .index is gitignored, so verify edge files in filesystem
@@ -393,7 +398,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
     assertEquals(topLevelEdgeExistsAfter, true, "Top-level edge should be added");
 
     // Verify physical location still unchanged
-    const physicalPathAfterMove2 = await findItemDirectoryById(
+    const physicalPathAfterMove2 = await findItemFileById(
       ctx.testHome,
       "test-workspace",
       item1Id,
@@ -405,38 +410,48 @@ describe("Scenario 15: Git-friendly diffs", () => {
     );
   });
 
-  it("15.4: Content edit affects only content.md", async () => {
+  it("15.4: Content edit affects only the .md file body", async () => {
     // Create item
     const _result = await runCommand(ctx.testHome, ["note", "Test item"]);
     const itemId = await getLatestItemIdFromDate(ctx.testHome, "test-workspace", todayDate);
     await gitCommit(workspaceDir, "Add test item");
 
-    // Edit content.md directly
-    const itemDir = await findItemDirectoryById(ctx.testHome, "test-workspace", itemId);
-    assertExists(itemDir, "Item directory should exist");
+    // Edit .md file body (keeping frontmatter intact)
+    const itemFilePath = await findItemFileById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemFilePath, "Item file should exist");
 
-    const contentPath = join(itemDir, "content.md");
-    await Deno.writeTextFile(contentPath, "# Test item\n\nAdded content here.\n");
+    // Read, parse, and update content
+    const content = await Deno.readTextFile(itemFilePath);
+    const parseResult = parseFrontmatter(content);
+    if (parseResult.type === "error") {
+      throw new Error("Failed to parse frontmatter");
+    }
+    const { frontmatter, body: _body } = parseResult.value;
+
+    // Update only the body, keeping frontmatter unchanged
+    const newContent = serializeFrontmatter(
+      frontmatter as Record<string, unknown>,
+      "# Test item\n\nAdded content here.",
+    );
+    await Deno.writeTextFile(itemFilePath, newContent);
 
     // Check git status
     const status = await gitStatus(workspaceDir);
 
-    // Only content.md should be modified
+    // Only the .md file should be modified
     assertEquals(status.modified.length, 1, "Only one file should be modified");
     assertEquals(
-      status.modified[0].includes("content.md"),
+      status.modified[0].includes(`${itemId}.md`),
       true,
-      "Modified file should be content.md",
+      "Modified file should be the .md file",
     );
 
-    // meta.json and edge files should not be modified
-    const hasMetaChanges = status.modified.some((file) => file.includes("meta.json"));
+    // Edge files should not be modified
     const hasEdgeChanges = status.modified.some((file) => file.includes(".edge.json"));
-    assertEquals(hasMetaChanges, false, "meta.json should not be modified");
     assertEquals(hasEdgeChanges, false, "Edge files should not be modified");
   });
 
-  it("15.5: Rank change affects only edge file", async () => {
+  it("15.5: Rank change affects only frontmatter in .md file", async () => {
     // Create items
     const _result1 = await runCommand(ctx.testHome, ["note", "Item 1"]);
     const item1Id = await getLatestItemIdFromDate(ctx.testHome, "test-workspace", todayDate);
@@ -449,14 +464,10 @@ describe("Scenario 15: Git-friendly diffs", () => {
     // Check git status
     const status = await gitStatus(workspaceDir);
 
-    // Rank is stored in meta.json (per new design: meta.json is source of truth)
-    // meta.json should be modified
-    const metaModified = status.modified.some((file) => file.includes(`${item1Id}/meta.json`));
-    assertEquals(metaModified, true, "meta.json should be modified for rank change");
-
-    // content.md should not be modified
-    const contentModified = status.modified.some((file) => file.includes(`${item1Id}/content.md`));
-    assertEquals(contentModified, false, "content.md should not be modified");
+    // Rank is stored in frontmatter (per new design: frontmatter is source of truth)
+    // .md file should be modified
+    const mdModified = status.modified.some((file) => file.includes(`${item1Id}.md`));
+    assertEquals(mdModified, true, ".md file should be modified for rank change");
 
     // .index is gitignored, but edge file should exist in filesystem with updated rank
     const edgeFilePath = join(
@@ -473,7 +484,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
     assertEquals(edgeFileExists, true, "Edge file should exist in filesystem");
   });
 
-  it("15.6: Status change affects only meta.json", async () => {
+  it("15.6: Status change affects only frontmatter in .md file", async () => {
     // Create item
     const _result = await runCommand(ctx.testHome, ["note", "Task item"]);
     const itemId = await getLatestItemIdFromDate(ctx.testHome, "test-workspace", todayDate);
@@ -486,53 +497,57 @@ describe("Scenario 15: Git-friendly diffs", () => {
     // Check git status
     const status = await gitStatus(workspaceDir);
 
-    // Only meta.json should be modified
+    // Only .md file should be modified (frontmatter updated)
     assertEquals(
-      status.modified.some((file) => file.includes(`${itemId}/meta.json`)),
+      status.modified.some((file) => file.includes(`${itemId}.md`)),
       true,
-      "meta.json should be modified",
+      ".md file should be modified",
     );
 
-    // content.md and edge files should not be modified
+    // Edge files should not be modified
     assertEquals(
-      status.modified.some((file) => file.includes(`${itemId}/content.md`)),
+      status.modified.some((file) => file.includes(".edge.json")),
       false,
-      "content.md should not be modified",
+      "Edge files should not be modified",
     );
   });
 
-  it("15.7: Alias setting affects only meta.json and alias index", async () => {
+  it("15.7: Alias setting affects only frontmatter in .md file and alias index", async () => {
     // Create item without explicit alias
     const _result = await runCommand(ctx.testHome, ["note", "Test item"]);
     const itemId = await getLatestItemIdFromDate(ctx.testHome, "test-workspace", todayDate);
     await gitCommit(workspaceDir, "Add test item");
 
-    // Set custom alias by editing meta.json
-    const itemDir = await findItemDirectoryById(ctx.testHome, "test-workspace", itemId);
-    assertExists(itemDir, "Item directory should exist");
+    // Set custom alias by editing frontmatter
+    const itemFilePath = await findItemFileById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemFilePath, "Item file should exist");
 
-    const metaPath = join(itemDir, "meta.json");
-    const metaContent = await Deno.readTextFile(metaPath);
-    const meta = JSON.parse(metaContent);
-    meta.alias = "custom-name";
-    await Deno.writeTextFile(metaPath, JSON.stringify(meta, null, 2) + "\n");
+    const content = await Deno.readTextFile(itemFilePath);
+    const parseResult = parseFrontmatter(content);
+    if (parseResult.type === "error") {
+      throw new Error("Failed to parse frontmatter");
+    }
+    const { frontmatter, body } = parseResult.value;
+
+    // Update alias in frontmatter
+    const updatedFrontmatter = {
+      ...(frontmatter as Record<string, unknown>),
+      alias: "custom-name",
+    };
+    const newContent = serializeFrontmatter(updatedFrontmatter, body);
+    await Deno.writeTextFile(itemFilePath, newContent);
 
     // Check git status
     const status = await gitStatus(workspaceDir);
 
-    // Only meta.json should be modified
+    // Only .md file should be modified
     assertEquals(
-      status.modified.some((file) => file.includes(`${itemId}/meta.json`)),
+      status.modified.some((file) => file.includes(`${itemId}.md`)),
       true,
-      "meta.json should be modified",
+      ".md file should be modified",
     );
 
-    // content.md and edge files should not be modified
-    assertEquals(
-      status.modified.some((file) => file.includes(`${itemId}/content.md`)),
-      false,
-      "content.md should not be modified",
-    );
+    // Edge files should not be modified
     assertEquals(
       status.modified.some((file) => file.includes(".edge.json")),
       false,
@@ -567,15 +582,13 @@ describe("Scenario 15: Git-friendly diffs", () => {
     // Only new files should be added
     assertEquals(status.modified.length, 0, "No existing files should be modified");
 
-    // Verify new page files were added
+    // Verify new page .md file was added
     const [year, month, day] = todayDate.split("-");
-    const pageItemPath = `items/${year}/${month}/${day}/${pageId}`;
+    const pageItemPath = `items/${year}/${month}/${day}/${pageId}.md`;
 
-    const hasContentMd = status.added.some((file) => file.includes(`${pageItemPath}/content.md`));
-    const hasMetaJson = status.added.some((file) => file.includes(`${pageItemPath}/meta.json`));
+    const hasItemMd = status.added.some((file) => file.includes(pageItemPath));
 
-    assertEquals(hasContentMd, true, `${pageItemPath}/content.md should be added`);
-    assertEquals(hasMetaJson, true, `${pageItemPath}/meta.json should be added`);
+    assertEquals(hasItemMd, true, `${pageItemPath} should be added`);
 
     // .index is gitignored, so verify edge file in filesystem
     const subsectionEdgePath = join(
@@ -665,10 +678,10 @@ describe("Scenario 15: Git-friendly diffs", () => {
     assertEquals(mergeB.success, true, "Merge feature-B should succeed without conflicts");
 
     // Verify both items exist
-    const itemADir = await findItemDirectoryById(ctx.testHome, "test-workspace", itemAId);
-    const itemBDir = await findItemDirectoryById(ctx.testHome, "test-workspace", itemBId);
-    assertExists(itemADir, "Feature A item should exist after merge");
-    assertExists(itemBDir, "Feature B item should exist after merge");
+    const itemAFile = await findItemFileById(ctx.testHome, "test-workspace", itemAId);
+    const itemBFile = await findItemFileById(ctx.testHome, "test-workspace", itemBId);
+    assertExists(itemAFile, "Feature A item should exist after merge");
+    assertExists(itemBFile, "Feature B item should exist after merge");
   });
 
   it("15.10: Concurrent same-item edits create detectable conflicts", async () => {
@@ -677,9 +690,8 @@ describe("Scenario 15: Git-friendly diffs", () => {
     const itemId = await getLatestItemIdFromDate(ctx.testHome, "test-workspace", todayDate);
     await gitCommit(workspaceDir, "Add shared memo");
 
-    const itemDir = await findItemDirectoryById(ctx.testHome, "test-workspace", itemId);
-    assertExists(itemDir);
-    const contentPath = join(itemDir, "content.md");
+    const itemFilePath = await findItemFileById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemFilePath);
 
     // Create branch A
     await new Deno.Command("git", {
@@ -687,8 +699,17 @@ describe("Scenario 15: Git-friendly diffs", () => {
       cwd: workspaceDir,
     }).output();
 
-    // Edit on branch A
-    await Deno.writeTextFile(contentPath, "# Shared memo\n\nEdit from branch A\n");
+    // Edit on branch A - read, parse, update body
+    const contentA = await Deno.readTextFile(itemFilePath);
+    const parseResultA = parseFrontmatter(contentA);
+    if (parseResultA.type === "error") {
+      throw new Error("Failed to parse frontmatter");
+    }
+    const newContentA = serializeFrontmatter(
+      parseResultA.value.frontmatter as Record<string, unknown>,
+      "# Shared memo\n\nEdit from branch A",
+    );
+    await Deno.writeTextFile(itemFilePath, newContentA);
     await gitCommit(workspaceDir, "Edit from branch A");
 
     // Switch to main and create branch B
@@ -702,8 +723,17 @@ describe("Scenario 15: Git-friendly diffs", () => {
       cwd: workspaceDir,
     }).output();
 
-    // Edit same file on branch B
-    await Deno.writeTextFile(contentPath, "# Shared memo\n\nEdit from branch B\n");
+    // Edit same file on branch B - read, parse, update body
+    const contentB = await Deno.readTextFile(itemFilePath);
+    const parseResultB = parseFrontmatter(contentB);
+    if (parseResultB.type === "error") {
+      throw new Error("Failed to parse frontmatter");
+    }
+    const newContentB = serializeFrontmatter(
+      parseResultB.value.frontmatter as Record<string, unknown>,
+      "# Shared memo\n\nEdit from branch B",
+    );
+    await Deno.writeTextFile(itemFilePath, newContentB);
     await gitCommit(workspaceDir, "Edit from branch B");
 
     // Merge to main
