@@ -20,11 +20,10 @@
  */
 
 import { assertEquals, assertExists } from "@std/assert";
-import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
-  findItemDirectoryById,
+  findItemFileById,
   getCurrentDateFromCli,
   getLatestItemId,
   initWorkspace,
@@ -32,6 +31,7 @@ import {
   setupTestEnvironment,
   type TestContext,
 } from "./helpers.ts";
+import { parseFrontmatter } from "../../src/infrastructure/fileSystem/frontmatter.ts";
 
 describe("Scenario 7: Item status change", () => {
   let ctx: TestContext;
@@ -83,15 +83,17 @@ describe("Scenario 7: Item status change", () => {
       "Close command should succeed",
     );
 
-    // Verify status in meta.json
-    const itemDir = await findItemDirectoryById(ctx.testHome, "test-workspace", itemId);
-    assertExists(itemDir, "Item directory should exist");
-    const metaJson = join(itemDir!, "meta.json");
-    const metaContent = await Deno.readTextFile(metaJson);
-    const meta = JSON.parse(metaContent);
+    // Verify status in frontmatter
+    const itemFile = await findItemFileById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemFile, "Item file should exist");
+    const fileContent = await Deno.readTextFile(itemFile!);
+    const parseResult = parseFrontmatter(fileContent);
+    assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
+    if (parseResult.type === "error") throw new Error("Failed to parse frontmatter");
+    const meta = parseResult.value.frontmatter as Record<string, unknown>;
 
-    assertEquals(meta.status, "closed", "Status should be closed in meta.json");
-    assertExists(meta.closedAt, "closedAt should be set");
+    assertEquals(meta.status, "closed", "Status should be closed in frontmatter");
+    assertExists(meta.closed_at, "closed_at should be set");
   });
 
   it("reopens a closed item and updates status", async () => {
@@ -119,15 +121,17 @@ describe("Scenario 7: Item status change", () => {
       "Reopen command should succeed",
     );
 
-    // Verify status in meta.json
-    const itemDir = await findItemDirectoryById(ctx.testHome, "test-workspace", itemId);
-    assertExists(itemDir, "Item directory should exist");
-    const metaJson = join(itemDir!, "meta.json");
-    const metaContent = await Deno.readTextFile(metaJson);
-    const meta = JSON.parse(metaContent);
+    // Verify status in frontmatter
+    const itemFile = await findItemFileById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemFile, "Item file should exist");
+    const fileContent = await Deno.readTextFile(itemFile!);
+    const parseResult = parseFrontmatter(fileContent);
+    assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
+    if (parseResult.type === "error") throw new Error("Failed to parse frontmatter");
+    const meta = parseResult.value.frontmatter as Record<string, unknown>;
 
-    assertEquals(meta.status, "open", "Status should be open in meta.json");
-    assertEquals(meta.closedAt, undefined, "closedAt should be cleared");
+    assertEquals(meta.status, "open", "Status should be open in frontmatter");
+    assertEquals(meta.closed_at, undefined, "closed_at should be cleared");
   });
 
   it("executes full flow: create → close → reopen", async () => {
@@ -155,24 +159,31 @@ describe("Scenario 7: Item status change", () => {
     const closeResult = await runCommand(ctx.testHome, ["close", itemId]);
     assertEquals(closeResult.success, true, `close failed: ${closeResult.stderr}`);
 
-    // Verify status changed to closed in meta.json
-    const itemDir = await findItemDirectoryById(ctx.testHome, "test-workspace", itemId);
-    assertExists(itemDir, "Item directory should exist");
-    const metaJsonAfterClose = join(itemDir!, "meta.json");
-    const metaAfterClose = JSON.parse(await Deno.readTextFile(metaJsonAfterClose));
+    // Verify status changed to closed in frontmatter
+    const itemFile = await findItemFileById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemFile, "Item file should exist");
+    const fileContentAfterClose = await Deno.readTextFile(itemFile!);
+    const parseResultAfterClose = parseFrontmatter(fileContentAfterClose);
+    assertEquals(parseResultAfterClose.type, "ok", "Should parse frontmatter successfully");
+    if (parseResultAfterClose.type === "error") throw new Error("Failed to parse frontmatter");
+    const metaAfterClose = parseResultAfterClose.value.frontmatter as Record<string, unknown>;
     assertEquals(metaAfterClose.status, "closed", "Status should be closed");
 
     // Reopen item
     const reopenResult = await runCommand(ctx.testHome, ["reopen", itemId]);
     assertEquals(reopenResult.success, true, `reopen failed: ${reopenResult.stderr}`);
 
-    // Verify status changed back to open in meta.json
-    const metaAfterReopen = JSON.parse(await Deno.readTextFile(metaJsonAfterClose));
+    // Verify status changed back to open in frontmatter
+    const fileContentAfterReopen = await Deno.readTextFile(itemFile!);
+    const parseResultAfterReopen = parseFrontmatter(fileContentAfterReopen);
+    assertEquals(parseResultAfterReopen.type, "ok", "Should parse frontmatter successfully");
+    if (parseResultAfterReopen.type === "error") throw new Error("Failed to parse frontmatter");
+    const metaAfterReopen = parseResultAfterReopen.value.frontmatter as Record<string, unknown>;
     assertEquals(metaAfterReopen.status, "open", "Status should be open after reopen");
     assertEquals(
-      metaAfterReopen.closedAt,
+      metaAfterReopen.closed_at,
       undefined,
-      "closedAt should be cleared after reopen",
+      "closed_at should be cleared after reopen",
     );
 
     // Verify item appears in listing again

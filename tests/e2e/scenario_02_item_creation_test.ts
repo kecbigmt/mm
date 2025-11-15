@@ -10,11 +10,11 @@
  *   - Create items using the `note` command
  *   - List items using the `ls` command
  *   - Verify creation order is preserved (via LexoRank)
- *   - Validate on-disk file structure (YYYY/MM/DD/<item-id>/)
+ *   - Validate on-disk file structure (YYYY/MM/DD/<uuid>.md)
  *   - Confirm design-compliant storage:
- *     * Title stored in content.md as H1 (not in meta.json)
- *     * Metadata (status, timestamps, etc.) in meta.json
- *     * Body content in content.md (after H1 title)
+ *     * Title stored as first H1 in markdown body (not in frontmatter)
+ *     * Metadata (status, timestamps, etc.) in YAML frontmatter
+ *     * Body content in markdown (after frontmatter)
  *   - Test edge cases (empty list, multiple items)
  *
  * Design Reference:
@@ -33,6 +33,7 @@ import {
   setupTestEnvironment,
   type TestContext,
 } from "./helpers.ts";
+import { parseFrontmatter } from "../../src/infrastructure/fileSystem/frontmatter.ts";
 
 describe("Scenario 2: Item creation and listing", () => {
   let ctx: TestContext;
@@ -113,42 +114,47 @@ describe("Scenario 2: Item creation and listing", () => {
     const itemsBaseStat = await Deno.stat(itemsBaseDir);
     assertEquals(itemsBaseStat.isDirectory, true, "Items date directory should exist");
 
-    const itemDirs: string[] = [];
+    const itemFiles: string[] = [];
     for await (const entry of Deno.readDir(itemsBaseDir)) {
-      if (entry.isDirectory) {
-        itemDirs.push(entry.name);
+      if (entry.isFile && entry.name.endsWith(".md")) {
+        itemFiles.push(entry.name);
       }
     }
-    assertEquals(itemDirs.length, 1, "Should have exactly one item directory");
+    assertEquals(itemFiles.length, 1, "Should have exactly one item file");
 
-    const itemDir = join(itemsBaseDir, itemDirs[0]);
+    const itemFilePath = join(itemsBaseDir, itemFiles[0]);
+    const itemFileStat = await Deno.stat(itemFilePath);
+    assertEquals(itemFileStat.isFile, true, "Item .md file should exist");
 
-    const contentMd = join(itemDir, "content.md");
-    const contentStat = await Deno.stat(contentMd);
-    assertEquals(contentStat.isFile, true, "content.md should exist");
+    const fileContent = await Deno.readTextFile(itemFilePath);
+    const parseResult = parseFrontmatter<{
+      schema: string;
+      id: string;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    }>(fileContent);
+    assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
 
-    const content = await Deno.readTextFile(contentMd);
-    assertEquals(content.includes("Test body"), true, "content.md should contain body");
+    if (parseResult.type === "error") return;
 
-    const metaJson = join(itemDir, "meta.json");
-    const metaStat = await Deno.stat(metaJson);
-    assertEquals(metaStat.isFile, true, "meta.json should exist");
+    const { frontmatter, body } = parseResult.value;
 
-    const metaContent = await Deno.readTextFile(metaJson);
-    const meta = JSON.parse(metaContent);
-    assertEquals(meta.schema, "mm.item/1", "meta.json should have correct schema");
-    assertEquals(typeof meta.id, "string", "meta.json should have id");
     assertEquals(
-      meta.title,
-      undefined,
-      "meta.json should NOT contain title (stored in content.md)",
+      frontmatter.schema,
+      "mm.item.frontmatter/1",
+      "Frontmatter should have correct schema",
     );
-    assertEquals(meta.status, "open", "meta.json should have open status");
-    assertEquals(typeof meta.createdAt, "string", "meta.json should have createdAt");
-    assertEquals(typeof meta.updatedAt, "string", "meta.json should have updatedAt");
+    assertEquals(typeof frontmatter.id, "string", "Frontmatter should have id");
+    assertEquals(frontmatter.status, "open", "Frontmatter should have open status");
+    assertEquals(typeof frontmatter.created_at, "string", "Frontmatter should have created_at");
+    assertEquals(typeof frontmatter.updated_at, "string", "Frontmatter should have updated_at");
+
+    assertEquals(body.includes("Test body"), true, "Body should contain body text");
 
     // Verify child edges directory exists in .index/graph/parents
-    const edgesDir = join(workspaceDir, ".index", "graph", "parents", itemDirs[0]);
+    const itemId = itemFiles[0].slice(0, -3); // Remove .md extension
+    const edgesDir = join(workspaceDir, ".index", "graph", "parents", itemId);
     const edgesDirStat = await Deno.stat(edgesDir);
     assertEquals(
       edgesDirStat.isDirectory,
@@ -167,29 +173,36 @@ describe("Scenario 2: Item creation and listing", () => {
 
     const itemsBaseDir = join(workspaceDir, "items", year, month, day);
 
-    const itemDirs: string[] = [];
+    const itemFiles: string[] = [];
     for await (const entry of Deno.readDir(itemsBaseDir)) {
-      if (entry.isDirectory) {
-        itemDirs.push(entry.name);
+      if (entry.isFile && entry.name.endsWith(".md")) {
+        itemFiles.push(entry.name);
       }
     }
-    assertEquals(itemDirs.length, 1, "Should have exactly one item directory");
+    assertEquals(itemFiles.length, 1, "Should have exactly one item file");
 
-    const itemDir = join(itemsBaseDir, itemDirs[0]);
-    const metaJson = join(itemDir, "meta.json");
-    const metaContent = await Deno.readTextFile(metaJson);
-    const meta = JSON.parse(metaContent);
+    const itemFilePath = join(itemsBaseDir, itemFiles[0]);
+    const fileContent = await Deno.readTextFile(itemFilePath);
+    const parseResult = parseFrontmatter<{
+      schema: string;
+      id: string;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    }>(fileContent);
 
-    assertEquals(meta.schema, "mm.item/1");
-    assertEquals(typeof meta.id, "string");
-    assertEquals(meta.title, undefined, "title should not be in meta.json");
-    assertEquals(meta.status, "open");
-    assertEquals(typeof meta.createdAt, "string");
-    assertEquals(typeof meta.updatedAt, "string");
+    assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
+    if (parseResult.type === "error") return;
 
-    const contentMd = join(itemDir, "content.md");
-    const content = await Deno.readTextFile(contentMd);
-    assertEquals(content.startsWith("# Test item"), true, "content.md should start with H1 title");
+    const { frontmatter, body } = parseResult.value;
+
+    assertEquals(frontmatter.schema, "mm.item.frontmatter/1");
+    assertEquals(typeof frontmatter.id, "string");
+    assertEquals(frontmatter.status, "open");
+    assertEquals(typeof frontmatter.created_at, "string");
+    assertEquals(typeof frontmatter.updated_at, "string");
+
+    assertEquals(body.startsWith("# Test item"), true, "Body should start with H1 title");
   });
 
   it("shows empty when no items exist", async () => {

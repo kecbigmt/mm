@@ -5,7 +5,7 @@ mm is a personal knowledgement CLI tool with built-in MCP server.
 It has a local-files PKM system unifying GTD / Bullet Journal / Zettelkasten around concise
 vocabulary: people interact with **Items** that live inside **Containers**, while the code models
 their union as a single Node algebraic data type. Items are created under a date container
-(Calendar), never moved physically; “moves” are reference (edge) relocations.
+(Calendar), never moved physically; "moves" update frontmatter (path, rank) and edge files.
 
 ## 2) Goals / Non-Goals
 
@@ -41,15 +41,16 @@ their union as a single Node algebraic data type. Items are created under a date
 ### Item
 
 - Must have exactly **one current parent container**.
-- Has content: `content.md` and `meta.json`.
+- Has content: single `.md` file with **YAML Frontmatter + Markdown body**.
 - Identified by **UUID v7** (creation timestamp embedded).
 - Created under the **date Container** matching its creation date.
-- Can be **moved** to another container; the physical file remains under its original date; only
-  **edges** (references) change. After move, it is **excluded** from the original date’s listing.
+- Can be **moved** to another container; the physical file location remains under its original date;
+  frontmatter (`path`, `rank`) and edge files are updated. After move, it is **excluded** from the
+  original date's listing.
 - Has per-container **rank (LexoRank)** for ordering.
 - May also act as a container (can have children).
-- Data fields (subset, deferred exact schema): title, status (open|closed), body, icons (open/closed
-  for note/task/event), start\_at, duration, due\_at, context tags, optional alias slug.
+- Frontmatter fields: `id`, `kind`, `status`, `path`, `rank`, `created_at`, `updated_at`, optional
+  `alias`, `tags`, `schema`, `extra`.
 - State transitions: `close`, `reopen`.
 
 ### Workspace
@@ -63,51 +64,57 @@ their union as a single Node algebraic data type. Items are created under a date
 ```
 /<workspace-root>/
   workspace.json                          # { timezone: "Asia/Tokyo" }
-  nodes/
+  items/
     YYYY/MM/DD/
-      <uuidv7>/
-        content.md                        # Markdown body (human-editable)
-        meta.json                         # { schema, id, icon, title, rank, created_at, status, ... }
-        edges/
-          <uuid>.edge.json                # child edge (Item → Item), e.g. { rank }
-          ...
-          0001/                           # numbering segment "1"
-            <uuid>.edge.json              # { schema, item_id?, rank }
-            0002/                         # numbering "1-2"
-              <uuid>.edge.json
-          0002/
-            <uuid>.edge.json
-          ...
-  aliases/
-    <slug>.alias.json                     # { schema, item_id: "<uuidv7>", created_at }
-  contexts/
-    <slug>.context.json                   # { schema, description, created_at }
+      <uuidv7>.md                         # Single file: YAML Frontmatter + Markdown body
+                                          # Frontmatter: id, kind, status, path, rank,
+                                          #              created_at, updated_at, alias?, tags?, ...
+                                          # Body: Markdown content
+  .index/                                 # Cache/index (Git-ignored, rebuildable)
+    graph/
+      dates/
+        YYYY-MM-DD/
+          <child-uuid>.edge.json          # { schema, to, rank }
+      parents/
+        <parent-uuid>/
+          <child-uuid>.edge.json          # Direct child
+          1/                              # Numbering section "1"
+            <child-uuid>.edge.json
+            3/                            # Nested section "1/3"
+              <child-uuid>.edge.json
+    aliases/
+      <hh>/
+        <hash>.alias.json                 # { schema, raw, canonical_key, created_at }
+  tags/
+    <hash>.tag.json                       # { schema, raw, canonical_key, created_at, description? }
 ```
 
-**Edge files**
+**Key points**
 
-- File name is `<target-id>.edge.json`. The target id is therefore known from the filename; an
-  optional `item_id` entry inside JSON must match when present.
-- `rank` orders children **within that container/segment**.
-
-**Mixing is allowed** within `edges/`: direct child edges and numbering subfolders (e.g.,
-`edges/0001/...`) can coexist.
+- **Single file per Item**: `<uuid>.md` contains both metadata (Frontmatter) and content (Markdown
+  body).
+- **Frontmatter is authoritative**: The Item's `path` and `rank` in Frontmatter are the source of
+  truth.
+- **`.index/graph` is rebuildable cache**: Edge files mirror Frontmatter placement for efficient
+  traversal; regenerated via `mm doctor --rebuild-index`.
+- **Git-ignored index**: `.index/` directory is not committed; each machine rebuilds it locally.
 
 ## 5) Ordering & Ranks
 
-- **`meta.json.rank`**: ordering **within the item’s creation-day container** (Calendar day).
-- **`*.edge.json.rank`**: ordering **within the current container** (date or numbering path).
+- **Frontmatter `rank`**: ordering within the Item's current placement (stored in `path` field).
+- **Edge files**: mirror the `rank` from Frontmatter for efficient traversal.
 - LexoRank (string) supports stable insertions (`head`, `tail`, `before:<id>`, `after:<id>`).
-  Periodic rebalancing may be performed by maintenance (`doctor --reindex`).
+  Periodic rebalancing may be performed by maintenance (`mm doctor --reindex`).
 
 ## 6) Movement & Placement
 
 - Items have **one active container** at a time.
-- Move updates edges and internal placement state so that:
+- Move updates **Frontmatter `path` and `rank`** fields so that:
 
   - the item **disappears** from its original day listing,
   - appears in the new container in the specified position.
-- Physical path stays under original `YYYY/MM/DD/<uuidv7>/`.
+- Physical path stays under original `YYYY/MM/DD/<uuidv7>.md`.
+- Edge files in `.index/graph` are rebuilt to reflect the new placement.
 
 ## 7) Aliases & Contexts
 
@@ -170,11 +177,28 @@ before:<id> | after:<id>
 
 ## 12) Validation (pre-save / doctor)
 
+**Frontmatter validation:**
+
+- Required fields present: `id`, `kind`, `status`, `path`, `rank`, `created_at`, `updated_at`.
+- `id` matches filename `<uuid>.md` and is valid UUID v7.
+- `kind` is one of allowed values (e.g., `note`, `task`, `event`).
+- `status` is one of allowed values (e.g., `inbox`, `scheduled`, `closed`, `discarded`).
+- `path` is normalized (no relative tokens like `today`).
+- `rank` is valid LexoRank format.
+- `created_at`, `updated_at` are valid ISO-8601 timestamps.
+- `alias` (if present) follows alias rules (no reserved tokens, unique canonical_key).
+- YAML is valid and parseable; UTF-8 (NFC), LF newlines.
+
+**Graph validation:**
+
 - Every `*.edge.json` points to an existing **Item** (no edge→edge).
 - No duplicate edges (same container + same target).
 - No cycles (an Item cannot be a descendant of itself).
-- JSON schema version matches; UTF-8 (NFC), LF newlines.
-- Short IDs resolve uniquely (otherwise return ambiguity error).
+- Edge files are consistent with Frontmatter `path` and `rank`.
+
+**Maintenance:**
+
+- `mm doctor --rebuild-index`: Rebuild `.index/graph` from all Frontmatter data.
 
 ## 13) Error Handling (CLI)
 
