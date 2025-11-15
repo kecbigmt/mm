@@ -85,3 +85,29 @@ export type {
   ParseLocatorOptions,
 } from "./locator.ts";
 export { isLocator, parseLocator } from "./locator.ts";
+
+export type { Placement, PlacementHead, PlacementValidationError } from "./placement.ts";
+export {
+  createDatePlacement,
+  createItemPlacement,
+  createPlacement,
+  isPlacement,
+  parsePlacement,
+  serializePlacement,
+} from "./placement.ts";
+
+export type { PlacementRange } from "./placement_range.ts";
+export {
+  createDateRange,
+  createNumericRange,
+  createSingleRange,
+  isDateRange,
+  isNumericRange,
+  isSingleRange,
+} from "./placement_range.ts";
+
+export type { ResolvedGraphPath, ResolvedSegment } from "./resolved_graph_path.ts";
+export {
+  createResolvedGraphPath,
+  formatResolvedGraphPath,
+} from "./resolved_graph_path.ts";
