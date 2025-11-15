@@ -2,7 +2,7 @@
 
 *A whitepaper for a path‑centric Item/Section model with logical navigation, Git‑friendly storage, and deterministic ordering.*
 
-**Version:** 1.0 (design draft, updated)
+**Version:** 1.1 (frontmatter edition)
 **Audience:** engineers, product designers, contributors
 **Scope:** system design; no concrete implementation code beyond high‑level interface sketches
 
@@ -17,7 +17,7 @@ The system is built from **two primitives**:
 * **Item** — an addressable entity (note, task, event, concept). Items can have children.
 * **Section** — a numbered (or dated) *shelf* under a parent, addressing a **bucket of siblings**.
 
-Each Item has **exactly one active placement**: *(parent Item or top‑level date, Section path, rank)*. Moving an Item updates **edges only**; physical files never move.
+Each Item has **exactly one active placement**: *(parent Item or top‑level date, Section path, rank)*. Moving an Item updates **frontmatter (`path`, `rank`) and edge files**; physical file **location** never moves.
 
 Navigation adopts Unix semantics (`cd`, `ls`, `pwd`) with `.` and `..` that work **across both node and section levels**. A single `/` separator is used everywhere. The workspace time zone is **fixed**.
 
@@ -46,8 +46,9 @@ Navigation adopts Unix semantics (`cd`, `ls`, `pwd`) with `.` and `..` that work
 ### 3.1 Item
 
 * **Identity**: UUID v7 (timestamp‑embedded).
-* **Content**: `content.md` (human‑editable; title is the first Markdown H1).
-* **Metadata**: `meta.json` (status, timestamps, alias, etc.; **no title**).
+* **Content**: Single `.md` file with **YAML Frontmatter + Markdown body**.
+* **Frontmatter fields**: `id`, `kind`, `status`, `path`, `rank`, `created_at`, `updated_at`, optional `alias`, `tags`, `schema`, `extra`.
+* **Body**: Markdown content; title is the first H1.
 * Exactly **one active placement** in the logical graph.
 
 ### 3.2 Section
@@ -180,15 +181,16 @@ Ambiguities (e.g., missing nodes) return a clear error with candidates and hints
       YYYY/
         MM/
           DD/
-            <uuidv7>/
-              content.md                    # Markdown (title = first H1)
-              meta.json                     # { schema, id, status, created_at, alias?, path, rank, ... }
+            <uuidv7>.md                      # Single file: YAML Frontmatter + Markdown body
+                                             # Frontmatter: id, kind, status, path, rank,
+                                             #              created_at, updated_at, alias?, tags?, ...
+                                             # Body: Markdown content (title = first H1)
 
     tags/
       <hash>.tag.json                        # { schema, raw, canonical_key, created_at, description? }
 
     .index/                                  # Cache/index directory (Git-ignored, rebuildable)
-      graph/                                 # Graph index (rebuildable from meta.json)
+      graph/                                 # Graph index (rebuildable from Frontmatter)
         dates/                               # Top-level date section edges
           2025-04-01/
             <child-uuid>.edge.json           # { schema, to, rank }
@@ -208,18 +210,20 @@ Ambiguities (e.g., missing nodes) return a clear error with candidates and hints
 
 **Notes**
 
-* **Authoritative placement**: The **single source of truth** for an Item's logical placement is:
-  * `meta.json` → `path` (normalized logical path, e.g., `/2025-01-09/<itemId>/1/3`)
-  * `meta.json` → `rank` (LexoRank string for ordering)
+* **Single file per Item**: `<uuid>.md` contains both metadata (Frontmatter) and content (Markdown body).
+* **Frontmatter is authoritative**: The **single source of truth** for an Item's logical placement is:
+  * Frontmatter → `path` (normalized logical path, e.g., `2025-01-09/<itemId>/1/3`)
+  * Frontmatter → `rank` (LexoRank string for ordering)
+  * Frontmatter → `id`, `kind`, `status`, `created_at`, `updated_at`, and other metadata
 * **Graph index (`.index/graph`)**: Edge files are **purely derived index/cache**:
-  * They mirror the placement information from `meta.json` for efficient graph traversal.
-  * They can be **completely rebuilt** from `meta.json` using `mm doctor --rebuild-index`.
+  * They mirror the placement information from Frontmatter for efficient graph traversal.
+  * They can be **completely rebuilt** from Frontmatter using `mm doctor --rebuild-index`.
   * This directory is **Git-ignored** (`.gitignore` includes `.index/`).
 * **Edge file locations**:
   * **Date sections**: `.index/graph/dates/<YYYY-MM-DD>/<childId>.edge.json` for items placed directly under a date.
   * **Parent sections**: `.index/graph/parents/<parentId>/<section-path>/<childId>.edge.json` for items placed under a parent Item's section.
-    * Example: Item at `/2025-09-01/<parentId>/1/3` → edge at `.index/graph/parents/<parentId>/1/3/<childId>.edge.json`
-* The **title** is the first non‑empty H1 in `content.md`. If no H1 is found, the Item is **Untitled** (title lookup streams until the first non‑blank line).
+    * Example: Item at `2025-09-01/<parentId>/1/3` → edge at `.index/graph/parents/<parentId>/1/3/<childId>.edge.json`
+* The **title** is the first non‑empty H1 in the Markdown body. If no H1 is found, the Item is **Untitled**.
 * Filenames for alias/tag indexes use **hash(canonical_key)** to avoid Unicode normalization pitfalls.
 
 ---
@@ -265,12 +269,12 @@ mm mv <id> <placement>
   * `head:<path>`
   * `tail:<path>`
   * `<path>` (same as `tail:<path>`)
-* **Relative to a sibling** (adopts sibling’s parent + section):
+* **Relative to a sibling** (adopts sibling's parent + section):
 
   * `after:<id2>`
   * `before:<id2>`
 
-> Physical files do not move; only edges change.
+> Physical files do not move; only **Frontmatter `path` and `rank`** are updated, and edge files in `.index/graph` are rebuilt.
 
 ### 8.3 List
 
@@ -304,23 +308,33 @@ Prohibited:
 
 ## 10) Validation & Doctor
 
-**Pre‑save / maintenance checks**
+**Frontmatter validation:**
+* Required fields present: `id`, `kind`, `status`, `path`, `rank`, `created_at`, `updated_at`.
+* `id` matches filename `<uuid>.md` and is valid UUID v7.
+* `kind` is one of allowed values (e.g., `note`, `task`, `event`).
+* `status` is one of allowed values (e.g., `inbox`, `scheduled`, `closed`, `discarded`).
+* `path` is normalized (no relative tokens like `today`).
+* `rank` is valid LexoRank format.
+* `created_at`, `updated_at` are valid ISO-8601 timestamps.
+* `alias` (if present) follows alias rules (no reserved tokens, unique canonical_key).
+* YAML is valid and parseable; UTF-8 (NFC), LF newlines.
 
+**Graph validation:**
 * Every `*.edge.json` points to an existing **Item** (no edge→edge).
 * No duplicates within the same (parent, section).
 * No cycles in the parent/child graph.
-* JSON schema version matches; UTF‑8 (NFC), LF newlines.
+* Edge files are consistent with Frontmatter `path` and `rank`.
 * Aliases are unique (index enforces uniqueness).
 * Date heads are valid, ranges are semantically valid (order, depth/prefix).
 
 **Maintenance**
 
-* `mm doctor --rebuild-index`: Rebuild `.index/graph` from `meta.json`. Use when:
+* `mm doctor --rebuild-index`: Rebuild `.index/graph` from all Frontmatter data. Use when:
   * Cloning workspace on a new machine (`.index/` is Git-ignored)
   * Index becomes corrupted or out-of-sync
   * After version updates that change index format
   * Process:
-    1. Scan all `items/**/meta.json` files
+    1. Scan all `items/**/*.md` files and parse Frontmatter
     2. Parse each `path` to extract (date-head or parentId, numeric section path)
     3. Group children by (parent, section) and sort by `rank`
     4. Write edge files to `.index/graph/dates/` and `.index/graph/parents/`
@@ -352,18 +366,17 @@ The MCP surface mirrors CLI semantics 1:1.
 
 * Writes are **atomic** (temp file + rename).
 * **Git-managed files**:
-  * `items/**/content.md` — Item content
-  * `items/**/meta.json` — Item metadata (includes authoritative `path` and `rank`)
+  * `items/**/*.md` — Item files (Frontmatter + Markdown body; includes authoritative `path`, `rank`, and all metadata)
   * `workspace.json`, `tags/*.tag.json`, and other config files
 * **Git-ignored files** (`.gitignore` includes `.index/`):
   * `.index/graph/**` — Graph index (edge files)
   * `.state.json` — Local session state
-  * Edge files are **rebuildable** from `meta.json` via `mm doctor --rebuild-index`
+  * Edge files are **rebuildable** from Frontmatter via `mm doctor --rebuild-index`
 * **Conflict resolution**:
-  * Changes to `meta.json` are typically line‑local (path, rank, status fields).
-  * Rank collisions surface as small JSON diffs and are resolved by reindexing.
-  * Competing moves on the same Item → last‑writer wins at the `meta.json` level (content unaffected).
-  * After `git pull`, if `.index/graph` is out-of-sync, run `mm doctor --rebuild-index` to regenerate the index from merged `meta.json` files.
+  * Changes to Frontmatter are typically line‑local (path, rank, status fields).
+  * Frontmatter conflicts surface as YAML diffs and are resolved by reindexing.
+  * Competing moves on the same Item → last‑writer wins at the Frontmatter level (Markdown body unaffected).
+  * After `git pull`, if `.index/graph` is out-of-sync, run `mm doctor --rebuild-index` to regenerate the index from merged Frontmatter.
 
 ---
 
