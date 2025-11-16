@@ -355,9 +355,46 @@ export const createPathResolver = (
     cwd: Placement,
     expr: PathExpression,
   ): Promise<Result<Placement, PathResolverError>> => {
+    // Validate absolute paths require a head segment
+    if (expr.isAbsolute) {
+      if (expr.segments.length === 0) {
+        return Result.error(
+          createValidationError(PATH_RESOLVER_ERROR_KIND, [
+            createValidationIssue(
+              "absolute path requires at least one segment to define head (date or item)",
+              { code: "absolute_path_missing_head" },
+            ),
+          ]),
+        );
+      }
+
+      const firstToken = expr.segments[0];
+      if (firstToken.kind === "numeric") {
+        return Result.error(
+          createValidationError(PATH_RESOLVER_ERROR_KIND, [
+            createValidationIssue(
+              "absolute path must start with date or item, not numeric section",
+              { code: "absolute_path_invalid_head" },
+            ),
+          ]),
+        );
+      }
+
+      if (firstToken.kind === "dot" || firstToken.kind === "dotdot") {
+        return Result.error(
+          createValidationError(PATH_RESOLVER_ERROR_KIND, [
+            createValidationIssue(
+              "absolute path cannot start with navigation token (. or ..)",
+              { code: "absolute_path_invalid_head" },
+            ),
+          ]),
+        );
+      }
+    }
+
     let stack: Placement = expr.isAbsolute
       ? createDatePlacement(
-        Result.unwrap(parseCalendarDay("1970-01-01")), // temp placeholder
+        Result.unwrap(parseCalendarDay("1970-01-01")), // temp placeholder, will be replaced by first token
         [],
       )
       : cwd;
