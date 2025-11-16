@@ -3,7 +3,7 @@ import { Result } from "../../shared/result.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
 import { StateRepository } from "../../domain/repositories/state_repository.ts";
-import { parsePath, Path } from "../../domain/primitives/mod.ts";
+import { parsePlacement, Placement } from "../../domain/primitives/mod.ts";
 
 const STATE_FILE_NAME = ".state.json";
 
@@ -71,7 +71,7 @@ export const createFileSystemStateRepository = (
 ): StateRepository => {
   const statePath = join(options.workspaceRoot, STATE_FILE_NAME);
 
-  const loadCwd = async (): Promise<Result<Path | undefined, RepositoryError>> => {
+  const loadCwd = async (): Promise<Result<Placement | undefined, RepositoryError>> => {
     const stateResult = await readState(statePath);
     if (stateResult.type === "error") {
       return stateResult;
@@ -82,10 +82,10 @@ export const createFileSystemStateRepository = (
       return Result.ok(undefined);
     }
 
-    const parsed = parsePath(cwdString);
+    const parsed = parsePlacement(cwdString);
     if (parsed.type === "error") {
       return Result.error(
-        createRepositoryError("state", "load", "invalid cwd path in state file", {
+        createRepositoryError("state", "load", "invalid cwd placement in state file", {
           cause: parsed.error,
         }),
       );
@@ -94,13 +94,13 @@ export const createFileSystemStateRepository = (
     return Result.ok(parsed.value);
   };
 
-  const saveCwd = async (path: Path): Promise<Result<void, RepositoryError>> => {
+  const saveCwd = async (placement: Placement): Promise<Result<void, RepositoryError>> => {
     const stateResult = await readState(statePath);
     if (stateResult.type === "error") {
       return stateResult;
     }
 
-    const nextState: StateSnapshot = { default_cwd: path.toString() };
+    const nextState: StateSnapshot = { default_cwd: placement.toString() };
     return await writeState(statePath, nextState);
   };
 

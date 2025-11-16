@@ -2,7 +2,7 @@ import { dirname, join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { ItemRepository } from "../../domain/repositories/item_repository.ts";
 import { Item, ItemSnapshot, parseItem } from "../../domain/models/item.ts";
-import { ItemId, Path } from "../../domain/primitives/mod.ts";
+import { ItemId, Placement, PlacementRange } from "../../domain/primitives/mod.ts";
 import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
@@ -22,7 +22,7 @@ export type FileSystemItemRepositoryDependencies = Readonly<{
 type LoadResult = Result<Item | undefined, RepositoryError>;
 type SaveResult = Result<void, RepositoryError>;
 type DeleteResult = Result<void, RepositoryError>;
-type listByPathResult = Result<ReadonlyArray<Item>, RepositoryError>;
+type ListByPlacementResult = Result<ReadonlyArray<Item>, RepositoryError>;
 
 type ItemFileRecord = Readonly<{
   readonly id: string;
@@ -34,7 +34,7 @@ type ItemFrontmatter = Readonly<{
   icon: string;
   kind?: string;
   status: string;
-  path: string;
+  placement: string;
   rank: string;
   created_at: string;
   updated_at: string;
@@ -114,15 +114,39 @@ const edgesDirectory = (workspaceRoot: string, itemId: string): string =>
   join(workspaceRoot, ".index", "graph", "parents", itemId);
 
 /**
- * Check if a path represents a top-level date section
- * A top-level date path has exactly one segment that is a date
+ * Check if a placement is directly under a date (no sections, no parent item)
  */
-const isTopLevelDatePath = (path: Path): boolean => {
-  if (path.segments.length !== 1) {
-    return false;
+const isDirectlyUnderDate = (placement: Placement): boolean => {
+  return placement.head.kind === "date" && placement.section.length === 0;
+};
+
+/**
+ * Check if item matches a placement range
+ */
+const matchesPlacementRange = (item: Item, range: PlacementRange): boolean => {
+  switch (range.kind) {
+    case "single": {
+      return item.data.placement.equals(range.at);
+    }
+    case "dateRange": {
+      if (item.data.placement.head.kind !== "date") {
+        return false;
+      }
+      const itemDate = item.data.placement.head.date.toString();
+      return itemDate >= range.from.toString() && itemDate <= range.to.toString();
+    }
+    case "numericRange": {
+      const itemParent = item.data.placement.parent();
+      if (!itemParent || !itemParent.equals(range.parent)) {
+        return false;
+      }
+      const lastSection = item.data.placement.section[item.data.placement.section.length - 1];
+      if (lastSection === undefined) {
+        return false;
+      }
+      return lastSection >= range.from && lastSection <= range.to;
+    }
   }
-  const segment = path.segments[0];
-  return segment.kind === "Date";
 };
 
 const parseSnapshot = (
@@ -149,7 +173,7 @@ const writeItemFile = async (
     id: snapshot.id,
     icon: snapshot.icon,
     status: snapshot.status,
-    path: snapshot.path,
+    placement: snapshot.placement,
     rank: snapshot.rank,
     created_at: snapshot.createdAt,
     updated_at: snapshot.updatedAt,
@@ -159,7 +183,7 @@ const writeItemFile = async (
     due_at: snapshot.dueAt,
     alias: snapshot.alias,
     context: snapshot.context,
-    schema: "mm.item.frontmatter/1",
+    schema: "mm.item.frontmatter/2",
   };
 
   // Build body (title + content)
@@ -268,7 +292,7 @@ const loadItemFromFile = async (
     id: frontmatter.id,
     icon: frontmatter.icon,
     status: frontmatter.status,
-    path: frontmatter.path,
+    placement: frontmatter.placement,
     rank: frontmatter.rank,
     createdAt: frontmatter.created_at,
     updatedAt: frontmatter.updated_at,
@@ -474,15 +498,16 @@ export const createFileSystemItemRepository = (
       return edgesResult;
     }
 
-    // Handle top-level edge file updates
-    const newPathIsTopLevel = isTopLevelDatePath(item.data.path);
-    const oldPathIsTopLevel = existingItem ? isTopLevelDatePath(existingItem.data.path) : false;
+    // Handle top-level edge file updates (items directly under date)
+    const newIsDirectUnderDate = isDirectlyUnderDate(item.data.placement);
+    const oldIsDirectUnderDate = existingItem
+      ? isDirectlyUnderDate(existingItem.data.placement)
+      : false;
 
-    // If path changed from top-level to non-top-level, delete old top-level edge
-    if (existingItem && oldPathIsTopLevel && !newPathIsTopLevel) {
-      const oldDateSegment = existingItem.data.path.segments[0];
-      if (oldDateSegment.kind === "Date") {
-        const oldDateStr = oldDateSegment.value.toString();
+    // If placement changed from direct-under-date to something else, delete old top-level edge
+    if (existingItem && oldIsDirectUnderDate && !newIsDirectUnderDate) {
+      if (existingItem.data.placement.head.kind === "date") {
+        const oldDateStr = existingItem.data.placement.head.date.toString();
         const deleteResult = await deletePlacementEdge(
           dependencies.root,
           oldDateStr,
@@ -494,16 +519,15 @@ export const createFileSystemItemRepository = (
       }
     }
 
-    // If path changed between different top-level dates, delete old and create new
-    if (existingItem && oldPathIsTopLevel && newPathIsTopLevel) {
-      const oldDateSegment = existingItem.data.path.segments[0];
-      const newDateSegment = item.data.path.segments[0];
+    // If placement changed between different dates (both direct-under-date), delete old and create new
+    if (existingItem && oldIsDirectUnderDate && newIsDirectUnderDate) {
       if (
-        oldDateSegment.kind === "Date" &&
-        newDateSegment.kind === "Date" &&
-        oldDateSegment.value.toString() !== newDateSegment.value.toString()
+        existingItem.data.placement.head.kind === "date" &&
+        item.data.placement.head.kind === "date" &&
+        existingItem.data.placement.head.date.toString() !==
+          item.data.placement.head.date.toString()
       ) {
-        const oldDateStr = oldDateSegment.value.toString();
+        const oldDateStr = existingItem.data.placement.head.date.toString();
         const deleteResult = await deletePlacementEdge(
           dependencies.root,
           oldDateStr,
@@ -515,50 +539,46 @@ export const createFileSystemItemRepository = (
       }
     }
 
-    // If path changed from non-top-level to top-level, delete old parent edge
-    if (existingItem && !oldPathIsTopLevel && newPathIsTopLevel) {
-      const oldPathSegments = existingItem.data.path.segments;
-      if (oldPathSegments.length >= 2 && oldPathSegments[1].kind === "ItemId") {
-        const oldParentId = oldPathSegments[1].value as ItemId;
-        const oldSectionSegments = oldPathSegments.slice(2);
-        const oldSectionPath = oldSectionSegments
-          .filter((seg) => seg.kind !== "range")
-          .map((seg) => seg.toString())
-          .join("/");
+    // If placement changed from item-parent to date-parent, delete old parent edge
+    if (
+      existingItem &&
+      existingItem.data.placement.head.kind === "item" &&
+      item.data.placement.head.kind === "date"
+    ) {
+      const oldParentId = existingItem.data.placement.head.id;
+      const oldSectionPath = existingItem.data.placement.section.join("/");
 
-        const oldEdgeDir = oldSectionPath
-          ? join(
-            dependencies.root,
-            ".index",
-            "graph",
-            "parents",
-            oldParentId.toString(),
-            oldSectionPath,
-          )
-          : join(dependencies.root, ".index", "graph", "parents", oldParentId.toString());
-        const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
+      const oldEdgeDir = oldSectionPath
+        ? join(
+          dependencies.root,
+          ".index",
+          "graph",
+          "parents",
+          oldParentId.toString(),
+          oldSectionPath,
+        )
+        : join(dependencies.root, ".index", "graph", "parents", oldParentId.toString());
+      const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
 
-        // Delete old edge file
-        try {
-          await Deno.remove(oldEdgeFilePath);
-        } catch (error) {
-          if (!(error instanceof Deno.errors.NotFound)) {
-            return Result.error(
-              createRepositoryError("item", "save", "failed to delete old parent edge file", {
-                identifier: snapshot.id,
-                cause: error,
-              }),
-            );
-          }
+      // Delete old edge file
+      try {
+        await Deno.remove(oldEdgeFilePath);
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) {
+          return Result.error(
+            createRepositoryError("item", "save", "failed to delete old parent edge file", {
+              identifier: snapshot.id,
+              cause: error,
+            }),
+          );
         }
       }
     }
 
-    // Save top-level placement edge if this item is placed under a date section
-    if (newPathIsTopLevel) {
-      const dateSegment = item.data.path.segments[0];
-      if (dateSegment.kind === "Date") {
-        const dateStr = dateSegment.value.toString(); // YYYY-MM-DD format
+    // Save top-level placement edge if this item is directly under a date
+    if (newIsDirectUnderDate) {
+      if (item.data.placement.head.kind === "date") {
+        const dateStr = item.data.placement.head.date.toString(); // YYYY-MM-DD format
         const topLevelResult = await savePlacementEdge(
           dependencies.root,
           dateStr,
@@ -569,129 +589,98 @@ export const createFileSystemItemRepository = (
           return topLevelResult;
         }
       }
-    } else {
-      // If not top-level, save edge file in parent item's edges directory
-      // Path format: /date/parent-id/section1/section2/.../this-item
-      // We need to save edge in parent-id's edges/section1/section2/... directory
-      const pathSegments = item.data.path.segments;
+    } else if (item.data.placement.head.kind === "item") {
+      // If not directly under date, save edge file in parent item's edges directory
+      const parentId = item.data.placement.head.id;
 
-      // Delete old parent edge if path changed from non-top-level parent
-      if (existingItem && !oldPathIsTopLevel) {
-        const oldPathSegments = existingItem.data.path.segments;
-        if (oldPathSegments.length >= 2 && oldPathSegments[1].kind === "ItemId") {
-          const oldParentId = oldPathSegments[1].value as ItemId;
-          const oldSectionSegments = oldPathSegments.slice(2);
-          const oldSectionPath = oldSectionSegments
-            .filter((seg) => seg.kind !== "range")
-            .map((seg) => seg.toString())
-            .join("/");
+      // Delete old parent edge if parent or section changed
+      if (existingItem && existingItem.data.placement.head.kind === "item") {
+        const oldParentId = existingItem.data.placement.head.id;
+        const oldSectionPath = existingItem.data.placement.section.join("/");
 
-          // Check if parent or section changed
-          const newParentId = pathSegments.length >= 2 && pathSegments[1].kind === "ItemId"
-            ? pathSegments[1].value as ItemId
-            : null;
-          const newSectionSegments = pathSegments.slice(2);
-          const newSectionPath = newSectionSegments
-            .filter((seg) => seg.kind !== "range")
-            .map((seg) => seg.toString())
-            .join("/");
+        const parentChanged = oldParentId.toString() !== parentId.toString();
+        const newSectionPath = item.data.placement.section.join("/");
+        const sectionChanged = oldSectionPath !== newSectionPath;
 
-          const parentChanged = !newParentId || oldParentId.toString() !== newParentId.toString();
-          const sectionChanged = oldSectionPath !== newSectionPath;
-
-          if (parentChanged || sectionChanged) {
-            const oldEdgeDir = oldSectionPath
-              ? join(
-                dependencies.root,
-                ".index",
-                "graph",
-                "parents",
-                oldParentId.toString(),
-                oldSectionPath,
-              )
-              : join(dependencies.root, ".index", "graph", "parents", oldParentId.toString());
-            const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
-
-            // Delete old edge file
-            try {
-              await Deno.remove(oldEdgeFilePath);
-            } catch (error) {
-              if (!(error instanceof Deno.errors.NotFound)) {
-                return Result.error(
-                  createRepositoryError("item", "save", "failed to delete old parent edge file", {
-                    identifier: snapshot.id,
-                    cause: error,
-                  }),
-                );
-              }
-            }
-          }
-        }
-      }
-
-      // Save new parent edge file
-      if (pathSegments.length >= 2) {
-        // First segment is date, second is parent ID
-        const parentSegment = pathSegments[1];
-        if (parentSegment.kind === "ItemId") {
-          const parentId = parentSegment.value;
-
-          // Build section path from remaining segments
-          const sectionSegments = pathSegments.slice(2); // Skip date and parent
-          const sectionPath = sectionSegments
-            .filter((seg) => seg.kind !== "range")
-            .map((seg) => seg.toString())
-            .join("/");
-
-          // Edge directory: .index/graph/parents/<parentId>/section1/section2/...
-          const edgeDir = sectionPath
+        if (parentChanged || sectionChanged) {
+          const oldEdgeDir = oldSectionPath
             ? join(
               dependencies.root,
               ".index",
               "graph",
               "parents",
-              parentId.toString(),
-              sectionPath,
+              oldParentId.toString(),
+              oldSectionPath,
             )
-            : join(dependencies.root, ".index", "graph", "parents", parentId.toString());
+            : join(dependencies.root, ".index", "graph", "parents", oldParentId.toString());
+          const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
 
-          // Create edge file for this item in parent's edge directory
-          const edgeFilePath = join(edgeDir, `${item.data.id.toString()}.edge.json`);
-
-          // Ensure edge directory exists
+          // Delete old edge file
           try {
-            await Deno.mkdir(edgeDir, { recursive: true });
+            await Deno.remove(oldEdgeFilePath);
           } catch (error) {
-            if (!(error instanceof Deno.errors.AlreadyExists)) {
+            if (!(error instanceof Deno.errors.NotFound)) {
               return Result.error(
-                createRepositoryError("item", "save", "failed to create edge directory", {
+                createRepositoryError("item", "save", "failed to delete old parent edge file", {
                   identifier: snapshot.id,
                   cause: error,
                 }),
               );
             }
           }
-
-          // Write edge file
-          const edgeSnapshot = {
-            schema: "mm.edge/1",
-            from: parentId.toString(),
-            to: item.data.id.toString(),
-            rank: item.data.rank.toString(),
-          };
-          const edgePayload = JSON.stringify(edgeSnapshot, null, 2);
-
-          try {
-            await Deno.writeTextFile(edgeFilePath, `${edgePayload}\n`);
-          } catch (error) {
-            return Result.error(
-              createRepositoryError("item", "save", "failed to write parent edge file", {
-                identifier: snapshot.id,
-                cause: error,
-              }),
-            );
-          }
         }
+      }
+
+      // Save new parent edge file
+      const sectionPath = item.data.placement.section.join("/");
+
+      // Edge directory: .index/graph/parents/<parentId>/section1/section2/...
+      const edgeDir = sectionPath
+        ? join(
+          dependencies.root,
+          ".index",
+          "graph",
+          "parents",
+          parentId.toString(),
+          sectionPath,
+        )
+        : join(dependencies.root, ".index", "graph", "parents", parentId.toString());
+
+      // Create edge file for this item in parent's edge directory
+      const edgeFilePath = join(edgeDir, `${item.data.id.toString()}.edge.json`);
+
+      // Ensure edge directory exists
+      try {
+        await Deno.mkdir(edgeDir, { recursive: true });
+      } catch (error) {
+        if (!(error instanceof Deno.errors.AlreadyExists)) {
+          return Result.error(
+            createRepositoryError("item", "save", "failed to create edge directory", {
+              identifier: snapshot.id,
+              cause: error,
+            }),
+          );
+        }
+      }
+
+      // Write edge file
+      const edgeSnapshot = {
+        schema: "mm.edge/1",
+        from: parentId.toString(),
+        to: item.data.id.toString(),
+        rank: item.data.rank.toString(),
+      };
+      const edgePayload = JSON.stringify(edgeSnapshot, null, 2);
+
+      try {
+        await Deno.writeTextFile(edgeFilePath, `${edgePayload}\n`);
+      } catch (error) {
+        return Result.error(
+          createRepositoryError("item", "save", "failed to write parent edge file", {
+            identifier: snapshot.id,
+            cause: error,
+          }),
+        );
       }
     }
 
@@ -719,13 +708,11 @@ export const createFileSystemItemRepository = (
     const item = itemResult.value;
 
     if (item) {
-      const pathIsTopLevel = isTopLevelDatePath(item.data.path);
-
-      // Delete top-level edge if item was placed under a date section
-      if (pathIsTopLevel) {
-        const dateSegment = item.data.path.segments[0];
-        if (dateSegment.kind === "Date") {
-          const dateStr = dateSegment.value.toString();
+      // Delete edge based on placement
+      if (isDirectlyUnderDate(item.data.placement)) {
+        // Delete top-level edge if item was directly under a date
+        if (item.data.placement.head.kind === "date") {
+          const dateStr = item.data.placement.head.date.toString();
           const topLevelResult = await deletePlacementEdge(
             dependencies.root,
             dateStr,
@@ -735,41 +722,34 @@ export const createFileSystemItemRepository = (
             return topLevelResult;
           }
         }
-      } else {
-        // Delete parent edge if item was placed under a parent
-        const pathSegments = item.data.path.segments;
-        if (pathSegments.length >= 2 && pathSegments[1].kind === "ItemId") {
-          const parentId = pathSegments[1].value as ItemId;
-          const sectionSegments = pathSegments.slice(2);
-          const sectionPath = sectionSegments
-            .filter((seg) => seg.kind !== "range")
-            .map((seg) => seg.toString())
-            .join("/");
+      } else if (item.data.placement.head.kind === "item") {
+        // Delete parent edge if item was under a parent item
+        const parentId = item.data.placement.head.id;
+        const sectionPath = item.data.placement.section.join("/");
 
-          const edgeDir = sectionPath
-            ? join(
-              dependencies.root,
-              ".index",
-              "graph",
-              "parents",
-              parentId.toString(),
-              sectionPath,
-            )
-            : join(dependencies.root, ".index", "graph", "parents", parentId.toString());
-          const edgeFilePath = join(edgeDir, `${id.toString()}.edge.json`);
+        const edgeDir = sectionPath
+          ? join(
+            dependencies.root,
+            ".index",
+            "graph",
+            "parents",
+            parentId.toString(),
+            sectionPath,
+          )
+          : join(dependencies.root, ".index", "graph", "parents", parentId.toString());
+        const edgeFilePath = join(edgeDir, `${id.toString()}.edge.json`);
 
-          // Delete parent edge file
-          try {
-            await Deno.remove(edgeFilePath);
-          } catch (error) {
-            if (!(error instanceof Deno.errors.NotFound)) {
-              return Result.error(
-                createRepositoryError("item", "delete", "failed to delete parent edge file", {
-                  identifier: idStr,
-                  cause: error,
-                }),
-              );
-            }
+        // Delete parent edge file
+        try {
+          await Deno.remove(edgeFilePath);
+        } catch (error) {
+          if (!(error instanceof Deno.errors.NotFound)) {
+            return Result.error(
+              createRepositoryError("item", "delete", "failed to delete parent edge file", {
+                identifier: idStr,
+                cause: error,
+              }),
+            );
           }
         }
       }
@@ -791,11 +771,9 @@ export const createFileSystemItemRepository = (
     return Result.ok(undefined);
   };
 
-  const listByPath = async (
-    path: Path,
-  ): Promise<listByPathResult> => {
-    // Note: Path normalization should be done in the workflow layer before calling this method
-    // This method expects a normalized path (aliases already resolved)
+  const listByPlacement = async (
+    range: PlacementRange,
+  ): Promise<ListByPlacementResult> => {
     const filesResult = await collectItemFiles(dependencies.root);
     if (filesResult.type === "error") {
       return filesResult;
@@ -822,7 +800,7 @@ export const createFileSystemItemRepository = (
         );
       }
 
-      if (item.data.path.equals(path)) {
+      if (matchesPlacementRange(item, range)) {
         items.push(item);
       }
     }
@@ -836,6 +814,6 @@ export const createFileSystemItemRepository = (
     load,
     save,
     delete: remove,
-    listByPath,
+    listByPlacement,
   };
 };
