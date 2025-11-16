@@ -88,8 +88,24 @@ Deno.bench({
       }
 
       // Create 1000 items across 100 different dates (10 items per date)
-      for (let day = 1; day <= 100; day++) {
-        const date = `2025-01-${day.toString().padStart(2, "0")}`;
+      // Span across January through April to ensure all dates are valid
+      for (let i = 0; i < 100; i++) {
+        const dayOfYear = i + 1;
+        let month, day;
+        if (dayOfYear <= 31) {
+          month = 1;
+          day = dayOfYear;
+        } else if (dayOfYear <= 59) {
+          month = 2;
+          day = dayOfYear - 31;
+        } else if (dayOfYear <= 90) {
+          month = 3;
+          day = dayOfYear - 59;
+        } else {
+          month = 4;
+          day = dayOfYear - 90;
+        }
+        const date = `2025-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
         await createItems(ctx.testHome, 10, date);
       }
 
