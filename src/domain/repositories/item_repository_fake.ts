@@ -1,6 +1,6 @@
 import { Result } from "../../shared/result.ts";
 import { Item } from "../models/item.ts";
-import { ItemId, Path } from "../primitives/mod.ts";
+import { ItemId, PlacementRange } from "../primitives/mod.ts";
 import { ItemRepository } from "./item_repository.ts";
 import { RepositoryError } from "./repository_error.ts";
 
@@ -8,9 +8,37 @@ type ItemMap = Map<string, Item>;
 
 const ok = Result.ok;
 
-const cloneAndSortByPath = (items: Iterable<Item>, path: Path): Item[] =>
+const matchesPlacementRange = (item: Item, range: PlacementRange): boolean => {
+  switch (range.kind) {
+    case "single": {
+      return item.data.placement.equals(range.at);
+    }
+    case "dateRange": {
+      // Check if item's placement head is a date within the range
+      if (item.data.placement.head.kind !== "date") {
+        return false;
+      }
+      const itemDate = item.data.placement.head.date.toString();
+      return itemDate >= range.from.toString() && itemDate <= range.to.toString();
+    }
+    case "numericRange": {
+      // Check if item's placement parent matches and section is within range
+      if (!item.data.placement.parent()?.equals(range.parent)) {
+        return false;
+      }
+      // Get the last section number
+      const lastSection = item.data.placement.section[item.data.placement.section.length - 1];
+      if (lastSection === undefined) {
+        return false;
+      }
+      return lastSection >= range.from && lastSection <= range.to;
+    }
+  }
+};
+
+const cloneAndSortByPlacement = (items: Iterable<Item>, range: PlacementRange): Item[] =>
   Array.from(items)
-    .filter((item) => item.data.path.equals(path))
+    .filter((item) => matchesPlacementRange(item, range))
     .sort((first, second) => first.data.rank.compare(second.data.rank));
 
 export class InMemoryItemRepository implements ItemRepository {
@@ -39,8 +67,8 @@ export class InMemoryItemRepository implements ItemRepository {
     return Promise.resolve(ok(undefined));
   }
 
-  listByPath(path: Path): Promise<Result<ReadonlyArray<Item>, RepositoryError>> {
-    return Promise.resolve(ok(cloneAndSortByPath(this.items.values(), path)));
+  listByPlacement(range: PlacementRange): Promise<Result<ReadonlyArray<Item>, RepositoryError>> {
+    return Promise.resolve(ok(cloneAndSortByPlacement(this.items.values(), range)));
   }
 
   clear(): void {
