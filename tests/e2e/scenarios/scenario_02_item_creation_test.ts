@@ -32,8 +32,8 @@ import {
   runCommand,
   setupTestEnvironment,
   type TestContext,
-} from "./helpers.ts";
-import { parseFrontmatter } from "../../src/infrastructure/fileSystem/frontmatter.ts";
+} from "../helpers.ts";
+import { parseFrontmatter } from "../../../src/infrastructure/fileSystem/frontmatter.ts";
 
 describe("Scenario 2: Item creation and listing", () => {
   let ctx: TestContext;

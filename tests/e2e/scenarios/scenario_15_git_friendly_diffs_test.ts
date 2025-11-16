@@ -36,11 +36,11 @@ import {
   runCommand,
   setupTestEnvironment,
   type TestContext,
-} from "./helpers.ts";
+} from "../helpers.ts";
 import {
   parseFrontmatter,
   serializeFrontmatter,
-} from "../../src/infrastructure/fileSystem/frontmatter.ts";
+} from "../../../src/infrastructure/fileSystem/frontmatter.ts";
 
 /**
  * Git helper: Initialize a git repository

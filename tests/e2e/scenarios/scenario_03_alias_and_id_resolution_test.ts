@@ -28,8 +28,8 @@ import {
   runCommand,
   setupTestEnvironment,
   type TestContext,
-} from "./helpers.ts";
-import { parseFrontmatter } from "../../src/infrastructure/fileSystem/frontmatter.ts";
+} from "../helpers.ts";
+import { parseFrontmatter } from "../../../src/infrastructure/fileSystem/frontmatter.ts";
 
 describe("Scenario 3: Alias and ID resolution", () => {
   let ctx: TestContext;

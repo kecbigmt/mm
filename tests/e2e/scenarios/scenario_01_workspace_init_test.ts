@@ -29,7 +29,7 @@ import {
   runCommand,
   setupTestEnvironment,
   type TestContext,
-} from "./helpers.ts";
+} from "../helpers.ts";
 
 describe("Scenario 1: Workspace initialization and basic operations", () => {
   let ctx: TestContext;
