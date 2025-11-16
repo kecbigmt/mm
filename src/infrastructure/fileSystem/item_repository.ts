@@ -25,11 +25,6 @@ type SaveResult = Result<void, RepositoryError>;
 type DeleteResult = Result<void, RepositoryError>;
 type ListByPlacementResult = Result<ReadonlyArray<Item>, RepositoryError>;
 
-type ItemFileRecord = Readonly<{
-  readonly id: string;
-  readonly filePath: string;
-}>;
-
 type ItemFrontmatter = Readonly<{
   id: string;
   icon: string;
@@ -48,9 +43,6 @@ type ItemFrontmatter = Readonly<{
   tags?: string[];
   schema?: string;
 }>;
-
-const YEAR_DIRECTORY_REGEX = /^\d{4}$/u;
-const MONTH_DAY_DIRECTORY_REGEX = /^\d{2}$/u;
 
 const itemsDirectory = (root: string): string => join(root, "items");
 
@@ -119,35 +111,6 @@ const edgesDirectory = (workspaceRoot: string, itemId: string): string =>
  */
 const isDirectlyUnderDate = (placement: Placement): boolean => {
   return placement.head.kind === "date" && placement.section.length === 0;
-};
-
-/**
- * Check if item matches a placement range
- */
-const matchesPlacementRange = (item: Item, range: PlacementRange): boolean => {
-  switch (range.kind) {
-    case "single": {
-      return item.data.placement.equals(range.at);
-    }
-    case "dateRange": {
-      if (item.data.placement.head.kind !== "date") {
-        return false;
-      }
-      const itemDate = item.data.placement.head.date.toString();
-      return itemDate >= range.from.toString() && itemDate <= range.to.toString();
-    }
-    case "numericRange": {
-      const itemParent = item.data.placement.parent();
-      if (!itemParent || !itemParent.equals(range.parent)) {
-        return false;
-      }
-      const lastSection = item.data.placement.section[item.data.placement.section.length - 1];
-      if (lastSection === undefined) {
-        return false;
-      }
-      return lastSection >= range.from && lastSection <= range.to;
-    }
-  }
 };
 
 const parseSnapshot = (
@@ -370,72 +333,6 @@ const findItemFile = async (
   }
 
   return Result.ok(undefined);
-};
-
-const collectItemFiles = async (
-  root: string,
-): Promise<Result<ReadonlyArray<ItemFileRecord>, RepositoryError>> => {
-  const base = itemsDirectory(root);
-  const items: ItemFileRecord[] = [];
-  try {
-    for await (const yearEntry of Deno.readDir(base)) {
-      if (!yearEntry.isDirectory || yearEntry.name.startsWith(".")) {
-        continue;
-      }
-      if (!YEAR_DIRECTORY_REGEX.test(yearEntry.name)) {
-        return Result.error(
-          createRepositoryError("item", "list", `unexpected year directory: ${yearEntry.name}`),
-        );
-      }
-      const yearPath = join(base, yearEntry.name);
-      for await (const monthEntry of Deno.readDir(yearPath)) {
-        if (!monthEntry.isDirectory || monthEntry.name.startsWith(".")) {
-          continue;
-        }
-        if (!MONTH_DAY_DIRECTORY_REGEX.test(monthEntry.name)) {
-          return Result.error(
-            createRepositoryError("item", "list", `unexpected month directory: ${monthEntry.name}`),
-          );
-        }
-        const monthPath = join(yearPath, monthEntry.name);
-        for await (const dayEntry of Deno.readDir(monthPath)) {
-          if (!dayEntry.isDirectory || dayEntry.name.startsWith(".")) {
-            continue;
-          }
-          if (!MONTH_DAY_DIRECTORY_REGEX.test(dayEntry.name)) {
-            return Result.error(
-              createRepositoryError("item", "list", `unexpected day directory: ${dayEntry.name}`),
-            );
-          }
-          const dayPath = join(monthPath, dayEntry.name);
-          for await (const fileEntry of Deno.readDir(dayPath)) {
-            // Skip directories and hidden files
-            if (fileEntry.isDirectory || fileEntry.name.startsWith(".")) {
-              continue;
-            }
-            // Only process .md files
-            if (!fileEntry.name.endsWith(".md")) {
-              continue;
-            }
-            // Extract item ID from filename (remove .md extension)
-            const id = fileEntry.name.slice(0, -3);
-            const filePath = join(dayPath, fileEntry.name);
-            items.push({ id, filePath });
-          }
-        }
-      }
-    }
-    return Result.ok(items);
-  } catch (error) {
-    if (error instanceof Deno.errors.NotFound) {
-      return Result.ok([]);
-    }
-    return Result.error(
-      createRepositoryError("item", "list", "failed to scan items directory", {
-        cause: error,
-      }),
-    );
-  }
 };
 
 export const createFileSystemItemRepository = (
