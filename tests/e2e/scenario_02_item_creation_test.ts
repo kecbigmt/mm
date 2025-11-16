@@ -142,7 +142,7 @@ describe("Scenario 2: Item creation and listing", () => {
 
     assertEquals(
       frontmatter.schema,
-      "mm.item.frontmatter/1",
+      "mm.item.frontmatter/2",
       "Frontmatter should have correct schema",
     );
     assertEquals(typeof frontmatter.id, "string", "Frontmatter should have id");
@@ -196,7 +196,7 @@ describe("Scenario 2: Item creation and listing", () => {
 
     const { frontmatter, body } = parseResult.value;
 
-    assertEquals(frontmatter.schema, "mm.item.frontmatter/1");
+    assertEquals(frontmatter.schema, "mm.item.frontmatter/2");
     assertEquals(typeof frontmatter.id, "string");
     assertEquals(frontmatter.status, "open");
     assertEquals(typeof frontmatter.created_at, "string");

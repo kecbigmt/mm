@@ -246,14 +246,14 @@ Deno.test("range_expression.parseRangeExpression - dotdot at end (not range)", (
 Deno.test("range_expression.parseRangeExpression - parent navigation patterns", () => {
   // All of these should be treated as paths (navigation), not ranges
   const navigationPatterns = [
-    "../",           // parent directory
-    "..",            // parent directory (no trailing slash)
-    "../../",        // grandparent directory
-    "../../../",     // great-grandparent
-    "../foo",        // parent then into foo
-    "foo/../bar",    // foo then back then bar
-    "../1",          // parent then section 1
-    "1/../2",        // section 1 then back then section 2
+    "../", // parent directory
+    "..", // parent directory (no trailing slash)
+    "../../", // grandparent directory
+    "../../../", // great-grandparent
+    "../foo", // parent then into foo
+    "foo/../bar", // foo then back then bar
+    "../1", // parent then section 1
+    "1/../2", // section 1 then back then section 2
   ];
 
   for (const pattern of navigationPatterns) {
@@ -276,11 +276,11 @@ Deno.test("range_expression.parseRangeExpression - parent navigation patterns", 
 Deno.test("range_expression.parseRangeExpression - true range patterns", () => {
   // All of these should be treated as ranges
   const rangePatterns = [
-    "1..5",          // numeric range
-    "a..z",          // id/alias range
-    "foo/1..3",      // numeric range with parent
+    "1..5", // numeric range
+    "a..z", // id/alias range
+    "foo/1..3", // numeric range with parent
     "/2025-11-15/1..10", // absolute numeric range
-    "book/1..3",     // alias with numeric range
+    "book/1..3", // alias with numeric range
   ];
 
   for (const pattern of rangePatterns) {
