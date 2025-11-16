@@ -36,7 +36,6 @@ Before full implementation, conduct small spike tasks to validate technical appr
 Small exploratory tasks to de-risk high-uncertainty areas.
 
 #### **Spike 0.1: Placement Parsing Investigation**
-**Effort:** 1-2 hours
 
 Investigate existing `Placement` type structure and parsing:
 
@@ -54,7 +53,6 @@ Investigate existing `Placement` type structure and parsing:
 ---
 
 #### **Spike 0.2: Cycle Detection Prototype**
-**Effort:** 2-3 hours
 
 Prototype cycle detection algorithm:
 
@@ -70,7 +68,6 @@ Prototype cycle detection algorithm:
 ---
 
 #### **Spike 0.3: Large Workspace Scan Benchmark**
-**Effort:** 1-2 hours
 
 Benchmark workspace scanning performance:
 
@@ -748,11 +745,9 @@ Phase 5 (Testing - Parallel with 3-4):
 
 ### **Iteration 0: Risk Mitigation (Sequential)**
 Execute spikes sequentially to validate technical approaches:
-- Spike 0.1: Placement Parsing (1-2h)
-- Spike 0.2: Cycle Detection (2-3h)
-- Spike 0.3: Workspace Scanning (1-2h)
-
-**Total:** 4-7 hours
+- Spike 0.1: Placement Parsing
+- Spike 0.2: Cycle Detection
+- Spike 0.3: Workspace Scanning
 
 ### **Iteration 1: High-Risk Domain Tasks (Parallel after spikes)**
 Prioritize high-risk tasks early:
@@ -783,40 +778,6 @@ Can start when workflows are ready:
 - Task 5.1 can start immediately (or during Phase 0)
 - Task 5.2 as commands become available
 - Task 5.3 near completion
-
----
-
-## Estimated Effort (Revised)
-
-| Phase | Task | Complexity | Estimated Time | Priority |
-|-------|------|-----------|----------------|----------|
-| 0.1 | Placement Parsing Spike | Low | 1-2 hours | HIGH |
-| 0.2 | Cycle Detection Spike | Low | 2-3 hours | HIGH |
-| 0.3 | Workspace Scan Spike | Low | 1-2 hours | HIGH |
-| 1.1 | Validation Error Types | Low | 2-4 hours | MEDIUM |
-| 1.2 | Item Validator | Medium | 4-6 hours | MEDIUM |
-| 1.3 | Graph Validator | High | 6-8 hours | HIGH |
-| 1.4 | Index Rebuilder | Medium | 4-6 hours | HIGH |
-| 1.5 | Rank Rebalancer | Medium | 4-6 hours | MEDIUM |
-| 2.1 | Workspace Scanner | Medium | 4-6 hours | HIGH |
-| 2.2 | Index Writer | Medium | 4-6 hours | MEDIUM |
-| 2.3 | Item Updater | Low | 2-4 hours | MEDIUM |
-| 3.1 | Check Workflow | Medium | 4-6 hours | MEDIUM |
-| 3.2 | Rebuild Index Workflow | Medium | 4-6 hours | MEDIUM |
-| 3.3 | Rebalance Rank Workflow | Medium | 4-6 hours | MEDIUM |
-| 4.1 | check command | Low | 2-4 hours | MEDIUM |
-| 4.2 | rebuild-index command | Low | 2-4 hours | MEDIUM |
-| 4.3 | rebalance-rank command | Low | 2-4 hours | MEDIUM |
-| 4.4 | doctor command | Low | 1-2 hours | LOW |
-| 4.5 | Main integration | Low | 1-2 hours | LOW |
-| 5.1 | Test Fixtures | Low | 2-4 hours | MEDIUM |
-| 5.2 | E2E Tests | Medium | 4-6 hours | MEDIUM |
-| 5.3 | Documentation | Low | 2-4 hours | LOW |
-
-**Phase 0 (Spikes):** 4-7 hours
-**Phase 1-5 (Implementation):** 60-95 hours
-**Total:** ~64-102 hours (single developer, sequential)
-**With Parallelization (4 developers):** ~28-40 hours (including spike overhead)
 
 ---
 
