@@ -65,8 +65,12 @@ Deno.bench({
       }
 
       // Create 500 items across 50 different dates (10 items per date)
-      for (let day = 1; day <= 50; day++) {
-        const date = `2025-01-${day.toString().padStart(2, "0")}`;
+      // Span across January and February to ensure all dates are valid
+      for (let i = 0; i < 50; i++) {
+        const dayOfYear = i + 1;
+        const month = dayOfYear <= 31 ? 1 : 2;
+        const day = dayOfYear <= 31 ? dayOfYear : dayOfYear - 31;
+        const date = `2025-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
         await createItems(ctx.testHome, 10, date);
       }
 
