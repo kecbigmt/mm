@@ -30,11 +30,11 @@ jobs:
       - name: Run bench on main
         working-directory: main
         run: |
-          deno bench --json --allow-read --allow-write --allow-env --allow-run tests/performance/ci/ > ../bench-main.json
+          deno bench --json --allow-read --allow-write --allow-env --allow-run tests/performance/ci/*.ts > ../bench-main.json
 
       - name: Run bench on PR
         run: |
-          deno bench --json --allow-read --allow-write --allow-env --allow-run tests/performance/ci/ > bench-pr.json
+          deno bench --json --allow-read --allow-write --allow-env --allow-run tests/performance/ci/*.ts > bench-pr.json
 
       - name: Generate comparison report (Markdown)
         if: ${{ success() }}
