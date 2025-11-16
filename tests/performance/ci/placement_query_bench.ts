@@ -25,7 +25,14 @@ const createItems = async (testHome: string, count: number, date: string) => {
   for (let i = 0; i < count; i++) {
     promises.push(runCommand(testHome, ["note", `Item ${i}`, "-p", date]));
   }
-  await Promise.all(promises);
+  const results = await Promise.all(promises);
+
+  // Fail fast if any command failed
+  for (const result of results) {
+    if (!result.success) {
+      throw new Error(`Failed to create item: ${result.stderr}`);
+    }
+  }
 };
 
 /**
@@ -52,7 +59,10 @@ Deno.bench({
 
     try {
       // Initialize workspace
-      await runCommand(ctx.testHome, ["workspace", "init", "bench"]);
+      const initResult = await runCommand(ctx.testHome, ["workspace", "init", "bench"]);
+      if (!initResult.success) {
+        throw new Error(`Failed to initialize workspace: ${initResult.stderr}`);
+      }
 
       // Create 500 items across 50 different dates (10 items per date)
       for (let day = 1; day <= 50; day++) {
@@ -63,8 +73,12 @@ Deno.bench({
       // Query only one date (should return 10 items)
       // Performance should be similar to querying 10 items from a 100-item workspace
       b.start();
-      await runCommand(ctx.testHome, ["ls", "2025-01-01"]);
+      const queryResult = await runCommand(ctx.testHome, ["ls", "2025-01-01"]);
       b.end();
+
+      if (!queryResult.success) {
+        throw new Error(`Query failed: ${queryResult.stderr}`);
+      }
     } finally {
       await cleanupTestEnvironment(ctx);
     }
