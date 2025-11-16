@@ -1,8 +1,10 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
-import { PathNormalizationService } from "../../../domain/services/path_normalization_service.ts";
-import { parseLocator } from "../../../domain/primitives/locator.ts";
+import { parsePathExpression } from "../path_expression.ts";
+import { createPathResolver } from "../../../domain/services/path_resolver.ts";
+import { parseTimezoneIdentifier } from "../../../domain/primitives/mod.ts";
+import { formatPlacementForDisplay } from "../../../domain/services/placement_display_service.ts";
 
 export function createCdCommand() {
   return new Command()
@@ -29,7 +31,6 @@ export function createCdCommand() {
           {
             stateRepository: deps.stateRepository,
             itemRepository: deps.itemRepository,
-            aliasRepository: deps.aliasRepository,
           },
           now,
         );
@@ -37,55 +38,74 @@ export function createCdCommand() {
           console.error(cwdResult.error.message);
           return;
         }
-        console.log(cwdResult.value.toString());
-        return;
-      }
-
-      const locatorResult = parseLocator(pathArg, {
-        today: now,
-        cwd: await CwdResolutionService.getCwd(
-          {
-            stateRepository: deps.stateRepository,
-            itemRepository: deps.itemRepository,
-            aliasRepository: deps.aliasRepository,
-          },
-          now,
-        ).then((r) => r.type === "ok" ? r.value : undefined),
-      });
-
-      if (locatorResult.type === "error") {
-        console.error("Invalid path:", locatorResult.error.issues.map((i) => i.message).join(", "));
-        return;
-      }
-
-      const targetPath = locatorResult.value.path;
-      if (targetPath.isRange()) {
-        console.error("cd does not accept ranges; use ls for ranges");
-        return;
-      }
-
-      // Normalize path for display (preserves aliases in the path for user-friendly CWD)
-      const normalizedResult = await PathNormalizationService.normalize(
-        targetPath,
-        {
+        // Display placement with aliases
+        const displayResult = await formatPlacementForDisplay(cwdResult.value, {
           itemRepository: deps.itemRepository,
-          aliasRepository: deps.aliasRepository,
-        },
-        { preserveAlias: true },
-      );
-
-      if (normalizedResult.type === "error") {
-        console.error(normalizedResult.error.message);
+        });
+        if (displayResult.type === "error") {
+          console.error(displayResult.error.message);
+          return;
+        }
+        console.log(displayResult.value);
         return;
       }
 
-      const normalizedPath = normalizedResult.value;
-      const setResult = await CwdResolutionService.setCwd(
-        normalizedPath,
+      // Get current placement
+      const cwdPlacementResult = await CwdResolutionService.getCwd(
         {
           stateRepository: deps.stateRepository,
           itemRepository: deps.itemRepository,
-          aliasRepository: deps.aliasRepository,
+        },
+        now,
+      );
+      if (cwdPlacementResult.type === "error") {
+        console.error(cwdPlacementResult.error.message);
+        return;
+      }
+
+      // Parse path expression
+      const exprResult = parsePathExpression(pathArg);
+      if (exprResult.type === "error") {
+        console.error(
+          "Invalid path expression:",
+          exprResult.error.issues.map((i) => i.message).join(", "),
+        );
+        return;
+      }
+
+      // Create path resolver
+      const timezoneResult = parseTimezoneIdentifier("UTC");
+      if (timezoneResult.type === "error") {
+        console.error("Failed to parse timezone");
+        return;
+      }
+
+      const pathResolver = createPathResolver({
+        aliasRepository: deps.aliasRepository,
+        itemRepository: deps.itemRepository,
+        timezone: timezoneResult.value,
+        today: now,
+      });
+
+      // Resolve expression to placement
+      const placementResult = await pathResolver.resolvePath(
+        cwdPlacementResult.value,
+        exprResult.value,
+      );
+
+      if (placementResult.type === "error") {
+        console.error(
+          "Failed to resolve path:",
+          placementResult.error.issues.map((i) => i.message).join(", "),
+        );
+        return;
+      }
+
+      const setResult = await CwdResolutionService.setCwd(
+        placementResult.value,
+        {
+          stateRepository: deps.stateRepository,
+          itemRepository: deps.itemRepository,
         },
       );
 
@@ -94,6 +114,14 @@ export function createCdCommand() {
         return;
       }
 
-      console.log(setResult.value.toString());
+      // Display placement with aliases
+      const displayResult = await formatPlacementForDisplay(setResult.value, {
+        itemRepository: deps.itemRepository,
+      });
+      if (displayResult.type === "error") {
+        console.error(displayResult.error.message);
+        return;
+      }
+      console.log(displayResult.value);
     });
 }

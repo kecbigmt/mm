@@ -1,6 +1,7 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
+import { formatPlacementForDisplay } from "../../../domain/services/placement_display_service.ts";
 
 export function createPwdCommand() {
   return new Command()
@@ -25,7 +26,6 @@ export function createPwdCommand() {
         {
           stateRepository: deps.stateRepository,
           itemRepository: deps.itemRepository,
-          aliasRepository: deps.aliasRepository,
         },
         now,
       );
@@ -35,6 +35,14 @@ export function createPwdCommand() {
         return;
       }
 
-      console.log(cwdResult.value.toString());
+      // Display placement with aliases
+      const displayResult = await formatPlacementForDisplay(cwdResult.value, {
+        itemRepository: deps.itemRepository,
+      });
+      if (displayResult.type === "error") {
+        console.error(displayResult.error.message);
+        return;
+      }
+      console.log(displayResult.value);
     });
 }

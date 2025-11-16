@@ -122,10 +122,15 @@ Deno.test({
       // Parse frontmatter
       const frontmatterEnd = fileContent.indexOf("\n---\n", 4);
       const yamlContent = fileContent.slice(4, frontmatterEnd);
-      assert(yamlContent.includes("path: /2024-01-05"), "frontmatter should contain path");
+      // YAML may quote date strings, so check for either quoted or unquoted format
+      assert(
+        yamlContent.includes("placement: 2024-01-05") ||
+          yamlContent.includes("placement: '2024-01-05'"),
+        "frontmatter should contain placement",
+      );
       assert(yamlContent.includes("rank:"), "frontmatter should contain rank");
       assert(
-        yamlContent.includes("schema: mm.item.frontmatter/1"),
+        yamlContent.includes("schema: mm.item.frontmatter/2"),
         "frontmatter should contain schema",
       );
 

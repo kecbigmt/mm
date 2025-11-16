@@ -1,9 +1,10 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { dateTimeFromDate, parseLocator } from "../../../domain/primitives/mod.ts";
+import { dateTimeFromDate, parseTimezoneIdentifier } from "../../../domain/primitives/mod.ts";
 import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
-import { PathNormalizationService } from "../../../domain/services/path_normalization_service.ts";
+import { parsePathExpression } from "../path_expression.ts";
+import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -52,7 +53,6 @@ export function createNoteCommand() {
         {
           stateRepository: deps.stateRepository,
           itemRepository: deps.itemRepository,
-          aliasRepository: deps.aliasRepository,
         },
         now,
       );
@@ -61,50 +61,46 @@ export function createNoteCommand() {
         return;
       }
 
-      const parentPath = (async () => {
-        if (!parentArg) {
-          return cwdResult.value;
-        }
+      // Resolve parent placement
+      let parentPlacement = cwdResult.value;
 
-        const locatorResult = parseLocator(parentArg, {
-          today: now,
-          cwd: cwdResult.value,
-        });
-        if (locatorResult.type === "error") {
+      if (parentArg) {
+        const exprResult = parsePathExpression(parentArg);
+        if (exprResult.type === "error") {
           console.error(
-            "Invalid parent locator:",
-            locatorResult.error.issues.map((i) => i.message).join(", "),
+            "Invalid parent expression:",
+            exprResult.error.issues.map((i) => i.message).join(", "),
           );
-          return undefined;
+          return;
         }
 
-        if (locatorResult.value.path.isRange()) {
-          console.error("Parent path cannot be a range");
-          return undefined;
+        const timezoneResult = parseTimezoneIdentifier("UTC");
+        if (timezoneResult.type === "error") {
+          console.error("Failed to parse timezone");
+          return;
         }
 
-        // Normalize path for display (preserves aliases in the path)
-        // CreateItemWorkflow will normalize again for comparison purposes
-        const normalizedResult = await PathNormalizationService.normalize(
-          locatorResult.value.path,
-          {
-            itemRepository: deps.itemRepository,
-            aliasRepository: deps.aliasRepository,
-          },
-          { preserveAlias: true },
+        const pathResolver = createPathResolver({
+          aliasRepository: deps.aliasRepository,
+          itemRepository: deps.itemRepository,
+          timezone: timezoneResult.value,
+          today: now,
+        });
+
+        const resolveResult = await pathResolver.resolvePath(
+          cwdResult.value,
+          exprResult.value,
         );
 
-        if (normalizedResult.type === "error") {
-          console.error(normalizedResult.error.message);
-          return undefined;
+        if (resolveResult.type === "error") {
+          console.error(
+            "Failed to resolve parent:",
+            resolveResult.error.issues.map((i) => i.message).join(", "),
+          );
+          return;
         }
 
-        return normalizedResult.value;
-      })();
-
-      const resolvedParentPath = await parentPath;
-      if (!resolvedParentPath) {
-        return;
+        parentPlacement = resolveResult.value;
       }
 
       const createdAtResult = dateTimeFromDate(now);
@@ -123,7 +119,7 @@ export function createNoteCommand() {
         body: bodyOption,
         context: contextOption,
         alias: aliasOption,
-        parentPath: resolvedParentPath,
+        parentPlacement: parentPlacement,
         createdAt: createdAtResult.value,
       }, {
         itemRepository: deps.itemRepository,
@@ -146,7 +142,7 @@ export function createNoteCommand() {
       const item = workflowResult.value.item;
       const label = formatItemLabel(item);
       console.log(
-        `✅ Created note [${label}] ${item.data.title.toString()} at ${resolvedParentPath.toString()}`,
+        `✅ Created note [${label}] ${item.data.title.toString()} at ${parentPlacement.toString()}`,
       );
 
       if (options.edit === true) {
