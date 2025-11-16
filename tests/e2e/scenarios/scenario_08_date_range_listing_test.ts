@@ -32,7 +32,7 @@ import {
   runCommand,
   setupTestEnvironment,
   type TestContext,
-} from "./helpers.ts";
+} from "../helpers.ts";
 
 describe("Scenario 8: Date range listing", () => {
   let ctx: TestContext;

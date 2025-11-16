@@ -26,7 +26,7 @@ import {
   runCommand,
   setupTestEnvironment,
   type TestContext,
-} from "./helpers.ts";
+} from "../helpers.ts";
 
 describe("Scenario 9: Numeric section range listing", () => {
   let ctx: TestContext;

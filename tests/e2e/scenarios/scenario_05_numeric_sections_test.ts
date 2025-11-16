@@ -27,7 +27,7 @@ import {
   runCommand,
   setupTestEnvironment,
   type TestContext,
-} from "./helpers.ts";
+} from "../helpers.ts";
 
 describe("Scenario 5: Numeric section creation and navigation", () => {
   let ctx: TestContext;
