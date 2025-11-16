@@ -387,3 +387,89 @@ Deno.test("PathResolver - returns error for absolute path starting with dot (/./
     assertEquals(result.error.issues[0].code, "absolute_path_invalid_head");
   }
 });
+
+Deno.test("PathResolver - falls back to single range for different date parents", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-11-16"));
+
+  // Try to resolve range with different date parents (2025-11-15/1..2025-11-16/3)
+  const { parseRangeExpression } = await import("../../presentation/cli/path_expression.ts");
+  const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-15/1..2025-11-16/3"));
+  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    // Should fall back to single range of 'from' (2025-11-15/1)
+    assertEquals(result.value.kind, "single");
+    if (result.value.kind === "single") {
+      assertEquals(result.value.at.toString(), "2025-11-15/1");
+    }
+  }
+});
+
+Deno.test("PathResolver - falls back to single range for different item parents", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-11-16"));
+  const itemA = Result.unwrap(itemIdFromString("019a0000-0000-7000-8000-000000000001"));
+  const itemB = Result.unwrap(itemIdFromString("019a0000-0000-7000-8000-000000000002"));
+
+  const placementA = createDatePlacement(today, []);
+  const placementB = createDatePlacement(today, []);
+  const now = Result.unwrap(dateTimeFromDate(new Date("2025-11-16T00:00:00Z")));
+
+  await itemRepository.save(createItem({
+    id: itemA,
+    title: Result.unwrap(itemTitleFromString("Item A")),
+    icon: createItemIcon("note"),
+    status: itemStatusOpen(),
+    placement: placementA,
+    rank: Result.unwrap(itemRankFromString("a0")),
+    createdAt: now,
+    updatedAt: now,
+  }));
+
+  await itemRepository.save(createItem({
+    id: itemB,
+    title: Result.unwrap(itemTitleFromString("Item B")),
+    icon: createItemIcon("note"),
+    status: itemStatusOpen(),
+    placement: placementB,
+    rank: Result.unwrap(itemRankFromString("a0")),
+    createdAt: now,
+    updatedAt: now,
+  }));
+
+  // Try to resolve range with different item parents (itemA/1..itemB/3)
+  const { parseRangeExpression } = await import("../../presentation/cli/path_expression.ts");
+  const rangeExpr = Result.unwrap(
+    parseRangeExpression(`${itemA.toString()}/1..${itemB.toString()}/3`),
+  );
+  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    // Should fall back to single range of 'from' (itemA/1)
+    assertEquals(result.value.kind, "single");
+    if (result.value.kind === "single") {
+      assertEquals(result.value.at.toString(), `${itemA.toString()}/1`);
+    }
+  }
+});

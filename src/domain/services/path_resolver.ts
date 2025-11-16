@@ -453,6 +453,19 @@ export const createPathResolver = (
       from.section.length > 0 &&
       to.section.length > 0
     ) {
+      // Validate that heads are actually equal (same date or same item id)
+      let headsEqual = false;
+      if (from.head.kind === "date" && to.head.kind === "date") {
+        headsEqual = from.head.date.toString() === to.head.date.toString();
+      } else if (from.head.kind === "item" && to.head.kind === "item") {
+        headsEqual = from.head.id.toString() === to.head.id.toString();
+      }
+
+      if (!headsEqual) {
+        // Different parent placements - fall back to single range
+        return Result.ok(createSingleRange(from));
+      }
+
       const fromSectionPrefix = from.section.slice(0, -1);
       const toSectionPrefix = to.section.slice(0, -1);
 
