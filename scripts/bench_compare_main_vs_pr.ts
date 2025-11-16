@@ -57,20 +57,14 @@ function formatRatio(ratio: number, percentChange: number): string {
 async function loadBenchResults(path: string): Promise<BenchResult[]> {
   try {
     const content = await Deno.readTextFile(path);
-    const lines = content.trim().split("\n");
-    const results: BenchResult[] = [];
+    const json = JSON.parse(content);
 
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const parsed = JSON.parse(line);
-        results.push(parsed);
-      } catch {
-        // Skip invalid JSON lines
-      }
+    // deno bench --json outputs a single JSON object with a "benches" array
+    if (json.benches && Array.isArray(json.benches)) {
+      return json.benches;
     }
 
-    return results;
+    return [];
   } catch (error) {
     console.error(`Error reading ${path}: ${error}`);
     return [];
