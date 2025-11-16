@@ -462,8 +462,15 @@ export const createPathResolver = (
       }
 
       if (!headsEqual) {
-        // Different parent placements - fall back to single range
-        return Result.ok(createSingleRange(from));
+        // Different parent placements - return error
+        return Result.error(
+          createValidationError(PATH_RESOLVER_ERROR_KIND, [
+            createValidationIssue(
+              "numeric range endpoints must share the same parent placement",
+              { code: "range_different_parents" },
+            ),
+          ]),
+        );
       }
 
       const fromSectionPrefix = from.section.slice(0, -1);

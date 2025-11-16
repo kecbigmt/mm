@@ -388,7 +388,7 @@ Deno.test("PathResolver - returns error for absolute path starting with dot (/./
   }
 });
 
-Deno.test("PathResolver - falls back to single range for different date parents", async () => {
+Deno.test("PathResolver - returns error for different date parents", async () => {
   const itemRepository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
 
@@ -406,17 +406,13 @@ Deno.test("PathResolver - falls back to single range for different date parents"
   const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-15/1..2025-11-16/3"));
   const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
 
-  assertEquals(result.type, "ok");
-  if (result.type === "ok") {
-    // Should fall back to single range of 'from' (2025-11-15/1)
-    assertEquals(result.value.kind, "single");
-    if (result.value.kind === "single") {
-      assertEquals(result.value.at.toString(), "2025-11-15/1");
-    }
+  assertEquals(result.type, "error");
+  if (result.type === "error") {
+    assertEquals(result.error.issues[0].code, "range_different_parents");
   }
 });
 
-Deno.test("PathResolver - falls back to single range for different item parents", async () => {
+Deno.test("PathResolver - returns error for different item parents", async () => {
   const itemRepository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
 
@@ -464,12 +460,8 @@ Deno.test("PathResolver - falls back to single range for different item parents"
   );
   const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
 
-  assertEquals(result.type, "ok");
-  if (result.type === "ok") {
-    // Should fall back to single range of 'from' (itemA/1)
-    assertEquals(result.value.kind, "single");
-    if (result.value.kind === "single") {
-      assertEquals(result.value.at.toString(), `${itemA.toString()}/1`);
-    }
+  assertEquals(result.type, "error");
+  if (result.type === "error") {
+    assertEquals(result.error.issues[0].code, "range_different_parents");
   }
 });
