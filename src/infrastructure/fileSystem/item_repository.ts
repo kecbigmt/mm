@@ -13,6 +13,7 @@ import {
   writeEdgeCollection,
 } from "./edge_store.ts";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter.ts";
+import { queryEdgeReferences } from "./graph_index.ts";
 
 export type FileSystemItemRepositoryDependencies = Readonly<{
   readonly root: string;
@@ -774,18 +775,38 @@ export const createFileSystemItemRepository = (
   const listByPlacement = async (
     range: PlacementRange,
   ): Promise<ListByPlacementResult> => {
-    const filesResult = await collectItemFiles(dependencies.root);
-    if (filesResult.type === "error") {
-      return filesResult;
+    // Query edge references from index instead of scanning all files
+    const edgeRefsResult = await queryEdgeReferences(dependencies.root, range);
+    if (edgeRefsResult.type === "error") {
+      return edgeRefsResult;
     }
 
     const items: Item[] = [];
 
-    for (const record of filesResult.value) {
+    // Load only the items that match the placement range
+    for (const edgeRef of edgeRefsResult.value) {
+      const itemIdStr = edgeRef.itemId.toString();
+
+      // Find item file path
+      const filePathResult = await findItemFile(dependencies, itemIdStr);
+      if (filePathResult.type === "error") {
+        return filePathResult;
+      }
+
+      const filePath = filePathResult.value;
+      if (!filePath) {
+        return Result.error(
+          createRepositoryError("item", "list", "item file not found", {
+            identifier: itemIdStr,
+          }),
+        );
+      }
+
+      // Load item from file
       const itemResult = await loadItemFromFile(
         dependencies.root,
-        record.filePath,
-        record.id,
+        filePath,
+        itemIdStr,
       );
       if (itemResult.type === "error") {
         return itemResult;
@@ -795,16 +816,15 @@ export const createFileSystemItemRepository = (
       if (!item) {
         return Result.error(
           createRepositoryError("item", "list", "item metadata is missing", {
-            identifier: record.id,
+            identifier: itemIdStr,
           }),
         );
       }
 
-      if (matchesPlacementRange(item, range)) {
-        items.push(item);
-      }
+      items.push(item);
     }
 
+    // Sort by rank (items are already mostly sorted from edge files, but ensure correctness)
     items.sort((first, second) => first.data.rank.compare(second.data.rank));
 
     return Result.ok(items);
