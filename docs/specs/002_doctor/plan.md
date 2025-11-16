@@ -12,11 +12,85 @@ This plan breaks down the implementation of `mm doctor` into independent, parall
 
 ---
 
+## Risk Assessment & Mitigation
+
+### High-Risk Tasks (High Uncertainty)
+
+The following tasks have significant technical uncertainty and should be de-risked early:
+
+1. **Task 1.3: Graph Validator (Cycle Detection)** - Complex algorithm, performance unknown at scale
+2. **Task 1.4: Index Rebuilder (Placement Parsing)** - Parsing logic unclear from existing codebase
+3. **Task 2.1: Workspace Scanner (Streaming)** - Performance characteristics unknown for large workspaces
+4. **Task 3.1: Check Workflow (Integration Complexity)** - Aggregating all validation results
+
+### Mitigation Strategy: Phase 0 (Spikes)
+
+Before full implementation, conduct small spike tasks to validate technical approaches and reduce uncertainty.
+
+---
+
 ## Task Breakdown
 
-### **Phase 1: Domain Layer (Parallel)**
+### **Phase 0: Risk Mitigation Spikes (Sequential)**
 
-These tasks define core domain logic and can be developed in parallel.
+Small exploratory tasks to de-risk high-uncertainty areas.
+
+#### **Spike 0.1: Placement Parsing Investigation**
+**Effort:** 1-2 hours
+
+Investigate existing `Placement` type structure and parsing:
+
+- Examine `src/domain/primitives/placement.ts`
+- Understand internal representation (head, section, etc.)
+- Prototype parsing placement string to extract:
+  - Parent (date `YYYY-MM-DD` or UUID)
+  - Section path (e.g., `/1/3`)
+- Document findings for Task 1.4
+
+**Deliverable:** Small prototype + documentation of parsing approach
+
+**Reduces risk for:** Task 1.4 (Index Rebuilder)
+
+---
+
+#### **Spike 0.2: Cycle Detection Prototype**
+**Effort:** 2-3 hours
+
+Prototype cycle detection algorithm:
+
+- Implement DFS-based cycle detection
+- Test with small graph fixtures (valid graphs, simple cycles, complex cycles)
+- Benchmark with larger graphs (100s, 1000s of nodes)
+- Identify memory/performance characteristics
+
+**Deliverable:** Prototype implementation + benchmark results
+
+**Reduces risk for:** Task 1.3 (Graph Validator)
+
+---
+
+#### **Spike 0.3: Large Workspace Scan Benchmark**
+**Effort:** 1-2 hours
+
+Benchmark workspace scanning performance:
+
+- Create test workspace with 1000+ items
+- Implement simple AsyncIterator-based scanner
+- Measure:
+  - Throughput (items/sec)
+  - Memory usage
+  - Error handling overhead
+- Compare batch vs. streaming approaches
+
+**Deliverable:** Benchmark results + recommended approach
+
+**Reduces risk for:** Task 2.1 (Workspace Scanner)
+
+---
+
+### **Phase 1: Domain Layer (Adjusted Order)**
+
+Core domain logic. High-risk tasks prioritized early after spikes.
 
 #### **Task 1.1: Validation Error Types**
 **File:** `src/domain/validation/validation_error.ts`
@@ -127,6 +201,8 @@ export interface GraphValidator {
 
 **Dependencies:** Task 1.1 (validation error types)
 
+**Priority:** HIGH - Complex algorithm, implement early after Spike 0.2
+
 ---
 
 #### **Task 1.4: Index Rebuilder Service**
@@ -165,6 +241,8 @@ export type RebuildResult = Readonly<{
 - Unit tests with various placement patterns
 
 **Dependencies:** None (uses existing domain models)
+
+**Priority:** HIGH - Placement parsing needs validation, implement early after Spike 0.1
 
 ---
 
@@ -232,6 +310,8 @@ export interface WorkspaceScanner {
 - Error handling tests
 
 **Dependencies:** None (uses existing file I/O)
+
+**Priority:** HIGH - Critical for all workflows, implement early after Spike 0.3
 
 ---
 
@@ -623,19 +703,24 @@ Document `mm doctor` commands:
 
 ---
 
-## Task Dependencies Visualization
+## Task Dependencies Visualization (Revised)
 
 ```
-Phase 1 (Domain - Parallel):
+Phase 0 (Spikes - Sequential):
+  0.1 Placement Parsing Investigation
+  0.2 Cycle Detection Prototype
+  0.3 Workspace Scan Benchmark
+
+Phase 1 (Domain - Prioritized):
   1.1 Validation Error Types
     ├─> 1.2 Item Validator
-    └─> 1.3 Graph Validator
+    └─> 1.3 Graph Validator (HIGH PRIORITY, after Spike 0.2)
 
-  1.4 Index Rebuilder (independent)
+  1.4 Index Rebuilder (HIGH PRIORITY, after Spike 0.1)
   1.5 Rank Rebalancer (independent)
 
-Phase 2 (Infrastructure - Parallel):
-  2.1 Workspace Scanner (independent)
+Phase 2 (Infrastructure - Prioritized):
+  2.1 Workspace Scanner (HIGH PRIORITY, after Spike 0.3)
   2.2 Index Writer (independent)
   2.3 Item Updater (independent)
 
@@ -652,27 +737,35 @@ Phase 4 (Presentation - Sequential):
   4.5 Main integration ← 4.4
 
 Phase 5 (Testing - Parallel with 3-4):
-  5.1 Fixtures (independent)
+  5.1 Fixtures (can start in Phase 0)
   5.2 E2E Tests ← 5.1, all Phase 4
   5.3 Documentation ← 4.1, 4.2, 4.3
 ```
 
 ---
 
-## Parallelization Strategy
+## Parallelization Strategy (Revised)
 
-### **Iteration 1: Domain Foundation (Parallel)**
-Can be developed simultaneously by different developers:
-- Task 1.1 + 1.2 (Developer A)
-- Task 1.3 (Developer B)
-- Task 1.4 (Developer C)
-- Task 1.5 (Developer D)
+### **Iteration 0: Risk Mitigation (Sequential)**
+Execute spikes sequentially to validate technical approaches:
+- Spike 0.1: Placement Parsing (1-2h)
+- Spike 0.2: Cycle Detection (2-3h)
+- Spike 0.3: Workspace Scanning (1-2h)
+
+**Total:** 4-7 hours
+
+### **Iteration 1: High-Risk Domain Tasks (Parallel after spikes)**
+Prioritize high-risk tasks early:
+- Task 1.1 (Developer A) - Foundation for others
+- Task 1.3 (Developer B) - After Spike 0.2, high complexity
+- Task 1.4 (Developer C) - After Spike 0.1, high complexity
+- Task 1.2 + 1.5 (Developer D) - Lower risk, can start in parallel
 
 ### **Iteration 2: Infrastructure (Parallel)**
 Can be developed simultaneously:
-- Task 2.1 (Developer A)
-- Task 2.2 (Developer B)
-- Task 2.3 (Developer C)
+- Task 2.1 (Developer A) - After Spike 0.3, high priority
+- Task 2.2 (Developer B) - Standard file I/O
+- Task 2.3 (Developer C) - Standard file I/O
 
 ### **Iteration 3: Workflows (Semi-parallel)**
 Can start when dependencies are ready:
@@ -687,42 +780,53 @@ Can start when workflows are ready:
 - Task 4.5 final integration
 
 ### **Ongoing: Testing & Docs**
-- Task 5.1 can start immediately
+- Task 5.1 can start immediately (or during Phase 0)
 - Task 5.2 as commands become available
 - Task 5.3 near completion
 
 ---
 
-## Estimated Effort
+## Estimated Effort (Revised)
 
-| Phase | Task | Complexity | Estimated Time |
-|-------|------|-----------|----------------|
-| 1.1 | Validation Error Types | Low | 2-4 hours |
-| 1.2 | Item Validator | Medium | 4-6 hours |
-| 1.3 | Graph Validator | High | 6-8 hours |
-| 1.4 | Index Rebuilder | Medium | 4-6 hours |
-| 1.5 | Rank Rebalancer | Medium | 4-6 hours |
-| 2.1 | Workspace Scanner | Medium | 4-6 hours |
-| 2.2 | Index Writer | Medium | 4-6 hours |
-| 2.3 | Item Updater | Low | 2-4 hours |
-| 3.1 | Check Workflow | Medium | 4-6 hours |
-| 3.2 | Rebuild Index Workflow | Medium | 4-6 hours |
-| 3.3 | Rebalance Rank Workflow | Medium | 4-6 hours |
-| 4.1 | check command | Low | 2-4 hours |
-| 4.2 | rebuild-index command | Low | 2-4 hours |
-| 4.3 | rebalance-rank command | Low | 2-4 hours |
-| 4.4 | doctor command | Low | 1-2 hours |
-| 4.5 | Main integration | Low | 1-2 hours |
-| 5.1 | Test Fixtures | Low | 2-4 hours |
-| 5.2 | E2E Tests | Medium | 4-6 hours |
-| 5.3 | Documentation | Low | 2-4 hours |
+| Phase | Task | Complexity | Estimated Time | Priority |
+|-------|------|-----------|----------------|----------|
+| 0.1 | Placement Parsing Spike | Low | 1-2 hours | HIGH |
+| 0.2 | Cycle Detection Spike | Low | 2-3 hours | HIGH |
+| 0.3 | Workspace Scan Spike | Low | 1-2 hours | HIGH |
+| 1.1 | Validation Error Types | Low | 2-4 hours | MEDIUM |
+| 1.2 | Item Validator | Medium | 4-6 hours | MEDIUM |
+| 1.3 | Graph Validator | High | 6-8 hours | HIGH |
+| 1.4 | Index Rebuilder | Medium | 4-6 hours | HIGH |
+| 1.5 | Rank Rebalancer | Medium | 4-6 hours | MEDIUM |
+| 2.1 | Workspace Scanner | Medium | 4-6 hours | HIGH |
+| 2.2 | Index Writer | Medium | 4-6 hours | MEDIUM |
+| 2.3 | Item Updater | Low | 2-4 hours | MEDIUM |
+| 3.1 | Check Workflow | Medium | 4-6 hours | MEDIUM |
+| 3.2 | Rebuild Index Workflow | Medium | 4-6 hours | MEDIUM |
+| 3.3 | Rebalance Rank Workflow | Medium | 4-6 hours | MEDIUM |
+| 4.1 | check command | Low | 2-4 hours | MEDIUM |
+| 4.2 | rebuild-index command | Low | 2-4 hours | MEDIUM |
+| 4.3 | rebalance-rank command | Low | 2-4 hours | MEDIUM |
+| 4.4 | doctor command | Low | 1-2 hours | LOW |
+| 4.5 | Main integration | Low | 1-2 hours | LOW |
+| 5.1 | Test Fixtures | Low | 2-4 hours | MEDIUM |
+| 5.2 | E2E Tests | Medium | 4-6 hours | MEDIUM |
+| 5.3 | Documentation | Low | 2-4 hours | LOW |
 
-**Total:** ~60-95 hours (single developer, sequential)
-**With Parallelization:** ~25-35 hours (4 developers)
+**Phase 0 (Spikes):** 4-7 hours
+**Phase 1-5 (Implementation):** 60-95 hours
+**Total:** ~64-102 hours (single developer, sequential)
+**With Parallelization (4 developers):** ~28-40 hours (including spike overhead)
 
 ---
 
 ## Success Criteria
+
+### **Phase 0 Complete:**
+- [ ] Placement parsing approach documented and validated
+- [ ] Cycle detection algorithm prototyped and benchmarked
+- [ ] Workspace scanning performance characteristics measured
+- [ ] Technical risks for high-uncertainty tasks mitigated
 
 ### **Phase 1 Complete:**
 - [ ] All validation error types defined
