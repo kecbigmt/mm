@@ -426,6 +426,40 @@ export const createPathResolver = (
         const fromLast = from.section[from.section.length - 1];
         const toLast = to.section[to.section.length - 1];
 
+        // Validate range bounds before calling createNumericRange
+        if (!Number.isInteger(fromLast) || fromLast < 1) {
+          return Result.error(
+            createValidationError(PATH_RESOLVER_ERROR_KIND, [
+              createValidationIssue(
+                `invalid range start: ${fromLast} (must be positive integer)`,
+                { code: "invalid_range_start" },
+              ),
+            ]),
+          );
+        }
+
+        if (!Number.isInteger(toLast) || toLast < 1) {
+          return Result.error(
+            createValidationError(PATH_RESOLVER_ERROR_KIND, [
+              createValidationIssue(
+                `invalid range end: ${toLast} (must be positive integer)`,
+                { code: "invalid_range_end" },
+              ),
+            ]),
+          );
+        }
+
+        if (fromLast > toLast) {
+          return Result.error(
+            createValidationError(PATH_RESOLVER_ERROR_KIND, [
+              createValidationIssue(
+                `invalid range: ${fromLast}..${toLast} (start must be <= end)`,
+                { code: "invalid_range_order" },
+              ),
+            ]),
+          );
+        }
+
         const parent = createPlacement(from.head, fromSectionPrefix);
         return Result.ok(createNumericRange(parent, fromLast, toLast));
       }

@@ -223,3 +223,75 @@ Deno.test("PathResolver - returns error when parent item does not exist", async 
     assertEquals(result.error.issues[0].code, "item_not_found");
   }
 });
+
+Deno.test("PathResolver - returns error for reversed numeric range (5..3)", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-11-16"));
+
+  // Try to resolve range using absolute path 2025-11-16/5..3 (reversed)
+  const { parseRangeExpression } = await import("../../presentation/cli/path_expression.ts");
+  const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-16/5..3"));
+  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+
+  assertEquals(result.type, "error");
+  if (result.type === "error") {
+    assertEquals(result.error.issues[0].code, "invalid_range_order");
+  }
+});
+
+Deno.test("PathResolver - returns error for large reversed numeric range (10..1)", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-11-16"));
+
+  // Try to resolve range 2025-11-16/10..1 (large reversed range)
+  const { parseRangeExpression } = await import("../../presentation/cli/path_expression.ts");
+  const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-16/10..1"));
+  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+
+  assertEquals(result.type, "error");
+  if (result.type === "error") {
+    assertEquals(result.error.issues[0].code, "invalid_range_order");
+  }
+});
+
+Deno.test("PathResolver - returns error for adjacent reversed numeric range (2..1)", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-11-16"));
+
+  // Try to resolve range 2025-11-16/2..1 (adjacent reversed)
+  const { parseRangeExpression } = await import("../../presentation/cli/path_expression.ts");
+  const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-16/2..1"));
+  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+
+  assertEquals(result.type, "error");
+  if (result.type === "error") {
+    assertEquals(result.error.issues[0].code, "invalid_range_order");
+  }
+});
