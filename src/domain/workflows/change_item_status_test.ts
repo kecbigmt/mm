@@ -6,7 +6,6 @@ import {
   dateTimeFromDate,
   itemStatusClosed,
   itemStatusOpen,
-  parsePath,
 } from "../primitives/mod.ts";
 import { itemIdFromString } from "../primitives/item_id.ts";
 import { itemTitleFromString } from "../primitives/item_title.ts";
@@ -17,15 +16,16 @@ import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts"
 
 const createAliasRepository = (): InMemoryAliasRepository => new InMemoryAliasRepository();
 
-function createTestItem(id: string, status: "open" | "closed" = "open") {
+async function createTestItem(id: string, status: "open" | "closed" = "open") {
   // Use actual UUID v7 format for testing
   const validId = id.length < 36 ? `0193d6c0-${id.padStart(4, "0")}-7000-8000-000000000000` : id;
   const itemId = Result.unwrap(itemIdFromString(validId));
   const title = Result.unwrap(itemTitleFromString("Test Item"));
+  const { parsePlacement } = await import("../primitives/placement.ts");
   const icon = createItemIcon("note");
   const itemStatus = status === "open" ? itemStatusOpen() : itemStatusClosed();
   const rank = Result.unwrap(itemRankFromString("a0"));
-  const path = Result.unwrap(parsePath("/2024-01-01"));
+  const placement = Result.unwrap(parsePlacement("2024-01-01"));
   const now = Result.unwrap(dateTimeFromDate(new Date()));
 
   return createItem({
@@ -33,7 +33,7 @@ function createTestItem(id: string, status: "open" | "closed" = "open") {
     title,
     icon,
     status: itemStatus,
-    path,
+    placement,
     rank,
     createdAt: now,
     updatedAt: now,
@@ -43,7 +43,7 @@ function createTestItem(id: string, status: "open" | "closed" = "open") {
 
 Deno.test("ChangeItemStatusWorkflow - close single open item", async () => {
   const repository = new InMemoryItemRepository();
-  const item = createTestItem("0001", "open");
+  const item = await createTestItem("0001", "open");
   repository.set(item);
 
   const now = Result.unwrap(dateTimeFromDate(new Date()));
@@ -67,7 +67,7 @@ Deno.test("ChangeItemStatusWorkflow - close single open item", async () => {
 
 Deno.test("ChangeItemStatusWorkflow - reopen single closed item", async () => {
   const repository = new InMemoryItemRepository();
-  const item = createTestItem("0002", "closed");
+  const item = await createTestItem("0002", "closed");
   repository.set(item);
 
   const now = Result.unwrap(dateTimeFromDate(new Date()));
@@ -91,8 +91,8 @@ Deno.test("ChangeItemStatusWorkflow - reopen single closed item", async () => {
 
 Deno.test("ChangeItemStatusWorkflow - close multiple items", async () => {
   const repository = new InMemoryItemRepository();
-  const item1 = createTestItem("0003", "open");
-  const item2 = createTestItem("0004", "open");
+  const item1 = await createTestItem("0003", "open");
+  const item2 = await createTestItem("0004", "open");
   repository.set(item1);
   repository.set(item2);
 
@@ -118,7 +118,7 @@ Deno.test("ChangeItemStatusWorkflow - close multiple items", async () => {
 
 Deno.test("ChangeItemStatusWorkflow - idempotent close", async () => {
   const repository = new InMemoryItemRepository();
-  const item = createTestItem("0005", "closed");
+  const item = await createTestItem("0005", "closed");
   repository.set(item);
 
   const now = Result.unwrap(dateTimeFromDate(new Date()));
@@ -142,7 +142,7 @@ Deno.test("ChangeItemStatusWorkflow - idempotent close", async () => {
 
 Deno.test("ChangeItemStatusWorkflow - partial failure", async () => {
   const repository = new InMemoryItemRepository();
-  const item1 = createTestItem("0006", "open");
+  const item1 = await createTestItem("0006", "open");
   repository.set(item1);
   // Second item doesn't exist
 

@@ -1,7 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { CwdResolutionService } from "./cwd_resolution_service.ts";
 import { createItem } from "../models/item.ts";
-import { createAlias } from "../models/alias.ts";
 import { itemTitleFromString } from "../primitives/item_title.ts";
 import { dateTimeFromDate } from "../primitives/date_time.ts";
 import { itemIdFromString } from "../primitives/item_id.ts";
@@ -11,9 +10,7 @@ import { createItemStatus } from "../primitives/item_status.ts";
 import { createItemIcon } from "../primitives/item_icon.ts";
 import { aliasSlugFromString } from "../primitives/alias_slug.ts";
 import type { ItemRepository } from "../repositories/item_repository.ts";
-import type { AliasRepository } from "../repositories/alias_repository.ts";
 import type { StateRepository } from "../repositories/state_repository.ts";
-import type { Alias } from "../models/alias.ts";
 import { Result } from "../../shared/result.ts";
 
 const createMockItemRepository = (
@@ -26,16 +23,6 @@ const createMockItemRepository = (
   save: () => Promise.resolve(Result.ok(undefined)),
   delete: () => Promise.resolve(Result.ok(undefined)),
   listByPlacement: () => Promise.resolve(Result.ok([])),
-});
-
-const createMockAliasRepository = (aliases?: Map<string, Alias>): AliasRepository => ({
-  load: (slug) => {
-    const alias = aliases?.get(slug.toString());
-    return Promise.resolve(Result.ok(alias));
-  },
-  save: () => Promise.resolve(Result.ok(undefined)),
-  delete: () => Promise.resolve(Result.ok(undefined)),
-  list: () => Promise.resolve(Result.ok([])),
 });
 
 const createMockStateRepository = (
@@ -55,7 +42,6 @@ const createMockStateRepository = (
 Deno.test("CwdResolutionService.getCwd returns default today path when nothing is stored", async () => {
   const stateRepo = createMockStateRepository();
   const itemRepo = createMockItemRepository(new Map());
-  const aliasRepo = createMockAliasRepository();
   const today = new Date("2024-06-15");
 
   const result = await CwdResolutionService.getCwd(
@@ -97,7 +83,6 @@ Deno.test("CwdResolutionService.getCwd returns stored CWD when valid", async () 
   const items = new Map([[item.data.id.toString(), item]]);
   const stateRepo = createMockStateRepository(item.data.id.toString());
   const itemRepo = createMockItemRepository(items);
-  const aliasRepo = createMockAliasRepository();
   const today = new Date("2024-06-15");
 
   const result = await CwdResolutionService.getCwd(
@@ -114,7 +99,6 @@ Deno.test("CwdResolutionService.getCwd returns stored CWD when valid", async () 
 Deno.test("CwdResolutionService.getCwd returns stored date path without overwriting", async () => {
   const stateRepo = createMockStateRepository("2024-06-15");
   const itemRepo = createMockItemRepository(new Map());
-  const aliasRepo = createMockAliasRepository();
   const today = new Date("2024-11-02");
 
   const result = await CwdResolutionService.getCwd(
@@ -133,7 +117,6 @@ Deno.test("CwdResolutionService.getCwd returns stored date path without overwrit
 Deno.test("CwdResolutionService.getCwd falls back to today when stored item not found", async () => {
   const stateRepo = createMockStateRepository("019965a7-2789-740a-b8c1-1415904fd108");
   const itemRepo = createMockItemRepository(new Map());
-  const aliasRepo = createMockAliasRepository();
   const today = new Date();
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, "0");
@@ -152,7 +135,6 @@ Deno.test("CwdResolutionService.getCwd falls back to today when stored item not 
 Deno.test("CwdResolutionService.setCwd validates item path exists", async () => {
   const stateRepo = createMockStateRepository();
   const itemRepo = createMockItemRepository(new Map());
-  const aliasRepo = createMockAliasRepository();
 
   const nonExistentItemPlacement = parsePlacement("019965a7-2789-740a-b8c1-1415904fd108");
   assert(nonExistentItemPlacement.type === "ok");
@@ -171,7 +153,6 @@ Deno.test("CwdResolutionService.setCwd validates item path exists", async () => 
 Deno.test("CwdResolutionService.setCwd allows date paths", async () => {
   const stateRepo = createMockStateRepository();
   const itemRepo = createMockItemRepository(new Map());
-  const aliasRepo = createMockAliasRepository();
 
   const datePlacement = parsePlacement("2024-06-15");
   assert(datePlacement.type === "ok");
@@ -214,7 +195,6 @@ Deno.test("CwdResolutionService.setCwd allows valid item paths", async () => {
   const items = new Map([[item.data.id.toString(), item]]);
   const stateRepo = createMockStateRepository();
   const itemRepo = createMockItemRepository(items);
-  const aliasRepo = createMockAliasRepository();
 
   const itemPlacement = parsePlacement(item.data.id.toString());
   assert(itemPlacement.type === "ok");
@@ -261,17 +241,9 @@ Deno.test("CwdResolutionService.setCwd allows paths with numeric sections", asyn
     alias: aliasSlug.value,
   });
 
-  const alias = createAlias({
-    slug: aliasSlug.value,
-    itemId: itemId.value,
-    createdAt: createdAt.value,
-  });
-
   const items = new Map([[item.data.id.toString(), item]]);
-  const aliases = new Map([[alias.data.slug.toString(), alias]]);
   const stateRepo = createMockStateRepository();
   const itemRepo = createMockItemRepository(items);
-  const aliasRepo = createMockAliasRepository(aliases);
 
   // Placement with numeric section: item ID + numeric section
   const placementWithSection = parsePlacement(`${item.data.id.toString()}/1`);

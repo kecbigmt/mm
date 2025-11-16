@@ -10,7 +10,7 @@ import {
   itemRankFromString,
   itemStatusOpen,
   itemTitleFromString,
-  parsePath,
+  parsePlacement,
 } from "../primitives/mod.ts";
 import { createRankService, RankGenerator, RankService } from "../services/rank_service.ts";
 import { createIdGenerationService } from "../services/id_generation_service.ts";
@@ -54,7 +54,7 @@ const createExistingItem = (id: string, rank: string, section: string): Item => 
   const title = Result.unwrap(itemTitleFromString("Existing"));
   const icon = createItemIcon("note");
   const status = itemStatusOpen();
-  const path = Result.unwrap(parsePath(`/${section}`));
+  const placement = Result.unwrap(parsePlacement(section));
   const itemRank = Result.unwrap(itemRankFromString(rank));
   const createdAt = Result.unwrap(parseDateTime("2024-09-20T12:00:00Z"));
 
@@ -63,7 +63,7 @@ const createExistingItem = (id: string, rank: string, section: string): Item => 
     title,
     icon,
     status,
-    path,
+    placement,
     rank: itemRank,
     createdAt,
     updatedAt: createdAt,
@@ -77,13 +77,13 @@ Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async 
   const rankService = createTestRankService();
   const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
 
-  const parentPath = Result.unwrap(parsePath("/2024-09-20"));
+  const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
   const result = await CreateItemWorkflow.execute({
     title: "New note",
     itemType: "note",
-    parentPath,
+    parentPlacement,
     createdAt,
   }, {
     itemRepository: repository,
@@ -99,8 +99,8 @@ Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async 
 
   assertEquals(result.value.item.data.rank.toString(), "m");
 
-  const listResult = await repository.listByPath(
-    Result.unwrap(parsePath("/2024-09-20")),
+  const listResult = await repository.listByPlacement(
+    { kind: "single", at: Result.unwrap(parsePlacement("2024-09-20")) },
   );
   if (listResult.type !== "ok") {
     throw new Error(`expected ok list result, received ${JSON.stringify(listResult.error)}`);
@@ -122,13 +122,13 @@ Deno.test("CreateItemWorkflow appends rank after existing siblings", async () =>
   );
   Result.unwrap(await repository.save(existing));
 
-  const parentPath = Result.unwrap(parsePath("/2024-09-20"));
+  const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T13:00:00Z")));
 
   const result = await CreateItemWorkflow.execute({
     title: "Follow-up",
     itemType: "note",
-    parentPath,
+    parentPlacement,
     createdAt,
   }, {
     itemRepository: repository,
@@ -144,8 +144,8 @@ Deno.test("CreateItemWorkflow appends rank after existing siblings", async () =>
 
   assertEquals(result.value.item.data.rank.toString(), "mn");
 
-  const listResult = await repository.listByPath(
-    Result.unwrap(parsePath("/2024-09-20")),
+  const listResult = await repository.listByPlacement(
+    { kind: "single", at: Result.unwrap(parsePlacement("2024-09-20")) },
   );
   if (listResult.type !== "ok") {
     throw new Error(`expected ok list result, received ${JSON.stringify(listResult.error)}`);
@@ -164,14 +164,14 @@ Deno.test("CreateItemWorkflow saves alias when provided", async () => {
   const rankService = createTestRankService();
   const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
 
-  const parentPath = Result.unwrap(parsePath("/2024-09-20"));
+  const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
   const result = await CreateItemWorkflow.execute({
     title: "Chapter 1",
     itemType: "note",
     alias: "chapter1",
-    parentPath,
+    parentPlacement,
     createdAt,
   }, {
     itemRepository: repository,
@@ -205,7 +205,7 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
   const idService1 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
   const idService2 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd121");
 
-  const parentPath = Result.unwrap(parsePath("/2024-09-20"));
+  const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
   // Create first item with alias
@@ -213,7 +213,7 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
     title: "First",
     itemType: "note",
     alias: "chapter1",
-    parentPath,
+    parentPlacement,
     createdAt,
   }, {
     itemRepository: repository,
@@ -232,7 +232,7 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
     title: "Second",
     itemType: "note",
     alias: "chapter1",
-    parentPath,
+    parentPlacement,
     createdAt,
   }, {
     itemRepository: repository,

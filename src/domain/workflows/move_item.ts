@@ -6,26 +6,20 @@ import {
 } from "../../shared/errors.ts";
 import { Item } from "../models/item.ts";
 import { DateTime } from "../primitives/date_time.ts";
-import { parsePath, Path } from "../primitives/path.ts";
-import { parseLocator, ParseLocatorOptions } from "../primitives/locator.ts";
+import { Placement } from "../primitives/placement.ts";
+import { parseTimezoneIdentifier, TimezoneIdentifier } from "../primitives/timezone_identifier.ts";
+import { parsePathExpression } from "../../presentation/cli/path_expression.ts";
+import { createPathResolver } from "../services/path_resolver.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
-import { LocatorResolutionService } from "../services/locator_resolution_service.ts";
 import { RankService } from "../services/rank_service.ts";
-import { ItemRank } from "../primitives/item_rank.ts";
-
-export type PlacementTarget = Readonly<
-  | { readonly kind: "head"; readonly path: Path }
-  | { readonly kind: "tail"; readonly path: Path }
-  | { readonly kind: "after"; readonly itemId: string }
-  | { readonly kind: "before"; readonly itemId: string }
->;
 
 export type MoveItemInput = Readonly<{
-  itemLocator: string;
-  placement: string;
-  cwd?: Path;
+  itemExpression: string; // PathExpression to identify the item
+  targetExpression: string; // PathExpression for target placement
+  cwd: Placement;
+  timezone?: TimezoneIdentifier;
   today?: Date;
   occurredAt: DateTime;
 }>;
@@ -44,468 +38,336 @@ export type MoveItemResult = Readonly<{
   item: Item;
 }>;
 
-const parsePlacement = (
-  input: string,
-  options: ParseLocatorOptions,
-): Result<PlacementTarget, MoveItemValidationError> => {
-  const trimmed = input.trim();
-
-  if (trimmed.startsWith("head:")) {
-    const pathStr = trimmed.slice(5);
-    const locatorResult = parseLocator(pathStr, options);
-    if (locatorResult.type === "error") {
-      return Result.error(
-        createValidationError("MoveItem", locatorResult.error.issues),
-      );
-    }
-    const path = locatorResult.value.path;
-    if (path.isRange()) {
-      return Result.error(
-        createValidationError("MoveItem", [
-          createValidationIssue("placement target cannot be a range", {
-            code: "range_not_allowed",
-            path: ["placement"],
-          }),
-        ]),
-      );
-    }
-    return Result.ok({ kind: "head", path });
-  }
-
-  if (trimmed.startsWith("tail:")) {
-    const pathStr = trimmed.slice(5);
-    const locatorResult = parseLocator(pathStr, options);
-    if (locatorResult.type === "error") {
-      return Result.error(
-        createValidationError("MoveItem", locatorResult.error.issues),
-      );
-    }
-    const path = locatorResult.value.path;
-    if (path.isRange()) {
-      return Result.error(
-        createValidationError("MoveItem", [
-          createValidationIssue("placement target cannot be a range", {
-            code: "range_not_allowed",
-            path: ["placement"],
-          }),
-        ]),
-      );
-    }
-    return Result.ok({ kind: "tail", path });
-  }
-
-  if (trimmed.startsWith("after:")) {
-    const itemId = trimmed.slice(6);
-    return Result.ok({ kind: "after", itemId });
-  }
-
-  if (trimmed.startsWith("before:")) {
-    const itemId = trimmed.slice(7);
-    return Result.ok({ kind: "before", itemId });
-  }
-
-  const locatorResult = parseLocator(trimmed, options);
-  if (locatorResult.type === "error") {
-    return Result.error(
-      createValidationError("MoveItem", locatorResult.error.issues),
-    );
-  }
-  const path = locatorResult.value.path;
-  if (path.isRange()) {
-    return Result.error(
-      createValidationError("MoveItem", [
-        createValidationIssue("placement target cannot be a range", {
-          code: "range_not_allowed",
-          path: ["placement"],
-        }),
-      ]),
-    );
-  }
-  return Result.ok({ kind: "tail", path });
-};
-
-const resolveTargetItem = async (
-  itemId: string,
-  deps: MoveItemDependencies,
-  options: ParseLocatorOptions,
-): Promise<Result<Item | undefined, MoveItemError>> => {
-  const resolveResult = await LocatorResolutionService.resolveItem(
-    itemId,
-    deps,
-    options,
-  );
-  if (resolveResult.type === "error") {
-    return Result.error(resolveResult.error as MoveItemError);
-  }
-  return Result.ok(resolveResult.value);
-};
-
-const normalizePlacementPath = async (
-  path: Path,
-  deps: MoveItemDependencies,
-  options: ParseLocatorOptions,
-): Promise<Result<Path, MoveItemError>> => {
-  if (path.segments.length === 0) {
-    return Result.ok(path);
-  }
-
-  const canonicalSegments: string[] = [];
-
-  for (const segment of path.segments) {
-    switch (segment.kind) {
-      case "Date":
-      case "Numeric": {
-        canonicalSegments.push(segment.toString());
-        break;
-      }
-      case "ItemId": {
-        canonicalSegments.push(segment.toString());
-        break;
-      }
-      case "ItemAlias": {
-        const resolveResult = await LocatorResolutionService.resolveItem(
-          segment.toString(),
-          deps,
-          options,
-        );
-        if (resolveResult.type === "error") {
-          if (resolveResult.error.kind === "ValidationError") {
-            return Result.error(
-              createValidationError("MoveItem", resolveResult.error.issues),
-            );
-          }
-          return Result.error(resolveResult.error);
-        }
-
-        const item = resolveResult.value;
-        if (!item) {
-          return Result.error(
-            createValidationError("MoveItem", [
-              createValidationIssue(`alias not found: ${segment.toString()}`, {
-                code: "alias_not_found",
-                path: ["placement"],
-              }),
-            ]),
-          );
-        }
-
-        const itemPathSegments = item.data.path.segments.map((seg) => seg.toString());
-
-        if (canonicalSegments.length === 0) {
-          canonicalSegments.push(...itemPathSegments);
-        } else {
-          if (
-            canonicalSegments.length !== itemPathSegments.length ||
-            !itemPathSegments.every((value, index) => canonicalSegments[index] === value)
-          ) {
-            return Result.error(
-              createValidationError("MoveItem", [
-                createValidationIssue("alias path does not match item placement", {
-                  code: "alias_context_mismatch",
-                  path: ["placement"],
-                }),
-              ]),
-            );
-          }
-        }
-
-        canonicalSegments.push(item.data.id.toString());
-        break;
-      }
-      default: {
-        return Result.error(
-          createValidationError("MoveItem", [
-            createValidationIssue("unsupported segment in placement path", {
-              code: "unsupported_segment",
-              path: ["placement"],
-            }),
-          ]),
-        );
-      }
-    }
-  }
-
-  const canonicalPath = canonicalSegments.length === 0 ? "/" : `/${canonicalSegments.join("/")}`;
-  const parsedResult = parsePath(canonicalPath, options);
-  if (parsedResult.type === "error") {
-    return Result.error(
-      createValidationError("MoveItem", parsedResult.error.issues),
-    );
-  }
-
-  return Result.ok(parsedResult.value);
-};
-
-const calculateRankForPlacement = async (
-  target: PlacementTarget,
-  deps: MoveItemDependencies,
-  options: ParseLocatorOptions,
-): Promise<Result<{ path: Path; rank: ItemRank }, MoveItemError>> => {
-  switch (target.kind) {
-    case "head": {
-      const normalizedResult = await normalizePlacementPath(target.path, deps, options);
-      if (normalizedResult.type === "error") {
-        return Result.error(normalizedResult.error);
-      }
-
-      const normalizedPath = normalizedResult.value;
-
-      const siblingsResult = await deps.itemRepository.listByPath(normalizedPath);
-      if (siblingsResult.type === "error") {
-        return Result.error(siblingsResult.error);
-      }
-
-      const minRankResult = deps.rankService.minRank();
-      if (minRankResult.type === "error") {
-        return Result.error(
-          createValidationError("MoveItem", [
-            createValidationIssue("failed to generate minimum rank", {
-              code: "rank_generation_failed",
-              path: ["placement"],
-            }),
-          ]),
-        );
-      }
-      return Result.ok({ path: normalizedPath, rank: minRankResult.value });
-    }
-    case "tail": {
-      const normalizedResult = await normalizePlacementPath(target.path, deps, options);
-
-      if (normalizedResult.type === "error") {
-        return Result.error(normalizedResult.error);
-      }
-
-      const normalizedPath = normalizedResult.value;
-      const siblingsResult = await deps.itemRepository.listByPath(normalizedPath);
-      if (siblingsResult.type === "error") {
-        return Result.error(siblingsResult.error);
-      }
-
-      const siblings = siblingsResult.value;
-      if (siblings.length === 0) {
-        const middleRankResult = deps.rankService.middleRank();
-        if (middleRankResult.type === "error") {
-          return Result.error(
-            createValidationError("MoveItem", [
-              createValidationIssue("failed to generate middle rank", {
-                code: "rank_generation_failed",
-                path: ["placement"],
-              }),
-            ]),
-          );
-        }
-        return Result.ok({ path: normalizedPath, rank: middleRankResult.value });
-      }
-
-      const lastItem = siblings[siblings.length - 1];
-      const nextRankResult = deps.rankService.nextRank(lastItem.data.rank);
-      if (nextRankResult.type === "error") {
-        return Result.error(
-          createValidationError("MoveItem", [
-            createValidationIssue("failed to generate next rank", {
-              code: "rank_generation_failed",
-              path: ["placement"],
-            }),
-          ]),
-        );
-      }
-      return Result.ok({ path: normalizedPath, rank: nextRankResult.value });
-    }
-    case "after": {
-      const targetItemResult = await resolveTargetItem(target.itemId, deps, options);
-      if (targetItemResult.type === "error") {
-        return Result.error(targetItemResult.error);
-      }
-      const targetItem = targetItemResult.value;
-      if (!targetItem) {
-        return Result.error(
-          createValidationError("MoveItem", [
-            createValidationIssue(`target item not found: ${target.itemId}`, {
-              code: "target_not_found",
-              path: ["placement"],
-            }),
-          ]),
-        );
-      }
-
-      const siblingsResult = await deps.itemRepository.listByPath(targetItem.data.path);
-      if (siblingsResult.type === "error") {
-        return Result.error(siblingsResult.error);
-      }
-
-      const siblings = siblingsResult.value;
-      const targetIndex = siblings.findIndex((item) =>
-        item.data.id.toString() === targetItem.data.id.toString()
-      );
-      if (targetIndex === -1) {
-        return Result.error(
-          createValidationError("MoveItem", [
-            createValidationIssue("target item not found in siblings", {
-              code: "target_not_in_siblings",
-              path: ["placement"],
-            }),
-          ]),
-        );
-      }
-
-      if (targetIndex === siblings.length - 1) {
-        const nextRankResult = deps.rankService.nextRank(targetItem.data.rank);
-        if (nextRankResult.type === "error") {
-          return Result.error(
-            createValidationError("MoveItem", [
-              createValidationIssue("failed to generate next rank", {
-                code: "rank_generation_failed",
-                path: ["placement"],
-              }),
-            ]),
-          );
-        }
-        return Result.ok({ path: targetItem.data.path, rank: nextRankResult.value });
-      }
-
-      const nextSibling = siblings[targetIndex + 1];
-      const betweenRankResult = deps.rankService.betweenRanks(
-        targetItem.data.rank,
-        nextSibling.data.rank,
-      );
-      if (betweenRankResult.type === "error") {
-        return Result.error(
-          createValidationError("MoveItem", [
-            createValidationIssue("failed to generate between rank", {
-              code: "rank_generation_failed",
-              path: ["placement"],
-            }),
-          ]),
-        );
-      }
-      return Result.ok({ path: targetItem.data.path, rank: betweenRankResult.value });
-    }
-    case "before": {
-      const targetItemResult = await resolveTargetItem(target.itemId, deps, options);
-      if (targetItemResult.type === "error") {
-        return Result.error(targetItemResult.error);
-      }
-      const targetItem = targetItemResult.value;
-      if (!targetItem) {
-        return Result.error(
-          createValidationError("MoveItem", [
-            createValidationIssue(`target item not found: ${target.itemId}`, {
-              code: "target_not_found",
-              path: ["placement"],
-            }),
-          ]),
-        );
-      }
-
-      const siblingsResult = await deps.itemRepository.listByPath(targetItem.data.path);
-      if (siblingsResult.type === "error") {
-        return Result.error(siblingsResult.error);
-      }
-
-      const siblings = siblingsResult.value;
-      const targetIndex = siblings.findIndex((item) =>
-        item.data.id.toString() === targetItem.data.id.toString()
-      );
-      if (targetIndex === -1) {
-        return Result.error(
-          createValidationError("MoveItem", [
-            createValidationIssue("target item not found in siblings", {
-              code: "target_not_in_siblings",
-              path: ["placement"],
-            }),
-          ]),
-        );
-      }
-
-      if (targetIndex === 0) {
-        const prevRankResult = deps.rankService.prevRank(targetItem.data.rank);
-        if (prevRankResult.type === "error") {
-          return Result.error(
-            createValidationError("MoveItem", [
-              createValidationIssue("failed to generate previous rank", {
-                code: "rank_generation_failed",
-                path: ["placement"],
-              }),
-            ]),
-          );
-        }
-        return Result.ok({ path: targetItem.data.path, rank: prevRankResult.value });
-      }
-
-      const prevSibling = siblings[targetIndex - 1];
-      const betweenRankResult = deps.rankService.betweenRanks(
-        prevSibling.data.rank,
-        targetItem.data.rank,
-      );
-      if (betweenRankResult.type === "error") {
-        return Result.error(
-          createValidationError("MoveItem", [
-            createValidationIssue("failed to generate between rank", {
-              code: "rank_generation_failed",
-              path: ["placement"],
-            }),
-          ]),
-        );
-      }
-      return Result.ok({ path: targetItem.data.path, rank: betweenRankResult.value });
-    }
-  }
-};
-
 export const MoveItemWorkflow = {
-  execute: async (
+  async execute(
     input: MoveItemInput,
     deps: MoveItemDependencies,
-  ): Promise<Result<MoveItemResult, MoveItemError>> => {
-    const options: ParseLocatorOptions = {
-      cwd: input.cwd,
-      today: input.today ?? new Date(),
-    };
+  ): Promise<Result<MoveItemResult, MoveItemError>> {
+    const today = input.today ?? new Date();
 
-    const itemResolveResult = await LocatorResolutionService.resolveItem(
-      input.itemLocator,
-      deps,
-      options,
-    );
-    if (itemResolveResult.type === "error") {
-      return Result.error(itemResolveResult.error as MoveItemError);
+    const timezoneResult = input.timezone
+      ? Result.ok(input.timezone)
+      : parseTimezoneIdentifier("UTC");
+    if (timezoneResult.type === "error") {
+      return Result.error(
+        createValidationError("MoveItem", timezoneResult.error.issues),
+      );
     }
 
-    const item = itemResolveResult.value;
-    if (!item) {
+    const pathResolver = createPathResolver({
+      aliasRepository: deps.aliasRepository,
+      itemRepository: deps.itemRepository,
+      timezone: timezoneResult.value,
+      today,
+    });
+
+    // 1. Resolve item expression
+    const itemExprResult = parsePathExpression(input.itemExpression);
+    if (itemExprResult.type === "error") {
       return Result.error(
         createValidationError("MoveItem", [
-          createValidationIssue(`item not found: ${input.itemLocator}`, {
-            code: "item_not_found",
-            path: ["itemLocator"],
+          createValidationIssue(
+            `invalid item expression: ${
+              itemExprResult.error.issues.map((i) => i.message).join(", ")
+            }`,
+            {
+              code: "invalid_item_expression",
+              path: ["itemExpression"],
+            },
+          ),
+        ]),
+      );
+    }
+
+    const itemPlacementResult = await pathResolver.resolvePath(
+      input.cwd,
+      itemExprResult.value,
+    );
+    if (itemPlacementResult.type === "error") {
+      return Result.error(
+        createValidationError("MoveItem", [
+          createValidationIssue(
+            `failed to resolve item: ${
+              itemPlacementResult.error.issues.map((i) => i.message).join(", ")
+            }`,
+            {
+              code: "item_resolution_failed",
+              path: ["itemExpression"],
+            },
+          ),
+        ]),
+      );
+    }
+
+    // Get item by ID (placement head must be an item)
+    if (itemPlacementResult.value.head.kind !== "item") {
+      return Result.error(
+        createValidationError("MoveItem", [
+          createValidationIssue("item expression must resolve to an item, not a date", {
+            code: "not_an_item",
+            path: ["itemExpression"],
           }),
         ]),
       );
     }
 
-    const placementResult = parsePlacement(input.placement, options);
-    if (placementResult.type === "error") {
-      return Result.error(placementResult.error);
+    const loadResult = await deps.itemRepository.load(itemPlacementResult.value.head.id);
+    if (loadResult.type === "error") {
+      return Result.error(loadResult.error);
     }
 
-    const rankResult = await calculateRankForPlacement(
-      placementResult.value,
-      deps,
-      options,
+    if (!loadResult.value) {
+      return Result.error(
+        createValidationError("MoveItem", [
+          createValidationIssue("item not found", {
+            code: "item_not_found",
+            path: ["itemExpression"],
+          }),
+        ]),
+      );
+    }
+
+    const item = loadResult.value;
+
+    // 2. Parse target expression (handle special prefixes: head:, tail:, after:, before:)
+    let targetPlacement: Placement;
+    let newRank;
+
+    // Check for special positioning syntax
+    if (input.targetExpression.startsWith("head:")) {
+      // head:placement - move to head (minimum rank) of specified placement
+      const placementExpr = input.targetExpression.slice(5); // Remove "head:" prefix
+      const exprResult = parsePathExpression(placementExpr);
+      if (exprResult.type === "error") {
+        return Result.error(
+          createValidationError("MoveItem", [
+            createValidationIssue(
+              `invalid head: placement expression: ${
+                exprResult.error.issues.map((i) => i.message).join(", ")
+              }`,
+              {
+                code: "invalid_target_expression",
+                path: ["targetExpression"],
+              },
+            ),
+          ]),
+        );
+      }
+
+      const placementResult = await pathResolver.resolvePath(input.cwd, exprResult.value);
+      if (placementResult.type === "error") {
+        return Result.error(
+          createValidationError("MoveItem", [
+            createValidationIssue(
+              `failed to resolve head: placement: ${
+                placementResult.error.issues.map((i) => i.message).join(", ")
+              }`,
+              {
+                code: "target_resolution_failed",
+                path: ["targetExpression"],
+              },
+            ),
+          ]),
+        );
+      }
+
+      targetPlacement = placementResult.value;
+      const rankResult = deps.rankService.minRank();
+      if (rankResult.type === "error") {
+        return Result.error(createValidationError("MoveItem", rankResult.error.issues));
+      }
+      newRank = rankResult.value;
+    } else if (input.targetExpression.startsWith("tail:")) {
+      // tail:placement - move to tail (maximum rank) of specified placement
+      const placementExpr = input.targetExpression.slice(5); // Remove "tail:" prefix
+      const exprResult = parsePathExpression(placementExpr);
+      if (exprResult.type === "error") {
+        return Result.error(
+          createValidationError("MoveItem", [
+            createValidationIssue(
+              `invalid tail: placement expression: ${
+                exprResult.error.issues.map((i) => i.message).join(", ")
+              }`,
+              {
+                code: "invalid_target_expression",
+                path: ["targetExpression"],
+              },
+            ),
+          ]),
+        );
+      }
+
+      const placementResult = await pathResolver.resolvePath(input.cwd, exprResult.value);
+      if (placementResult.type === "error") {
+        return Result.error(
+          createValidationError("MoveItem", [
+            createValidationIssue(
+              `failed to resolve tail: placement: ${
+                placementResult.error.issues.map((i) => i.message).join(", ")
+              }`,
+              {
+                code: "target_resolution_failed",
+                path: ["targetExpression"],
+              },
+            ),
+          ]),
+        );
+      }
+
+      targetPlacement = placementResult.value;
+      const rankResult = deps.rankService.maxRank();
+      if (rankResult.type === "error") {
+        return Result.error(createValidationError("MoveItem", rankResult.error.issues));
+      }
+      newRank = rankResult.value;
+    } else if (
+      input.targetExpression.startsWith("after:") || input.targetExpression.startsWith("before:")
+    ) {
+      // after:item or before:item - move relative to another item
+      const isAfter = input.targetExpression.startsWith("after:");
+      const itemExpr = input.targetExpression.slice(isAfter ? 6 : 7);
+
+      const exprResult = parsePathExpression(itemExpr);
+      if (exprResult.type === "error") {
+        return Result.error(
+          createValidationError("MoveItem", [
+            createValidationIssue(
+              `invalid ${isAfter ? "after" : "before"}: item expression: ${
+                exprResult.error.issues.map((i) => i.message).join(", ")
+              }`,
+              {
+                code: "invalid_target_expression",
+                path: ["targetExpression"],
+              },
+            ),
+          ]),
+        );
+      }
+
+      const refPlacementResult = await pathResolver.resolvePath(input.cwd, exprResult.value);
+      if (refPlacementResult.type === "error") {
+        return Result.error(
+          createValidationError("MoveItem", [
+            createValidationIssue(
+              `failed to resolve ${isAfter ? "after" : "before"}: item: ${
+                refPlacementResult.error.issues.map((i) => i.message).join(", ")
+              }`,
+              {
+                code: "target_resolution_failed",
+                path: ["targetExpression"],
+              },
+            ),
+          ]),
+        );
+      }
+
+      if (refPlacementResult.value.head.kind !== "item") {
+        return Result.error(
+          createValidationError("MoveItem", [
+            createValidationIssue(
+              `${isAfter ? "after" : "before"}: target must be an item, not a date`,
+              {
+                code: "invalid_reference_item",
+                path: ["targetExpression"],
+              },
+            ),
+          ]),
+        );
+      }
+
+      const refItemResult = await deps.itemRepository.load(refPlacementResult.value.head.id);
+      if (refItemResult.type === "error") {
+        return Result.error(refItemResult.error);
+      }
+      if (!refItemResult.value) {
+        return Result.error(
+          createValidationError("MoveItem", [
+            createValidationIssue("reference item not found", {
+              code: "reference_item_not_found",
+              path: ["targetExpression"],
+            }),
+          ]),
+        );
+      }
+
+      const refItem = refItemResult.value;
+      targetPlacement = refItem.data.placement;
+
+      // Generate rank after/before reference item
+      const rankResult = isAfter
+        ? deps.rankService.nextRank(refItem.data.rank)
+        : deps.rankService.prevRank(refItem.data.rank);
+
+      if (rankResult.type === "error") {
+        return Result.error(createValidationError("MoveItem", rankResult.error.issues));
+      }
+      newRank = rankResult.value;
+    } else {
+      // Regular placement expression
+      const targetExprResult = parsePathExpression(input.targetExpression);
+      if (targetExprResult.type === "error") {
+        return Result.error(
+          createValidationError("MoveItem", [
+            createValidationIssue(
+              `invalid target expression: ${
+                targetExprResult.error.issues.map((i) => i.message).join(", ")
+              }`,
+              {
+                code: "invalid_target_expression",
+                path: ["targetExpression"],
+              },
+            ),
+          ]),
+        );
+      }
+
+      const targetPlacementResult = await pathResolver.resolvePath(
+        input.cwd,
+        targetExprResult.value,
+      );
+      if (targetPlacementResult.type === "error") {
+        return Result.error(
+          createValidationError("MoveItem", [
+            createValidationIssue(
+              `failed to resolve target: ${
+                targetPlacementResult.error.issues.map((i) => i.message).join(", ")
+              }`,
+              {
+                code: "target_resolution_failed",
+                path: ["targetExpression"],
+              },
+            ),
+          ]),
+        );
+      }
+
+      targetPlacement = targetPlacementResult.value;
+
+      // Get new rank (at head of target placement)
+      const newRankResult = deps.rankService.minRank();
+      if (newRankResult.type === "error") {
+        return Result.error(
+          createValidationError("MoveItem", newRankResult.error.issues),
+        );
+      }
+      newRank = newRankResult.value;
+    }
+
+    // 4. Relocate item
+    const relocated = item.relocate(
+      targetPlacement,
+      newRank,
+      input.occurredAt,
     );
-    if (rankResult.type === "error") {
-      return Result.error(rankResult.error);
-    }
 
-    const { path, rank } = rankResult.value;
-
-    const updatedItem = item.relocate(path, rank, input.occurredAt);
-
-    const saveResult = await deps.itemRepository.save(updatedItem);
+    // 5. Save
+    const saveResult = await deps.itemRepository.save(relocated);
     if (saveResult.type === "error") {
       return Result.error(saveResult.error);
     }
 
-    return Result.ok({ item: updatedItem });
+    return Result.ok({
+      item: relocated,
+    });
   },
 };
