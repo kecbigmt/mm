@@ -32,7 +32,6 @@ export function createMvCommand() {
         {
           stateRepository: deps.stateRepository,
           itemRepository: deps.itemRepository,
-          aliasRepository: deps.aliasRepository,
         },
         now,
       );
@@ -50,8 +49,8 @@ export function createMvCommand() {
 
       const workflowResult = await MoveItemWorkflow.execute(
         {
-          itemLocator,
-          placement,
+          itemExpression: itemLocator,
+          targetExpression: placement,
           cwd: cwdResult.value,
           today: now,
           occurredAt: occurredAtResult.value,
@@ -71,7 +70,7 @@ export function createMvCommand() {
       const { item } = workflowResult.value;
       const label = formatItemLabel(item);
       console.log(
-        `✅ Moved [${label}] ${item.data.title.toString()} to ${item.data.path.toString()}`,
+        `✅ Moved [${label}] ${item.data.title.toString()} to ${item.data.placement.toString()}`,
       );
     });
 }

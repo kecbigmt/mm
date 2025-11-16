@@ -2,7 +2,7 @@
 
 *A whitepaper for a path‑centric Item/Section model with logical navigation, Git‑friendly storage, and deterministic ordering.*
 
-**Version:** 1.1 (frontmatter edition)
+**Version:** 1.2 (placement edition)
 **Audience:** engineers, product designers, contributors
 **Scope:** system design; no concrete implementation code beyond high‑level interface sketches
 
@@ -47,9 +47,17 @@ Navigation adopts Unix semantics (`cd`, `ls`, `pwd`) with `.` and `..` that work
 
 * **Identity**: UUID v7 (timestamp‑embedded).
 * **Content**: Single `.md` file with **YAML Frontmatter + Markdown body**.
-* **Frontmatter fields**: `id`, `kind`, `status`, `path`, `rank`, `created_at`, `updated_at`, optional `alias`, `tags`, `schema`, `extra`.
+* **Frontmatter fields**: `id`, `kind`, `status`, `placement`, `rank`, `created_at`, `updated_at`, optional `alias`, `tags`, `schema`, `extra`.
 * **Body**: Markdown content; title is the first H1.
 * Exactly **one active placement** in the logical graph.
+
+**Note on `placement` field:**
+* The `placement` field stores the **normalized, absolute logical position** of the Item.
+* All user-facing path expressions (relative dates like `today`, aliases, navigation tokens like `.` or `..`) are **resolved to absolute form** before being stored in `placement`.
+* Format: slash-separated segments without leading `/`
+  * First segment: `YYYY-MM-DD` (date shelf) or UUID (parent item)
+  * Remaining segments: positive integers (numeric sections)
+* Examples: `2025-11-15`, `2025-11-15/1/3`, `019a85fc-67c4-7a54-be8e-305bae009f9e/1`
 
 ### 3.2 Section
 
@@ -78,6 +86,13 @@ Navigation adopts Unix semantics (`cd`, `ls`, `pwd`) with `.` and `..` that work
 ---
 
 ## 4) Path, Identifiers & Resolution
+
+### Terminology: Path vs. Placement
+
+* **Path**: A user-facing path expression that may contain syntactic sugar (relative dates like `today`, aliases, navigation tokens like `.` or `..`). Used for CLI input and user interaction.
+* **Placement**: The normalized, absolute logical position stored in an Item's frontmatter. Contains only absolute dates (`YYYY-MM-DD`) and UUIDs (no aliases, no relative tokens). This is the **canonical representation** in the domain model.
+
+All user-provided paths are **resolved to placement** before being stored in frontmatter.
 
 ### 4.1 Path Model
 
@@ -182,8 +197,8 @@ Ambiguities (e.g., missing nodes) return a clear error with candidates and hints
         MM/
           DD/
             <uuidv7>.md                      # Single file: YAML Frontmatter + Markdown body
-                                             # Frontmatter: id, kind, status, path, rank,
-                                             #              created_at, updated_at, alias?, tags?, ...
+                                             # Frontmatter: id, kind, status, placement, rank,
+                                             #              created_at, updated_at, alias?, tags?, schema, ...
                                              # Body: Markdown content (title = first H1)
 
     tags/
@@ -212,9 +227,9 @@ Ambiguities (e.g., missing nodes) return a clear error with candidates and hints
 
 * **Single file per Item**: `<uuid>.md` contains both metadata (Frontmatter) and content (Markdown body).
 * **Frontmatter is authoritative**: The **single source of truth** for an Item's logical placement is:
-  * Frontmatter → `path` (normalized logical path, e.g., `2025-01-09/<itemId>/1/3`)
+  * Frontmatter → `placement` (normalized logical position in absolute form, e.g., `2025-01-09`, `2025-01-09/1/3`, or `<parentId>/1/3`)
   * Frontmatter → `rank` (LexoRank string for ordering)
-  * Frontmatter → `id`, `kind`, `status`, `created_at`, `updated_at`, and other metadata
+  * Frontmatter → `id`, `kind`, `status`, `created_at`, `updated_at`, `schema`, and other metadata
 * **Graph index (`.index/graph`)**: Edge files are **purely derived index/cache**:
   * They mirror the placement information from Frontmatter for efficient graph traversal.
   * They can be **completely rebuilt** from Frontmatter using `mm doctor --rebuild-index`.
@@ -274,7 +289,7 @@ mm mv <id> <placement>
   * `after:<id2>`
   * `before:<id2>`
 
-> Physical files do not move; only **Frontmatter `path` and `rank`** are updated, and edge files in `.index/graph` are rebuilt.
+> Physical files do not move; only **Frontmatter `placement` and `rank`** are updated, and edge files in `.index/graph` are rebuilt.
 
 ### 8.3 List
 
@@ -309,13 +324,14 @@ Prohibited:
 ## 10) Validation & Doctor
 
 **Frontmatter validation:**
-* Required fields present: `id`, `kind`, `status`, `path`, `rank`, `created_at`, `updated_at`.
+* Required fields present: `id`, `kind`, `status`, `placement`, `rank`, `created_at`, `updated_at`, `schema`.
 * `id` matches filename `<uuid>.md` and is valid UUID v7.
 * `kind` is one of allowed values (e.g., `note`, `task`, `event`).
-* `status` is one of allowed values (e.g., `inbox`, `scheduled`, `closed`, `discarded`).
-* `path` is normalized (no relative tokens like `today`).
+* `status` is one of allowed values (e.g., `open`, `closed`).
+* `placement` is normalized (no relative tokens like `today`, no aliases; only absolute dates and UUIDs).
 * `rank` is valid LexoRank format.
 * `created_at`, `updated_at` are valid ISO-8601 timestamps.
+* `schema` is present (e.g., `mm.item.frontmatter/2`).
 * `alias` (if present) follows alias rules (no reserved tokens, unique canonical_key).
 * YAML is valid and parseable; UTF-8 (NFC), LF newlines.
 
@@ -323,7 +339,7 @@ Prohibited:
 * Every `*.edge.json` points to an existing **Item** (no edge→edge).
 * No duplicates within the same (parent, section).
 * No cycles in the parent/child graph.
-* Edge files are consistent with Frontmatter `path` and `rank`.
+* Edge files are consistent with Frontmatter `placement` and `rank`.
 * Aliases are unique (index enforces uniqueness).
 * Date heads are valid, ranges are semantically valid (order, depth/prefix).
 
@@ -335,7 +351,7 @@ Prohibited:
   * After version updates that change index format
   * Process:
     1. Scan all `items/**/*.md` files and parse Frontmatter
-    2. Parse each `path` to extract (date-head or parentId, numeric section path)
+    2. Parse each `placement` to extract (date-head or parentId, numeric section path)
     3. Group children by (parent, section) and sort by `rank`
     4. Write edge files to `.index/graph/dates/` and `.index/graph/parents/`
 * `mm doctor --reindex`: Rank compaction (rebalances LexoRank values).
@@ -366,14 +382,14 @@ The MCP surface mirrors CLI semantics 1:1.
 
 * Writes are **atomic** (temp file + rename).
 * **Git-managed files**:
-  * `items/**/*.md` — Item files (Frontmatter + Markdown body; includes authoritative `path`, `rank`, and all metadata)
+  * `items/**/*.md` — Item files (Frontmatter + Markdown body; includes authoritative `placement`, `rank`, and all metadata)
   * `workspace.json`, `tags/*.tag.json`, and other config files
 * **Git-ignored files** (`.gitignore` includes `.index/`):
   * `.index/graph/**` — Graph index (edge files)
   * `.state.json` — Local session state
   * Edge files are **rebuildable** from Frontmatter via `mm doctor --rebuild-index`
 * **Conflict resolution**:
-  * Changes to Frontmatter are typically line‑local (path, rank, status fields).
+  * Changes to Frontmatter are typically line‑local (placement, rank, status fields).
   * Frontmatter conflicts surface as YAML diffs and are resolved by reindexing.
   * Competing moves on the same Item → last‑writer wins at the Frontmatter level (Markdown body unaffected).
   * After `git pull`, if `.index/graph` is out-of-sync, run `mm doctor --rebuild-index` to regenerate the index from merged Frontmatter.

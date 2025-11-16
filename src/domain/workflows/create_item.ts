@@ -9,7 +9,8 @@ import {
   itemStatusOpen,
   itemTitleFromString,
   parseAliasSlug,
-  Path,
+  Placement,
+  PlacementRange,
   TagSlug,
   tagSlugFromString,
 } from "../primitives/mod.ts";
@@ -19,7 +20,6 @@ import { RepositoryError } from "../repositories/repository_error.ts";
 import { RankService } from "../services/rank_service.ts";
 import { IdGenerationService } from "../services/id_generation_service.ts";
 import { AliasAutoGenerator } from "../services/alias_auto_generator.ts";
-import { PathNormalizationService } from "../services/path_normalization_service.ts";
 import { createAlias } from "../models/alias.ts";
 
 export type CreateItemInput = Readonly<{
@@ -28,7 +28,7 @@ export type CreateItemInput = Readonly<{
   body?: string;
   context?: string;
   alias?: string;
-  parentPath: Path;
+  parentPlacement: Placement;
   createdAt: DateTime;
 }>;
 
@@ -149,15 +149,6 @@ export const CreateItemWorkflow = {
       // If no unique alias found after retries, continue without alias
     }
 
-    if (input.parentPath.isRange()) {
-      issues.push(
-        createValidationIssue("parent path cannot be a range", {
-          code: "range_not_allowed",
-          path: ["parentPath"],
-        }),
-      );
-    }
-
     const idResult = deps.idGenerationService.generateId();
     const id = idResult.type === "ok" ? idResult.value : undefined;
     if (idResult.type === "error") {
@@ -178,28 +169,9 @@ export const CreateItemWorkflow = {
     const resolvedId = id as ItemId;
     const resolvedTitle = title!;
 
-    // Normalize parent path before querying repository
-    const normalizedResult = await PathNormalizationService.normalize(
-      input.parentPath,
-      {
-        itemRepository: deps.itemRepository,
-        aliasRepository: deps.aliasRepository,
-      },
-      { preserveAlias: false },
-    );
-
-    if (normalizedResult.type === "error") {
-      // Map PathNormalizationError to CreateItemError
-      if (normalizedResult.error.kind === "ValidationError") {
-        return Result.error(invalidInput(normalizedResult.error.issues));
-      }
-      return Result.error(repositoryFailure(normalizedResult.error));
-    }
-
-    const normalizedParentPath = normalizedResult.value;
-    const siblingsResult = await deps.itemRepository.listByPath(
-      normalizedParentPath,
-    );
+    // Query siblings at the parent placement
+    const range: PlacementRange = { kind: "single", at: input.parentPlacement };
+    const siblingsResult = await deps.itemRepository.listByPlacement(range);
     if (siblingsResult.type === "error") {
       return Result.error(repositoryFailure(siblingsResult.error));
     }
@@ -252,7 +224,7 @@ export const CreateItemWorkflow = {
       title: resolvedTitle,
       icon: createItemIcon(input.itemType),
       status: itemStatusOpen(),
-      path: normalizedParentPath,
+      placement: input.parentPlacement,
       rank: rankResult.value,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,

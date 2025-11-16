@@ -5,7 +5,7 @@ mm is a personal knowledgement CLI tool with built-in MCP server.
 It has a local-files PKM system unifying GTD / Bullet Journal / Zettelkasten around concise
 vocabulary: people interact with **Items** that live inside **Containers**, while the code models
 their union as a single Node algebraic data type. Items are created under a date container
-(Calendar), never moved physically; "moves" update frontmatter (path, rank) and edge files.
+(Calendar), never moved physically; "moves" update frontmatter (placement, rank) and edge files.
 
 ## 2) Goals / Non-Goals
 
@@ -45,11 +45,11 @@ their union as a single Node algebraic data type. Items are created under a date
 - Identified by **UUID v7** (creation timestamp embedded).
 - Created under the **date Container** matching its creation date.
 - Can be **moved** to another container; the physical file location remains under its original date;
-  frontmatter (`path`, `rank`) and edge files are updated. After move, it is **excluded** from the
+  frontmatter (`placement`, `rank`) and edge files are updated. After move, it is **excluded** from the
   original date's listing.
 - Has per-container **rank (LexoRank)** for ordering.
 - May also act as a container (can have children).
-- Frontmatter fields: `id`, `kind`, `status`, `path`, `rank`, `created_at`, `updated_at`, optional
+- Frontmatter fields: `id`, `kind`, `status`, `placement`, `rank`, `created_at`, `updated_at`, optional
   `alias`, `tags`, `schema`, `extra`.
 - State transitions: `close`, `reopen`.
 
@@ -67,8 +67,8 @@ their union as a single Node algebraic data type. Items are created under a date
   items/
     YYYY/MM/DD/
       <uuidv7>.md                         # Single file: YAML Frontmatter + Markdown body
-                                          # Frontmatter: id, kind, status, path, rank,
-                                          #              created_at, updated_at, alias?, tags?, ...
+                                          # Frontmatter: id, kind, status, placement, rank,
+                                          #              created_at, updated_at, alias?, tags?, schema, ...
                                           # Body: Markdown content
   .index/                                 # Cache/index (Git-ignored, rebuildable)
     graph/
@@ -93,7 +93,7 @@ their union as a single Node algebraic data type. Items are created under a date
 
 - **Single file per Item**: `<uuid>.md` contains both metadata (Frontmatter) and content (Markdown
   body).
-- **Frontmatter is authoritative**: The Item's `path` and `rank` in Frontmatter are the source of
+- **Frontmatter is authoritative**: The Item's `placement` and `rank` in Frontmatter are the source of
   truth.
 - **`.index/graph` is rebuildable cache**: Edge files mirror Frontmatter placement for efficient
   traversal; regenerated via `mm doctor --rebuild-index`.
@@ -101,7 +101,7 @@ their union as a single Node algebraic data type. Items are created under a date
 
 ## 5) Ordering & Ranks
 
-- **Frontmatter `rank`**: ordering within the Item's current placement (stored in `path` field).
+- **Frontmatter `rank`**: ordering within the Item's current placement (stored in `placement` field).
 - **Edge files**: mirror the `rank` from Frontmatter for efficient traversal.
 - LexoRank (string) supports stable insertions (`head`, `tail`, `before:<id>`, `after:<id>`).
   Periodic rebalancing may be performed by maintenance (`mm doctor --reindex`).
@@ -109,7 +109,7 @@ their union as a single Node algebraic data type. Items are created under a date
 ## 6) Movement & Placement
 
 - Items have **one active container** at a time.
-- Move updates **Frontmatter `path` and `rank`** fields so that:
+- Move updates **Frontmatter `placement` and `rank`** fields so that:
 
   - the item **disappears** from its original day listing,
   - appears in the new container in the specified position.
@@ -179,13 +179,14 @@ before:<id> | after:<id>
 
 **Frontmatter validation:**
 
-- Required fields present: `id`, `kind`, `status`, `path`, `rank`, `created_at`, `updated_at`.
+- Required fields present: `id`, `kind`, `status`, `placement`, `rank`, `created_at`, `updated_at`, `schema`.
 - `id` matches filename `<uuid>.md` and is valid UUID v7.
 - `kind` is one of allowed values (e.g., `note`, `task`, `event`).
-- `status` is one of allowed values (e.g., `inbox`, `scheduled`, `closed`, `discarded`).
-- `path` is normalized (no relative tokens like `today`).
+- `status` is one of allowed values (e.g., `open`, `closed`).
+- `placement` is normalized (no relative tokens like `today`, no aliases; only absolute dates and UUIDs).
 - `rank` is valid LexoRank format.
 - `created_at`, `updated_at` are valid ISO-8601 timestamps.
+- `schema` is present (e.g., `mm.item.frontmatter/2`).
 - `alias` (if present) follows alias rules (no reserved tokens, unique canonical_key).
 - YAML is valid and parseable; UTF-8 (NFC), LF newlines.
 
@@ -194,7 +195,7 @@ before:<id> | after:<id>
 - Every `*.edge.json` points to an existing **Item** (no edge→edge).
 - No duplicate edges (same container + same target).
 - No cycles (an Item cannot be a descendant of itself).
-- Edge files are consistent with Frontmatter `path` and `rank`.
+- Edge files are consistent with Frontmatter `placement` and `rank`.
 
 **Maintenance:**
 

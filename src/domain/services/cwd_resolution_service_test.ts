@@ -1,19 +1,16 @@
 import { assert, assertEquals } from "@std/assert";
 import { CwdResolutionService } from "./cwd_resolution_service.ts";
 import { createItem } from "../models/item.ts";
-import { createAlias } from "../models/alias.ts";
 import { itemTitleFromString } from "../primitives/item_title.ts";
 import { dateTimeFromDate } from "../primitives/date_time.ts";
 import { itemIdFromString } from "../primitives/item_id.ts";
-import { parsePath } from "../primitives/path.ts";
+import { parsePlacement } from "../primitives/placement.ts";
 import { itemRankFromString } from "../primitives/item_rank.ts";
 import { createItemStatus } from "../primitives/item_status.ts";
 import { createItemIcon } from "../primitives/item_icon.ts";
 import { aliasSlugFromString } from "../primitives/alias_slug.ts";
 import type { ItemRepository } from "../repositories/item_repository.ts";
-import type { AliasRepository } from "../repositories/alias_repository.ts";
 import type { StateRepository } from "../repositories/state_repository.ts";
-import type { Alias } from "../models/alias.ts";
 import { Result } from "../../shared/result.ts";
 
 const createMockItemRepository = (
@@ -25,17 +22,7 @@ const createMockItemRepository = (
   },
   save: () => Promise.resolve(Result.ok(undefined)),
   delete: () => Promise.resolve(Result.ok(undefined)),
-  listByPath: () => Promise.resolve(Result.ok([])),
-});
-
-const createMockAliasRepository = (aliases?: Map<string, Alias>): AliasRepository => ({
-  load: (slug) => {
-    const alias = aliases?.get(slug.toString());
-    return Promise.resolve(Result.ok(alias));
-  },
-  save: () => Promise.resolve(Result.ok(undefined)),
-  delete: () => Promise.resolve(Result.ok(undefined)),
-  list: () => Promise.resolve(Result.ok([])),
+  listByPlacement: () => Promise.resolve(Result.ok([])),
 });
 
 const createMockStateRepository = (
@@ -44,7 +31,7 @@ const createMockStateRepository = (
 ): StateRepository => ({
   loadCwd: () => {
     if (!storedCwd) return Promise.resolve(Result.ok(undefined));
-    const parsed = parsePath(storedCwd);
+    const parsed = parsePlacement(storedCwd);
     if (parsed.type === "error") return Promise.resolve(Result.ok(undefined));
     return Promise.resolve(Result.ok(parsed.value));
   },
@@ -55,16 +42,15 @@ const createMockStateRepository = (
 Deno.test("CwdResolutionService.getCwd returns default today path when nothing is stored", async () => {
   const stateRepo = createMockStateRepository();
   const itemRepo = createMockItemRepository(new Map());
-  const aliasRepo = createMockAliasRepository();
   const today = new Date("2024-06-15");
 
   const result = await CwdResolutionService.getCwd(
-    { stateRepository: stateRepo, itemRepository: itemRepo, aliasRepository: aliasRepo },
+    { stateRepository: stateRepo, itemRepository: itemRepo },
     today,
   );
 
   assert(result.type === "ok", "operation should succeed");
-  assertEquals(result.value.toString(), "/2024-06-15");
+  assertEquals(result.value.toString(), "2024-06-15");
 });
 
 Deno.test("CwdResolutionService.getCwd returns stored CWD when valid", async () => {
@@ -77,8 +63,8 @@ Deno.test("CwdResolutionService.getCwd returns stored CWD when valid", async () 
   const createdAt = dateTimeFromDate(new Date("2024-01-01"));
   assert(createdAt.type === "ok");
 
-  const path = parsePath("/2024-01-01");
-  assert(path.type === "ok");
+  const placement = parsePlacement("2024-01-01");
+  assert(placement.type === "ok");
 
   const rank = itemRankFromString("a0");
   assert(rank.type === "ok");
@@ -87,7 +73,7 @@ Deno.test("CwdResolutionService.getCwd returns stored CWD when valid", async () 
     id: itemId.value,
     title: title.value,
     icon: createItemIcon("note"),
-    path: path.value,
+    placement: placement.value,
     rank: rank.value,
     status: createItemStatus("open"),
     createdAt: createdAt.value,
@@ -95,53 +81,50 @@ Deno.test("CwdResolutionService.getCwd returns stored CWD when valid", async () 
   });
 
   const items = new Map([[item.data.id.toString(), item]]);
-  const stateRepo = createMockStateRepository(`/${item.data.id.toString()}`);
+  const stateRepo = createMockStateRepository(item.data.id.toString());
   const itemRepo = createMockItemRepository(items);
-  const aliasRepo = createMockAliasRepository();
   const today = new Date("2024-06-15");
 
   const result = await CwdResolutionService.getCwd(
-    { stateRepository: stateRepo, itemRepository: itemRepo, aliasRepository: aliasRepo },
+    { stateRepository: stateRepo, itemRepository: itemRepo },
     today,
   );
 
   assert(result.type === "ok", "getCwd should succeed");
   if (result.type === "ok") {
-    assertEquals(result.value.toString(), `/${item.data.id.toString()}`);
+    assertEquals(result.value.toString(), item.data.id.toString());
   }
 });
 
 Deno.test("CwdResolutionService.getCwd returns stored date path without overwriting", async () => {
-  const stateRepo = createMockStateRepository("/2024-06-15");
+  const stateRepo = createMockStateRepository("2024-06-15");
   const itemRepo = createMockItemRepository(new Map());
-  const aliasRepo = createMockAliasRepository();
   const today = new Date("2024-11-02");
 
   const result = await CwdResolutionService.getCwd(
-    { stateRepository: stateRepo, itemRepository: itemRepo, aliasRepository: aliasRepo },
+    { stateRepository: stateRepo, itemRepository: itemRepo },
     today,
   );
 
   assert(result.type === "ok", "operation should succeed");
   assertEquals(
     result.value.toString(),
-    "/2024-06-15",
-    "stored date path should be returned as-is, not overwritten with today",
+    "2024-06-15",
+    "stored date placement should be returned as-is, not overwritten with today",
   );
 });
 
 Deno.test("CwdResolutionService.getCwd falls back to today when stored item not found", async () => {
-  const stateRepo = createMockStateRepository("/019965a7-2789-740a-b8c1-1415904fd108");
+  const stateRepo = createMockStateRepository("019965a7-2789-740a-b8c1-1415904fd108");
   const itemRepo = createMockItemRepository(new Map());
-  const aliasRepo = createMockAliasRepository();
   const today = new Date();
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, "0");
   const day = String(today.getDate()).padStart(2, "0");
-  const expectedDate = `/${year}-${month}-${day}`;
+  const expectedDate = `${year}-${month}-${day}`;
 
   const result = await CwdResolutionService.getCwd(
-    { stateRepository: stateRepo, itemRepository: itemRepo, aliasRepository: aliasRepo },
+    { stateRepository: stateRepo, itemRepository: itemRepo },
     today,
   );
 
@@ -152,14 +135,13 @@ Deno.test("CwdResolutionService.getCwd falls back to today when stored item not 
 Deno.test("CwdResolutionService.setCwd validates item path exists", async () => {
   const stateRepo = createMockStateRepository();
   const itemRepo = createMockItemRepository(new Map());
-  const aliasRepo = createMockAliasRepository();
 
-  const nonExistentItemPath = parsePath("/019965a7-2789-740a-b8c1-1415904fd108");
-  assert(nonExistentItemPath.type === "ok");
+  const nonExistentItemPlacement = parsePlacement("019965a7-2789-740a-b8c1-1415904fd108");
+  assert(nonExistentItemPlacement.type === "ok");
 
   const result = await CwdResolutionService.setCwd(
-    nonExistentItemPath.value,
-    { stateRepository: stateRepo, itemRepository: itemRepo, aliasRepository: aliasRepo },
+    nonExistentItemPlacement.value,
+    { stateRepository: stateRepo, itemRepository: itemRepo },
   );
 
   assert(result.type === "error", "setCwd should fail for non-existent item");
@@ -171,14 +153,13 @@ Deno.test("CwdResolutionService.setCwd validates item path exists", async () => 
 Deno.test("CwdResolutionService.setCwd allows date paths", async () => {
   const stateRepo = createMockStateRepository();
   const itemRepo = createMockItemRepository(new Map());
-  const aliasRepo = createMockAliasRepository();
 
-  const datePath = parsePath("/2024-06-15");
-  assert(datePath.type === "ok");
+  const datePlacement = parsePlacement("2024-06-15");
+  assert(datePlacement.type === "ok");
 
   const result = await CwdResolutionService.setCwd(
-    datePath.value,
-    { stateRepository: stateRepo, itemRepository: itemRepo, aliasRepository: aliasRepo },
+    datePlacement.value,
+    { stateRepository: stateRepo, itemRepository: itemRepo },
   );
 
   assert(result.type === "ok", "operation should succeed");
@@ -194,8 +175,8 @@ Deno.test("CwdResolutionService.setCwd allows valid item paths", async () => {
   const createdAt = dateTimeFromDate(new Date("2024-01-01"));
   assert(createdAt.type === "ok");
 
-  const path = parsePath("/2024-01-01");
-  assert(path.type === "ok");
+  const placement = parsePlacement("2024-01-01");
+  assert(placement.type === "ok");
 
   const rank = itemRankFromString("a0");
   assert(rank.type === "ok");
@@ -204,7 +185,7 @@ Deno.test("CwdResolutionService.setCwd allows valid item paths", async () => {
     id: itemId.value,
     title: title.value,
     icon: createItemIcon("note"),
-    path: path.value,
+    placement: placement.value,
     rank: rank.value,
     status: createItemStatus("open"),
     createdAt: createdAt.value,
@@ -214,19 +195,18 @@ Deno.test("CwdResolutionService.setCwd allows valid item paths", async () => {
   const items = new Map([[item.data.id.toString(), item]]);
   const stateRepo = createMockStateRepository();
   const itemRepo = createMockItemRepository(items);
-  const aliasRepo = createMockAliasRepository();
 
-  const itemPath = parsePath(`/${item.data.id.toString()}`);
-  assert(itemPath.type === "ok");
+  const itemPlacement = parsePlacement(item.data.id.toString());
+  assert(itemPlacement.type === "ok");
 
   const result = await CwdResolutionService.setCwd(
-    itemPath.value,
-    { stateRepository: stateRepo, itemRepository: itemRepo, aliasRepository: aliasRepo },
+    itemPlacement.value,
+    { stateRepository: stateRepo, itemRepository: itemRepo },
   );
 
   assert(result.type === "ok", "operation should succeed");
   if (result.type === "ok") {
-    assertEquals(result.value.toString(), `/${item.data.id.toString()}`);
+    assertEquals(result.value.toString(), item.data.id.toString());
   }
 });
 
@@ -240,8 +220,8 @@ Deno.test("CwdResolutionService.setCwd allows paths with numeric sections", asyn
   const createdAt = dateTimeFromDate(new Date("2024-01-01"));
   assert(createdAt.type === "ok");
 
-  const path = parsePath("/2024-01-01");
-  assert(path.type === "ok");
+  const placement = parsePlacement("2024-01-01");
+  assert(placement.type === "ok");
 
   const rank = itemRankFromString("a0");
   assert(rank.type === "ok");
@@ -253,7 +233,7 @@ Deno.test("CwdResolutionService.setCwd allows paths with numeric sections", asyn
     id: itemId.value,
     title: title.value,
     icon: createItemIcon("note"),
-    path: path.value,
+    placement: placement.value,
     rank: rank.value,
     status: createItemStatus("open"),
     createdAt: createdAt.value,
@@ -261,29 +241,21 @@ Deno.test("CwdResolutionService.setCwd allows paths with numeric sections", asyn
     alias: aliasSlug.value,
   });
 
-  const alias = createAlias({
-    slug: aliasSlug.value,
-    itemId: itemId.value,
-    createdAt: createdAt.value,
-  });
-
   const items = new Map([[item.data.id.toString(), item]]);
-  const aliases = new Map([[alias.data.slug.toString(), alias]]);
   const stateRepo = createMockStateRepository();
   const itemRepo = createMockItemRepository(items);
-  const aliasRepo = createMockAliasRepository(aliases);
 
-  // Path with numeric section: item ID + numeric section
-  const pathWithSection = parsePath(`/${item.data.id.toString()}/1`);
-  assert(pathWithSection.type === "ok");
+  // Placement with numeric section: item ID + numeric section
+  const placementWithSection = parsePlacement(`${item.data.id.toString()}/1`);
+  assert(placementWithSection.type === "ok");
 
   const result = await CwdResolutionService.setCwd(
-    pathWithSection.value,
-    { stateRepository: stateRepo, itemRepository: itemRepo, aliasRepository: aliasRepo },
+    placementWithSection.value,
+    { stateRepository: stateRepo, itemRepository: itemRepo },
   );
 
-  assert(result.type === "ok", "setCwd should accept paths with numeric sections");
+  assert(result.type === "ok", "setCwd should accept placements with numeric sections");
   if (result.type === "ok") {
-    assertEquals(result.value.toString(), `/${item.data.id.toString()}/1`);
+    assertEquals(result.value.toString(), `${item.data.id.toString()}/1`);
   }
 });

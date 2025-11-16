@@ -6,12 +6,11 @@ import {
 } from "../../shared/errors.ts";
 import { Item } from "../models/item.ts";
 import { DateTime } from "../primitives/date_time.ts";
+import { parseItemId } from "../primitives/item_id.ts";
+import { parseAliasSlug } from "../primitives/alias_slug.ts";
+import { ItemRepository } from "../repositories/item_repository.ts";
+import { AliasRepository } from "../repositories/alias_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
-import {
-  LocatorResolutionDependencies,
-  LocatorResolutionError,
-  LocatorResolutionService,
-} from "../services/locator_resolution_service.ts";
 
 export type StatusAction = "close" | "reopen";
 
@@ -21,13 +20,15 @@ export type ChangeItemStatusInput = Readonly<{
   occurredAt: DateTime;
 }>;
 
-export type ChangeItemStatusDependencies = LocatorResolutionDependencies;
+export type ChangeItemStatusDependencies = Readonly<{
+  itemRepository: ItemRepository;
+  aliasRepository: AliasRepository;
+}>;
 
 export type ChangeItemStatusValidationError = ValidationError<"ChangeItemStatus">;
 
 export type ChangeItemStatusError =
   | ChangeItemStatusValidationError
-  | LocatorResolutionError
   | RepositoryError;
 
 export type ChangeItemStatusResult = Readonly<{
@@ -61,19 +62,48 @@ export const ChangeItemStatusWorkflow = {
     }> = [];
 
     for (const itemId of input.itemIds) {
-      const resolutionResult = await LocatorResolutionService.resolveItem(
-        itemId,
-        deps,
-      );
-      if (resolutionResult.type === "error") {
-        failed.push({
-          itemId,
-          error: resolutionResult.error,
-        });
-        continue;
+      // Try to resolve as UUID first, then as alias
+      let item: Item | undefined;
+      const uuidResult = parseItemId(itemId);
+
+      if (uuidResult.type === "ok") {
+        // It's a valid UUID
+        const loadResult = await deps.itemRepository.load(uuidResult.value);
+        if (loadResult.type === "error") {
+          failed.push({
+            itemId,
+            error: loadResult.error,
+          });
+          continue;
+        }
+        item = loadResult.value;
+      } else {
+        // Try as alias
+        const aliasResult = parseAliasSlug(itemId);
+        if (aliasResult.type === "ok") {
+          const aliasLoadResult = await deps.aliasRepository.load(aliasResult.value);
+          if (aliasLoadResult.type === "error") {
+            failed.push({
+              itemId,
+              error: aliasLoadResult.error,
+            });
+            continue;
+          }
+          const alias = aliasLoadResult.value;
+          if (alias) {
+            const itemLoadResult = await deps.itemRepository.load(alias.data.itemId);
+            if (itemLoadResult.type === "error") {
+              failed.push({
+                itemId,
+                error: itemLoadResult.error,
+              });
+              continue;
+            }
+            item = itemLoadResult.value;
+          }
+        }
       }
 
-      const item = resolutionResult.value;
       if (!item) {
         failed.push({
           itemId,

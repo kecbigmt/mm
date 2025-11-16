@@ -43,7 +43,6 @@ export function createLsCommand() {
         {
           stateRepository: deps.stateRepository,
           itemRepository: deps.itemRepository,
-          aliasRepository: deps.aliasRepository,
         },
         now,
       );
@@ -55,7 +54,7 @@ export function createLsCommand() {
 
       const workflowResult = await ListItemsWorkflow.execute(
         {
-          locator: locatorArg,
+          expression: locatorArg,
           cwd: cwdResult.value,
           today: now,
         },

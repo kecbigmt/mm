@@ -71,17 +71,25 @@ export { isTagSlug, parseTagSlug, tagSlugFromString } from "./tag_slug.ts";
 export type { WorkspaceName, WorkspaceNameValidationError } from "./workspace_name.ts";
 export { isWorkspaceName, parseWorkspaceName, workspaceNameFromString } from "./workspace_name.ts";
 
-export type { PathSegment, PathSegmentValidationError } from "./path_segment.ts";
-export { isPathSegment, parsePathSegment } from "./path_segment.ts";
+export type { Placement, PlacementHead, PlacementValidationError } from "./placement.ts";
+export {
+  createDatePlacement,
+  createItemPlacement,
+  createPlacement,
+  isPlacement,
+  parsePlacement,
+  serializePlacement,
+} from "./placement.ts";
 
-export type { ParsePathOptions, Path, PathRangeSegment, PathValidationError } from "./path.ts";
-export { isPath, parsePath, pathFromString } from "./path.ts";
+export type { PlacementRange } from "./placement_range.ts";
+export {
+  createDateRange,
+  createNumericRange,
+  createSingleRange,
+  isDateRange,
+  isNumericRange,
+  isSingleRange,
+} from "./placement_range.ts";
 
-export type {
-  Locator,
-  LocatorRange,
-  LocatorRangeKind,
-  LocatorValidationError,
-  ParseLocatorOptions,
-} from "./locator.ts";
-export { isLocator, parseLocator } from "./locator.ts";
+export type { ResolvedGraphPath, ResolvedSegment } from "./resolved_graph_path.ts";
+export { createResolvedGraphPath, formatResolvedGraphPath } from "./resolved_graph_path.ts";

@@ -1,6 +1,7 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { LocatorResolutionService } from "../../../domain/services/locator_resolution_service.ts";
+import { parseItemId } from "../../../domain/primitives/item_id.ts";
+import { parseAliasSlug } from "../../../domain/primitives/alias_slug.ts";
 import { join } from "@std/path";
 
 const formatItemLabel = (
@@ -43,25 +44,40 @@ export function createWhereCommand() {
       }
 
       const deps = depsResult.value;
-      const now = new Date();
 
-      const resolveResult = await LocatorResolutionService.resolveItem(
-        locatorArg,
-        {
-          itemRepository: deps.itemRepository,
-          aliasRepository: deps.aliasRepository,
-        },
-        {
-          today: now,
-        },
-      );
+      // Try to resolve as UUID first, then as alias
+      let item;
+      const uuidResult = parseItemId(locatorArg);
 
-      if (resolveResult.type === "error") {
-        console.error(resolveResult.error.message);
-        return;
+      if (uuidResult.type === "ok") {
+        // It's a valid UUID
+        const loadResult = await deps.itemRepository.load(uuidResult.value);
+        if (loadResult.type === "error") {
+          console.error(loadResult.error.message);
+          return;
+        }
+        item = loadResult.value;
+      } else {
+        // Try as alias
+        const aliasResult = parseAliasSlug(locatorArg);
+        if (aliasResult.type === "ok") {
+          const aliasLoadResult = await deps.aliasRepository.load(aliasResult.value);
+          if (aliasLoadResult.type === "error") {
+            console.error(aliasLoadResult.error.message);
+            return;
+          }
+          const alias = aliasLoadResult.value;
+          if (alias) {
+            const itemLoadResult = await deps.itemRepository.load(alias.data.itemId);
+            if (itemLoadResult.type === "error") {
+              console.error(itemLoadResult.error.message);
+              return;
+            }
+            item = itemLoadResult.value;
+          }
+        }
       }
 
-      const item = resolveResult.value;
       if (!item) {
         console.error(`Item not found: ${locatorArg}`);
         return;
@@ -70,10 +86,11 @@ export function createWhereCommand() {
       const label = formatItemLabel(item);
       console.log(`Item [${label}]:`);
 
-      // Build logical path with alias if present
+      // Build logical path with alias if present (add leading / for display)
+      const placementStr = item.data.placement.toString();
       const logicalPath = item.data.alias
-        ? `${item.data.path.toString()}/${item.data.alias.toString()}`
-        : item.data.path.toString();
+        ? `/${placementStr}/${item.data.alias.toString()}`
+        : `/${placementStr}`;
       console.log(`  Logical:  ${logicalPath}`);
       console.log(`  Rank:     ${item.data.rank.toString()}`);
 
