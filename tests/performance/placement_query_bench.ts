@@ -20,7 +20,14 @@ const createItems = async (testHome: string, count: number, date: string) => {
   for (let i = 0; i < count; i++) {
     promises.push(runCommand(testHome, ["note", `Item ${i}`, "-p", date]));
   }
-  await Promise.all(promises);
+  const results = await Promise.all(promises);
+
+  // Fail fast if any command failed
+  for (const result of results) {
+    if (!result.success) {
+      throw new Error(`Failed to create item: ${result.stderr}`);
+    }
+  }
 };
 
 /**
@@ -36,7 +43,10 @@ Deno.bench({
 
     try {
       // Initialize workspace
-      await runCommand(ctx.testHome, ["workspace", "init", "bench"]);
+      const initResult = await runCommand(ctx.testHome, ["workspace", "init", "bench"]);
+      if (!initResult.success) {
+        throw new Error(`Failed to initialize workspace: ${initResult.stderr}`);
+      }
 
       // Create 100 items across 10 different dates (10 items per date)
       for (let day = 1; day <= 10; day++) {
@@ -46,8 +56,12 @@ Deno.bench({
 
       // Query only one date (should return 10 items)
       b.start();
-      await runCommand(ctx.testHome, ["ls", "2025-01-01"]);
+      const queryResult = await runCommand(ctx.testHome, ["ls", "2025-01-01"]);
       b.end();
+
+      if (!queryResult.success) {
+        throw new Error(`Query failed: ${queryResult.stderr}`);
+      }
     } finally {
       await cleanupTestEnvironment(ctx);
     }
@@ -68,18 +82,41 @@ Deno.bench({
     const ctx = await setupTestEnvironment();
 
     try {
-      await runCommand(ctx.testHome, ["workspace", "init", "bench"]);
+      const initResult = await runCommand(ctx.testHome, ["workspace", "init", "bench"]);
+      if (!initResult.success) {
+        throw new Error(`Failed to initialize workspace: ${initResult.stderr}`);
+      }
 
       // Create 1000 items across 100 different dates (10 items per date)
-      for (let day = 1; day <= 100; day++) {
-        const date = `2025-01-${day.toString().padStart(2, "0")}`;
+      // Span across January through April to ensure all dates are valid
+      for (let i = 0; i < 100; i++) {
+        const dayOfYear = i + 1;
+        let month, day;
+        if (dayOfYear <= 31) {
+          month = 1;
+          day = dayOfYear;
+        } else if (dayOfYear <= 59) {
+          month = 2;
+          day = dayOfYear - 31;
+        } else if (dayOfYear <= 90) {
+          month = 3;
+          day = dayOfYear - 59;
+        } else {
+          month = 4;
+          day = dayOfYear - 90;
+        }
+        const date = `2025-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
         await createItems(ctx.testHome, 10, date);
       }
 
       // Query only one date (should return 10 items)
       b.start();
-      await runCommand(ctx.testHome, ["ls", "2025-01-01"]);
+      const queryResult = await runCommand(ctx.testHome, ["ls", "2025-01-01"]);
       b.end();
+
+      if (!queryResult.success) {
+        throw new Error(`Query failed: ${queryResult.stderr}`);
+      }
     } finally {
       await cleanupTestEnvironment(ctx);
     }
@@ -97,7 +134,10 @@ Deno.bench({
     const ctx = await setupTestEnvironment();
 
     try {
-      await runCommand(ctx.testHome, ["workspace", "init", "bench"]);
+      const initResult = await runCommand(ctx.testHome, ["workspace", "init", "bench"]);
+      if (!initResult.success) {
+        throw new Error(`Failed to initialize workspace: ${initResult.stderr}`);
+      }
 
       // Create items across 30 days
       for (let day = 1; day <= 30; day++) {
@@ -107,8 +147,12 @@ Deno.bench({
 
       // Query 7-day range (should return 70 items)
       b.start();
-      await runCommand(ctx.testHome, ["ls", "2025-01-01..2025-01-07"]);
+      const queryResult = await runCommand(ctx.testHome, ["ls", "2025-01-01..2025-01-07"]);
       b.end();
+
+      if (!queryResult.success) {
+        throw new Error(`Query failed: ${queryResult.stderr}`);
+      }
     } finally {
       await cleanupTestEnvironment(ctx);
     }
@@ -128,7 +172,10 @@ Deno.bench({
     const ctx = await setupTestEnvironment();
 
     try {
-      await runCommand(ctx.testHome, ["workspace", "init", "bench"]);
+      const initResult = await runCommand(ctx.testHome, ["workspace", "init", "bench"]);
+      if (!initResult.success) {
+        throw new Error(`Failed to initialize workspace: ${initResult.stderr}`);
+      }
 
       // Create items on different dates
       for (let day = 1; day <= 10; day++) {
@@ -138,8 +185,12 @@ Deno.bench({
 
       // Query a date with no items
       b.start();
-      await runCommand(ctx.testHome, ["ls", "2025-02-01"]);
+      const queryResult = await runCommand(ctx.testHome, ["ls", "2025-02-01"]);
       b.end();
+
+      if (!queryResult.success) {
+        throw new Error(`Query failed: ${queryResult.stderr}`);
+      }
     } finally {
       await cleanupTestEnvironment(ctx);
     }
@@ -159,7 +210,10 @@ Deno.bench({
     const ctx = await setupTestEnvironment();
 
     try {
-      await runCommand(ctx.testHome, ["workspace", "init", "bench"]);
+      const initResult = await runCommand(ctx.testHome, ["workspace", "init", "bench"]);
+      if (!initResult.success) {
+        throw new Error(`Failed to initialize workspace: ${initResult.stderr}`);
+      }
 
       // Create 100 items on one date
       await createItems(ctx.testHome, 100, "2025-01-01");
@@ -172,8 +226,12 @@ Deno.bench({
 
       // Query the date with 100 items
       b.start();
-      await runCommand(ctx.testHome, ["ls", "2025-01-01"]);
+      const queryResult = await runCommand(ctx.testHome, ["ls", "2025-01-01"]);
       b.end();
+
+      if (!queryResult.success) {
+        throw new Error(`Query failed: ${queryResult.stderr}`);
+      }
     } finally {
       await cleanupTestEnvironment(ctx);
     }
