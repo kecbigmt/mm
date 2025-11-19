@@ -1,7 +1,7 @@
 # **mm doctor: Implementation Plan**
 
 **Version:** 1.0
-**Status:** Planning
+**Status:** In Progress (Sequential Complete, Parallel tracks ready)
 **Target:** Initial implementation of `mm doctor` subcommands
 
 ---
@@ -34,28 +34,29 @@ All implementation follows the **Red-Green-Refactor** cycle:
 
 ```
 src/
-  domain/
-    services/
-      index_rebuilder.ts
-      index_rebuilder_test.ts    # Unit tests alongside implementation
   infrastructure/
     fileSystem/
+      fixtures/
+        helpers.ts               # Shared helpers for test workspace generation
       index_doctor.ts
       index_doctor_test.ts
+      workspace_scanner.ts
+      workspace_scanner_test.ts
   presentation/
     cli/
       commands/
         doctor/
+          mod.ts                 # Parent command
           check.ts
           check_test.ts
 
 tests/
   e2e/
-    fixtures/
-      doctor/                    # Test workspaces
     scenarios/
       doctor_test.ts             # End-to-end tests
 ```
+
+Test workspaces are generated dynamically during test execution using helpers from `fixtures/helpers.ts`, not committed as static files.
 
 ### Test Types by Layer
 
@@ -614,21 +615,23 @@ await new Command()
 
 ### **Phase 3: Testing & Documentation (Parallel with Phase 2)**
 
-#### **Task 3.1: Integration Test Fixtures**
-**Directory:** `tests/e2e/fixtures/doctor/`
+#### **Task 3.1: Test Fixture Helpers**
+**File:** `src/infrastructure/fileSystem/fixtures/helpers.ts`
 
-Create test workspaces with known issues:
+Shared helper functions for generating test workspaces dynamically:
 
-- `valid-workspace/` - Clean workspace (check should pass)
-- `invalid-frontmatter/` - Missing fields, malformed placement
-- `graph-cycles/` - Parent-child cycles
-- `index-desync/` - Frontmatter and index out of sync
-- `dense-ranks/` - High-density ranks requiring rebalance
+- `createTestWorkspace()` - Create minimal workspace in temp directory
+- `createItemFile()` - Create item with valid frontmatter
+- `createEdgeFile()` - Create date/parent edge file
+- `createAliasFile()` - Create alias index file
+- `createItemContent()` / `createDateEdgeContent()` / etc. - Content generators
+
+**Usage:** Each test creates its own workspace in a temp directory using these helpers, then cleans up after execution. This keeps tests independent and avoids committing large fixture directories.
 
 **Deliverables:**
-- Test fixture workspaces
-- README documenting each fixture
-- Fixture generation scripts if needed
+- Shared helper functions for workspace generation
+- Content generators for items, edges, aliases
+- High-level helpers (createTestWorkspace, createItemFile, etc.)
 
 **Dependencies:** None
 
@@ -652,7 +655,7 @@ Deno.test("mm doctor rebalance-rank - redistributes ranks evenly", async () => {
 - Coverage of success and error paths
 - Performance benchmarks
 
-**Dependencies:** Task 3.1 (fixtures)
+**Dependencies:** Task 3.1 (fixture helpers)
 
 ---
 
@@ -686,8 +689,8 @@ Phase 0 (Spikes - Sequential):
   0.3 Workspace Scan Benchmark
 
 Sequential (Common Foundation):
+  3.1 Test Fixture Helpers (TDD foundation)
   1.4 Workspace Scanner (all commands depend on this)
-  3.1 Integration Test Fixtures (TDD foundation)
   2.4 doctor command (parent command framework)
   2.5 Main CLI integration
 
@@ -731,8 +734,8 @@ Execute spikes sequentially to validate technical approaches:
 
 ### **Sequential: Common Foundation**
 Must be completed before parallel work begins:
-1. Task 1.4 - Workspace Scanner (all commands depend on this)
-2. Task 3.1 - Integration Test Fixtures (TDD foundation)
+1. Task 3.1 - Test Fixture Helpers (TDD foundation)
+2. Task 1.4 - Workspace Scanner (all commands depend on this)
 3. Task 2.4 - doctor command (parent command framework)
 4. Task 2.5 - Main CLI integration
 
@@ -767,10 +770,10 @@ Must be completed before parallel work begins:
 - [x] Technical risks for high-uncertainty tasks mitigated
 
 ### **Sequential (Common Foundation) Complete:**
-- [ ] Workspace scanner streams Items/Edges/Aliases
-- [ ] Test fixtures cover all scenarios (valid, invalid, cycles, etc.)
-- [ ] Parent doctor command registered
-- [ ] Main CLI integration working
+- [x] Test fixture helpers for dynamic workspace generation
+- [x] Workspace scanner streams Items/Edges/Aliases
+- [x] Parent doctor command registered
+- [x] Main CLI integration working
 
 ### **Parallel A (check) Complete:**
 - [ ] Index doctor with checkIndexIntegrity (including cycle detection)
