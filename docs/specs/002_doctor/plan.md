@@ -1,14 +1,15 @@
 # **mm doctor: Implementation Plan**
 
-**Version:** 1.0
-**Status:** In Progress (Sequential Complete, Parallel tracks ready)
-**Target:** Initial implementation of `mm doctor` subcommands
+**Version:** 1.0 **Status:** In Progress (Sequential Complete, Parallel C Complete) **Target:**
+Initial implementation of `mm doctor` subcommands
 
 ---
 
 ## Overview
 
-This plan breaks down the implementation of `mm doctor` into independent, parallelizable tasks organized by architectural layer. Each task is designed to be implementable without blocking dependencies where possible.
+This plan breaks down the implementation of `mm doctor` into independent, parallelizable tasks
+organized by architectural layer. Each task is designed to be implementable without blocking
+dependencies where possible.
 
 ---
 
@@ -56,15 +57,16 @@ tests/
       doctor_test.ts             # End-to-end tests
 ```
 
-Test workspaces are generated dynamically during test execution using helpers from `fixtures/helpers.ts`, not committed as static files.
+Test workspaces are generated dynamically during test execution using helpers from
+`fixtures/helpers.ts`, not committed as static files.
 
 ### Test Types by Layer
 
-| Layer | Test Type | Focus |
-|-------|-----------|-------|
-| Domain | Unit tests | Pure logic, no I/O |
+| Layer          | Test Type          | Focus                       |
+| -------------- | ------------------ | --------------------------- |
+| Domain         | Unit tests         | Pure logic, no I/O          |
 | Infrastructure | Unit + Integration | File I/O with test fixtures |
-| Presentation | E2E tests | Full command execution |
+| Presentation   | E2E tests          | Full command execution      |
 
 ### Example TDD Cycle
 
@@ -108,11 +110,13 @@ The following tasks have significant technical uncertainty and should be de-risk
 
 1. **Task 1.1: Index Rebuilder (Placement Parsing)** - Parsing logic unclear from existing codebase
 2. **Task 1.3: Index Doctor (Cycle Detection)** - Complex algorithm, performance unknown at scale
-3. **Task 1.4: Workspace Scanner (Streaming)** - Performance characteristics unknown for large workspaces
+3. **Task 1.4: Workspace Scanner (Streaming)** - Performance characteristics unknown for large
+   workspaces
 
 ### Mitigation Strategy: Phase 0 (Spikes)
 
-Before full implementation, conduct small spike tasks to validate technical approaches and reduce uncertainty.
+Before full implementation, conduct small spike tasks to validate technical approaches and reduce
+uncertainty.
 
 ---
 
@@ -177,6 +181,7 @@ Benchmark workspace scanning performance:
 These tasks implement filesystem operations and can be developed in parallel.
 
 #### **Task 1.1: Index Rebuilder**
+
 **File:** `src/infrastructure/fileSystem/index_rebuilder.ts`
 
 Implement index rebuild logic:
@@ -184,12 +189,12 @@ Implement index rebuild logic:
 ```typescript
 export interface IndexRebuilder {
   rebuildFromItems(
-    items: ReadonlyArray<Item>
+    items: ReadonlyArray<Item>,
   ): Result<RebuildResult, RebuildError>;
 }
 
 export type RebuildResult = Readonly<{
-  graphEdges: Map<string, ReadonlyArray<Edge>>;  // key: directory path
+  graphEdges: Map<string, ReadonlyArray<Edge>>; // key: directory path
   aliases: Map<string, Alias>;
   itemsProcessed: number;
   edgesCreated: number;
@@ -198,6 +203,7 @@ export type RebuildResult = Readonly<{
 ```
 
 **Process:**
+
 1. Parse each Item's `placement` field
 2. Extract parent (date or UUID) and section path
 3. Group Items by (parent, section)
@@ -206,6 +212,7 @@ export type RebuildResult = Readonly<{
 6. Build alias map
 
 **Deliverables:**
+
 - `IndexRebuilder` implementation
 - Placement parsing logic
 - Edge grouping and sorting logic
@@ -217,49 +224,67 @@ export type RebuildResult = Readonly<{
 
 ---
 
-#### **Task 1.2: Rank Rebalancer**
+#### **Task 1.2: Rank Rebalancer** ✅
+
 **File:** `src/infrastructure/fileSystem/rank_rebalancer.ts`
 
 Implement rank rebalancing logic:
 
 ```typescript
-export interface RankRebalancer {
-  rebalanceGroup(
-    siblings: ReadonlyArray<Item>
-  ): Result<ReadonlyArray<ItemRankUpdate>, RebalanceError>;
-}
-
 export type ItemRankUpdate = Readonly<{
   itemId: ItemId;
   oldRank: ItemRank;
   newRank: ItemRank;
 }>;
+
+export const rebalanceGroup = (
+  siblings: ReadonlyArray<Item>,
+  rankService: RankService,
+): Result<ReadonlyArray<ItemRankUpdate>, RebalanceError>;
+
+export const groupByPlacement = (
+  items: ReadonlyArray<Item>,
+): ReadonlyArray<PlacementGroup>;
 ```
 
+**Implementation notes:**
+
+- Changed from interface to pure functions for simpler composition
+- Added `groupByPlacement` helper function in same module
+- RankService passed as parameter for testability
+
 **Process:**
+
 1. Sort siblings by current `rank` (with `created_at` tiebreak)
-2. Generate evenly-spaced new ranks using LexoRank
-3. Verify ordering preserved
-4. Return rank updates
+2. Generate evenly-spaced new ranks using RankService
+3. Return updates only for items whose rank changed
+4. Group items by placement string for batch processing
 
 **Deliverables:**
-- `RankRebalancer` implementation
-- Even distribution algorithm
-- Ordering preservation verification
-- Unit tests with dense rank scenarios
+
+- `rebalanceGroup` function implementation
+- `groupByPlacement` helper function
+- Even distribution using `RankService.generateEquallySpacedRanks`
+- Unit tests (8 test cases)
 
 **Dependencies:** Existing `RankService`
 
 ---
 
 #### **Task 1.3: Index Doctor**
+
 **File:** `src/infrastructure/fileSystem/index_doctor.ts`
 
 Implement index integrity checking for `mm doctor check`:
 
 ```typescript
 export type IndexIntegrityIssue = Readonly<{
-  kind: "EdgeTargetNotFound" | "DuplicateEdge" | "CycleDetected" | "AliasConflict" | "EdgeItemMismatch";
+  kind:
+    | "EdgeTargetNotFound"
+    | "DuplicateEdge"
+    | "CycleDetected"
+    | "AliasConflict"
+    | "EdgeItemMismatch";
   message: string;
   path?: string;
   context?: Record<string, unknown>;
@@ -283,10 +308,12 @@ export const checkIndexIntegrity = (
 ```
 
 **Design principle:**
+
 - Parse individual models (Item, EdgeReference, AliasEntry) validates data within model boundaries
 - `checkIndexIntegrity` validates relationships between parsed models
 
 **Integrity checks:**
+
 - Every edge points to existing Item
 - No duplicate edges within same (parent, section)
 - No cycles in parent/child graph
@@ -294,6 +321,7 @@ export const checkIndexIntegrity = (
 - Edge files match Item frontmatter placement/rank
 
 **Deliverables:**
+
 - `IndexIntegrityIssue` type
 - `checkIndexIntegrity` function
 - Cycle detection algorithm (DFS-based)
@@ -306,6 +334,7 @@ export const checkIndexIntegrity = (
 ---
 
 #### **Task 1.4: Workspace Scanner**
+
 **File:** `src/infrastructure/fileSystem/workspace_scanner.ts`
 
 Implement workspace scanning:
@@ -319,11 +348,13 @@ export interface WorkspaceScanner {
 ```
 
 **Features:**
+
 - Stream-based scanning (memory efficient)
 - Error tolerance (continue on individual file errors)
 - Progress reporting capability
 
 **Deliverables:**
+
 - `WorkspaceScanner` implementation
 - Async iteration for large workspaces
 - Unit tests with fixture workspaces
@@ -336,6 +367,7 @@ export interface WorkspaceScanner {
 ---
 
 #### **Task 1.5: Index Writer**
+
 **File:** `src/infrastructure/fileSystem/index_writer.ts`
 
 Implement atomic index writing:
@@ -344,23 +376,25 @@ Implement atomic index writing:
 export interface IndexWriter {
   writeGraphIndex(
     workspaceRoot: string,
-    edges: Map<string, ReadonlyArray<Edge>>
+    edges: Map<string, ReadonlyArray<Edge>>,
   ): Promise<Result<void, WriteError>>;
 
   writeAliasIndex(
     workspaceRoot: string,
-    aliases: Map<string, Alias>
+    aliases: Map<string, Alias>,
   ): Promise<Result<void, WriteError>>;
 }
 ```
 
 **Process:**
+
 1. Write to temporary directory (`.index/.tmp-graph/`, `.index/.tmp-aliases/`)
 2. Verify writes succeeded
 3. Delete existing index
 4. Rename temporary to final location
 
 **Deliverables:**
+
 - `IndexWriter` implementation
 - Atomic write with temp directory
 - Cleanup on error
@@ -370,33 +404,59 @@ export interface IndexWriter {
 
 ---
 
-#### **Task 1.6: Item Updater**
+#### **Task 1.6: Item Updater** ✅
+
 **File:** `src/infrastructure/fileSystem/item_updater.ts`
 
 Implement batch Item updates for rank rebalancing:
 
 ```typescript
-export interface ItemUpdater {
-  updateRanks(
-    workspaceRoot: string,
-    updates: ReadonlyArray<ItemRankUpdate>
-  ): AsyncIterableIterator<Result<UpdateResult, UpdateError>>;
-}
-
 export type UpdateResult = Readonly<{
   itemId: ItemId;
   updated: boolean;
 }>;
+
+export type UpdateError = Readonly<{
+  kind: "io_error" | "parse_error";
+  message: string;
+  itemId: string;
+  cause?: unknown;
+}>;
+
+export async function* updateRanks(
+  workspaceRoot: string,
+  timezone: string,
+  updates: ReadonlyArray<ItemRankUpdate>,
+  updatedAt: DateTime,
+): AsyncIterableIterator<Result<UpdateResult, UpdateError>>;
+
+export const updateAllRanks = async (
+  workspaceRoot: string,
+  timezone: string,
+  updates: ReadonlyArray<ItemRankUpdate>,
+  updatedAt: DateTime,
+): Promise<Result<ReadonlyArray<UpdateResult>, UpdateError>>;
 ```
 
+**Implementation notes:**
+
+- Changed from interface to pure functions
+- Added timezone parameter for file path derivation
+- Added DateTime parameter for updated_at timestamp
+- Added `updateAllRanks` convenience function for batch collection
+- Updates both item frontmatter and corresponding edge files
+
 **Features:**
+
 - Atomic file updates (temp file + rename)
 - Frontmatter-only updates (preserve body)
 - Update `updated_at` timestamp
-- Parallel updates where safe
+- Edge file rank synchronization
 
 **Deliverables:**
-- `ItemUpdater` implementation
+
+- `updateRanks` generator function
+- `updateAllRanks` batch function
 - Frontmatter update logic
 - Atomic file writes
 - Unit tests with file updates
@@ -410,6 +470,7 @@ export type UpdateResult = Readonly<{
 CLI commands that implement the full processing flow directly.
 
 #### **Task 2.1: CLI Command - check**
+
 **File:** `src/presentation/cli/commands/doctor/check.ts`
 
 Implement `mm doctor check` command with full processing flow:
@@ -450,23 +511,27 @@ export const checkCommand = new Command()
 ```
 
 **Output format:**
+
 - Structured report by category
 - Color-coded (errors in red, warnings in yellow)
 - Summary counts
 - Exit code 0 if no issues, 1 if issues found
 
 **Deliverables:**
+
 - `check` command implementation
 - Report formatting logic
 - E2E tests with test workspaces
 
 **Dependencies:**
+
 - Task 1.3 (Index Doctor)
 - Task 1.4 (Workspace Scanner)
 
 ---
 
 #### **Task 2.2: CLI Command - rebuild-index**
+
 **File:** `src/presentation/cli/commands/doctor/rebuild_index.ts`
 
 Implement `mm doctor rebuild-index` command with full processing flow:
@@ -497,23 +562,27 @@ export const rebuildIndexCommand = new Command()
 ```
 
 **Output format:**
+
 - Progress indicator
 - Summary (items scanned, edges created, etc.)
 - Success/error message
 
 **Deliverables:**
+
 - `rebuild-index` command implementation
 - Progress display
 - E2E tests
 
 **Dependencies:**
+
 - Task 1.1 (Index Rebuilder)
 - Task 1.4 (Workspace Scanner)
 - Task 1.5 (Index Writer)
 
 ---
 
-#### **Task 2.3: CLI Command - rebalance-rank**
+#### **Task 2.3: CLI Command - rebalance-rank** ✅
+
 **File:** `src/presentation/cli/commands/doctor/rebalance_rank.ts`
 
 Implement `mm doctor rebalance-rank` command with full processing flow:
@@ -522,43 +591,56 @@ Implement `mm doctor rebalance-rank` command with full processing flow:
 export const rebalanceRankCommand = new Command()
   .name("rebalance-rank")
   .description("Rebalance LexoRank values for siblings")
-  .action(async () => {
-    const workspaceRoot = await resolveWorkspace();
+  .option("-w, --workspace <path:string>", "Workspace path or name")
+  .action(async (options) => {
+    // 1. Load dependencies
+    const deps = await loadCliDependencies(options.workspace);
 
-    // 1. Scan all Items
-    const items = await scanAndParseAllItems(workspaceRoot);
+    // 2. Scan all Items
+    const scanner = createWorkspaceScanner(deps.root);
+    const items = [...scanner.scanAllItems()];
 
-    // 2. Group by (parent, section)
+    // 3. Group by placement
     const groups = groupByPlacement(items);
 
-    // 3. Rebalance each group
+    // 4. Rebalance each group
     const allUpdates: ItemRankUpdate[] = [];
     for (const group of groups) {
-      const updates = rebalanceGroup(group.siblings);
+      const updates = rebalanceGroup(group.siblings, deps.rankService);
       allUpdates.push(...updates);
     }
 
-    // 4. Update Items and edge files
-    await updateItemRanks(workspaceRoot, allUpdates);
+    // 5. Update Items and edge files
+    await updateAllRanks(deps.root, deps.timezone, allUpdates, updatedAt);
 
-    // 5. Display results and warn about Git changes
-    displayRebalanceResult(allUpdates);
-    console.log("Warning: Files have been modified. Review and commit changes.");
+    // 6. Display results and warn about Git changes
   });
 ```
 
+**Implementation notes:**
+
+- Added `--workspace` option for workspace selection
+- Uses `loadCliDependencies` for consistent dependency loading
+- RankService injected from dependencies for testability
+- Shows scan errors but continues processing
+- Shows group-by-group breakdown in output
+
 **Output format:**
-- Progress indicator
-- Summary by group
+
+- Scan count and errors
+- Group count
+- Items rebalanced per group (top 10)
 - Warning about Git changes
 
 **Deliverables:**
+
 - `rebalance-rank` command implementation
-- Progress display
+- Workspace option support
+- Progress display with group breakdown
 - Git change warning
-- E2E tests
 
 **Dependencies:**
+
 - Task 1.2 (Rank Rebalancer)
 - Task 1.4 (Workspace Scanner)
 - Task 1.6 (Item Updater)
@@ -566,6 +648,7 @@ export const rebalanceRankCommand = new Command()
 ---
 
 #### **Task 2.4: CLI Command - doctor (parent)**
+
 **File:** `src/presentation/cli/commands/doctor.ts`
 
 Implement parent `mm doctor` command:
@@ -580,12 +663,14 @@ export const doctorCommand = new Command()
 ```
 
 **Deliverables:**
+
 - Parent `doctor` command
 - Subcommand registration
 - Help text
 - E2E tests for command discovery
 
 **Dependencies:**
+
 - Task 2.1 (check command)
 - Task 2.2 (rebuild-index command)
 - Task 2.3 (rebalance-rank command)
@@ -593,6 +678,7 @@ export const doctorCommand = new Command()
 ---
 
 #### **Task 2.5: Main CLI Integration**
+
 **File:** `src/main.ts`
 
 Register `doctor` command in main CLI:
@@ -606,6 +692,7 @@ await new Command()
 ```
 
 **Deliverables:**
+
 - Integration in `main.ts`
 - E2E tests for full command paths
 
@@ -616,6 +703,7 @@ await new Command()
 ### **Phase 3: Testing & Documentation (Parallel with Phase 2)**
 
 #### **Task 3.1: Test Fixture Helpers**
+
 **File:** `src/infrastructure/fileSystem/fixtures/helpers.ts`
 
 Shared helper functions for generating test workspaces dynamically:
@@ -626,9 +714,11 @@ Shared helper functions for generating test workspaces dynamically:
 - `createAliasFile()` - Create alias index file
 - `createItemContent()` / `createDateEdgeContent()` / etc. - Content generators
 
-**Usage:** Each test creates its own workspace in a temp directory using these helpers, then cleans up after execution. This keeps tests independent and avoids committing large fixture directories.
+**Usage:** Each test creates its own workspace in a temp directory using these helpers, then cleans
+up after execution. This keeps tests independent and avoids committing large fixture directories.
 
 **Deliverables:**
+
 - Shared helper functions for workspace generation
 - Content generators for items, edges, aliases
 - High-level helpers (createTestWorkspace, createItemFile, etc.)
@@ -638,6 +728,7 @@ Shared helper functions for generating test workspaces dynamically:
 ---
 
 #### **Task 3.2: E2E Test Scenarios**
+
 **File:** `tests/e2e/scenarios/doctor_test.ts`
 
 End-to-end tests for all commands:
@@ -651,6 +742,7 @@ Deno.test("mm doctor rebalance-rank - redistributes ranks evenly", async () => {
 ```
 
 **Deliverables:**
+
 - Comprehensive E2E test suite
 - Coverage of success and error paths
 - Performance benchmarks
@@ -660,7 +752,9 @@ Deno.test("mm doctor rebalance-rank - redistributes ranks evenly", async () => {
 ---
 
 #### **Task 3.3: Documentation Updates**
+
 **Files:**
+
 - `README.md`
 - `docs/cli.md` (if exists)
 
@@ -672,6 +766,7 @@ Document `mm doctor` commands:
 - Troubleshooting guide
 
 **Deliverables:**
+
 - User-facing documentation
 - Examples and use cases
 - Screenshots/sample output
@@ -714,11 +809,14 @@ Finalization (after all parallel tasks):
 ```
 
 **Design principle:**
-- Parse individual models (Item, EdgeReference, AliasEntry) validates data within model boundaries ("Parse, don't validate")
+
+- Parse individual models (Item, EdgeReference, AliasEntry) validates data within model boundaries
+  ("Parse, don't validate")
 - `checkIndexIntegrity` validates relationships between parsed models (integrity check)
 - CLI commands implement full processing flow directly (no workflow layer)
 
 **Parallel development:**
+
 - After Sequential tasks complete, three agents can work independently on Parallel A/B/C
 - Each parallel track is self-contained with its own infrastructure + CLI command
 
@@ -727,13 +825,17 @@ Finalization (after all parallel tasks):
 ## Parallelization Strategy (Revised)
 
 ### **Phase 0: Risk Mitigation Spikes (Sequential)**
+
 Execute spikes sequentially to validate technical approaches:
+
 - Spike 0.1: Placement Parsing
 - Spike 0.2: Cycle Detection
 - Spike 0.3: Workspace Scanning
 
 ### **Sequential: Common Foundation**
+
 Must be completed before parallel work begins:
+
 1. Task 3.1 - Test Fixture Helpers (TDD foundation)
 2. Task 1.4 - Workspace Scanner (all commands depend on this)
 3. Task 2.4 - doctor command (parent command framework)
@@ -742,20 +844,24 @@ Must be completed before parallel work begins:
 ### **Parallel Tracks (3 agents can work independently)**
 
 **Agent A - check command:**
+
 1. Task 1.3 - Index Doctor (checkIndexIntegrity)
 2. Task 2.1 - CLI Command - check
 
 **Agent B - rebuild-index command:**
+
 1. Task 1.1 - Index Rebuilder
 2. Task 1.5 - Index Writer
 3. Task 2.2 - CLI Command - rebuild-index
 
 **Agent C - rebalance-rank command:**
+
 1. Task 1.2 - Rank Rebalancer
 2. Task 1.6 - Item Updater
 3. Task 2.3 - CLI Command - rebalance-rank
 
 ### **Finalization (after all parallel tracks complete)**
+
 - Task 3.2 - E2E Tests (comprehensive testing of all commands)
 - Task 3.3 - Documentation (user-facing docs)
 
@@ -764,36 +870,43 @@ Must be completed before parallel work begins:
 ## Success Criteria
 
 ### **Phase 0 Complete:**
+
 - [x] Placement parsing approach documented and validated
 - [x] Cycle detection algorithm prototyped and benchmarked
 - [x] Workspace scanning performance characteristics measured
 - [x] Technical risks for high-uncertainty tasks mitigated
 
 ### **Sequential (Common Foundation) Complete:**
+
 - [x] Test fixture helpers for dynamic workspace generation
 - [x] Workspace scanner streams Items/Edges/Aliases
 - [x] Parent doctor command registered
 - [x] Main CLI integration working
 
 ### **Parallel A (check) Complete:**
+
 - [ ] Index doctor with checkIndexIntegrity (including cycle detection)
 - [ ] `mm doctor check` detects all issue categories
 
 ### **Parallel B (rebuild-index) Complete:**
+
 - [ ] Index rebuilder functional
 - [ ] Index writer performs atomic writes
 - [ ] `mm doctor rebuild-index` rebuilds from frontmatter
 
 ### **Parallel C (rebalance-rank) Complete:**
-- [ ] Rank rebalancer functional
-- [ ] Item updater handles batch rank updates
-- [ ] `mm doctor rebalance-rank` redistributes ranks
+
+- [x] Rank rebalancer functional
+- [x] Item updater handles batch rank updates
+- [x] `mm doctor rebalance-rank` redistributes ranks
 
 ### **Finalization Complete:**
+
 - [ ] E2E tests pass for all commands
 - [ ] Documentation complete and accurate
 
 ### **Overall Success:**
+
 - [ ] `deno task test` passes
 - [ ] `deno lint` passes
 - [ ] `deno fmt --check` passes
