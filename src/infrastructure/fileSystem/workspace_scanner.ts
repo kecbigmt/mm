@@ -6,6 +6,7 @@ import { parseItemId } from "../../domain/primitives/item_id.ts";
 import { parseItemRank } from "../../domain/primitives/item_rank.ts";
 import { parseFrontmatter } from "./frontmatter.ts";
 import { EdgeReference } from "./graph_index.ts";
+import { EdgeReferenceWithPath } from "./index_doctor.ts";
 
 /**
  * Error type for workspace scanning operations
@@ -26,6 +27,7 @@ export type ScanError = Readonly<{
 export type WorkspaceScanner = Readonly<{
   scanAllItems(): AsyncIterableIterator<Result<Item, ScanError>>;
   scanAllEdges(): AsyncIterableIterator<Result<EdgeReference, ScanError>>;
+  scanAllEdgesWithPath(): AsyncIterableIterator<Result<EdgeReferenceWithPath, ScanError>>;
   scanAllAliases(): AsyncIterableIterator<Result<Alias, ScanError>>;
 }>;
 
@@ -225,6 +227,24 @@ export const createWorkspaceScanner = (workspaceRoot: string): WorkspaceScanner 
     }
   };
 
+  const scanAllEdgesWithPath = async function* (): AsyncIterableIterator<
+    Result<EdgeReferenceWithPath, ScanError>
+  > {
+    // Scan date edges
+    const datesDir = join(workspaceRoot, ".index", "graph", "dates");
+    for await (const filePath of walkEdgeFiles(datesDir)) {
+      const result = await parseEdgeFileWithPath(filePath);
+      yield result;
+    }
+
+    // Scan parent edges
+    const parentsDir = join(workspaceRoot, ".index", "graph", "parents");
+    for await (const filePath of walkEdgeFiles(parentsDir)) {
+      const result = await parseEdgeFileWithPath(filePath);
+      yield result;
+    }
+  };
+
   const scanAllAliases = async function* (): AsyncIterableIterator<Result<Alias, ScanError>> {
     const aliasesDir = join(workspaceRoot, ".index", "aliases");
 
@@ -276,6 +296,7 @@ export const createWorkspaceScanner = (workspaceRoot: string): WorkspaceScanner 
   return Object.freeze({
     scanAllItems,
     scanAllEdges,
+    scanAllEdgesWithPath,
     scanAllAliases,
   });
 };
@@ -346,5 +367,66 @@ async function parseEdgeFile(filePath: string): Promise<Result<EdgeReference, Sc
   return Result.ok({
     itemId: itemIdResult.value,
     rank: rankResult.value,
+  });
+}
+
+/**
+ * Parse an edge file into an EdgeReferenceWithPath (includes file path for doctor commands)
+ */
+async function parseEdgeFileWithPath(
+  filePath: string,
+): Promise<Result<EdgeReferenceWithPath, ScanError>> {
+  // Read file content
+  let content: string;
+  try {
+    content = await Deno.readTextFile(filePath);
+  } catch (error) {
+    return Result.error({
+      kind: "io_error",
+      message: "failed to read edge file",
+      path: filePath,
+      cause: error,
+    });
+  }
+
+  // Parse JSON
+  let data: { schema?: string; to?: string; rank: string };
+  try {
+    data = JSON.parse(content);
+  } catch (error) {
+    return Result.error({
+      kind: "parse_error",
+      message: "invalid JSON in edge file",
+      path: filePath,
+      cause: error,
+    });
+  }
+
+  // For date edges, extract item ID from filename
+  // For parent edges, use the "to" field
+  let itemIdStr: string;
+  if (data.to) {
+    itemIdStr = data.to;
+  } else {
+    // Extract from filename: <itemId>.edge.json
+    const fileName = filePath.split("/").pop() ?? "";
+    itemIdStr = fileName.replace(".edge.json", "");
+  }
+
+  // Parse item ID
+  const itemIdResult = parseItemId(itemIdStr);
+  if (itemIdResult.type === "error") {
+    return Result.error({
+      kind: "parse_error",
+      message: "invalid item ID in edge file",
+      path: filePath,
+      cause: itemIdResult.error,
+    });
+  }
+
+  return Result.ok({
+    itemId: itemIdResult.value,
+    rank: data.rank,
+    path: filePath,
   });
 }
