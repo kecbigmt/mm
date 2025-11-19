@@ -761,10 +761,10 @@ Must be completed before parallel work begins:
 ## Success Criteria
 
 ### **Phase 0 Complete:**
-- [ ] Placement parsing approach documented and validated
-- [ ] Cycle detection algorithm prototyped and benchmarked
-- [ ] Workspace scanning performance characteristics measured
-- [ ] Technical risks for high-uncertainty tasks mitigated
+- [x] Placement parsing approach documented and validated
+- [x] Cycle detection algorithm prototyped and benchmarked
+- [x] Workspace scanning performance characteristics measured
+- [x] Technical risks for high-uncertainty tasks mitigated
 
 ### **Sequential (Common Foundation) Complete:**
 - [ ] Workspace scanner streams Items/Edges/Aliases
