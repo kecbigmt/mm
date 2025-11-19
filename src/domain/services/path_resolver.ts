@@ -71,7 +71,7 @@ export type PathResolverDependencies = Readonly<{
 export const createPathResolver = (
   dependencies: PathResolverDependencies,
 ): PathResolver => {
-  const { aliasRepository, timezone: _timezone } = dependencies;
+  const { aliasRepository, timezone } = dependencies;
   const today = dependencies.today ?? new Date();
 
   // Relative date resolution logic (copied from path.ts)
@@ -97,28 +97,44 @@ export const createPathResolver = (
     sat: 6,
   };
 
-  const startOfUtcDay = (date: Date): Date =>
-    new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-
-  const formatIsoDate = (date: Date): string => date.toISOString().slice(0, 10);
-
-  const adjustDays = (base: Date, offset: number): Date => {
-    const adjusted = new Date(base);
-    adjusted.setUTCDate(adjusted.getUTCDate() + offset);
-    return adjusted;
+  // Get today's date components in the workspace timezone
+  const getTodayComponents = (date: Date): { year: number; month: number; day: number } => {
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone.toString(),
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = formatter.formatToParts(date);
+    const lookup = new Map(parts.map((part) => [part.type, part.value]));
+    return {
+      year: Number.parseInt(lookup.get("year") || "1970", 10),
+      month: Number.parseInt(lookup.get("month") || "01", 10),
+      day: Number.parseInt(lookup.get("day") || "01", 10),
+    };
   };
 
-  const adjustMonths = (base: Date, offset: number): Date => {
-    const adjusted = new Date(base);
-    adjusted.setUTCMonth(adjusted.getUTCMonth() + offset);
-    return adjusted;
+  // Get the day of week (0=Sun, 6=Sat) for a date in the workspace timezone
+  const getDayOfWeek = (date: Date): number => {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone.toString(),
+      weekday: "short",
+    });
+    const weekday = formatter.format(date).toLowerCase();
+    const weekdayMap: Record<string, number> = {
+      sun: 0,
+      mon: 1,
+      tue: 2,
+      wed: 3,
+      thu: 4,
+      fri: 5,
+      sat: 6,
+    };
+    return weekdayMap[weekday] ?? 0;
   };
 
-  const adjustYears = (base: Date, offset: number): Date => {
-    const adjusted = new Date(base);
-    adjusted.setUTCFullYear(adjusted.getUTCFullYear() + offset);
-    return adjusted;
-  };
+  const formatDateString = (year: number, month: number, day: number): string =>
+    `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
   const resolveRelativeDate = (expr: string): Result<CalendarDay, PathResolverError> => {
     const normalized = expr.trim().toLowerCase();
@@ -126,8 +142,11 @@ export const createPathResolver = (
     // Check for simple keywords
     const keywordOffset = RELATIVE_DAY_KEYWORDS.get(normalized);
     if (keywordOffset !== undefined) {
-      const base = startOfUtcDay(today);
-      const dateStr = formatIsoDate(adjustDays(base, keywordOffset));
+      const { year, month, day } = getTodayComponents(today);
+      // Create a date in local time for proper day arithmetic
+      const base = new Date(year, month - 1, day);
+      base.setDate(base.getDate() + keywordOffset);
+      const dateStr = formatDateString(base.getFullYear(), base.getMonth() + 1, base.getDate());
       const result = parseCalendarDay(dateStr);
       if (result.type === "error") {
         return Result.error(
@@ -143,21 +162,26 @@ export const createPathResolver = (
       const [, operator, magnitudeRaw, unit] = periodMatch;
       const magnitude = Number.parseInt(magnitudeRaw, 10);
       const direction = operator === "+" ? 1 : -1;
-      const base = startOfUtcDay(today);
+      const { year, month, day } = getTodayComponents(today);
+      const base = new Date(year, month - 1, day);
 
       let dateStr: string;
       switch (unit) {
         case "d":
-          dateStr = formatIsoDate(adjustDays(base, direction * magnitude));
+          base.setDate(base.getDate() + direction * magnitude);
+          dateStr = formatDateString(base.getFullYear(), base.getMonth() + 1, base.getDate());
           break;
         case "w":
-          dateStr = formatIsoDate(adjustDays(base, direction * magnitude * 7));
+          base.setDate(base.getDate() + direction * magnitude * 7);
+          dateStr = formatDateString(base.getFullYear(), base.getMonth() + 1, base.getDate());
           break;
         case "m":
-          dateStr = formatIsoDate(adjustMonths(base, direction * magnitude));
+          base.setMonth(base.getMonth() + direction * magnitude);
+          dateStr = formatDateString(base.getFullYear(), base.getMonth() + 1, base.getDate());
           break;
         case "y":
-          dateStr = formatIsoDate(adjustYears(base, direction * magnitude));
+          base.setFullYear(base.getFullYear() + direction * magnitude);
+          dateStr = formatDateString(base.getFullYear(), base.getMonth() + 1, base.getDate());
           break;
         default:
           return Result.error(
@@ -184,8 +208,9 @@ export const createPathResolver = (
     if (weekdayMatch) {
       const [, operator, weekdayRaw] = weekdayMatch;
       const targetIndex = WEEKDAY_INDEX[weekdayRaw];
-      const base = startOfUtcDay(today);
-      const baseIndex = base.getUTCDay();
+      const baseIndex = getDayOfWeek(today);
+      const { year, month, day } = getTodayComponents(today);
+      const base = new Date(year, month - 1, day);
 
       let delta: number;
       if (operator === "+") {
@@ -197,7 +222,8 @@ export const createPathResolver = (
         delta = -delta;
       }
 
-      const dateStr = formatIsoDate(adjustDays(base, delta));
+      base.setDate(base.getDate() + delta);
+      const dateStr = formatDateString(base.getFullYear(), base.getMonth() + 1, base.getDate());
       const result = parseCalendarDay(dateStr);
       if (result.type === "error") {
         return Result.error(
