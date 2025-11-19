@@ -275,25 +275,35 @@ Rank rebalance complete.
 
 ## 4) Implementation Notes
 
-### 4.1 Validation Strategy
+### 4.1 Architecture
 
+* **No workflow layer**: CLI commands implement processing flow directly
+* **Layered validation**:
+  * **Parse** — Validates data within individual model boundaries (Item, EdgeReference, AliasEntry)
+  * **Integrity check** — Validates relationships between parsed models
+* **Infrastructure placement**: Index-related validation (`checkIndexIntegrity`) lives in infrastructure layer since indexes are filesystem concerns
+
+### 4.2 Validation Strategy
+
+* **Parse, don't validate**: Use existing `parseItem`, `parseEdgeReference`, `parseAliasEntry` functions to validate individual models during parsing
+* **Integrity checking**: Use `checkIndexIntegrity` function to validate relationships between parsed models (cycles, duplicates, orphans)
 * **Fast-fail vs. collect-all**: `check` should collect ALL issues before reporting (don't stop at first error)
 * **Parallel validation**: Where safe, validate multiple Items/edges in parallel
-* **Memory efficient**: Stream large workspaces; don't load all Items into memory at once
+* **Memory efficient**: Stream large workspaces; don't load all Items into memory at once (except for integrity checks that require full graph)
 
-### 4.2 Index Rebuild Strategy
+### 4.3 Index Rebuild Strategy
 
 * **Atomic directory replacement**: Build new index in temp dir, then atomic rename
 * **Progress reporting**: Show progress for large workspaces (e.g., every 100 Items)
 * **Error handling**: If any Item has malformed Frontmatter, log error and continue (index as many as possible)
 
-### 4.3 Rank Rebalance Strategy
+### 4.4 Rank Rebalance Strategy
 
 * **Batch updates**: Update multiple Items in parallel where safe
 * **Transactional semantics**: If any update fails, rollback is complex; prefer fail-fast with clear errors
 * **Rank generation**: Use LexoRank library to generate evenly-spaced ranks
 
-### 4.4 Error Reporting
+### 4.5 Error Reporting
 
 * **Structured output**: Machine-parseable (JSON mode?) for tooling integration
 * **Actionable messages**: Tell user how to fix each issue type
