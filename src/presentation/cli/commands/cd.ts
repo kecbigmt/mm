@@ -3,7 +3,6 @@ import { loadCliDependencies } from "../dependencies.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { parsePathExpression } from "../path_expression.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
-import { parseTimezoneIdentifier } from "../../../domain/primitives/mod.ts";
 import { formatPlacementForDisplay } from "../../../domain/services/placement_display_service.ts";
 
 export function createCdCommand() {
@@ -74,16 +73,10 @@ export function createCdCommand() {
       }
 
       // Create path resolver
-      const timezoneResult = parseTimezoneIdentifier("UTC");
-      if (timezoneResult.type === "error") {
-        console.error("Failed to parse timezone");
-        return;
-      }
-
       const pathResolver = createPathResolver({
         aliasRepository: deps.aliasRepository,
         itemRepository: deps.itemRepository,
-        timezone: timezoneResult.value,
+        timezone: deps.timezone,
         today: now,
       });
 

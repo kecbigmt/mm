@@ -106,9 +106,14 @@ export const getWorkspacePath = (testHome: string, name: string): string => {
 
 /**
  * Returns today's date for testing date-based operations.
+ * Uses local timezone to match CLI behavior.
  */
 export const getTodayString = (): string => {
-  return new Date().toISOString().split("T")[0];
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
 /**
@@ -130,17 +135,23 @@ export const parseAliasFromOutput = (output: string): string | null => {
 /**
  * Calculates a date string by adding days to a base date.
  * Useful for testing relative date operations.
+ * Uses local timezone to match CLI behavior.
  */
 export const addDaysToString = (dateStr: string, days: number): string => {
-  const date = new Date(dateStr + "T00:00:00Z");
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().split("T")[0];
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  const newYear = date.getFullYear();
+  const newMonth = String(date.getMonth() + 1).padStart(2, "0");
+  const newDay = String(date.getDate()).padStart(2, "0");
+  return `${newYear}-${newMonth}-${newDay}`;
 };
 
 /**
  * Finds the next occurrence of a weekday from a given date.
  * Returns the date string (YYYY-MM-DD) of the next occurrence.
  * If today is the target weekday, returns next week's occurrence.
+ * Uses local timezone to match CLI behavior.
  */
 export const findNextWeekday = (dateStr: string, weekday: string): string => {
   const WEEKDAY_INDEX: Record<string, number> = {
@@ -157,20 +168,25 @@ export const findNextWeekday = (dateStr: string, weekday: string): string => {
     throw new Error(`Invalid weekday: ${weekday}`);
   }
 
-  const date = new Date(dateStr + "T00:00:00Z");
-  const baseIndex = date.getUTCDay();
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  const baseIndex = date.getDay();
   let delta = (targetIndex - baseIndex + 7) % 7;
   if (delta === 0) {
     delta = 7; // Next week if today is the target weekday
   }
-  date.setUTCDate(date.getUTCDate() + delta);
-  return date.toISOString().split("T")[0];
+  date.setDate(date.getDate() + delta);
+  const newYear = date.getFullYear();
+  const newMonth = String(date.getMonth() + 1).padStart(2, "0");
+  const newDay = String(date.getDate()).padStart(2, "0");
+  return `${newYear}-${newMonth}-${newDay}`;
 };
 
 /**
  * Finds the previous occurrence of a weekday from a given date.
  * Returns the date string (YYYY-MM-DD) of the previous occurrence.
  * If today is the target weekday, returns last week's occurrence.
+ * Uses local timezone to match CLI behavior.
  */
 export const findPreviousWeekday = (dateStr: string, weekday: string): string => {
   const WEEKDAY_INDEX: Record<string, number> = {
@@ -187,14 +203,18 @@ export const findPreviousWeekday = (dateStr: string, weekday: string): string =>
     throw new Error(`Invalid weekday: ${weekday}`);
   }
 
-  const date = new Date(dateStr + "T00:00:00Z");
-  const baseIndex = date.getUTCDay();
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  const baseIndex = date.getDay();
   let delta = (baseIndex - targetIndex + 7) % 7;
   if (delta === 0) {
     delta = 7; // Last week if today is the target weekday
   }
-  date.setUTCDate(date.getUTCDate() - delta);
-  return date.toISOString().split("T")[0];
+  date.setDate(date.getDate() - delta);
+  const newYear = date.getFullYear();
+  const newMonth = String(date.getMonth() + 1).padStart(2, "0");
+  const newDay = String(date.getDate()).padStart(2, "0");
+  return `${newYear}-${newMonth}-${newDay}`;
 };
 
 /**

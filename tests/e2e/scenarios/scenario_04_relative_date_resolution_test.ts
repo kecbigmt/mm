@@ -27,7 +27,7 @@ import {
   cleanupTestEnvironment,
   findNextWeekday,
   findPreviousWeekday,
-  getTodayString,
+  getCurrentDateFromCli,
   initWorkspace,
   runCommand,
   setupTestEnvironment,
@@ -41,7 +41,7 @@ describe("Scenario 4: Relative date resolution", () => {
   beforeEach(async () => {
     ctx = await setupTestEnvironment();
     await initWorkspace(ctx.testHome, "test-workspace");
-    today = getTodayString();
+    today = await getCurrentDateFromCli(ctx.testHome);
   });
 
   afterEach(async () => {

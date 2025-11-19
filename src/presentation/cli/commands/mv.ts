@@ -54,6 +54,7 @@ export function createMvCommand() {
           cwd: cwdResult.value,
           today: now,
           occurredAt: occurredAtResult.value,
+          timezone: deps.timezone,
         },
         {
           itemRepository: deps.itemRepository,
