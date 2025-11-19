@@ -10,6 +10,7 @@ import { createPwdCommand } from "./presentation/cli/commands/pwd.ts";
 import { createLsCommand } from "./presentation/cli/commands/ls.ts";
 import { createWhereCommand } from "./presentation/cli/commands/where.ts";
 import { createMvCommand } from "./presentation/cli/commands/mv.ts";
+import { createDoctorCommand } from "./presentation/cli/commands/doctor/mod.ts";
 
 async function main() {
   const cli = new Command()
@@ -27,7 +28,8 @@ async function main() {
       "where",
       createWhereCommand().description("Show logical and physical paths for an item"),
     )
-    .command("mv", createMvCommand().description("Move item to a new placement"));
+    .command("mv", createMvCommand().description("Move item to a new placement"))
+    .command("doctor", createDoctorCommand().description("Workspace validation and maintenance"));
 
   await cli.parse(Deno.args);
 }
