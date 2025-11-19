@@ -12,16 +12,102 @@ This plan breaks down the implementation of `mm doctor` into independent, parall
 
 ---
 
+## Development Approach
+
+### Test-Driven Development (TDD)
+
+All implementation follows the **Red-Green-Refactor** cycle:
+
+1. **Red** - Write a failing test that defines the expected behavior
+2. **Green** - Write the minimum code to make the test pass
+3. **Refactor** - Improve code quality while keeping tests green
+
+### TDD Guidelines
+
+- **Start with tests**: Every new function/module begins with a test file
+- **Small increments**: Each cycle should be completable in minutes, not hours
+- **Test behavior, not implementation**: Focus on inputs/outputs, not internal details
+- **Descriptive test names**: Test names should describe the scenario and expected outcome
+- **One assertion per test** (where practical): Makes failures easier to diagnose
+
+### Test Organization
+
+```
+src/
+  domain/
+    services/
+      index_rebuilder.ts
+      index_rebuilder_test.ts    # Unit tests alongside implementation
+  infrastructure/
+    fileSystem/
+      index_doctor.ts
+      index_doctor_test.ts
+  presentation/
+    cli/
+      commands/
+        doctor/
+          check.ts
+          check_test.ts
+
+tests/
+  e2e/
+    fixtures/
+      doctor/                    # Test workspaces
+    scenarios/
+      doctor_test.ts             # End-to-end tests
+```
+
+### Test Types by Layer
+
+| Layer | Test Type | Focus |
+|-------|-----------|-------|
+| Domain | Unit tests | Pure logic, no I/O |
+| Infrastructure | Unit + Integration | File I/O with test fixtures |
+| Presentation | E2E tests | Full command execution |
+
+### Example TDD Cycle
+
+```typescript
+// 1. RED - Write failing test
+Deno.test("detectCycles - returns empty array for valid DAG", () => {
+  const edges = [
+    { from: "a", to: "b" },
+    { from: "b", to: "c" },
+  ];
+  const result = detectCycles(edges);
+  assertEquals(result, []);
+});
+
+// 2. GREEN - Minimal implementation
+export const detectCycles = (edges: Edge[]): CycleIssue[] => {
+  return []; // TODO: implement
+};
+
+// 3. RED - Add next test case
+Deno.test("detectCycles - detects simple cycle", () => {
+  const edges = [
+    { from: "a", to: "b" },
+    { from: "b", to: "a" },
+  ];
+  const result = detectCycles(edges);
+  assertEquals(result.length, 1);
+});
+
+// 4. GREEN - Implement cycle detection
+// 5. REFACTOR - Clean up implementation
+```
+
+---
+
 ## Risk Assessment & Mitigation
 
 ### High-Risk Tasks (High Uncertainty)
 
 The following tasks have significant technical uncertainty and should be de-risked early:
 
-1. **Task 1.3: Graph Validator (Cycle Detection)** - Complex algorithm, performance unknown at scale
-2. **Task 1.4: Index Rebuilder (Placement Parsing)** - Parsing logic unclear from existing codebase
-3. **Task 2.1: Workspace Scanner (Streaming)** - Performance characteristics unknown for large workspaces
-4. **Task 3.1: Check Workflow (Integration Complexity)** - Aggregating all validation results
+1. **Task 1.1: Index Rebuilder (Placement Parsing)** - Parsing logic unclear from existing codebase
+2. **Task 1.3: Index Doctor (Cycle Detection)** - Complex algorithm, performance unknown at scale
+3. **Task 1.4: Workspace Scanner (Streaming)** - Performance characteristics unknown for large workspaces
 
 ### Mitigation Strategy: Phase 0 (Spikes)
 
@@ -44,11 +130,11 @@ Investigate existing `Placement` type structure and parsing:
 - Prototype parsing placement string to extract:
   - Parent (date `YYYY-MM-DD` or UUID)
   - Section path (e.g., `/1/3`)
-- Document findings for Task 1.4
+- Document findings for Task 1.1
 
 **Deliverable:** Small prototype + documentation of parsing approach
 
-**Reduces risk for:** Task 1.4 (Index Rebuilder)
+**Reduces risk for:** Task 1.1 (Index Rebuilder)
 
 ---
 
@@ -63,7 +149,7 @@ Prototype cycle detection algorithm:
 
 **Deliverable:** Prototype implementation + benchmark results
 
-**Reduces risk for:** Task 1.3 (Graph Validator)
+**Reduces risk for:** Task 1.3 (Index Doctor)
 
 ---
 
@@ -81,129 +167,16 @@ Benchmark workspace scanning performance:
 
 **Deliverable:** Benchmark results + recommended approach
 
-**Reduces risk for:** Task 2.1 (Workspace Scanner)
+**Reduces risk for:** Task 1.4 (Workspace Scanner)
 
 ---
 
-### **Phase 1: Domain Layer (Adjusted Order)**
+### **Phase 1: Infrastructure Layer**
 
-Core domain logic. High-risk tasks prioritized early after spikes.
+These tasks implement filesystem operations and can be developed in parallel.
 
-#### **Task 1.1: Validation Error Types**
-**File:** `src/domain/validation/validation_error.ts`
-
-Define error types for `mm doctor check`:
-
-```typescript
-export type FrontmatterValidationIssue =
-  | MissingRequiredField
-  | InvalidFieldValue
-  | InvalidPlacementFormat
-  | InvalidRankFormat
-  | InvalidAliasFormat
-  | YamlParseError
-  | ...
-
-export type GraphValidationIssue =
-  | EdgeTargetNotFound
-  | DuplicateEdge
-  | CycleDetected
-  | EdgeFrontmatterMismatch
-  | ...
-
-export type IndexValidationIssue =
-  | OrphanedEdgeFile
-  | MissingEdgeFile
-  | AliasIndexMismatch
-  | ...
-
-export type ValidationReport = Readonly<{
-  frontmatterIssues: ReadonlyArray<FrontmatterValidationIssue>;
-  graphIssues: ReadonlyArray<GraphValidationIssue>;
-  indexIssues: ReadonlyArray<IndexValidationIssue>;
-  itemsScanned: number;
-  edgesScanned: number;
-  aliasesScanned: number;
-}>;
-```
-
-**Deliverables:**
-- Type definitions for all validation issue types
-- `ValidationReport` aggregate type
-- Helper functions for creating validation issues
-- Unit tests for type guards and helpers
-
-**Dependencies:** None (pure types)
-
----
-
-#### **Task 1.2: Item Validator Service**
-**File:** `src/domain/services/item_validator.ts`
-
-Implement validation logic for individual Items:
-
-```typescript
-export interface ItemValidator {
-  validateFrontmatter(item: Item): ReadonlyArray<FrontmatterValidationIssue>;
-  validatePlacement(placement: Placement): ReadonlyArray<FrontmatterValidationIssue>;
-  validateRank(rank: ItemRank): ReadonlyArray<FrontmatterValidationIssue>;
-  validateAlias(alias?: AliasSlug): ReadonlyArray<FrontmatterValidationIssue>;
-}
-```
-
-**Validation rules:**
-- Required fields present (`id`, `kind`, `status`, `placement`, `rank`, `created_at`, `updated_at`, `schema`)
-- `id` matches filename and is valid UUID v7
-- `kind` is valid enum value
-- `status` is valid enum value
-- `placement` is normalized (no relative dates, no aliases)
-- `rank` is valid LexoRank format
-- Timestamps are valid ISO-8601
-- `schema` is present
-- `alias` (if present) follows rules and is not reserved
-
-**Deliverables:**
-- `ItemValidator` implementation
-- Unit tests covering all validation rules
-- Edge cases (missing fields, malformed values, etc.)
-
-**Dependencies:** Task 1.1 (validation error types)
-
----
-
-#### **Task 1.3: Graph Validator Service**
-**File:** `src/domain/services/graph_validator.ts`
-
-Implement graph-level validation:
-
-```typescript
-export interface GraphValidator {
-  validateEdges(edges: ReadonlyArray<Edge>, items: Map<ItemId, Item>): ReadonlyArray<GraphValidationIssue>;
-  detectCycles(edges: ReadonlyArray<Edge>): ReadonlyArray<GraphValidationIssue>;
-  validateAliasUniqueness(items: ReadonlyArray<Item>): ReadonlyArray<GraphValidationIssue>;
-}
-```
-
-**Validation rules:**
-- Every edge points to existing Item
-- No duplicate edges within same (parent, section)
-- No cycles in parent/child graph
-- Alias `canonical_key` uniqueness
-- Edge files match Frontmatter placement/rank
-
-**Deliverables:**
-- `GraphValidator` implementation
-- Cycle detection algorithm (DFS-based)
-- Unit tests with graph fixtures (valid graphs, cycles, duplicates)
-
-**Dependencies:** Task 1.1 (validation error types)
-
-**Priority:** HIGH - Complex algorithm, implement early after Spike 0.2
-
----
-
-#### **Task 1.4: Index Rebuilder Service**
-**File:** `src/domain/services/index_rebuilder.ts`
+#### **Task 1.1: Index Rebuilder**
+**File:** `src/infrastructure/fileSystem/index_rebuilder.ts`
 
 Implement index rebuild logic:
 
@@ -243,8 +216,8 @@ export type RebuildResult = Readonly<{
 
 ---
 
-#### **Task 1.5: Rank Rebalancer Service**
-**File:** `src/domain/services/rank_rebalancer.ts`
+#### **Task 1.2: Rank Rebalancer**
+**File:** `src/infrastructure/fileSystem/rank_rebalancer.ts`
 
 Implement rank rebalancing logic:
 
@@ -278,11 +251,60 @@ export type ItemRankUpdate = Readonly<{
 
 ---
 
-### **Phase 2: Infrastructure Layer (Parallel after Phase 1)**
+#### **Task 1.3: Index Doctor**
+**File:** `src/infrastructure/fileSystem/index_doctor.ts`
 
-These tasks implement filesystem operations and can be developed in parallel.
+Implement index integrity checking for `mm doctor check`:
 
-#### **Task 2.1: Workspace Scanner**
+```typescript
+export type IndexIntegrityIssue = Readonly<{
+  kind: "EdgeTargetNotFound" | "DuplicateEdge" | "CycleDetected" | "AliasConflict" | "EdgeItemMismatch";
+  message: string;
+  path?: string;
+  context?: Record<string, unknown>;
+}>;
+
+export const checkIndexIntegrity = (
+  items: ReadonlyMap<ItemId, Item>,
+  edges: ReadonlyArray<EdgeReference>,
+  aliases: ReadonlyArray<AliasEntry>,
+): ReadonlyArray<IndexIntegrityIssue> => {
+  const issues: IndexIntegrityIssue[] = [];
+
+  // 1. Check edge targets exist in items
+  // 2. Detect duplicate edges within same (parent, section)
+  // 3. Detect cycles in parent-child relationships
+  // 4. Validate alias uniqueness
+  // 5. Check edge rank matches item rank
+
+  return issues;
+};
+```
+
+**Design principle:**
+- Parse individual models (Item, EdgeReference, AliasEntry) validates data within model boundaries
+- `checkIndexIntegrity` validates relationships between parsed models
+
+**Integrity checks:**
+- Every edge points to existing Item
+- No duplicate edges within same (parent, section)
+- No cycles in parent/child graph
+- Alias uniqueness
+- Edge files match Item frontmatter placement/rank
+
+**Deliverables:**
+- `IndexIntegrityIssue` type
+- `checkIndexIntegrity` function
+- Cycle detection algorithm (DFS-based)
+- Unit tests with fixtures (valid, cycles, duplicates, orphans)
+
+**Dependencies:** None (uses existing types)
+
+**Priority:** HIGH - Complex algorithm, implement early after Spike 0.2
+
+---
+
+#### **Task 1.4: Workspace Scanner**
 **File:** `src/infrastructure/fileSystem/workspace_scanner.ts`
 
 Implement workspace scanning:
@@ -312,7 +334,7 @@ export interface WorkspaceScanner {
 
 ---
 
-#### **Task 2.2: Index Writer**
+#### **Task 1.5: Index Writer**
 **File:** `src/infrastructure/fileSystem/index_writer.ts`
 
 Implement atomic index writing:
@@ -347,7 +369,7 @@ export interface IndexWriter {
 
 ---
 
-#### **Task 2.3: Item Updater**
+#### **Task 1.6: Item Updater**
 **File:** `src/infrastructure/fileSystem/item_updater.ts`
 
 Implement batch Item updates for rank rebalancing:
@@ -382,131 +404,47 @@ export type UpdateResult = Readonly<{
 
 ---
 
-### **Phase 3: Workflow Layer (Sequential after Phase 2)**
+### **Phase 2: Presentation Layer (Sequential after Phase 1)**
 
-These workflows orchestrate domain services and infrastructure.
+CLI commands that implement the full processing flow directly.
 
-#### **Task 3.1: Check Workflow**
-**File:** `src/domain/workflows/doctor_check.ts`
-
-Implement `mm doctor check` workflow:
-
-```typescript
-export const DoctorCheckWorkflow = {
-  execute: async (
-    deps: DoctorCheckDependencies
-  ): Promise<Result<ValidationReport, DoctorCheckError>>
-};
-```
-
-**Process:**
-1. Scan all Items (stream)
-2. Validate each Item's frontmatter
-3. Collect all Items for graph validation
-4. Scan all edges
-5. Validate graph (cycles, duplicates, edge-item consistency)
-6. Validate index consistency
-7. Build ValidationReport
-
-**Deliverables:**
-- `DoctorCheckWorkflow` implementation
-- Error aggregation logic
-- Integration tests with fixture workspaces
-- Performance tests (large workspaces)
-
-**Dependencies:**
-- Task 1.2 (ItemValidator)
-- Task 1.3 (GraphValidator)
-- Task 2.1 (WorkspaceScanner)
-
----
-
-#### **Task 3.2: Rebuild Index Workflow**
-**File:** `src/domain/workflows/doctor_rebuild_index.ts`
-
-Implement `mm doctor rebuild-index` workflow:
-
-```typescript
-export const DoctorRebuildIndexWorkflow = {
-  execute: async (
-    deps: DoctorRebuildIndexDependencies
-  ): Promise<Result<RebuildIndexResult, RebuildIndexError>>
-};
-```
-
-**Process:**
-1. Scan all Items
-2. Rebuild index using `IndexRebuilder`
-3. Basic validation of rebuilt index
-4. Write to temporary location using `IndexWriter`
-5. Verify integrity
-6. Replace existing index
-
-**Deliverables:**
-- `DoctorRebuildIndexWorkflow` implementation
-- Progress reporting
-- Integration tests
-- Rollback on error tests
-
-**Dependencies:**
-- Task 1.4 (IndexRebuilder)
-- Task 2.1 (WorkspaceScanner)
-- Task 2.2 (IndexWriter)
-
----
-
-#### **Task 3.3: Rebalance Rank Workflow**
-**File:** `src/domain/workflows/doctor_rebalance_rank.ts`
-
-Implement `mm doctor rebalance-rank` workflow:
-
-```typescript
-export const DoctorRebalanceRankWorkflow = {
-  execute: async (
-    deps: DoctorRebalanceRankDependencies
-  ): Promise<Result<RebalanceRankResult, RebalanceRankError>>
-};
-```
-
-**Process:**
-1. Scan all Items
-2. Group by (parent, section)
-3. For each group, call `RankRebalancer`
-4. Collect all rank updates
-5. Update Items using `ItemUpdater`
-6. Update edge files
-7. Report results
-
-**Deliverables:**
-- `DoctorRebalanceRankWorkflow` implementation
-- Group-by-placement logic
-- Progress reporting
-- Integration tests
-
-**Dependencies:**
-- Task 1.5 (RankRebalancer)
-- Task 2.1 (WorkspaceScanner)
-- Task 2.3 (ItemUpdater)
-
----
-
-### **Phase 4: Presentation Layer (Sequential after Phase 3)**
-
-CLI commands that expose workflows to users.
-
-#### **Task 4.1: CLI Command - check**
+#### **Task 2.1: CLI Command - check**
 **File:** `src/presentation/cli/commands/doctor/check.ts`
 
-Implement `mm doctor check` command:
+Implement `mm doctor check` command with full processing flow:
 
 ```typescript
 export const checkCommand = new Command()
   .name("check")
   .description("Inspect workspace integrity without modifications")
   .action(async () => {
-    // Call DoctorCheckWorkflow
-    // Format and display ValidationReport
-    // Exit with appropriate code
+    const workspaceRoot = await resolveWorkspace();
+
+    // 1. Scan and parse all Items
+    const items = new Map<ItemId, Item>();
+    const itemIssues: ItemValidationResult[] = [];
+    for await (const file of scanItemFiles(workspaceRoot)) {
+      const result = parseItem(file.snapshot);
+      if (result.type === "error") {
+        itemIssues.push({ filePath: file.path, issues: result.error.issues });
+      } else {
+        items.set(result.value.data.id, result.value);
+      }
+    }
+
+    // 2. Scan and parse all EdgeReferences and AliasEntries
+    const edges = await scanAndParseEdges(workspaceRoot);
+    const aliases = await scanAndParseAliases(workspaceRoot);
+
+    // 3. Check index integrity
+    const integrityIssues = checkIndexIntegrity(items, edges, aliases);
+
+    // 4. Display report
+    displayReport({ itemIssues, integrityIssues });
+
+    // 5. Exit with appropriate code
+    const hasIssues = itemIssues.length > 0 || integrityIssues.length > 0;
+    Deno.exit(hasIssues ? 1 : 0);
   });
 ```
 
@@ -521,23 +459,39 @@ export const checkCommand = new Command()
 - Report formatting logic
 - E2E tests with test workspaces
 
-**Dependencies:** Task 3.1 (DoctorCheckWorkflow)
+**Dependencies:**
+- Task 1.3 (Index Doctor)
+- Task 1.4 (Workspace Scanner)
 
 ---
 
-#### **Task 4.2: CLI Command - rebuild-index**
+#### **Task 2.2: CLI Command - rebuild-index**
 **File:** `src/presentation/cli/commands/doctor/rebuild_index.ts`
 
-Implement `mm doctor rebuild-index` command:
+Implement `mm doctor rebuild-index` command with full processing flow:
 
 ```typescript
 export const rebuildIndexCommand = new Command()
   .name("rebuild-index")
   .description("Rebuild .index/ from Item frontmatter")
   .action(async () => {
-    // Call DoctorRebuildIndexWorkflow
-    // Display progress
-    // Report results
+    const workspaceRoot = await resolveWorkspace();
+
+    // 1. Scan all Items
+    const items = await scanAndParseAllItems(workspaceRoot);
+
+    // 2. Rebuild index using IndexRebuilder
+    const rebuildResult = rebuildFromItems(items);
+
+    // 3. Write to temporary location
+    await writeGraphIndex(workspaceRoot, rebuildResult.graphEdges, { temp: true });
+    await writeAliasIndex(workspaceRoot, rebuildResult.aliases, { temp: true });
+
+    // 4. Replace existing index
+    await replaceIndex(workspaceRoot);
+
+    // 5. Display results
+    displayRebuildResult(rebuildResult);
   });
 ```
 
@@ -551,24 +505,44 @@ export const rebuildIndexCommand = new Command()
 - Progress display
 - E2E tests
 
-**Dependencies:** Task 3.2 (DoctorRebuildIndexWorkflow)
+**Dependencies:**
+- Task 1.1 (Index Rebuilder)
+- Task 1.4 (Workspace Scanner)
+- Task 1.5 (Index Writer)
 
 ---
 
-#### **Task 4.3: CLI Command - rebalance-rank**
+#### **Task 2.3: CLI Command - rebalance-rank**
 **File:** `src/presentation/cli/commands/doctor/rebalance_rank.ts`
 
-Implement `mm doctor rebalance-rank` command:
+Implement `mm doctor rebalance-rank` command with full processing flow:
 
 ```typescript
 export const rebalanceRankCommand = new Command()
   .name("rebalance-rank")
   .description("Rebalance LexoRank values for siblings")
   .action(async () => {
-    // Call DoctorRebalanceRankWorkflow
-    // Display progress
-    // Report results
-    // Warn user to commit changes
+    const workspaceRoot = await resolveWorkspace();
+
+    // 1. Scan all Items
+    const items = await scanAndParseAllItems(workspaceRoot);
+
+    // 2. Group by (parent, section)
+    const groups = groupByPlacement(items);
+
+    // 3. Rebalance each group
+    const allUpdates: ItemRankUpdate[] = [];
+    for (const group of groups) {
+      const updates = rebalanceGroup(group.siblings);
+      allUpdates.push(...updates);
+    }
+
+    // 4. Update Items and edge files
+    await updateItemRanks(workspaceRoot, allUpdates);
+
+    // 5. Display results and warn about Git changes
+    displayRebalanceResult(allUpdates);
+    console.log("Warning: Files have been modified. Review and commit changes.");
   });
 ```
 
@@ -583,11 +557,14 @@ export const rebalanceRankCommand = new Command()
 - Git change warning
 - E2E tests
 
-**Dependencies:** Task 3.3 (DoctorRebalanceRankWorkflow)
+**Dependencies:**
+- Task 1.2 (Rank Rebalancer)
+- Task 1.4 (Workspace Scanner)
+- Task 1.6 (Item Updater)
 
 ---
 
-#### **Task 4.4: CLI Command - doctor (parent)**
+#### **Task 2.4: CLI Command - doctor (parent)**
 **File:** `src/presentation/cli/commands/doctor.ts`
 
 Implement parent `mm doctor` command:
@@ -608,13 +585,13 @@ export const doctorCommand = new Command()
 - E2E tests for command discovery
 
 **Dependencies:**
-- Task 4.1 (check command)
-- Task 4.2 (rebuild-index command)
-- Task 4.3 (rebalance-rank command)
+- Task 2.1 (check command)
+- Task 2.2 (rebuild-index command)
+- Task 2.3 (rebalance-rank command)
 
 ---
 
-#### **Task 4.5: Main CLI Integration**
+#### **Task 2.5: Main CLI Integration**
 **File:** `src/main.ts`
 
 Register `doctor` command in main CLI:
@@ -631,13 +608,13 @@ await new Command()
 - Integration in `main.ts`
 - E2E tests for full command paths
 
-**Dependencies:** Task 4.4 (doctor command)
+**Dependencies:** Task 2.4 (doctor command)
 
 ---
 
-### **Phase 5: Testing & Documentation (Parallel with Phases 3-4)**
+### **Phase 3: Testing & Documentation (Parallel with Phase 2)**
 
-#### **Task 5.1: Integration Test Fixtures**
+#### **Task 3.1: Integration Test Fixtures**
 **Directory:** `tests/e2e/fixtures/doctor/`
 
 Create test workspaces with known issues:
@@ -657,7 +634,7 @@ Create test workspaces with known issues:
 
 ---
 
-#### **Task 5.2: E2E Test Scenarios**
+#### **Task 3.2: E2E Test Scenarios**
 **File:** `tests/e2e/scenarios/doctor_test.ts`
 
 End-to-end tests for all commands:
@@ -675,11 +652,11 @@ Deno.test("mm doctor rebalance-rank - redistributes ranks evenly", async () => {
 - Coverage of success and error paths
 - Performance benchmarks
 
-**Dependencies:** Task 5.1 (fixtures)
+**Dependencies:** Task 3.1 (fixtures)
 
 ---
 
-#### **Task 5.3: Documentation Updates**
+#### **Task 3.3: Documentation Updates**
 **Files:**
 - `README.md`
 - `docs/cli.md` (if exists)
@@ -696,7 +673,7 @@ Document `mm doctor` commands:
 - Examples and use cases
 - Screenshots/sample output
 
-**Dependencies:** Tasks 4.1-4.3 (CLI commands)
+**Dependencies:** Tasks 2.1-2.3 (CLI commands)
 
 ---
 
@@ -708,76 +685,76 @@ Phase 0 (Spikes - Sequential):
   0.2 Cycle Detection Prototype
   0.3 Workspace Scan Benchmark
 
-Phase 1 (Domain - Prioritized):
-  1.1 Validation Error Types
-    ├─> 1.2 Item Validator
-    └─> 1.3 Graph Validator (HIGH PRIORITY, after Spike 0.2)
+Sequential (Common Foundation):
+  1.4 Workspace Scanner (all commands depend on this)
+  3.1 Integration Test Fixtures (TDD foundation)
+  2.4 doctor command (parent command framework)
+  2.5 Main CLI integration
 
-  1.4 Index Rebuilder (HIGH PRIORITY, after Spike 0.1)
-  1.5 Rank Rebalancer (independent)
+Parallel A (check command):
+  1.3 Index Doctor (checkIndexIntegrity)
+  2.1 check command
 
-Phase 2 (Infrastructure - Prioritized):
-  2.1 Workspace Scanner (HIGH PRIORITY, after Spike 0.3)
-  2.2 Index Writer (independent)
-  2.3 Item Updater (independent)
+Parallel B (rebuild-index command):
+  1.1 Index Rebuilder
+  1.5 Index Writer
+  2.2 rebuild-index command
 
-Phase 3 (Workflows - Sequential):
-  3.1 Check Workflow ← 1.2, 1.3, 2.1
-  3.2 Rebuild Index Workflow ← 1.4, 2.1, 2.2
-  3.3 Rebalance Rank Workflow ← 1.5, 2.1, 2.3
+Parallel C (rebalance-rank command):
+  1.2 Rank Rebalancer
+  1.6 Item Updater
+  2.3 rebalance-rank command
 
-Phase 4 (Presentation - Sequential):
-  4.1 check command ← 3.1
-  4.2 rebuild-index command ← 3.2
-  4.3 rebalance-rank command ← 3.3
-  4.4 doctor command ← 4.1, 4.2, 4.3
-  4.5 Main integration ← 4.4
-
-Phase 5 (Testing - Parallel with 3-4):
-  5.1 Fixtures (can start in Phase 0)
-  5.2 E2E Tests ← 5.1, all Phase 4
-  5.3 Documentation ← 4.1, 4.2, 4.3
+Finalization (after all parallel tasks):
+  3.2 E2E Tests
+  3.3 Documentation
 ```
+
+**Design principle:**
+- Parse individual models (Item, EdgeReference, AliasEntry) validates data within model boundaries ("Parse, don't validate")
+- `checkIndexIntegrity` validates relationships between parsed models (integrity check)
+- CLI commands implement full processing flow directly (no workflow layer)
+
+**Parallel development:**
+- After Sequential tasks complete, three agents can work independently on Parallel A/B/C
+- Each parallel track is self-contained with its own infrastructure + CLI command
 
 ---
 
 ## Parallelization Strategy (Revised)
 
-### **Iteration 0: Risk Mitigation (Sequential)**
+### **Phase 0: Risk Mitigation Spikes (Sequential)**
 Execute spikes sequentially to validate technical approaches:
 - Spike 0.1: Placement Parsing
 - Spike 0.2: Cycle Detection
 - Spike 0.3: Workspace Scanning
 
-### **Iteration 1: High-Risk Domain Tasks (Parallel after spikes)**
-Prioritize high-risk tasks early:
-- Task 1.1 (Developer A) - Foundation for others
-- Task 1.3 (Developer B) - After Spike 0.2, high complexity
-- Task 1.4 (Developer C) - After Spike 0.1, high complexity
-- Task 1.2 + 1.5 (Developer D) - Lower risk, can start in parallel
+### **Sequential: Common Foundation**
+Must be completed before parallel work begins:
+1. Task 1.4 - Workspace Scanner (all commands depend on this)
+2. Task 3.1 - Integration Test Fixtures (TDD foundation)
+3. Task 2.4 - doctor command (parent command framework)
+4. Task 2.5 - Main CLI integration
 
-### **Iteration 2: Infrastructure (Parallel)**
-Can be developed simultaneously:
-- Task 2.1 (Developer A) - After Spike 0.3, high priority
-- Task 2.2 (Developer B) - Standard file I/O
-- Task 2.3 (Developer C) - Standard file I/O
+### **Parallel Tracks (3 agents can work independently)**
 
-### **Iteration 3: Workflows (Semi-parallel)**
-Can start when dependencies are ready:
-- Task 3.1 (when 1.2, 1.3, 2.1 ready)
-- Task 3.2 (when 1.4, 2.1, 2.2 ready)
-- Task 3.3 (when 1.5, 2.1, 2.3 ready)
+**Agent A - check command:**
+1. Task 1.3 - Index Doctor (checkIndexIntegrity)
+2. Task 2.1 - CLI Command - check
 
-### **Iteration 4: Presentation (Semi-parallel)**
-Can start when workflows are ready:
-- Tasks 4.1, 4.2, 4.3 in parallel
-- Task 4.4 when 4.1-4.3 ready
-- Task 4.5 final integration
+**Agent B - rebuild-index command:**
+1. Task 1.1 - Index Rebuilder
+2. Task 1.5 - Index Writer
+3. Task 2.2 - CLI Command - rebuild-index
 
-### **Ongoing: Testing & Docs**
-- Task 5.1 can start immediately (or during Phase 0)
-- Task 5.2 as commands become available
-- Task 5.3 near completion
+**Agent C - rebalance-rank command:**
+1. Task 1.2 - Rank Rebalancer
+2. Task 1.6 - Item Updater
+3. Task 2.3 - CLI Command - rebalance-rank
+
+### **Finalization (after all parallel tracks complete)**
+- Task 3.2 - E2E Tests (comprehensive testing of all commands)
+- Task 3.3 - Documentation (user-facing docs)
 
 ---
 
@@ -789,31 +766,28 @@ Can start when workflows are ready:
 - [ ] Workspace scanning performance characteristics measured
 - [ ] Technical risks for high-uncertainty tasks mitigated
 
-### **Phase 1 Complete:**
-- [ ] All validation error types defined
-- [ ] Item validator with comprehensive tests
-- [ ] Graph validator with cycle detection
-- [ ] Index rebuilder functional
-- [ ] Rank rebalancer functional
-
-### **Phase 2 Complete:**
+### **Sequential (Common Foundation) Complete:**
 - [ ] Workspace scanner streams Items/Edges/Aliases
-- [ ] Index writer performs atomic writes
-- [ ] Item updater handles batch rank updates
+- [ ] Test fixtures cover all scenarios (valid, invalid, cycles, etc.)
+- [ ] Parent doctor command registered
+- [ ] Main CLI integration working
 
-### **Phase 3 Complete:**
+### **Parallel A (check) Complete:**
+- [ ] Index doctor with checkIndexIntegrity (including cycle detection)
 - [ ] `mm doctor check` detects all issue categories
+
+### **Parallel B (rebuild-index) Complete:**
+- [ ] Index rebuilder functional
+- [ ] Index writer performs atomic writes
 - [ ] `mm doctor rebuild-index` rebuilds from frontmatter
+
+### **Parallel C (rebalance-rank) Complete:**
+- [ ] Rank rebalancer functional
+- [ ] Item updater handles batch rank updates
 - [ ] `mm doctor rebalance-rank` redistributes ranks
 
-### **Phase 4 Complete:**
-- [ ] All CLI commands registered and functional
-- [ ] Help text and error messages clear
-- [ ] Integration in main CLI
-
-### **Phase 5 Complete:**
+### **Finalization Complete:**
 - [ ] E2E tests pass for all commands
-- [ ] Test fixtures cover all scenarios
 - [ ] Documentation complete and accurate
 
 ### **Overall Success:**

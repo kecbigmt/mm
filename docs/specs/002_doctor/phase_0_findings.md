@@ -42,7 +42,7 @@ Understand the `Placement` type structure and prototype parsing logic to extract
    - Item (no section): `.index/graph/parents/<parent-uuid>/`
    - Item (with section): `.index/graph/parents/<parent-uuid>/<section-path>/`
 
-### Impact on Task 1.4 (Index Rebuilder)
+### Impact on Task 1.2 (Index Rebuilder)
 
 - ✅ **No custom parsing needed** - use existing `parsePlacement()`
 - ✅ **Clear directory mapping logic** identified
@@ -93,11 +93,11 @@ Prototype DFS-based cycle detection, test with fixtures, and benchmark performan
    - ✅ Self-loop (A → A)
    - ✅ Disconnected graph with cycle in one component
 
-### Impact on Task 1.3 (Graph Validator)
+### Impact on Task 2.1 (Index Doctor)
 
 - ✅ **DFS approach validated** - efficient and scalable
 - ✅ **Performance acceptable** for workspace scale
-- ✅ **Implementation straightforward** - adapt with `ItemId` types and `ValidationIssue` results
+- ✅ **Implementation straightforward** - adapt with `ItemId` types and `IndexIntegrityIssue` results
 
 ### Deliverable
 
@@ -144,7 +144,7 @@ Benchmark workspace scanning performance, compare streaming vs. batch approaches
    }
    ```
 
-### Impact on Task 2.1 (Workspace Scanner)
+### Impact on Task 2.2 (Workspace Scanner)
 
 - ✅ **AsyncIterableIterator is the right approach** - constant memory, good throughput
 - ✅ **Performance acceptable** - handles 1000s of items in <30ms
@@ -161,25 +161,15 @@ Benchmark workspace scanning performance, compare streaming vs. batch approaches
 
 | Task | Risk Level (Before) | Risk Level (After) | Mitigation |
 |------|---------------------|-----------------------|------------|
-| **Task 1.3** (Graph Validator) | 🔴 HIGH | 🟢 LOW | DFS algorithm validated, benchmarks show acceptable performance |
-| **Task 1.4** (Index Rebuilder) | 🔴 HIGH | 🟢 LOW | Placement parsing logic clear, existing APIs sufficient |
-| **Task 2.1** (Workspace Scanner) | 🔴 HIGH | 🟢 LOW | Streaming approach validated, performance characteristics known |
+| **Task 1.2** (Index Rebuilder) | 🔴 HIGH | 🟢 LOW | Placement parsing logic clear, existing APIs sufficient |
+| **Task 2.1** (Index Doctor) | 🔴 HIGH | 🟢 LOW | DFS algorithm validated, benchmarks show acceptable performance |
+| **Task 2.2** (Workspace Scanner) | 🔴 HIGH | 🟢 LOW | Streaming approach validated, performance characteristics known |
 
 ---
 
 ## Recommendations for Implementation
 
-### Task 1.3 (Graph Validator)
-
-```typescript
-export interface GraphValidator {
-  detectCycles(edges: ReadonlyArray<Edge>): ReadonlyArray<GraphValidationIssue>;
-  // Use DFS with white/gray/black node marking
-  // Return ValidationIssue for each cycle found
-}
-```
-
-### Task 1.4 (Index Rebuilder)
+### Task 1.2 (Index Rebuilder)
 
 ```typescript
 export interface IndexRebuilder {
@@ -189,7 +179,20 @@ export interface IndexRebuilder {
 }
 ```
 
-### Task 2.1 (Workspace Scanner)
+### Task 2.1 (Index Doctor)
+
+```typescript
+export const checkIndexIntegrity = (
+  items: ReadonlyMap<ItemId, Item>,
+  edges: ReadonlyArray<EdgeReference>,
+  aliases: ReadonlyArray<AliasEntry>,
+): ReadonlyArray<IndexIntegrityIssue> => {
+  // Use DFS with white/gray/black node marking for cycle detection
+  // Return IndexIntegrityIssue for each issue found
+};
+```
+
+### Task 2.2 (Workspace Scanner)
 
 ```typescript
 export interface WorkspaceScanner {
@@ -203,14 +206,20 @@ export interface WorkspaceScanner {
 
 ## Next Steps
 
-Phase 0 is complete. Proceed to **Phase 1: Domain Layer** implementation with confidence that high-risk technical areas have been validated.
+Phase 0 is complete. Proceed to **Phase 1 & 2** implementation with confidence that high-risk technical areas have been validated.
 
 ### Priority Tasks (Iteration 1):
 
-1. **Task 1.1** - Validation Error Types (foundation)
-2. **Task 1.3** - Graph Validator (high complexity, now de-risked)
-3. **Task 1.4** - Index Rebuilder (high complexity, now de-risked)
-4. **Task 1.2 + 1.5** - Item Validator + Rank Rebalancer (lower risk, parallel work)
+1. **Task 1.1** - ValidationReport Type (foundation)
+2. **Task 1.2** - Index Rebuilder (high complexity, now de-risked)
+3. **Task 1.3** - Rank Rebalancer (independent)
+4. **Task 2.1** - Index Doctor (high complexity, now de-risked)
+
+### Iteration 2:
+
+1. **Task 2.2** - Workspace Scanner (high priority, now de-risked)
+2. **Task 2.3** - Index Writer (standard file I/O)
+3. **Task 2.4** - Item Updater (standard file I/O)
 
 ---
 
