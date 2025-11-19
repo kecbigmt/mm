@@ -57,6 +57,7 @@ export function createLsCommand() {
           expression: locatorArg,
           cwd: cwdResult.value,
           today: now,
+          timezone: deps.timezone,
         },
         {
           itemRepository: deps.itemRepository,

@@ -1,6 +1,6 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { dateTimeFromDate, parseTimezoneIdentifier } from "../../../domain/primitives/mod.ts";
+import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
 import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { parsePathExpression } from "../path_expression.ts";
@@ -74,16 +74,10 @@ export function createNoteCommand() {
           return;
         }
 
-        const timezoneResult = parseTimezoneIdentifier("UTC");
-        if (timezoneResult.type === "error") {
-          console.error("Failed to parse timezone");
-          return;
-        }
-
         const pathResolver = createPathResolver({
           aliasRepository: deps.aliasRepository,
           itemRepository: deps.itemRepository,
-          timezone: timezoneResult.value,
+          timezone: deps.timezone,
           today: now,
         });
 
