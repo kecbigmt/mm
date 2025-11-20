@@ -297,7 +297,7 @@ describe("Scenario 17: Doctor rebuild-index", () => {
   it("shows progress for large number of items", async () => {
     await runCommand(ctx.testHome, ["cd", "today"]);
 
-    // Create 5 items (not 100 to keep test fast, but enough to verify counting)
+    // Create 5 items to verify counting works correctly while keeping the test fast
     for (let i = 0; i < 5; i++) {
       await runCommand(ctx.testHome, ["note", `Item ${i + 1}`]);
     }
