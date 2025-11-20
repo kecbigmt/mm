@@ -132,4 +132,9 @@ export const createRebuildIndexCommand = () =>
       console.log(`  - Parent sections: ${parentEdges} edges`);
       console.log(`✓ Built alias index (${aliasesCreated} aliases)`);
       console.log("\nIndex rebuild complete.");
+
+      // Exit with error if any items failed to parse
+      if (parseErrors.length > 0) {
+        Deno.exit(1);
+      }
     });
