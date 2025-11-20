@@ -61,12 +61,12 @@ Deno.test("checkIndexIntegrity - returns empty array for valid workspace", () =>
     createTestEdge(
       id1,
       "a",
-      ".index/graph/dates/2025-01-15/019a85fc-67c4-7a54-be8e-305bae009f9e.edge.json",
+      "/workspace/.index/graph/dates/2025-01-15/019a85fc-67c4-7a54-be8e-305bae009f9e.edge.json",
     ),
     createTestEdge(
       id2,
       "b",
-      ".index/graph/dates/2025-01-15/019a8603-1234-7890-abcd-1234567890ab.edge.json",
+      "/workspace/.index/graph/dates/2025-01-15/019a8603-1234-7890-abcd-1234567890ab.edge.json",
     ),
   ];
 
@@ -88,12 +88,12 @@ Deno.test("checkIndexIntegrity - detects edge pointing to non-existent item", ()
     createTestEdge(
       id1,
       "a",
-      ".index/graph/dates/2025-01-15/019a85fc-67c4-7a54-be8e-305bae009f9e.edge.json",
+      "/workspace/.index/graph/dates/2025-01-15/019a85fc-67c4-7a54-be8e-305bae009f9e.edge.json",
     ),
     createTestEdge(
       orphanId,
       "b",
-      ".index/graph/dates/2025-01-15/019a8610-1234-7890-abcd-badc0ffee000.edge.json",
+      "/workspace/.index/graph/dates/2025-01-15/019a8610-1234-7890-abcd-badc0ffee000.edge.json",
     ),
   ];
 
@@ -117,12 +117,12 @@ Deno.test("checkIndexIntegrity - detects duplicate edges in same directory", () 
     createTestEdge(
       id1,
       "a",
-      ".index/graph/dates/2025-01-15/019a85fc-67c4-7a54-be8e-305bae009f9e.edge.json",
+      "/workspace/.index/graph/dates/2025-01-15/019a85fc-67c4-7a54-be8e-305bae009f9e.edge.json",
     ),
     createTestEdge(
       id1,
       "a",
-      ".index/graph/dates/2025-01-15/019a85fc-67c4-7a54-be8e-305bae009f9e.copy.edge.json",
+      "/workspace/.index/graph/dates/2025-01-15/019a85fc-67c4-7a54-be8e-305bae009f9e.copy.edge.json",
     ),
   ];
 
@@ -187,17 +187,17 @@ Deno.test("checkIndexIntegrity - no cycle for valid parent-child chain", () => {
     createTestEdge(
       idA,
       "a",
-      ".index/graph/dates/2025-01-15/019a85fc-67c4-7a54-be8e-305bae009f9e.edge.json",
+      `/workspace/.index/graph/dates/2025-01-15/${idA}.edge.json`,
     ),
     createTestEdge(
       idB,
       "b",
-      `.index/graph/parents/${idA}/019a8603-1234-7890-abcd-1234567890ab.edge.json`,
+      `/workspace/.index/graph/parents/${idA}/${idB}.edge.json`,
     ),
     createTestEdge(
       idC,
       "c",
-      `.index/graph/parents/${idB}/019a8610-5678-7890-abcd-0987654321ab.edge.json`,
+      `/workspace/.index/graph/parents/${idB}/${idC}.edge.json`,
     ),
   ];
 
@@ -205,9 +205,10 @@ Deno.test("checkIndexIntegrity - no cycle for valid parent-child chain", () => {
 
   const issues = checkIndexIntegrity(items, edges, aliases);
 
-  // Should only have missing edge issues since we didn't match all edges
+  // No issues expected for valid chain with correct edge locations
   const cycleIssue = issues.find((i) => i.kind === "CycleDetected");
   assertEquals(cycleIssue, undefined);
+  assertEquals(issues.length, 0);
 });
 
 Deno.test("checkIndexIntegrity - detects alias conflict (duplicate canonical_key)", () => {
@@ -224,12 +225,12 @@ Deno.test("checkIndexIntegrity - detects alias conflict (duplicate canonical_key
     createTestEdge(
       id1,
       "a",
-      ".index/graph/dates/2025-01-15/019a85fc-67c4-7a54-be8e-305bae009f9e.edge.json",
+      `/workspace/.index/graph/dates/2025-01-15/${id1}.edge.json`,
     ),
     createTestEdge(
       id2,
       "b",
-      ".index/graph/dates/2025-01-15/019a8603-1234-7890-abcd-1234567890ab.edge.json",
+      `/workspace/.index/graph/dates/2025-01-15/${id2}.edge.json`,
     ),
   ];
 
@@ -256,7 +257,7 @@ Deno.test("checkIndexIntegrity - detects missing edge file for item", () => {
     createTestEdge(
       id1,
       "a",
-      ".index/graph/dates/2025-01-15/019a85fc-67c4-7a54-be8e-305bae009f9e.edge.json",
+      `/workspace/.index/graph/dates/2025-01-15/${id1}.edge.json`,
     ),
   ];
 
@@ -281,7 +282,7 @@ Deno.test("checkIndexIntegrity - detects rank mismatch between edge and item", (
     createTestEdge(
       id1,
       "z",
-      ".index/graph/dates/2025-01-15/019a85fc-67c4-7a54-be8e-305bae009f9e.edge.json",
+      `/workspace/.index/graph/dates/2025-01-15/${id1}.edge.json`,
     ),
   ];
 
@@ -325,4 +326,119 @@ Deno.test("checkIndexIntegrity - complex cycle detection (B -> D -> C -> B)", ()
 
   const cycleIssue = issues.find((i) => i.kind === "CycleDetected");
   assertEquals(cycleIssue !== undefined, true);
+});
+
+Deno.test("checkIndexIntegrity - detects edge in wrong location (stale edge)", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+
+  // Item was moved from 2025-01-10 to 2025-01-15, but edge file is still at old location
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15", "a")], // Current placement
+  ]);
+
+  // Edge is at old location (2025-01-10) instead of new location (2025-01-15)
+  const edges: EdgeReferenceWithPath[] = [
+    createTestEdge(
+      id1,
+      "a",
+      `/workspace/.index/graph/dates/2025-01-10/${id1}.edge.json`, // Wrong location
+    ),
+  ];
+
+  const aliases: Alias[] = [];
+
+  const issues = checkIndexIntegrity(items, edges, aliases);
+
+  const locationIssue = issues.find((i) => i.kind === "EdgeLocationMismatch");
+  assertEquals(locationIssue !== undefined, true);
+  assertEquals(locationIssue?.context?.expectedDirectory, "dates/2025-01-15");
+  assertEquals(locationIssue?.context?.actualDirectory, "dates/2025-01-10");
+});
+
+Deno.test("checkIndexIntegrity - detects edge in wrong location (parent to date)", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+  const parentId = "019a8603-1234-7890-abcd-1234567890ab";
+
+  // Item was moved from under parent to date placement
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15", "a")], // Current placement under date
+    [parentId, createTestItem(parentId, "2025-01-15", "b")],
+  ]);
+
+  // Edge is still at old parent location
+  const edges: EdgeReferenceWithPath[] = [
+    createTestEdge(
+      id1,
+      "a",
+      `/workspace/.index/graph/parents/${parentId}/${id1}.edge.json`, // Wrong location
+    ),
+    createTestEdge(
+      parentId,
+      "b",
+      `/workspace/.index/graph/dates/2025-01-15/${parentId}.edge.json`,
+    ),
+  ];
+
+  const aliases: Alias[] = [];
+
+  const issues = checkIndexIntegrity(items, edges, aliases);
+
+  const locationIssue = issues.find((i) => i.kind === "EdgeLocationMismatch");
+  assertEquals(locationIssue !== undefined, true);
+  assertEquals(locationIssue?.context?.expectedDirectory, "dates/2025-01-15");
+  assertEquals(locationIssue?.context?.actualDirectory, `parents/${parentId}`);
+});
+
+Deno.test("checkIndexIntegrity - validates edge location with numeric sections", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+
+  // Item is in section 1/2 under date
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15/1/2", "a")],
+  ]);
+
+  // Edge is at correct location with sections
+  const edges: EdgeReferenceWithPath[] = [
+    createTestEdge(
+      id1,
+      "a",
+      `/workspace/.index/graph/dates/2025-01-15/1/2/${id1}.edge.json`,
+    ),
+  ];
+
+  const aliases: Alias[] = [];
+
+  const issues = checkIndexIntegrity(items, edges, aliases);
+
+  // No location mismatch expected
+  const locationIssue = issues.find((i) => i.kind === "EdgeLocationMismatch");
+  assertEquals(locationIssue, undefined);
+  assertEquals(issues.length, 0);
+});
+
+Deno.test("checkIndexIntegrity - detects edge in wrong section", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+
+  // Item is in section 1/2 under date
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15/1/2", "a")],
+  ]);
+
+  // Edge is in wrong section (1/3 instead of 1/2)
+  const edges: EdgeReferenceWithPath[] = [
+    createTestEdge(
+      id1,
+      "a",
+      `/workspace/.index/graph/dates/2025-01-15/1/3/${id1}.edge.json`, // Wrong section
+    ),
+  ];
+
+  const aliases: Alias[] = [];
+
+  const issues = checkIndexIntegrity(items, edges, aliases);
+
+  const locationIssue = issues.find((i) => i.kind === "EdgeLocationMismatch");
+  assertEquals(locationIssue !== undefined, true);
+  assertEquals(locationIssue?.context?.expectedDirectory, "dates/2025-01-15/1/2");
+  assertEquals(locationIssue?.context?.actualDirectory, "dates/2025-01-15/1/3");
 });
