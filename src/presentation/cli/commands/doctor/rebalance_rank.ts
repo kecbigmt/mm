@@ -64,8 +64,8 @@ export const rebalanceRankCommand = new Command()
       today: now,
     });
 
-    // Resolve each path expression and collect items
-    const items: Item[] = [];
+    // Resolve each path expression and collect items (deduplicated by item ID)
+    const itemsMap = new Map<string, Item>();
     const resolveErrors: string[] = [];
 
     for (const pathExpr of paths) {
@@ -93,8 +93,13 @@ export const rebalanceRankCommand = new Command()
         continue;
       }
 
-      items.push(...itemsResult.value);
+      // Add items to map (deduplicates by item ID for overlapping paths)
+      for (const item of itemsResult.value) {
+        itemsMap.set(item.data.id.toString(), item);
+      }
     }
+
+    const items = Array.from(itemsMap.values());
 
     if (resolveErrors.length > 0) {
       console.log(`⚠ ${resolveErrors.length} path(s) could not be resolved:`);

@@ -283,6 +283,47 @@ describe("Scenario 18: Doctor rebalance-rank", () => {
       "Should report items count",
     );
   });
+
+  it("deduplicates items when paths overlap", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    // Create items
+    await runCommand(ctx.testHome, ["note", "Item 1"]);
+    await runCommand(ctx.testHome, ["note", "Item 2"]);
+    await runCommand(ctx.testHome, ["note", "Item 3"]);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+
+    // Run rebalance-rank with duplicate paths (today specified twice)
+    const rebalanceResult = await runCommand(ctx.testHome, [
+      "doctor",
+      "rebalance-rank",
+      today,
+      today,
+    ]);
+    assertEquals(rebalanceResult.success, true, `rebalance-rank failed: ${rebalanceResult.stderr}`);
+
+    // Should report 3 items (not 6), confirming deduplication
+    assertEquals(
+      rebalanceResult.stdout.includes("Found 3 items"),
+      true,
+      "Should report 3 deduplicated items, not 6",
+    );
+
+    // Verify ranks are still correct (3 distinct ranks, not 6)
+    const itemIds = await getItemIdsFromDate(ctx.testHome, "test-workspace", today);
+    assertEquals(itemIds.length, 3, "Should have 3 items");
+
+    const ranks = await getRanksForItems(
+      getWorkspacePath(ctx.testHome, "test-workspace"),
+      today,
+      itemIds,
+    );
+
+    // All ranks should be different (no duplicates from double-counting)
+    const uniqueRanks = new Set(ranks);
+    assertEquals(uniqueRanks.size, 3, "Should have 3 unique ranks");
+  });
 });
 
 /**
