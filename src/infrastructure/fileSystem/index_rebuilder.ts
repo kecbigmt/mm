@@ -12,7 +12,8 @@ import { ItemId } from "../../domain/primitives/item_id.ts";
 import { ItemRank } from "../../domain/primitives/item_rank.ts";
 
 /**
- * Edge data for index rebuilding
+ * Edge data for index rebuilding.
+ * Intentionally excludes created_at for simplicity; sorting uses rank only.
  */
 export type EdgeData = Readonly<{
   readonly itemId: ItemId;
@@ -151,8 +152,7 @@ export const rebuildFromItems = async (
     }
   }
 
-  // Sort edges within each directory by rank.
-  // EdgeData intentionally excludes created_at for simplicity.
+  // Sort edges within each directory by rank only (no created_at tiebreaker)
   const sortedEdgesByDirectory = new Map<string, ReadonlyArray<EdgeData>>();
   for (const [dirPath, edges] of edgesByDirectory) {
     const sorted = [...edges].sort((a, b) => a.rank.compare(b.rank));
