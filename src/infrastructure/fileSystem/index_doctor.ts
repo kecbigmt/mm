@@ -21,7 +21,8 @@ export type IndexIntegrityIssue = Readonly<{
     | "CycleDetected"
     | "AliasConflict"
     | "EdgeItemMismatch"
-    | "MissingEdge";
+    | "MissingEdge"
+    | "EdgeLocationMismatch";
   message: string;
   path?: string;
   context?: Record<string, unknown>;
@@ -272,12 +273,71 @@ const checkAliasUniqueness = (
 };
 
 /**
+ * Derive the expected edge directory pattern from an item's placement
+ *
+ * Returns a pattern like:
+ * - "dates/2024-01-15" for date placement
+ * - "dates/2024-01-15/1/2" for date placement with sections
+ * - "parents/<parent-id>" for item placement
+ * - "parents/<parent-id>/1/2" for item placement with sections
+ */
+const deriveExpectedEdgeDirectory = (item: Item): string => {
+  const placement = item.data.placement;
+  const sections = placement.section;
+
+  let basePath: string;
+
+  if (placement.head.kind === "date") {
+    const date = placement.head.date;
+    // Use ISO format (YYYY-MM-DD) to match graph_index storage
+    const dateStr = date.data.iso;
+    basePath = `dates/${dateStr}`;
+  } else {
+    // item placement
+    const parentId = placement.head.id.toString();
+    basePath = `parents/${parentId}`;
+  }
+
+  if (sections.length > 0) {
+    return `${basePath}/${sections.join("/")}`;
+  }
+
+  return basePath;
+};
+
+/**
+ * Extract the edge directory from an edge file path
+ *
+ * Input: "/workspace/.index/graph/dates/2024/01/15/item-id.edge.json"
+ * Output: "dates/2024/01/15"
+ */
+const extractEdgeDirectory = (edgePath: string): string | null => {
+  // Find ".index/graph/" in the path
+  const graphMarker = ".index/graph/";
+  const graphIndex = edgePath.indexOf(graphMarker);
+
+  if (graphIndex === -1) {
+    return null;
+  }
+
+  // Extract everything after ".index/graph/" up to the filename
+  const afterGraph = edgePath.slice(graphIndex + graphMarker.length);
+  const lastSlash = afterGraph.lastIndexOf("/");
+
+  if (lastSlash === -1) {
+    return null;
+  }
+
+  return afterGraph.slice(0, lastSlash);
+};
+
+/**
  * Check that edge files are in sync with item frontmatter
  *
  * Reports:
  * - Missing edges: Items with placement but no corresponding edge file
- * - Orphaned edges: Edge files without corresponding items
  * - Rank mismatch: Edge rank differs from item rank
+ * - Location mismatch: Edge exists but in wrong directory
  */
 const checkEdgeItemSync = (
   items: ReadonlyMap<string, Item>,
@@ -285,19 +345,23 @@ const checkEdgeItemSync = (
 ): IndexIntegrityIssue[] => {
   const issues: IndexIntegrityIssue[] = [];
 
-  // Build set of item IDs that have edge files
-  const itemsWithEdges = new Set<string>();
-  const edgeRankByItem = new Map<string, string>();
+  // Build map of item ID -> edge info (path and rank)
+  const edgesByItem = new Map<string, { path: string; rank: string }>();
 
   for (const edge of edges) {
     const itemIdStr = edge.itemId.toString();
-    itemsWithEdges.add(itemIdStr);
-    edgeRankByItem.set(itemIdStr, edge.rank);
+    // If multiple edges for same item, keep the first one (duplicates are reported elsewhere)
+    if (!edgesByItem.has(itemIdStr)) {
+      edgesByItem.set(itemIdStr, { path: edge.path, rank: edge.rank });
+    }
   }
 
-  // Check each item has an edge file
+  // Check each item
   for (const [id, item] of items) {
-    if (!itemsWithEdges.has(id)) {
+    const edgeInfo = edgesByItem.get(id);
+
+    if (!edgeInfo) {
+      // Missing edge file
       const placement = item.data.placement.toString();
       issues.push({
         kind: "MissingEdge",
@@ -307,26 +371,43 @@ const checkEdgeItemSync = (
           placement,
         },
       });
-    } else {
-      // Check rank matches
-      const edgeRank = edgeRankByItem.get(id);
-      const itemRank = item.data.rank.toString();
+      continue;
+    }
 
-      if (edgeRank && edgeRank !== itemRank) {
-        issues.push({
-          kind: "EdgeItemMismatch",
-          message: `Rank mismatch for item ${id}: edge has '${edgeRank}', item has '${itemRank}'`,
-          context: {
-            itemId: id,
-            edgeRank,
-            itemRank,
-          },
-        });
-      }
+    // Check edge location matches item placement
+    const expectedDir = deriveExpectedEdgeDirectory(item);
+    const actualDir = extractEdgeDirectory(edgeInfo.path);
+
+    if (actualDir && actualDir !== expectedDir) {
+      issues.push({
+        kind: "EdgeLocationMismatch",
+        message: `Edge file for item ${id} is in wrong location`,
+        path: edgeInfo.path,
+        context: {
+          itemId: id,
+          expectedDirectory: expectedDir,
+          actualDirectory: actualDir,
+          placement: item.data.placement.toString(),
+        },
+      });
+    }
+
+    // Check rank matches
+    const edgeRank = edgeInfo.rank;
+    const itemRank = item.data.rank.toString();
+
+    if (edgeRank !== itemRank) {
+      issues.push({
+        kind: "EdgeItemMismatch",
+        message: `Rank mismatch for item ${id}: edge has '${edgeRank}', item has '${itemRank}'`,
+        context: {
+          itemId: id,
+          edgeRank,
+          itemRank,
+        },
+      });
     }
   }
-
-  // Orphaned edges are already reported by checkEdgeTargets
 
   return issues;
 };

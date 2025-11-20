@@ -271,6 +271,8 @@ function formatIssueSectionName(kind: IndexIntegrityIssue["kind"]): string {
       return "Edge-Item Mismatches";
     case "MissingEdge":
       return "Missing Edges";
+    case "EdgeLocationMismatch":
+      return "Stale Edges";
     default:
       return "Other Issues";
   }
