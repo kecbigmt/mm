@@ -206,26 +206,40 @@ Index rebuild complete.
 
 ---
 
-### 3.3 `mm doctor rebalance-rank`
+### 3.3 `mm doctor rebalance-rank <paths...>`
 
 #### Purpose
 
-Rebalance LexoRank values for siblings within each (parent, section) group to restore insertion headroom and optimize rank performance.
+Rebalance LexoRank values for siblings within specified path(s) to restore insertion headroom and optimize rank performance.
 
 #### When to use
 
-* **Rank density is high**: Many insertions between same siblings have consumed available rank space
-* **Rank strings are long**: Excessive precision from repeated insertions
-* **Periodic maintenance**: Optimize rank performance as part of regular workspace cleanup
+* **Local rank density is high**: Many insertions in a specific date or item have consumed available rank space
+* **Rank strings are long**: Excessive precision from repeated insertions in a specific location
+* **After intensive editing**: After adding many items to today's date or a specific project item
 * **Not a correctness fix**: This is a UX/performance optimization, not a data integrity repair
+
+#### Arguments
+
+* `<paths...>`: One or more path expressions (required)
+  * Relative dates: `today`, `tomorrow`, `+2w`, `~mon`
+  * Absolute dates: `YYYY-MM-DD` (e.g., `2025-01-15`)
+  * Aliases: `book`, `project-x`
+  * Item UUID: `019a85fc-67c4-7a54-be8e-305bae009f9e`
+  * Sections: `book/1`, `2025-01-15/3`
+  * Multiple paths can be specified (space-separated)
 
 #### Process
 
-1. **Identify all (parent, section) groups**:
-   * Scan `.index/graph/dates/` for date-parented groups
-   * Scan `.index/graph/parents/` for Item-parented groups
+1. **Resolve and query items from specified paths**:
+   * Parse each path expression (supports relative dates, aliases, UUIDs, sections)
+   * Resolve to absolute placement using path resolver
+   * Query items efficiently using index (no full workspace scan)
 
-2. **For each group**:
+2. **Group by (parent, section)**:
+   * Group queried items by their full placement (parent + section)
+
+4. **For each group**:
    * Collect all sibling Items (children of same parent + section)
    * Sort by current `rank` (with `created_at` tiebreak for stability)
    * Generate evenly-spaced new rank values:
@@ -238,24 +252,48 @@ Rebalance LexoRank values for siblings within each (parent, section) group to re
    * Update edge files:
      * Update `rank` field in corresponding `.edge.json` files
 
-3. **Verify ordering preserved**:
+5. **Verify ordering preserved**:
    * Ensure sort order is identical before/after rebalance
    * Report any discrepancies
 
 #### Output format
 
 ```
-mm doctor rebalance-rank
+mm doctor rebalance-rank today
 
 Rebalancing ranks...
 
-✓ Found 156 (parent, section) groups
-✓ Rebalanced 1,247 items across all groups
-  - 2025-01-09: 23 items
-  - 2025-01-10: 18 items
-  - 019a85fc-67c4-7a54-be8e-305bae009f9e: 12 items
-  - 019a8603-1234-7890-abcd-1234567890ab/1: 8 items
-  - ...
+Target paths: today
+
+✓ Found 23 items in target paths
+✓ Grouped into 3 sibling groups
+✓ Rebalanced 23 items across 3 groups
+  - 2025-01-15: 18 items
+  - 2025-01-15/1: 3 items
+  - 2025-01-15/2: 2 items
+
+Rank rebalance complete.
+
+⚠ Changes made to Item files (frontmatter only).
+  Run 'git status' to review changes before committing.
+```
+
+Multiple paths:
+
+```
+mm doctor rebalance-rank today tomorrow book
+
+Rebalancing ranks...
+
+Target paths: today, tomorrow, book
+
+✓ Found 35 items in target paths
+✓ Grouped into 5 sibling groups
+✓ Rebalanced 35 items across 5 groups
+  - 2025-01-15: 18 items
+  - 2025-01-15/1: 3 items
+  - 2025-01-16: 12 items
+  - 019a85fc-...: 2 items
 
 Rank rebalance complete.
 
@@ -265,6 +303,10 @@ Rank rebalance complete.
 
 #### Important notes
 
+* **Requires path argument**: Must specify at least one path expression
+* **Flexible path expressions**: Supports relative dates, aliases, UUIDs, and sections
+* **Targeted rebalancing**: Only affects items in specified paths (smaller Git diffs)
+* **Efficient scanning**: Uses index-based queries, no full workspace scan
 * **Modifies Item files**: Updates Frontmatter `rank` and `updated_at` fields
 * **Should be committed**: Changes are in Git-tracked files and should be committed
 * **Preserves ordering**: Sibling order remains identical (sort by old rank = sort by new rank)
@@ -322,8 +364,10 @@ mm doctor check
 # Rebuild index from frontmatter
 mm doctor rebuild-index
 
-# Rebalance LexoRank values
-mm doctor rebalance-rank
+# Rebalance LexoRank values for specific path(s)
+mm doctor rebalance-rank today
+mm doctor rebalance-rank book
+mm doctor rebalance-rank today tomorrow book/1
 ```
 
 ### 5.2 Options (future)
@@ -336,12 +380,6 @@ mm doctor check --format=json
 
 # Rebuild index with progress bar
 mm doctor rebuild-index --verbose
-
-# Rebalance only specific parent
-mm doctor rebalance-rank --parent=<uuid>
-
-# Rebalance only specific date range
-mm doctor rebalance-rank --date-range=2025-01-01..2025-01-31
 ```
 
 ---

@@ -1,13 +1,12 @@
 /**
- * CLI command: mm doctor rebalance-rank
+ * CLI command: mm doctor rebalance-rank <paths...>
  *
- * Rebalances LexoRank values for siblings within each (parent, section) group
+ * Rebalances LexoRank values for siblings within specified path(s)
  * to restore insertion headroom and optimize rank performance.
  */
 
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../../dependencies.ts";
-import { createWorkspaceScanner } from "../../../../infrastructure/fileSystem/workspace_scanner.ts";
 import {
   groupByPlacement,
   ItemRankUpdate,
@@ -16,12 +15,16 @@ import {
 import { updateAllRanks } from "../../../../infrastructure/fileSystem/item_updater.ts";
 import { Item } from "../../../../domain/models/item.ts";
 import { parseDateTime } from "../../../../domain/primitives/mod.ts";
+import { parseRangeExpression } from "../../path_expression.ts";
+import { createPathResolver } from "../../../../domain/services/path_resolver.ts";
+import { CwdResolutionService } from "../../../../domain/services/cwd_resolution_service.ts";
 
 export const rebalanceRankCommand = new Command()
   .name("rebalance-rank")
-  .description("Rebalance LexoRank values for siblings")
+  .description("Rebalance LexoRank values for siblings within specified paths")
+  .arguments("<paths...:string>")
   .option("-w, --workspace <path:string>", "Workspace path or name")
-  .action(async (options) => {
+  .action(async (options, ...paths: string[]) => {
     // Load dependencies
     const depsResult = await loadCliDependencies(options.workspace);
     if (depsResult.type === "error") {
@@ -34,38 +37,89 @@ export const rebalanceRankCommand = new Command()
     }
 
     const deps = depsResult.value;
-    const scanner = createWorkspaceScanner(deps.root);
+    const now = new Date();
 
     console.log("Rebalancing ranks...\n");
+    console.log(`Target paths: ${paths.join(", ")}\n`);
 
-    // Scan all items
-    const items: Item[] = [];
-    const scanErrors: string[] = [];
+    // Get current CWD for path resolution
+    const cwdResult = await CwdResolutionService.getCwd(
+      {
+        stateRepository: deps.stateRepository,
+        itemRepository: deps.itemRepository,
+      },
+      now,
+    );
 
-    for await (const result of scanner.scanAllItems()) {
-      if (result.type === "error") {
-        scanErrors.push(`${result.error.path}: ${result.error.message}`);
-        continue;
-      }
-      items.push(result.value);
+    if (cwdResult.type === "error") {
+      console.error(`Error resolving CWD: ${cwdResult.error.message}`);
+      Deno.exit(1);
     }
 
-    if (scanErrors.length > 0) {
-      console.log(`⚠ ${scanErrors.length} items could not be scanned:`);
-      for (const err of scanErrors.slice(0, 5)) {
+    // Create path resolver
+    const pathResolver = createPathResolver({
+      aliasRepository: deps.aliasRepository,
+      itemRepository: deps.itemRepository,
+      timezone: deps.timezone,
+      today: now,
+    });
+
+    // Resolve each path expression and collect items
+    const items: Item[] = [];
+    const resolveErrors: string[] = [];
+
+    for (const pathExpr of paths) {
+      // Parse path expression
+      const rangeExprResult = parseRangeExpression(pathExpr);
+      if (rangeExprResult.type === "error") {
+        resolveErrors.push(`"${pathExpr}": invalid expression`);
+        continue;
+      }
+
+      // Resolve to PlacementRange
+      const resolveResult = await pathResolver.resolveRange(
+        cwdResult.value,
+        rangeExprResult.value,
+      );
+      if (resolveResult.type === "error") {
+        resolveErrors.push(`"${pathExpr}": ${resolveResult.error.issues.join(", ")}`);
+        continue;
+      }
+
+      // Query items efficiently using index
+      const itemsResult = await deps.itemRepository.listByPlacement(resolveResult.value);
+      if (itemsResult.type === "error") {
+        resolveErrors.push(`"${pathExpr}": ${itemsResult.error.message}`);
+        continue;
+      }
+
+      items.push(...itemsResult.value);
+    }
+
+    if (resolveErrors.length > 0) {
+      console.log(`⚠ ${resolveErrors.length} path(s) could not be resolved:`);
+      for (const err of resolveErrors.slice(0, 5)) {
         console.log(`  • ${err}`);
       }
-      if (scanErrors.length > 5) {
-        console.log(`  ... and ${scanErrors.length - 5} more`);
+      if (resolveErrors.length > 5) {
+        console.log(`  ... and ${resolveErrors.length - 5} more`);
       }
       console.log("");
     }
 
-    console.log(`✓ Scanned ${items.length} items`);
+    if (items.length === 0) {
+      console.log(`✗ No items found in target paths.`);
+      console.log(
+        `  Make sure the path expressions are correct (e.g., "today", "2025-01-15", alias, or UUID).`,
+      );
+      Deno.exit(1);
+    }
 
-    // Group by placement
+    console.log(`✓ Found ${items.length} items in target paths`);
+
+    // Group by placement (items are already filtered to target paths)
     const groups = groupByPlacement(items);
-    console.log(`✓ Found ${groups.length} (parent, section) groups`);
+    console.log(`✓ Grouped into ${groups.length} sibling groups`);
 
     // Rebalance each group
     const allUpdates: ItemRankUpdate[] = [];
@@ -88,13 +142,13 @@ export const rebalanceRankCommand = new Command()
     }
 
     if (allUpdates.length === 0) {
-      console.log("\n✓ All ranks are already balanced. No changes needed.");
+      console.log("\n✓ All ranks in target paths are already balanced. No changes needed.");
       Deno.exit(0);
     }
 
     // Get current timestamp for updated_at
-    const now = new Date().toISOString();
-    const updatedAtResult = parseDateTime(now);
+    const nowIso = new Date().toISOString();
+    const updatedAtResult = parseDateTime(nowIso);
     if (updatedAtResult.type === "error") {
       console.error("Error: failed to create timestamp");
       Deno.exit(1);

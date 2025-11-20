@@ -82,8 +82,8 @@ describe("Scenario 18: Doctor rebalance-rank", () => {
     const workspacePath = getWorkspacePath(ctx.testHome, "test-workspace");
     const initialRanks = await getRanksForItems(workspacePath, today, itemIds);
 
-    // Run rebalance-rank command
-    const rebalanceResult = await runCommand(ctx.testHome, ["doctor", "rebalance-rank"]);
+    // Run rebalance-rank command for today's date
+    const rebalanceResult = await runCommand(ctx.testHome, ["doctor", "rebalance-rank", today]);
     assertEquals(rebalanceResult.success, true, `rebalance-rank failed: ${rebalanceResult.stderr}`);
 
     // Verify command output
@@ -136,8 +136,8 @@ describe("Scenario 18: Doctor rebalance-rank", () => {
     // Wait a bit to ensure timestamp difference
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    // Run rebalance-rank
-    const rebalanceResult = await runCommand(ctx.testHome, ["doctor", "rebalance-rank"]);
+    // Run rebalance-rank for today's date
+    const rebalanceResult = await runCommand(ctx.testHome, ["doctor", "rebalance-rank", today]);
     assertEquals(rebalanceResult.success, true, `rebalance-rank failed: ${rebalanceResult.stderr}`);
 
     // Check if rank was actually changed (single item at middle rank may not change)
@@ -158,16 +158,34 @@ describe("Scenario 18: Doctor rebalance-rank", () => {
     }
   });
 
-  it("handles empty workspace gracefully", async () => {
-    // Run rebalance-rank on empty workspace
+  it("requires placement argument", async () => {
+    // Run rebalance-rank without placement argument should fail
     const rebalanceResult = await runCommand(ctx.testHome, ["doctor", "rebalance-rank"]);
-    assertEquals(rebalanceResult.success, true, `rebalance-rank failed: ${rebalanceResult.stderr}`);
-
-    // Should complete successfully with 0 items
     assertEquals(
-      rebalanceResult.stdout.includes("Scanned 0 items"),
+      rebalanceResult.success,
+      false,
+      "Should fail when no placement argument provided",
+    );
+  });
+
+  it("handles non-existent placement gracefully", async () => {
+    // Run rebalance-rank on non-existent date
+    const rebalanceResult = await runCommand(ctx.testHome, [
+      "doctor",
+      "rebalance-rank",
+      "2099-12-31",
+    ]);
+    assertEquals(
+      rebalanceResult.success,
+      false,
+      "Should fail when no items found in placement",
+    );
+
+    // Should report no items found
+    assertEquals(
+      rebalanceResult.stdout.includes("No items found"),
       true,
-      "Should report 0 items scanned",
+      "Should report no items found",
     );
   });
 
@@ -178,8 +196,10 @@ describe("Scenario 18: Doctor rebalance-rank", () => {
     await runCommand(ctx.testHome, ["note", "First item"]);
     await runCommand(ctx.testHome, ["note", "Second item"]);
 
-    // Run rebalance-rank
-    const rebalanceResult = await runCommand(ctx.testHome, ["doctor", "rebalance-rank"]);
+    const today = await getCurrentDateFromCli(ctx.testHome);
+
+    // Run rebalance-rank for today's date
+    const rebalanceResult = await runCommand(ctx.testHome, ["doctor", "rebalance-rank", today]);
     assertEquals(rebalanceResult.success, true, `rebalance-rank failed: ${rebalanceResult.stderr}`);
 
     // Check for git warning in output
@@ -207,8 +227,8 @@ describe("Scenario 18: Doctor rebalance-rank", () => {
     // Get initial content
     const initialContent = await Deno.readTextFile(itemPath);
 
-    // Run rebalance-rank
-    const rebalanceResult = await runCommand(ctx.testHome, ["doctor", "rebalance-rank"]);
+    // Run rebalance-rank for today's date
+    const rebalanceResult = await runCommand(ctx.testHome, ["doctor", "rebalance-rank", today]);
     assertEquals(rebalanceResult.success, true, `rebalance-rank failed: ${rebalanceResult.stderr}`);
 
     // Get updated content
@@ -245,13 +265,15 @@ describe("Scenario 18: Doctor rebalance-rank", () => {
     await runCommand(ctx.testHome, ["note", "Item 1"]);
     await runCommand(ctx.testHome, ["note", "Item 2"]);
 
-    // Run rebalance-rank
-    const rebalanceResult = await runCommand(ctx.testHome, ["doctor", "rebalance-rank"]);
+    const today = await getCurrentDateFromCli(ctx.testHome);
+
+    // Run rebalance-rank for today's date
+    const rebalanceResult = await runCommand(ctx.testHome, ["doctor", "rebalance-rank", today]);
     assertEquals(rebalanceResult.success, true, `rebalance-rank failed: ${rebalanceResult.stderr}`);
 
     // Should report group count
     assertEquals(
-      rebalanceResult.stdout.includes("(parent, section) groups"),
+      rebalanceResult.stdout.includes("sibling groups"),
       true,
       "Should report number of groups",
     );

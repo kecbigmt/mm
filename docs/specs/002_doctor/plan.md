@@ -585,22 +585,29 @@ export const rebuildIndexCommand = new Command()
 
 **File:** `src/presentation/cli/commands/doctor/rebalance_rank.ts`
 
-Implement `mm doctor rebalance-rank` command with full processing flow:
+Implement `mm doctor rebalance-rank <paths...>` command with full processing flow:
 
 ```typescript
 export const rebalanceRankCommand = new Command()
   .name("rebalance-rank")
-  .description("Rebalance LexoRank values for siblings")
+  .description("Rebalance LexoRank values for siblings within specified paths")
+  .arguments("<paths...:string>")
   .option("-w, --workspace <path:string>", "Workspace path or name")
-  .action(async (options) => {
+  .action(async (options, ...paths: string[]) => {
     // 1. Load dependencies
     const deps = await loadCliDependencies(options.workspace);
 
-    // 2. Scan all Items
-    const scanner = createWorkspaceScanner(deps.root);
-    const items = [...scanner.scanAllItems()];
+    // 2. Resolve each path expression and query items efficiently
+    const pathResolver = createPathResolver({...});
+    const items = [];
+    for (const pathExpr of paths) {
+      const rangeExprResult = parseRangeExpression(pathExpr);
+      const resolveResult = await pathResolver.resolveRange(cwd, rangeExprResult.value);
+      const itemsResult = await deps.itemRepository.listByPlacement(resolveResult.value);
+      items.push(...itemsResult.value);
+    }
 
-    // 3. Group by placement
+    // 3. Group filtered items by placement
     const groups = groupByPlacement(items);
 
     // 4. Rebalance each group
@@ -619,22 +626,27 @@ export const rebalanceRankCommand = new Command()
 
 **Implementation notes:**
 
+- **Requires path argument(s)**: One or more path expressions (supports relative dates, aliases, UUIDs, sections)
 - Added `--workspace` option for workspace selection
+- Uses path resolution for flexible input (today, book, 2025-01-15, etc.)
+- Efficient index-based queries (no full workspace scan)
 - Uses `loadCliDependencies` for consistent dependency loading
 - RankService injected from dependencies for testability
-- Shows scan errors but continues processing
+- Shows resolution errors but continues processing
 - Shows group-by-group breakdown in output
 
 **Output format:**
 
-- Scan count and errors
+- Target paths
+- Items found in target paths
 - Group count
 - Items rebalanced per group (top 10)
 - Warning about Git changes
 
 **Deliverables:**
 
-- `rebalance-rank` command implementation
+- `rebalance-rank` command implementation with required path arguments
+- Path resolution and efficient querying
 - Workspace option support
 - Progress display with group breakdown
 - Git change warning
