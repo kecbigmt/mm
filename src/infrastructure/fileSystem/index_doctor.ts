@@ -335,9 +335,9 @@ const extractEdgeDirectory = (edgePath: string): string | null => {
  * Check that edge files are in sync with item frontmatter
  *
  * Reports:
- * - Missing edges: Items with placement but no corresponding edge file
+ * - Missing edges: Items with no edge file at expected location
  * - Rank mismatch: Edge rank differs from item rank
- * - Location mismatch: Edge exists but in wrong directory
+ * - Location mismatch: Edge exists but in wrong directory (stale edges)
  */
 const checkEdgeItemSync = (
   items: ReadonlyMap<string, Item>,
@@ -345,23 +345,23 @@ const checkEdgeItemSync = (
 ): IndexIntegrityIssue[] => {
   const issues: IndexIntegrityIssue[] = [];
 
-  // Build map of item ID -> edge info (path and rank)
-  const edgesByItem = new Map<string, { path: string; rank: string }>();
+  // Build map of item ID -> ALL edges for that item
+  const edgesByItem = new Map<string, Array<{ path: string; rank: string }>>();
 
   for (const edge of edges) {
     const itemIdStr = edge.itemId.toString();
-    // If multiple edges for same item, keep the first one (duplicates are reported elsewhere)
-    if (!edgesByItem.has(itemIdStr)) {
-      edgesByItem.set(itemIdStr, { path: edge.path, rank: edge.rank });
-    }
+    const existing = edgesByItem.get(itemIdStr) ?? [];
+    existing.push({ path: edge.path, rank: edge.rank });
+    edgesByItem.set(itemIdStr, existing);
   }
 
   // Check each item
   for (const [id, item] of items) {
-    const edgeInfo = edgesByItem.get(id);
+    const itemEdges = edgesByItem.get(id);
+    const expectedDir = deriveExpectedEdgeDirectory(item);
 
-    if (!edgeInfo) {
-      // Missing edge file
+    if (!itemEdges || itemEdges.length === 0) {
+      // No edge files at all
       const placement = item.data.placement.toString();
       issues.push({
         kind: "MissingEdge",
@@ -374,38 +374,61 @@ const checkEdgeItemSync = (
       continue;
     }
 
-    // Check edge location matches item placement
-    const expectedDir = deriveExpectedEdgeDirectory(item);
-    const actualDir = extractEdgeDirectory(edgeInfo.path);
+    // Check all edges for this item
+    let hasCorrectLocation = false;
+    let correctEdge: { path: string; rank: string } | undefined;
 
-    if (actualDir && actualDir !== expectedDir) {
-      issues.push({
-        kind: "EdgeLocationMismatch",
-        message: `Edge file for item ${id} is in wrong location`,
-        path: edgeInfo.path,
-        context: {
-          itemId: id,
-          expectedDirectory: expectedDir,
-          actualDirectory: actualDir,
-          placement: item.data.placement.toString(),
-        },
-      });
+    for (const edgeInfo of itemEdges) {
+      const actualDir = extractEdgeDirectory(edgeInfo.path);
+
+      if (actualDir === expectedDir) {
+        // Found edge at correct location
+        hasCorrectLocation = true;
+        correctEdge = edgeInfo;
+      } else if (actualDir) {
+        // Edge at wrong location (stale edge)
+        issues.push({
+          kind: "EdgeLocationMismatch",
+          message: `Edge file for item ${id} is in wrong location`,
+          path: edgeInfo.path,
+          context: {
+            itemId: id,
+            expectedDirectory: expectedDir,
+            actualDirectory: actualDir,
+            placement: item.data.placement.toString(),
+          },
+        });
+      }
     }
 
-    // Check rank matches
-    const edgeRank = edgeInfo.rank;
-    const itemRank = item.data.rank.toString();
-
-    if (edgeRank !== itemRank) {
+    // If no edge at correct location, report missing
+    if (!hasCorrectLocation) {
+      const placement = item.data.placement.toString();
       issues.push({
-        kind: "EdgeItemMismatch",
-        message: `Rank mismatch for item ${id}: edge has '${edgeRank}', item has '${itemRank}'`,
+        kind: "MissingEdge",
+        message: `Missing edge file for item ${id} at expected location (placement: ${placement})`,
         context: {
           itemId: id,
-          edgeRank,
-          itemRank,
+          placement,
+          expectedDirectory: expectedDir,
         },
       });
+    } else if (correctEdge) {
+      // Check rank matches for the edge at correct location
+      const edgeRank = correctEdge.rank;
+      const itemRank = item.data.rank.toString();
+
+      if (edgeRank !== itemRank) {
+        issues.push({
+          kind: "EdgeItemMismatch",
+          message: `Rank mismatch for item ${id}: edge has '${edgeRank}', item has '${itemRank}'`,
+          context: {
+            itemId: id,
+            edgeRank,
+            itemRank,
+          },
+        });
+      }
     }
   }
 
