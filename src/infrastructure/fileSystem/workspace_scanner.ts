@@ -390,7 +390,7 @@ async function parseEdgeFileWithPath(
   }
 
   // Parse JSON
-  let data: { schema?: string; to?: string; rank: string };
+  let data: { schema?: string; to?: string; rank?: string };
   try {
     data = JSON.parse(content);
   } catch (error) {
@@ -399,6 +399,15 @@ async function parseEdgeFileWithPath(
       message: "invalid JSON in edge file",
       path: filePath,
       cause: error,
+    });
+  }
+
+  // Validate rank field exists
+  if (!data.rank) {
+    return Result.error({
+      kind: "parse_error",
+      message: "missing rank field in edge file",
+      path: filePath,
     });
   }
 
