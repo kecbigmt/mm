@@ -104,3 +104,32 @@ specified (or default) timezone.
 mm workspace use research
 mm ws use client-a --timezone Asia/Tokyo
 ```
+
+### Maintenance
+
+#### `doctor check`
+
+Validate workspace integrity without making modifications. Reports frontmatter issues, graph
+inconsistencies, and index sync problems.
+
+```sh
+mm doctor check
+```
+
+#### `doctor rebuild-index`
+
+Rebuild `.index/` directory from item frontmatter. Use after cloning workspace or when index is
+corrupted.
+
+```sh
+mm doctor rebuild-index
+```
+
+#### `doctor rebalance-rank <paths...>`
+
+Rebalance LexoRank values for items in specified paths to restore insertion headroom.
+
+```sh
+mm doctor rebalance-rank today
+mm doctor rebalance-rank 2025-01-15 book-alias
+```
