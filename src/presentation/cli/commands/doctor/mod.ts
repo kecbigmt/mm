@@ -1,5 +1,6 @@
 import { Command } from "@cliffy/command";
 import { createRebuildIndexCommand } from "./rebuild_index.ts";
+import { rebalanceRankCommand } from "./rebalance_rank.ts";
 
 /**
  * Create the parent doctor command with all subcommands
@@ -16,4 +17,5 @@ export const createDoctorCommand = () =>
       console.log("  rebalance-rank  Rebalance LexoRank values for siblings");
       console.log("\nRun 'mm doctor <command> --help' for more information.");
     })
-    .command("rebuild-index", createRebuildIndexCommand());
+    .command("rebuild-index", createRebuildIndexCommand())
+    .command("rebalance-rank", rebalanceRankCommand);
