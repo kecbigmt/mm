@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { checkIndexIntegrity, EdgeReferenceWithPath } from "./index_doctor.ts";
 import { Item, parseItem } from "../../domain/models/item.ts";
-import { Alias } from "../../domain/models/alias.ts";
+import { Alias, parseAlias } from "../../domain/models/alias.ts";
 import { parseItemId } from "../../domain/primitives/item_id.ts";
 
 /**
@@ -46,6 +46,25 @@ function createTestEdge(itemId: string, rank: string, path: string): EdgeReferen
     rank,
     path,
   };
+}
+
+/**
+ * Helper to create a test alias
+ */
+function createTestAlias(raw: string, itemId: string): Alias {
+  const canonicalKey = raw.normalize("NFKC").toLowerCase();
+  const snapshot = {
+    raw,
+    canonicalKey,
+    itemId,
+    createdAt: "2025-01-15T10:00:00Z",
+  };
+
+  const result = parseAlias(snapshot);
+  if (result.type === "error") {
+    throw new Error(`Failed to create test alias: ${JSON.stringify(result.error)}`);
+  }
+  return result.value;
 }
 
 Deno.test("checkIndexIntegrity - returns empty array for valid workspace", () => {
@@ -441,4 +460,143 @@ Deno.test("checkIndexIntegrity - detects edge in wrong section", () => {
   assertEquals(locationIssue !== undefined, true);
   assertEquals(locationIssue?.context?.expectedDirectory, "dates/2025-01-15/1/2");
   assertEquals(locationIssue?.context?.actualDirectory, "dates/2025-01-15/1/3");
+});
+
+Deno.test("checkIndexIntegrity - detects duplicate canonical_key in alias index", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+  const id2 = "019a8603-1234-7890-abcd-1234567890ab";
+
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15", "a", { alias: "test-alias" })],
+    [id2, createTestItem(id2, "2025-01-15", "b", { alias: "Test-Alias" })],
+  ]);
+
+  const edges: EdgeReferenceWithPath[] = [];
+
+  // Two alias index entries with same canonical_key but different items
+  const aliases: Alias[] = [
+    createTestAlias("test-alias", id1),
+    createTestAlias("Test-Alias", id2), // Same canonical_key, different item
+  ];
+
+  const issues = checkIndexIntegrity(items, edges, aliases);
+
+  const conflictIssue = issues.find((i) => i.kind === "AliasConflict");
+  assertEquals(conflictIssue !== undefined, true);
+  assertEquals(conflictIssue?.context?.canonicalKey, "test-alias");
+});
+
+Deno.test("checkIndexIntegrity - detects orphaned alias index (non-existent item)", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+  const orphanId = "019a8610-1234-7890-abcd-badc0ffee000";
+
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15", "a")],
+  ]);
+
+  const edges: EdgeReferenceWithPath[] = [];
+
+  // Alias index points to non-existent item
+  const aliases: Alias[] = [
+    createTestAlias("orphan-alias", orphanId),
+  ];
+
+  const issues = checkIndexIntegrity(items, edges, aliases);
+
+  const orphanIssue = issues.find((i) => i.kind === "OrphanedAliasIndex");
+  assertEquals(orphanIssue !== undefined, true);
+  assertEquals(orphanIssue?.message.includes(orphanId), true);
+});
+
+Deno.test("checkIndexIntegrity - detects orphaned alias index (item has no alias)", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+
+  // Item has no alias in frontmatter
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15", "a")],
+  ]);
+
+  const edges: EdgeReferenceWithPath[] = [];
+
+  // But alias index file exists
+  const aliases: Alias[] = [
+    createTestAlias("stale-alias", id1),
+  ];
+
+  const issues = checkIndexIntegrity(items, edges, aliases);
+
+  const orphanIssue = issues.find((i) => i.kind === "OrphanedAliasIndex");
+  assertEquals(orphanIssue !== undefined, true);
+  assertEquals(orphanIssue?.message.includes("has no alias in frontmatter"), true);
+});
+
+Deno.test("checkIndexIntegrity - detects alias index canonical_key mismatch", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+
+  // Item has alias "current-alias"
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15", "a", { alias: "current-alias" })],
+  ]);
+
+  const edges: EdgeReferenceWithPath[] = [];
+
+  // But alias index file has different canonical_key
+  const aliases: Alias[] = [
+    createTestAlias("old-alias", id1),
+  ];
+
+  const issues = checkIndexIntegrity(items, edges, aliases);
+
+  const orphanIssue = issues.find((i) => i.kind === "OrphanedAliasIndex");
+  assertEquals(orphanIssue !== undefined, true);
+  assertEquals(orphanIssue?.message.includes("doesn't match"), true);
+});
+
+Deno.test("checkIndexIntegrity - detects missing alias index", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+
+  // Item has alias in frontmatter
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15", "a", { alias: "test-alias" })],
+  ]);
+
+  const edges: EdgeReferenceWithPath[] = [];
+
+  // But no alias index file
+  const aliases: Alias[] = [];
+
+  const issues = checkIndexIntegrity(items, edges, aliases);
+
+  const missingIssue = issues.find((i) => i.kind === "MissingAliasIndex");
+  assertEquals(missingIssue !== undefined, true);
+  assertEquals(missingIssue?.context?.itemId, id1);
+  assertEquals(missingIssue?.context?.alias, "test-alias");
+});
+
+Deno.test("checkIndexIntegrity - valid alias index with matching frontmatter", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+
+  // Item has alias
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15", "a", { alias: "test-alias" })],
+  ]);
+
+  const edges: EdgeReferenceWithPath[] = [
+    createTestEdge(id1, "a", `/workspace/.index/graph/dates/2025-01-15/${id1}.edge.json`),
+  ];
+
+  // Matching alias index file
+  const aliases: Alias[] = [
+    createTestAlias("test-alias", id1),
+  ];
+
+  const issues = checkIndexIntegrity(items, edges, aliases);
+
+  // No alias-related issues
+  const aliasIssues = issues.filter((i) =>
+    i.kind === "AliasConflict" ||
+    i.kind === "OrphanedAliasIndex" ||
+    i.kind === "MissingAliasIndex"
+  );
+  assertEquals(aliasIssues.length, 0);
 });

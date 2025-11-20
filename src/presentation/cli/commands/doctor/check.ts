@@ -273,6 +273,10 @@ function formatIssueSectionName(kind: IndexIntegrityIssue["kind"]): string {
       return "Missing Edges";
     case "EdgeLocationMismatch":
       return "Stale Edges";
+    case "OrphanedAliasIndex":
+      return "Orphaned Alias Index";
+    case "MissingAliasIndex":
+      return "Missing Alias Index";
     default:
       return "Other Issues";
   }

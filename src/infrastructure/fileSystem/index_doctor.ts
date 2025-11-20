@@ -22,7 +22,9 @@ export type IndexIntegrityIssue = Readonly<{
     | "AliasConflict"
     | "EdgeItemMismatch"
     | "MissingEdge"
-    | "EdgeLocationMismatch";
+    | "EdgeLocationMismatch"
+    | "OrphanedAliasIndex"
+    | "MissingAliasIndex";
   message: string;
   path?: string;
   context?: Record<string, unknown>;
@@ -229,43 +231,150 @@ const detectCycles = (
 };
 
 /**
- * Check alias uniqueness across all items
+ * Check alias uniqueness and consistency between frontmatter and index files
  *
- * Two items cannot have the same canonical_key for their aliases
+ * Validates:
+ * 1. No duplicate canonical_key in item frontmatter
+ * 2. No duplicate canonical_key in alias index files
+ * 3. Alias index files point to valid items with matching aliases
+ * 4. Item frontmatter aliases have corresponding index files
  */
 const checkAliasUniqueness = (
   items: ReadonlyMap<string, Item>,
-  _aliases: ReadonlyArray<Alias>,
+  aliases: ReadonlyArray<Alias>,
 ): IndexIntegrityIssue[] => {
   const issues: IndexIntegrityIssue[] = [];
 
-  // Build map of canonical_key -> items
-  const aliasToItems = new Map<string, Array<{ id: string; raw: string }>>();
-
+  // Check for duplicate canonical_key in item frontmatter
+  const frontmatterByCanonicalKey = new Map<string, Array<{ id: string; raw: string }>>();
   for (const [id, item] of items) {
     const alias = item.data.alias;
     if (alias) {
-      // Convert to canonical form (NFKC + casefold)
       const canonicalKey = alias.toString().normalize("NFKC").toLowerCase();
       const rawAlias = alias.toString();
 
-      const existing = aliasToItems.get(canonicalKey) ?? [];
+      const existing = frontmatterByCanonicalKey.get(canonicalKey) ?? [];
       existing.push({ id, raw: rawAlias });
-      aliasToItems.set(canonicalKey, existing);
+      frontmatterByCanonicalKey.set(canonicalKey, existing);
     }
   }
 
-  // Report conflicts
-  for (const [canonicalKey, itemList] of aliasToItems) {
+  for (const [canonicalKey, itemList] of frontmatterByCanonicalKey) {
     if (itemList.length > 1) {
       issues.push({
         kind: "AliasConflict",
-        message: `Duplicate canonical_key '${canonicalKey}'`,
+        message: `Duplicate canonical_key '${canonicalKey}' in item frontmatter`,
         context: {
           canonicalKey,
           items: itemList.map((i) => ({ id: i.id, alias: i.raw })),
         },
       });
+    }
+  }
+
+  // Build map of canonical_key -> alias index entries
+  const indexByCanonicalKey = new Map<string, Alias[]>();
+  for (const alias of aliases) {
+    const canonicalKey = alias.data.slug.canonicalKey.toString();
+    const existing = indexByCanonicalKey.get(canonicalKey) ?? [];
+    existing.push(alias);
+    indexByCanonicalKey.set(canonicalKey, existing);
+  }
+
+  // Check for duplicate canonical_key in alias index files
+  for (const [canonicalKey, aliasEntries] of indexByCanonicalKey) {
+    if (aliasEntries.length > 1) {
+      issues.push({
+        kind: "AliasConflict",
+        message: `Duplicate canonical_key '${canonicalKey}' in alias index`,
+        context: {
+          canonicalKey,
+          entries: aliasEntries.map((a) => ({
+            itemId: a.data.itemId.toString(),
+            raw: a.data.slug.raw,
+          })),
+        },
+      });
+    }
+  }
+
+  // Build map of itemId -> alias index entry (for quick lookup)
+  const indexByItemId = new Map<string, Alias>();
+  for (const alias of aliases) {
+    const itemId = alias.data.itemId.toString();
+    // Use first entry if multiple (duplicates already reported above)
+    if (!indexByItemId.has(itemId)) {
+      indexByItemId.set(itemId, alias);
+    }
+  }
+
+  // Check each alias index entry
+  for (const alias of aliases) {
+    const itemId = alias.data.itemId.toString();
+    const canonicalKey = alias.data.slug.canonicalKey.toString();
+    const item = items.get(itemId);
+
+    if (!item) {
+      // Orphaned alias index: points to non-existent item
+      issues.push({
+        kind: "OrphanedAliasIndex",
+        message: `Alias index points to non-existent item: ${itemId}`,
+        context: {
+          itemId,
+          canonicalKey,
+          raw: alias.data.slug.raw,
+        },
+      });
+      continue;
+    }
+
+    const itemAlias = item.data.alias;
+    if (!itemAlias) {
+      // Orphaned alias index: item has no alias in frontmatter
+      issues.push({
+        kind: "OrphanedAliasIndex",
+        message: `Alias index exists but item ${itemId} has no alias in frontmatter`,
+        context: {
+          itemId,
+          canonicalKey,
+          raw: alias.data.slug.raw,
+        },
+      });
+      continue;
+    }
+
+    // Check if canonical_key matches
+    const itemCanonicalKey = itemAlias.toString().normalize("NFKC").toLowerCase();
+    if (canonicalKey !== itemCanonicalKey) {
+      // Stale alias index: canonical_key doesn't match item frontmatter
+      issues.push({
+        kind: "OrphanedAliasIndex",
+        message: `Alias index canonical_key '${canonicalKey}' doesn't match item ${itemId} frontmatter '${itemCanonicalKey}'`,
+        context: {
+          itemId,
+          indexCanonicalKey: canonicalKey,
+          itemCanonicalKey,
+        },
+      });
+    }
+  }
+
+  // Check each item's frontmatter alias
+  for (const [id, item] of items) {
+    const itemAlias = item.data.alias;
+    if (itemAlias) {
+      const aliasEntry = indexByItemId.get(id);
+      if (!aliasEntry) {
+        // Missing alias index file
+        issues.push({
+          kind: "MissingAliasIndex",
+          message: `Item ${id} has alias '${itemAlias.toString()}' but no alias index file`,
+          context: {
+            itemId: id,
+            alias: itemAlias.toString(),
+          },
+        });
+      }
     }
   }
 
