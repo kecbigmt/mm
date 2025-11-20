@@ -1,5 +1,5 @@
 /**
- * E2E Test Scenario 11: Doctor Check Command
+ * E2E Test Scenario 16: Doctor Check Command
  *
  * Purpose:
  *   Verify that `mm doctor check` correctly inspects workspace integrity
@@ -30,7 +30,7 @@ import {
   type TestContext,
 } from "../helpers.ts";
 
-describe("Scenario 11: Doctor check command", () => {
+describe("Scenario 16: Doctor check command", () => {
   let ctx: TestContext;
 
   beforeEach(async () => {
