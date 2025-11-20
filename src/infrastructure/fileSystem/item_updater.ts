@@ -62,6 +62,8 @@ const deriveFilePathFromId = (
   if (normalized.length !== 32) {
     return undefined;
   }
+  // UUID version is stored in the 13th character (index 12) per RFC 4122.
+  // This check ensures the ID is a UUID v7, which encodes timestamp in first 48 bits.
   if (normalized[12] !== "7") {
     return undefined;
   }
@@ -239,8 +241,14 @@ const updateItemRank = async (
       // Edge file might not exist (e.g., if index is out of sync)
       // Log warning but don't fail the operation
       if (!(error instanceof Deno.errors.NotFound)) {
-        // For non-NotFound errors, we still want to continue
-        // The item file has been updated, so the operation is partially successful
+        // For non-NotFound errors (e.g., permission denied, disk full, JSON parse error),
+        // warn the user so they can address the issue. The item file has been updated,
+        // so we continue but surface this partial failure.
+        console.warn(
+          `Warning: Failed to update edge file for item ${itemIdStr}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
       }
     }
   }
