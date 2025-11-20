@@ -200,11 +200,13 @@ Deno.test("rebalanceGroup - redistributes dense ranks to spread distribution", (
   const rankService = createRankService(createLexoRankGenerator());
 
   // Create items with dense ranks in middle of space (simulating consecutive creation)
-  // These ranks are all in h/i bucket - densely packed around middle
+  // These ranks are all in h bucket - densely packed around middle
   const items = [
     createTestItem("0001", "2025-01-15", "0|hzzzzz:"),
-    createTestItem("0002", "2025-01-15", "0|i00007:"),
-    createTestItem("0003", "2025-01-15", "0|i0000f:"),
+    createTestItem("0002", "2025-01-15", "0|hzzzzm:"),
+    createTestItem("0003", "2025-01-15", "0|hzzzzc:"),
+    createTestItem("0004", "2025-01-15", "0|hzzzzb:"),
+    createTestItem("0005", "2025-01-15", "0|hzzzza:"),
   ];
 
   const result = rebalanceGroup(items, rankService);
@@ -212,7 +214,7 @@ Deno.test("rebalanceGroup - redistributes dense ranks to spread distribution", (
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     // Should have updates for all items (ranks will change)
-    assertEquals(result.value.length, 3, "All items should be updated");
+    assertEquals(result.value.length, 5, "All items should be updated");
 
     // Sort updates by old rank to get consistent order
     const sortedUpdates = [...result.value].sort((a, b) =>
@@ -220,15 +222,19 @@ Deno.test("rebalanceGroup - redistributes dense ranks to spread distribution", (
     );
 
     // Verify exact old and new rank values
-    // Old ranks: dense in h/i bucket (middle of space)
-    assertEquals(sortedUpdates[0].oldRank.toString(), "0|hzzzzz:");
-    assertEquals(sortedUpdates[1].oldRank.toString(), "0|i00007:");
-    assertEquals(sortedUpdates[2].oldRank.toString(), "0|i0000f:");
+    // Old ranks: dense in h bucket (middle of space)
+    assertEquals(sortedUpdates[0].oldRank.toString(), "0|hzzzza:");
+    assertEquals(sortedUpdates[1].oldRank.toString(), "0|hzzzzb:");
+    assertEquals(sortedUpdates[2].oldRank.toString(), "0|hzzzzc:");
+    assertEquals(sortedUpdates[3].oldRank.toString(), "0|hzzzzm:");
+    assertEquals(sortedUpdates[4].oldRank.toString(), "0|hzzzzz:");
 
     // New ranks: spread from beginning of space (0 bucket)
     // This demonstrates ranks are redistributed with more insertion headroom
     assertEquals(sortedUpdates[0].newRank.toString(), "0|000000:");
     assertEquals(sortedUpdates[1].newRank.toString(), "0|100000:");
     assertEquals(sortedUpdates[2].newRank.toString(), "0|100008:");
+    assertEquals(sortedUpdates[3].newRank.toString(), "0|10000g:");
+    assertEquals(sortedUpdates[4].newRank.toString(), "0|10000o:");
   }
 });
