@@ -1,7 +1,8 @@
 # **mm doctor: Implementation Plan**
 
-**Version:** 1.0 **Status:** In Progress (Sequential Complete, Parallel C Complete) **Target:**
-Initial implementation of `mm doctor` subcommands
+**Version:** 1.0
+**Status:** In Progress (Sequential Complete, Parallel B Complete, Parallel C Complete)
+**Target:** Initial implementation of `mm doctor` subcommands
 
 ---
 
@@ -39,7 +40,11 @@ src/
     fileSystem/
       fixtures/
         helpers.ts               # Shared helpers for test workspace generation
-      index_doctor.ts
+      index_rebuilder.ts         # Index rebuild logic
+      index_rebuilder_test.ts
+      index_writer.ts            # Atomic index writing
+      index_writer_test.ts
+      index_doctor.ts            # Integrity checking (Parallel A)
       index_doctor_test.ts
       workspace_scanner.ts
       workspace_scanner_test.ts
@@ -48,7 +53,8 @@ src/
       commands/
         doctor/
           mod.ts                 # Parent command
-          check.ts
+          rebuild_index.ts       # rebuild-index subcommand
+          check.ts               # check subcommand (Parallel A)
           check_test.ts
 
 tests/
@@ -193,14 +199,24 @@ export interface IndexRebuilder {
   ): Result<RebuildResult, RebuildError>;
 }
 
+export type EdgeData = Readonly<{
+  readonly itemId: ItemId;
+  readonly rank: ItemRank;
+}>;
+
 export type RebuildResult = Readonly<{
-  graphEdges: Map<string, ReadonlyArray<Edge>>; // key: directory path
-  aliases: Map<string, Alias>;
+  graphEdges: Map<string, ReadonlyArray<EdgeData>>;  // key: directory path
+  aliases: Map<string, AliasSnapshot>;
   itemsProcessed: number;
   edgesCreated: number;
   aliasesCreated: number;
 }>;
 ```
+
+**Implementation Notes:**
+- Uses `EdgeData` (simplified type with `itemId` and `rank`) instead of full `Edge` model
+- Uses `AliasSnapshot` for serialization-ready alias data
+- Also exports standalone `rebuildFromItems` function for direct use
 
 **Process:**
 
@@ -376,22 +392,39 @@ Implement atomic index writing:
 export interface IndexWriter {
   writeGraphIndex(
     workspaceRoot: string,
-    edges: Map<string, ReadonlyArray<Edge>>,
-  ): Promise<Result<void, WriteError>>;
+    edges: Map<string, ReadonlyArray<EdgeData>>,
+    options?: { temp?: boolean }
+  ): Promise<Result<WriteStats, WriteError>>;
 
   writeAliasIndex(
     workspaceRoot: string,
-    aliases: Map<string, Alias>,
-  ): Promise<Result<void, WriteError>>;
+    aliases: Map<string, AliasSnapshot>,
+    options?: { temp?: boolean }
+  ): Promise<Result<WriteStats, WriteError>>;
+
+  replaceIndex(workspaceRoot: string): Promise<Result<void, WriteError>>;
 }
+
+export type WriteStats = Readonly<{
+  edgeFilesWritten: number;
+  aliasFilesWritten: number;
+  directoriesCreated: number;
+}>;
 ```
+
+**Implementation Notes:**
+- Uses `EdgeData` from index_rebuilder.ts
+- Uses `AliasSnapshot` for serialization
+- Returns `WriteStats` with counts for progress reporting
+- `replaceIndex` as separate function for atomic directory swap
+- `options.temp` controls whether to write to `.tmp-*` directories
 
 **Process:**
 
 1. Write to temporary directory (`.index/.tmp-graph/`, `.index/.tmp-aliases/`)
 2. Verify writes succeeded
-3. Delete existing index
-4. Rename temporary to final location
+3. Call `replaceIndex` to atomically swap directories
+4. Delete existing index and rename temporary to final location
 
 **Deliverables:**
 
@@ -901,9 +934,9 @@ Must be completed before parallel work begins:
 
 ### **Parallel B (rebuild-index) Complete:**
 
-- [ ] Index rebuilder functional
-- [ ] Index writer performs atomic writes
-- [ ] `mm doctor rebuild-index` rebuilds from frontmatter
+- [x] Index rebuilder functional
+- [x] Index writer performs atomic writes
+- [x] `mm doctor rebuild-index` rebuilds from frontmatter
 
 ### **Parallel C (rebalance-rank) Complete:**
 
