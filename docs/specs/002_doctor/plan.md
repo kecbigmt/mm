@@ -1,7 +1,7 @@
 # **mm doctor: Implementation Plan**
 
-**Version:** 1.0
-**Status:** In Progress (Sequential Complete, Parallel B Complete, Parallel C Complete)
+**Version:** 1.1
+**Status:** In Progress (Sequential Complete, Parallel A Complete, Parallel B Complete, Parallel C Complete)
 **Target:** Initial implementation of `mm doctor` subcommands
 
 ---
@@ -287,29 +287,39 @@ export const groupByPlacement = (
 
 ---
 
-#### **Task 1.3: Index Doctor**
+#### **Task 1.3: Index Doctor** ✅
 
 **File:** `src/infrastructure/fileSystem/index_doctor.ts`
 
 Implement index integrity checking for `mm doctor check`:
 
 ```typescript
+export type EdgeReferenceWithPath = Readonly<{
+  readonly itemId: ItemId;
+  readonly rank: string;
+  readonly path: string;
+}>;
+
 export type IndexIntegrityIssue = Readonly<{
   kind:
     | "EdgeTargetNotFound"
     | "DuplicateEdge"
     | "CycleDetected"
     | "AliasConflict"
-    | "EdgeItemMismatch";
+    | "EdgeItemMismatch"
+    | "MissingEdge"
+    | "EdgeLocationMismatch"
+    | "OrphanedAliasIndex"
+    | "MissingAliasIndex";
   message: string;
   path?: string;
   context?: Record<string, unknown>;
 }>;
 
 export const checkIndexIntegrity = (
-  items: ReadonlyMap<ItemId, Item>,
-  edges: ReadonlyArray<EdgeReference>,
-  aliases: ReadonlyArray<AliasEntry>,
+  items: ReadonlyMap<string, Item>,
+  edges: ReadonlyArray<EdgeReferenceWithPath>,
+  aliases: ReadonlyArray<Alias>,
 ): ReadonlyArray<IndexIntegrityIssue> => {
   const issues: IndexIntegrityIssue[] = [];
 
@@ -318,10 +328,16 @@ export const checkIndexIntegrity = (
   // 3. Detect cycles in parent-child relationships
   // 4. Validate alias uniqueness
   // 5. Check edge rank matches item rank
+  // 6. Check for missing edge files
 
   return issues;
 };
 ```
+
+**Implementation notes:**
+- Added `EdgeReferenceWithPath` type to include file path for error reporting
+- Added `scanAllEdgesWithPath()` to WorkspaceScanner to support this
+- Added `MissingEdge` and `EdgeLocationMismatch` issue types for edge-item sync validation
 
 **Design principle:**
 
@@ -502,7 +518,7 @@ export const updateAllRanks = async (
 
 CLI commands that implement the full processing flow directly.
 
-#### **Task 2.1: CLI Command - check**
+#### **Task 2.1: CLI Command - check** ✅
 
 **File:** `src/presentation/cli/commands/doctor/check.ts`
 
@@ -929,8 +945,10 @@ Must be completed before parallel work begins:
 
 ### **Parallel A (check) Complete:**
 
-- [ ] Index doctor with checkIndexIntegrity (including cycle detection)
-- [ ] `mm doctor check` detects all issue categories
+- [x] Index doctor with checkIndexIntegrity (including cycle detection)
+- [x] `mm doctor check` detects all issue categories
+- [x] Unit tests for index_doctor (26 tests)
+- [x] E2E tests for check command (6 tests in `scenario_11_doctor_check_test.ts`)
 
 ### **Parallel B (rebuild-index) Complete:**
 
