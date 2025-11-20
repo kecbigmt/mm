@@ -76,7 +76,7 @@ export const createRebuildIndexCommand = () =>
 
       console.log(`✓ Scanned ${items.length} items`);
 
-      // Report parse errors if any
+      // Report parse errors and abort if any
       if (parseErrors.length > 0) {
         console.log(`\n⚠ ${parseErrors.length} items could not be parsed:`);
         for (const error of parseErrors.slice(0, 10)) {
@@ -86,6 +86,10 @@ export const createRebuildIndexCommand = () =>
           console.log(`  ... and ${parseErrors.length - 10} more`);
         }
         console.log("");
+        console.error(
+          "Error: Cannot rebuild index with parse errors. Fix the issues above and try again.",
+        );
+        Deno.exit(1);
       }
 
       // Rebuild index from items
@@ -137,9 +141,4 @@ export const createRebuildIndexCommand = () =>
       console.log(`  - Parent sections: ${parentEdges} edges`);
       console.log(`✓ Built alias index (${aliasesCreated} aliases)`);
       console.log("\nIndex rebuild complete.");
-
-      // Exit with error if any items failed to parse
-      if (parseErrors.length > 0) {
-        Deno.exit(1);
-      }
     });
