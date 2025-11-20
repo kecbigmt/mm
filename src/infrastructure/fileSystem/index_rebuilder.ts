@@ -10,14 +10,16 @@ import { Item } from "../../domain/models/item.ts";
 import { AliasSnapshot } from "../../domain/models/alias.ts";
 import { ItemId } from "../../domain/primitives/item_id.ts";
 import { ItemRank } from "../../domain/primitives/item_rank.ts";
+import { DateTime } from "../../domain/primitives/date_time.ts";
 
 /**
  * Edge data for index rebuilding.
- * Intentionally excludes created_at for simplicity; sorting uses rank only.
+ * Includes created_at for stable sorting when ranks are equal.
  */
 export type EdgeData = Readonly<{
   readonly itemId: ItemId;
   readonly rank: ItemRank;
+  readonly createdAt: DateTime;
 }>;
 
 /**
@@ -119,6 +121,7 @@ export const rebuildFromItems = async (
     const edgeData: EdgeData = {
       itemId: item.data.id,
       rank: item.data.rank,
+      createdAt: item.data.createdAt,
     };
 
     // Get directory path for this item's placement
@@ -152,10 +155,14 @@ export const rebuildFromItems = async (
     }
   }
 
-  // Sort edges within each directory by rank only (no created_at tiebreaker)
+  // Sort edges within each directory by rank, with created_at tiebreaker
   const sortedEdgesByDirectory = new Map<string, ReadonlyArray<EdgeData>>();
   for (const [dirPath, edges] of edgesByDirectory) {
-    const sorted = [...edges].sort((a, b) => a.rank.compare(b.rank));
+    const sorted = [...edges].sort((a, b) => {
+      const rankCmp = a.rank.compare(b.rank);
+      if (rankCmp !== 0) return rankCmp;
+      return a.createdAt.data.epochMilliseconds - b.createdAt.data.epochMilliseconds;
+    });
     sortedEdgesByDirectory.set(dirPath, Object.freeze(sorted));
   }
 
