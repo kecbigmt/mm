@@ -417,20 +417,29 @@ const deriveExpectedEdgeDirectory = (item: Item): string => {
 /**
  * Extract the edge directory from an edge file path
  *
- * Input: "/workspace/.index/graph/dates/2024/01/15/item-id.edge.json"
- * Output: "dates/2024/01/15"
+ * Normalizes path separators for cross-platform compatibility.
+ *
+ * Input: "/workspace/.index/graph/dates/2024-01-15/item-id.edge.json"
+ * Output: "dates/2024-01-15"
+ *
+ * Also handles Windows paths:
+ * Input: "C:\\workspace\\.index\\graph\\dates\\2024-01-15\\item-id.edge.json"
+ * Output: "dates/2024-01-15"
  */
 const extractEdgeDirectory = (edgePath: string): string | null => {
+  // Normalize path separators to POSIX style for cross-platform compatibility
+  const normalizedPath = edgePath.replace(/\\/g, "/");
+
   // Find ".index/graph/" in the path
   const graphMarker = ".index/graph/";
-  const graphIndex = edgePath.indexOf(graphMarker);
+  const graphIndex = normalizedPath.indexOf(graphMarker);
 
   if (graphIndex === -1) {
     return null;
   }
 
   // Extract everything after ".index/graph/" up to the filename
-  const afterGraph = edgePath.slice(graphIndex + graphMarker.length);
+  const afterGraph = normalizedPath.slice(graphIndex + graphMarker.length);
   const lastSlash = afterGraph.lastIndexOf("/");
 
   if (lastSlash === -1) {

@@ -600,3 +600,58 @@ Deno.test("checkIndexIntegrity - valid alias index with matching frontmatter", (
   );
   assertEquals(aliasIssues.length, 0);
 });
+
+Deno.test("checkIndexIntegrity - handles Windows path separators", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+
+  // Item placed at date 2025-01-15
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15", "a")],
+  ]);
+
+  // Edge path with Windows backslashes
+  const edges: EdgeReferenceWithPath[] = [
+    createTestEdge(
+      id1,
+      "a",
+      `C:\\workspace\\.index\\graph\\dates\\2025-01-15\\${id1}.edge.json`,
+    ),
+  ];
+
+  const aliases: Alias[] = [];
+
+  const issues = checkIndexIntegrity(items, edges, aliases);
+
+  // Should not report location mismatch or missing edge
+  const locationIssue = issues.find((i) => i.kind === "EdgeLocationMismatch");
+  const missingIssue = issues.find((i) => i.kind === "MissingEdge");
+  assertEquals(locationIssue, undefined);
+  assertEquals(missingIssue, undefined);
+});
+
+Deno.test("checkIndexIntegrity - detects Windows path in wrong location", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+
+  // Item moved from 2025-01-10 to 2025-01-15
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15", "a")],
+  ]);
+
+  // Edge at old location with Windows path
+  const edges: EdgeReferenceWithPath[] = [
+    createTestEdge(
+      id1,
+      "a",
+      `C:\\workspace\\.index\\graph\\dates\\2025-01-10\\${id1}.edge.json`, // Wrong date
+    ),
+  ];
+
+  const aliases: Alias[] = [];
+
+  const issues = checkIndexIntegrity(items, edges, aliases);
+
+  const locationIssue = issues.find((i) => i.kind === "EdgeLocationMismatch");
+  assertEquals(locationIssue !== undefined, true);
+  assertEquals(locationIssue?.context?.expectedDirectory, "dates/2025-01-15");
+  assertEquals(locationIssue?.context?.actualDirectory, "dates/2025-01-10");
+});
