@@ -372,7 +372,8 @@ const checkAliasUniqueness = (
       // Stale alias index: canonical_key doesn't match item frontmatter
       issues.push({
         kind: "OrphanedAliasIndex",
-        message: `Alias index canonical_key '${canonicalKey}' doesn't match item ${itemId} frontmatter '${itemCanonicalKey}'`,
+        message:
+          `Alias index canonical_key '${canonicalKey}' doesn't match item ${itemId} frontmatter '${itemCanonicalKey}'`,
         context: {
           itemId,
           indexCanonicalKey: canonicalKey,
