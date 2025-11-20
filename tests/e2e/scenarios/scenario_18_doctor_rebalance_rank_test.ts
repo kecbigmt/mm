@@ -258,7 +258,7 @@ describe("Scenario 18: Doctor rebalance-rank", () => {
     );
   });
 
-  it("reports group count in output", async () => {
+  it("reports rebalanced items in output", async () => {
     await runCommand(ctx.testHome, ["cd", "today"]);
 
     // Create items
@@ -271,11 +271,16 @@ describe("Scenario 18: Doctor rebalance-rank", () => {
     const rebalanceResult = await runCommand(ctx.testHome, ["doctor", "rebalance-rank", today]);
     assertEquals(rebalanceResult.success, true, `rebalance-rank failed: ${rebalanceResult.stderr}`);
 
-    // Should report group count
+    // Should report rebalanced items
     assertEquals(
-      rebalanceResult.stdout.includes("sibling groups"),
+      rebalanceResult.stdout.includes("Rebalanced"),
       true,
-      "Should report number of groups",
+      "Should report number of rebalanced items",
+    );
+    assertEquals(
+      rebalanceResult.stdout.includes("items"),
+      true,
+      "Should report items count",
     );
   });
 });

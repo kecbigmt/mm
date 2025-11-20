@@ -639,8 +639,7 @@ export const rebalanceRankCommand = new Command()
 
 - Target paths
 - Items found in target paths
-- Group count
-- Items rebalanced per group (top 10)
+- Items rebalanced with placement breakdown (top 10)
 - Warning about Git changes
 
 **Deliverables:**

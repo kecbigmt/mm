@@ -266,8 +266,7 @@ Rebalancing ranks...
 Target paths: today
 
 ✓ Found 23 items in target paths
-✓ Grouped into 3 sibling groups
-✓ Rebalanced 23 items across 3 groups
+✓ Rebalanced 23 items
   - 2025-01-15: 18 items
   - 2025-01-15/1: 3 items
   - 2025-01-15/2: 2 items
@@ -288,8 +287,7 @@ Rebalancing ranks...
 Target paths: today, tomorrow, book
 
 ✓ Found 35 items in target paths
-✓ Grouped into 5 sibling groups
-✓ Rebalanced 35 items across 5 groups
+✓ Rebalanced 35 items
   - 2025-01-15: 18 items
   - 2025-01-15/1: 3 items
   - 2025-01-16: 12 items

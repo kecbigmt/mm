@@ -119,7 +119,6 @@ export const rebalanceRankCommand = new Command()
 
     // Group by placement (items are already filtered to target paths)
     const groups = groupByPlacement(items);
-    console.log(`✓ Grouped into ${groups.length} sibling groups`);
 
     // Rebalance each group
     const allUpdates: ItemRankUpdate[] = [];
@@ -166,15 +165,15 @@ export const rebalanceRankCommand = new Command()
     }
 
     // Display results
-    console.log(`✓ Rebalanced ${allUpdates.length} items across ${groupSummaries.length} groups`);
+    console.log(`✓ Rebalanced ${allUpdates.length} items`);
 
-    // Show group breakdown (first 10)
+    // Show placement breakdown (first 10)
     const sortedSummaries = groupSummaries.sort((a, b) => b.count - a.count);
     for (const summary of sortedSummaries.slice(0, 10)) {
       console.log(`  - ${summary.key}: ${summary.count} items`);
     }
     if (sortedSummaries.length > 10) {
-      console.log(`  - ... and ${sortedSummaries.length - 10} more groups`);
+      console.log(`  - ... and ${sortedSummaries.length - 10} more placements`);
     }
 
     console.log("\nRank rebalance complete.\n");
