@@ -21,7 +21,6 @@ export type IndexIntegrityIssue = Readonly<{
     | "CycleDetected"
     | "AliasConflict"
     | "EdgeItemMismatch"
-    | "OrphanedEdge"
     | "MissingEdge";
   message: string;
   path?: string;
