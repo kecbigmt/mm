@@ -5,12 +5,14 @@ import { EdgeData } from "./index_rebuilder.ts";
 import { AliasSnapshot } from "../../domain/models/alias.ts";
 import { parseItemId } from "../../domain/primitives/item_id.ts";
 import { parseItemRank } from "../../domain/primitives/item_rank.ts";
+import { parseDateTime } from "../../domain/primitives/date_time.ts";
 import { Result } from "../../shared/result.ts";
 
 // Helper to create test edge data
 const createTestEdgeData = (id: string, rank: string): EdgeData => ({
   itemId: Result.unwrap(parseItemId(id)),
   rank: Result.unwrap(parseItemRank(rank)),
+  createdAt: Result.unwrap(parseDateTime("2025-01-15T10:00:00Z")),
 });
 
 Deno.test("writeGraphIndex - writes date edges to temp directory", async () => {
