@@ -17,6 +17,22 @@ import { Item } from "../../../../domain/models/item.ts";
 import { loadCliDependencies } from "../../dependencies.ts";
 
 /**
+ * Clean up temporary index directories
+ */
+const cleanupTempDirs = async (workspaceRoot: string): Promise<void> => {
+  try {
+    await Deno.remove(join(workspaceRoot, ".index", ".tmp-graph"), { recursive: true });
+  } catch {
+    // Ignore cleanup errors
+  }
+  try {
+    await Deno.remove(join(workspaceRoot, ".index", ".tmp-aliases"), { recursive: true });
+  } catch {
+    // Ignore cleanup errors
+  }
+};
+
+/**
  * Create the rebuild-index command
  */
 export const createRebuildIndexCommand = () =>
@@ -103,12 +119,7 @@ export const createRebuildIndexCommand = () =>
       const aliasWriteResult = await writeAliasIndex(workspaceRoot, aliases, { temp: true });
       if (aliasWriteResult.type === "error") {
         console.error(`Error writing alias index: ${aliasWriteResult.error.message}`);
-        // Clean up temp graph directory
-        try {
-          await Deno.remove(join(workspaceRoot, ".index", ".tmp-graph"), { recursive: true });
-        } catch {
-          // Ignore cleanup errors
-        }
+        await cleanupTempDirs(workspaceRoot);
         Deno.exit(1);
       }
 
@@ -116,13 +127,7 @@ export const createRebuildIndexCommand = () =>
       const replaceResult = await replaceIndex(workspaceRoot);
       if (replaceResult.type === "error") {
         console.error(`Error replacing index: ${replaceResult.error.message}`);
-        // Clean up temp directories
-        try {
-          await Deno.remove(join(workspaceRoot, ".index", ".tmp-graph"), { recursive: true });
-          await Deno.remove(join(workspaceRoot, ".index", ".tmp-aliases"), { recursive: true });
-        } catch {
-          // Ignore cleanup errors
-        }
+        await cleanupTempDirs(workspaceRoot);
         Deno.exit(1);
       }
 
