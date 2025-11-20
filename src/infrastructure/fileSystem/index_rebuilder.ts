@@ -46,19 +46,17 @@ export type RebuildError = Readonly<{
 }>;
 
 /**
- * Compute hash for alias canonical key
- * Uses a simple hash function for directory distribution
+ * Compute SHA-256 hash for alias canonical key
+ * Must match the hash algorithm used by alias_repository.ts
  */
-const computeAliasHash = (canonicalKey: string): string => {
-  let hash = 0;
-  for (let i = 0; i < canonicalKey.length; i++) {
-    const char = canonicalKey.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  // Convert to hex and ensure positive
-  const hexHash = Math.abs(hash).toString(16).padStart(8, "0");
-  return hexHash;
+const computeAliasHash = async (canonicalKey: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(canonicalKey);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  const bytes = new Uint8Array(digest);
+  return Array.from(bytes)
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
 };
 
 /**
@@ -100,9 +98,9 @@ const getEdgeDirectoryPath = (item: Item): string => {
  * 5. Create Edge objects
  * 6. Build alias map
  */
-export const rebuildFromItems = (
+export const rebuildFromItems = async (
   items: ReadonlyArray<Item>,
-): Result<RebuildResult, RebuildError> => {
+): Promise<Result<RebuildResult, RebuildError>> => {
   // Map from directory path to edges
   const edgesByDirectory = new Map<string, EdgeData[]>();
 
@@ -138,7 +136,7 @@ export const rebuildFromItems = (
     if (item.data.alias) {
       const slug = item.data.alias;
       const canonicalKey = slug.canonicalKey.toString();
-      const hash = computeAliasHash(canonicalKey);
+      const hash = await computeAliasHash(canonicalKey);
       const aliasPath = `${hash.slice(0, 2)}/${hash}`;
 
       const aliasSnapshot: AliasSnapshot = {
@@ -153,9 +151,8 @@ export const rebuildFromItems = (
     }
   }
 
-  // Sort edges within each directory by rank (with created_at tiebreak if needed)
-  // Note: We can't tiebreak by created_at here since EdgeData doesn't have it
-  // The sorting is done by rank only, which should be sufficient
+  // Sort edges within each directory by rank.
+  // EdgeData intentionally excludes created_at for simplicity.
   const sortedEdgesByDirectory = new Map<string, ReadonlyArray<EdgeData>>();
   for (const [dirPath, edges] of edgesByDirectory) {
     const sorted = [...edges].sort((a, b) => a.rank.compare(b.rank));
@@ -175,7 +172,7 @@ export const rebuildFromItems = (
  * Index rebuilder interface
  */
 export type IndexRebuilder = Readonly<{
-  rebuildFromItems(items: ReadonlyArray<Item>): Result<RebuildResult, RebuildError>;
+  rebuildFromItems(items: ReadonlyArray<Item>): Promise<Result<RebuildResult, RebuildError>>;
 }>;
 
 /**

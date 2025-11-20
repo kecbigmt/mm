@@ -41,8 +41,8 @@ const createTestItem = (
   return createItem(data);
 };
 
-Deno.test("rebuildFromItems - empty items array returns empty result", () => {
-  const result = rebuildFromItems([]);
+Deno.test("rebuildFromItems - empty items array returns empty result", async () => {
+  const result = await rebuildFromItems([]);
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertEquals(result.value.itemsProcessed, 0);
@@ -53,14 +53,14 @@ Deno.test("rebuildFromItems - empty items array returns empty result", () => {
   }
 });
 
-Deno.test("rebuildFromItems - single item with date placement", () => {
+Deno.test("rebuildFromItems - single item with date placement", async () => {
   const item = createTestItem(
     "019a85fc-67c4-7a54-be8e-305bae009f9e",
     "2025-01-15",
     "aaa",
   );
 
-  const result = rebuildFromItems([item]);
+  const result = await rebuildFromItems([item]);
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertEquals(result.value.itemsProcessed, 1);
@@ -75,14 +75,14 @@ Deno.test("rebuildFromItems - single item with date placement", () => {
   }
 });
 
-Deno.test("rebuildFromItems - single item with date section placement", () => {
+Deno.test("rebuildFromItems - single item with date section placement", async () => {
   const item = createTestItem(
     "019a85fc-67c4-7a54-be8e-305bae009f9e",
     "2025-01-15/1/3",
     "aaa",
   );
 
-  const result = rebuildFromItems([item]);
+  const result = await rebuildFromItems([item]);
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     const edges = result.value.graphEdges.get("dates/2025-01-15/1/3");
@@ -91,14 +91,14 @@ Deno.test("rebuildFromItems - single item with date section placement", () => {
   }
 });
 
-Deno.test("rebuildFromItems - single item with parent placement", () => {
+Deno.test("rebuildFromItems - single item with parent placement", async () => {
   const item = createTestItem(
     "019a85fc-67c4-7a54-be8e-305bae009f9e",
     "019a8603-1234-7890-abcd-1234567890ab",
     "aaa",
   );
 
-  const result = rebuildFromItems([item]);
+  const result = await rebuildFromItems([item]);
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     const edges = result.value.graphEdges.get("parents/019a8603-1234-7890-abcd-1234567890ab");
@@ -107,14 +107,14 @@ Deno.test("rebuildFromItems - single item with parent placement", () => {
   }
 });
 
-Deno.test("rebuildFromItems - single item with parent section placement", () => {
+Deno.test("rebuildFromItems - single item with parent section placement", async () => {
   const item = createTestItem(
     "019a85fc-67c4-7a54-be8e-305bae009f9e",
     "019a8603-1234-7890-abcd-1234567890ab/1/2",
     "aaa",
   );
 
-  const result = rebuildFromItems([item]);
+  const result = await rebuildFromItems([item]);
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     const edges = result.value.graphEdges.get(
@@ -125,7 +125,7 @@ Deno.test("rebuildFromItems - single item with parent section placement", () => 
   }
 });
 
-Deno.test("rebuildFromItems - multiple items sorted by rank", () => {
+Deno.test("rebuildFromItems - multiple items sorted by rank", async () => {
   const item1 = createTestItem(
     "019a85fc-67c4-7a54-be8e-305bae009f9e",
     "2025-01-15",
@@ -142,7 +142,7 @@ Deno.test("rebuildFromItems - multiple items sorted by rank", () => {
     "bbb",
   );
 
-  const result = rebuildFromItems([item1, item2, item3]);
+  const result = await rebuildFromItems([item1, item2, item3]);
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertEquals(result.value.edgesCreated, 3);
@@ -156,7 +156,7 @@ Deno.test("rebuildFromItems - multiple items sorted by rank", () => {
   }
 });
 
-Deno.test("rebuildFromItems - item with alias", () => {
+Deno.test("rebuildFromItems - item with alias", async () => {
   const item = createTestItem(
     "019a85fc-67c4-7a54-be8e-305bae009f9e",
     "2025-01-15",
@@ -164,7 +164,7 @@ Deno.test("rebuildFromItems - item with alias", () => {
     { alias: "my-alias" },
   );
 
-  const result = rebuildFromItems([item]);
+  const result = await rebuildFromItems([item]);
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertEquals(result.value.aliasesCreated, 1);
@@ -176,15 +176,15 @@ Deno.test("rebuildFromItems - item with alias", () => {
     assertEquals(aliasSnapshot.canonicalKey, "my-alias");
     assertEquals(aliasSnapshot.itemId, "019a85fc-67c4-7a54-be8e-305bae009f9e");
 
-    // Check path format: "xx/xxxxxxxx"
+    // Check path format: "xx/<64-char-sha256-hash>"
     const parts = aliasPath.split("/");
     assertEquals(parts.length, 2);
     assertEquals(parts[0].length, 2);
-    assertEquals(parts[1].length, 8);
+    assertEquals(parts[1].length, 64);
   }
 });
 
-Deno.test("rebuildFromItems - multiple items with mixed placements", () => {
+Deno.test("rebuildFromItems - multiple items with mixed placements", async () => {
   const item1 = createTestItem(
     "019a85fc-67c4-7a54-be8e-305bae009f9e",
     "2025-01-15",
@@ -201,7 +201,7 @@ Deno.test("rebuildFromItems - multiple items with mixed placements", () => {
     "ccc",
   );
 
-  const result = rebuildFromItems([item1, item2, item3]);
+  const result = await rebuildFromItems([item1, item2, item3]);
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertEquals(result.value.graphEdges.size, 3);

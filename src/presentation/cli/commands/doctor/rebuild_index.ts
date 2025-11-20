@@ -73,7 +73,7 @@ export const createRebuildIndexCommand = () =>
       }
 
       // Rebuild index from items
-      const rebuildResult = rebuildFromItems(items);
+      const rebuildResult = await rebuildFromItems(items);
       if (rebuildResult.type === "error") {
         console.error(`Error: ${rebuildResult.error.message}`);
         Deno.exit(1);
