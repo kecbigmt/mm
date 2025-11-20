@@ -43,16 +43,23 @@ export type IndexIntegrityIssue = Readonly<{
  * 3. No cycles in parent/child graph
  * 4. Alias uniqueness across all Items
  * 5. Edge files match Item frontmatter placement/rank
+ *
+ * @param items - Successfully parsed items
+ * @param edges - Successfully parsed edges
+ * @param aliases - Successfully parsed aliases
+ * @param ignoreItemIds - Item IDs to ignore when checking for orphaned edges/aliases
+ *                        (typically parse-failed items to avoid cascading errors)
  */
 export const checkIndexIntegrity = (
   items: ReadonlyMap<string, Item>,
   edges: ReadonlyArray<EdgeReferenceWithPath>,
   aliases: ReadonlyArray<Alias>,
+  ignoreItemIds?: ReadonlySet<string>,
 ): ReadonlyArray<IndexIntegrityIssue> => {
   const issues: IndexIntegrityIssue[] = [];
 
   // 1. Check edge targets exist in items
-  const edgeTargetIssues = checkEdgeTargets(items, edges);
+  const edgeTargetIssues = checkEdgeTargets(items, edges, ignoreItemIds);
   issues.push(...edgeTargetIssues);
 
   // 2. Check for duplicate edges
@@ -64,7 +71,7 @@ export const checkIndexIntegrity = (
   issues.push(...cycleIssues);
 
   // 4. Validate alias uniqueness
-  const aliasIssues = checkAliasUniqueness(items, aliases);
+  const aliasIssues = checkAliasUniqueness(items, aliases, ignoreItemIds);
   issues.push(...aliasIssues);
 
   // 5. Check edge files match item frontmatter (missing edges, orphaned edges)
@@ -76,16 +83,24 @@ export const checkIndexIntegrity = (
 
 /**
  * Check that every edge points to an existing item
+ *
+ * @param ignoreItemIds - Item IDs to ignore when reporting orphaned edges
  */
 const checkEdgeTargets = (
   items: ReadonlyMap<string, Item>,
   edges: ReadonlyArray<EdgeReferenceWithPath>,
+  ignoreItemIds?: ReadonlySet<string>,
 ): IndexIntegrityIssue[] => {
   const issues: IndexIntegrityIssue[] = [];
 
   for (const edge of edges) {
     const itemIdStr = edge.itemId.toString();
     if (!items.has(itemIdStr)) {
+      // Skip if this item should be ignored (e.g., parse error already reported)
+      if (ignoreItemIds && ignoreItemIds.has(itemIdStr)) {
+        continue;
+      }
+
       issues.push({
         kind: "EdgeTargetNotFound",
         message: `Edge points to non-existent item: ${itemIdStr}`,
@@ -238,10 +253,13 @@ const detectCycles = (
  * 2. No duplicate canonical_key in alias index files
  * 3. Alias index files point to valid items with matching aliases
  * 4. Item frontmatter aliases have corresponding index files
+ *
+ * @param ignoreItemIds - Item IDs to ignore when reporting orphaned aliases
  */
 const checkAliasUniqueness = (
   items: ReadonlyMap<string, Item>,
   aliases: ReadonlyArray<Alias>,
+  ignoreItemIds?: ReadonlySet<string>,
 ): IndexIntegrityIssue[] => {
   const issues: IndexIntegrityIssue[] = [];
 
@@ -315,6 +333,11 @@ const checkAliasUniqueness = (
     const item = items.get(itemId);
 
     if (!item) {
+      // Skip if this item should be ignored (e.g., parse error already reported)
+      if (ignoreItemIds && ignoreItemIds.has(itemId)) {
+        continue;
+      }
+
       // Orphaned alias index: points to non-existent item
       issues.push({
         kind: "OrphanedAliasIndex",

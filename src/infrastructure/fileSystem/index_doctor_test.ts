@@ -655,3 +655,101 @@ Deno.test("checkIndexIntegrity - detects Windows path in wrong location", () => 
   assertEquals(locationIssue?.context?.expectedDirectory, "dates/2025-01-15");
   assertEquals(locationIssue?.context?.actualDirectory, "dates/2025-01-10");
 });
+
+Deno.test("checkIndexIntegrity - ignores orphaned edges for failed items", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+  const failedId = "019a8603-1234-7890-abcd-1234567890ab";
+
+  // Only id1 successfully parsed
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15", "a")],
+  ]);
+
+  // Edge points to failedId (which had parse error)
+  const edges: EdgeReferenceWithPath[] = [
+    createTestEdge(
+      id1,
+      "a",
+      `/workspace/.index/graph/dates/2025-01-15/${id1}.edge.json`,
+    ),
+    createTestEdge(
+      failedId,
+      "b",
+      `/workspace/.index/graph/dates/2025-01-15/${failedId}.edge.json`,
+    ),
+  ];
+
+  const aliases: Alias[] = [];
+
+  // Pass failedId as ignored
+  const ignoreItemIds = new Set([failedId]);
+  const issues = checkIndexIntegrity(items, edges, aliases, ignoreItemIds);
+
+  // Should NOT report EdgeTargetNotFound for failedId
+  const orphanedEdge = issues.find((i) =>
+    i.kind === "EdgeTargetNotFound" && i.context?.itemId === failedId
+  );
+  assertEquals(orphanedEdge, undefined);
+});
+
+Deno.test("checkIndexIntegrity - ignores orphaned aliases for failed items", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+  const failedId = "019a8603-1234-7890-abcd-1234567890ab";
+
+  // Only id1 successfully parsed
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15", "a", { alias: "test-alias" })],
+  ]);
+
+  const edges: EdgeReferenceWithPath[] = [];
+
+  // Alias points to failedId (which had parse error)
+  const aliases: Alias[] = [
+    createTestAlias("test-alias", id1),
+    createTestAlias("failed-alias", failedId),
+  ];
+
+  // Pass failedId as ignored
+  const ignoreItemIds = new Set([failedId]);
+  const issues = checkIndexIntegrity(items, edges, aliases, ignoreItemIds);
+
+  // Should NOT report OrphanedAliasIndex for failedId
+  const orphanedAlias = issues.find((i) =>
+    i.kind === "OrphanedAliasIndex" && i.context?.itemId === failedId
+  );
+  assertEquals(orphanedAlias, undefined);
+});
+
+Deno.test("checkIndexIntegrity - still reports genuine orphaned edges", () => {
+  const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
+  const orphanId = "019a8610-1234-7890-abcd-badc0ffee000";
+  const failedId = "019a8603-1234-7890-abcd-1234567890ab";
+
+  const items = new Map<string, Item>([
+    [id1, createTestItem(id1, "2025-01-15", "a")],
+  ]);
+
+  // One edge to genuinely orphaned item, one to failed item
+  const edges: EdgeReferenceWithPath[] = [
+    createTestEdge(
+      orphanId,
+      "b",
+      `/workspace/.index/graph/dates/2025-01-15/${orphanId}.edge.json`,
+    ),
+    createTestEdge(
+      failedId,
+      "c",
+      `/workspace/.index/graph/dates/2025-01-15/${failedId}.edge.json`,
+    ),
+  ];
+
+  const aliases: Alias[] = [];
+
+  const ignoreItemIds = new Set([failedId]);
+  const issues = checkIndexIntegrity(items, edges, aliases, ignoreItemIds);
+
+  // Should report EdgeTargetNotFound only for genuinely orphaned item
+  const orphanedEdges = issues.filter((i) => i.kind === "EdgeTargetNotFound");
+  assertEquals(orphanedEdges.length, 1);
+  assertEquals(orphanedEdges[0].context?.itemId, orphanId);
+});

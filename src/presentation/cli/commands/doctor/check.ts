@@ -11,6 +11,7 @@ import {
 } from "../../../../infrastructure/fileSystem/index_doctor.ts";
 import { Item } from "../../../../domain/models/item.ts";
 import { Alias } from "../../../../domain/models/alias.ts";
+import { parseItemId } from "../../../../domain/primitives/item_id.ts";
 
 /**
  * Item validation issue (parse errors during scanning)
@@ -91,6 +92,32 @@ export function createCheckCommand() {
 }
 
 /**
+ * Extract item ID from file path
+ *
+ * Uses parseItemId to validate the ID format, ensuring consistency
+ * with the rest of the codebase.
+ *
+ * Examples:
+ * - "items/2025/11/20/019a9ec8-e55a-7fe4-93ca-7d84b5bd9adf.md" → "019a9ec8-e55a-7fe4-93ca-7d84b5bd9adf"
+ * - "/path/to/items/019a9ec8-e55a-7fe4-93ca-7d84b5bd9adf.md" → "019a9ec8-e55a-7fe4-93ca-7d84b5bd9adf"
+ */
+function extractItemIdFromPath(path: string): string | null {
+  const fileName = path.split("/").pop();
+  if (!fileName) return null;
+
+  // Remove .md extension
+  const withoutExt = fileName.replace(/\.md$/, "");
+
+  // Validate using parseItemId to ensure consistency
+  const result = parseItemId(withoutExt);
+  if (result.type === "ok") {
+    return withoutExt;
+  }
+
+  return null;
+}
+
+/**
  * Scan workspace and validate all data
  */
 async function scanAndValidate(workspaceRoot: string): Promise<CheckReport> {
@@ -99,6 +126,7 @@ async function scanAndValidate(workspaceRoot: string): Promise<CheckReport> {
   // Scan items
   const items = new Map<string, Item>();
   const itemIssues: ItemValidationIssue[] = [];
+  const failedItemIds = new Set<string>();
   let itemsScanned = 0;
 
   for await (const result of scanner.scanAllItems()) {
@@ -108,6 +136,12 @@ async function scanAndValidate(workspaceRoot: string): Promise<CheckReport> {
         path: result.error.path,
         error: result.error,
       });
+
+      // Extract item ID from path to ignore in orphaned checks
+      const itemId = extractItemIdFromPath(result.error.path);
+      if (itemId) {
+        failedItemIds.add(itemId);
+      }
     } else {
       const item = result.value;
       items.set(item.data.id.toString(), item);
@@ -148,8 +182,8 @@ async function scanAndValidate(workspaceRoot: string): Promise<CheckReport> {
     }
   }
 
-  // Check index integrity
-  const integrityIssues = checkIndexIntegrity(items, edges, aliases);
+  // Check index integrity, ignoring items that failed to parse
+  const integrityIssues = checkIndexIntegrity(items, edges, aliases, failedItemIds);
 
   return {
     itemsScanned,
