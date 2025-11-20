@@ -265,7 +265,7 @@ export type EdgeReferenceWithPath = Readonly<{
 }>;
 
 export type IndexIntegrityIssue = Readonly<{
-  kind: "EdgeTargetNotFound" | "DuplicateEdge" | "CycleDetected" | "AliasConflict" | "EdgeItemMismatch" | "OrphanedEdge" | "MissingEdge";
+  kind: "EdgeTargetNotFound" | "DuplicateEdge" | "CycleDetected" | "AliasConflict" | "EdgeItemMismatch" | "MissingEdge" | "EdgeLocationMismatch";
   message: string;
   path?: string;
   context?: Record<string, unknown>;
@@ -292,7 +292,7 @@ export const checkIndexIntegrity = (
 **Implementation notes:**
 - Added `EdgeReferenceWithPath` type to include file path for error reporting
 - Added `scanAllEdgesWithPath()` to WorkspaceScanner to support this
-- Added `OrphanedEdge` and `MissingEdge` issue types for edge-item sync validation
+- Added `MissingEdge` and `EdgeLocationMismatch` issue types for edge-item sync validation
 
 **Design principle:**
 - Parse individual models (Item, EdgeReference, AliasEntry) validates data within model boundaries
