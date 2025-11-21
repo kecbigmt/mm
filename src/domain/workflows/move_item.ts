@@ -7,7 +7,6 @@ import {
 import { Item } from "../models/item.ts";
 import { DateTime } from "../primitives/date_time.ts";
 import { Placement } from "../primitives/placement.ts";
-import { PlacementRange } from "../primitives/placement_range.ts";
 import { parseTimezoneIdentifier, TimezoneIdentifier } from "../primitives/timezone_identifier.ts";
 import { parsePathExpression } from "../../presentation/cli/path_expression.ts";
 import { createPathResolver } from "../services/path_resolver.ts";

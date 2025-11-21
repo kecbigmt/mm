@@ -4,19 +4,14 @@ import { MoveItemWorkflow } from "./move_item.ts";
 import { CreateItemWorkflow } from "./create_item.ts";
 import { Result } from "../../shared/result.ts";
 import {
-  createItemIcon,
   dateTimeFromDate,
-  itemRankFromString,
   parsePlacement,
 } from "../primitives/mod.ts";
 import { createRankService, type RankGenerator } from "../services/rank_service.ts";
 import { createIdGenerationService } from "../services/id_generation_service.ts";
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
 import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.ts";
-import {
-  createAliasAutoGenerator,
-  type RandomSource,
-} from "../services/alias_auto_generator.ts";
+import { createAliasAutoGenerator, type RandomSource } from "../services/alias_auto_generator.ts";
 
 const createTestRankService = () => {
   const generator: RankGenerator = {
