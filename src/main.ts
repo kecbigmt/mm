@@ -2,6 +2,8 @@
 
 import { Command } from "@cliffy/command";
 import { createNoteCommand } from "./presentation/cli/commands/note.ts";
+import { createTaskCommand } from "./presentation/cli/commands/task.ts";
+import { createEventCommand } from "./presentation/cli/commands/event.ts";
 import { createCloseCommand } from "./presentation/cli/commands/close.ts";
 import { createReopenCommand } from "./presentation/cli/commands/reopen.ts";
 import { createWorkspaceCommand } from "./presentation/cli/commands/workspace.ts";
@@ -18,6 +20,8 @@ async function main() {
     .version("0.1.0")
     .description("Personal knowledge management CLI tool")
     .command("note", createNoteCommand().description("Create a new note")).alias("n")
+    .command("task", createTaskCommand().description("Create a new task")).alias("t")
+    .command("event", createEventCommand().description("Create a new event")).alias("ev")
     .command("close", createCloseCommand().description("Close items"))
     .command("reopen", createReopenCommand().description("Reopen closed items"))
     .command("workspace", createWorkspaceCommand().description("Workspace management")).alias("ws")
