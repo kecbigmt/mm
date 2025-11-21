@@ -195,14 +195,14 @@ const validateEventDateConsistency = (
 ```typescript
 Deno.test("validateEventDateConsistency - accepts matching dates", () => {
   const startAt = parseDateTime("2025-01-15T14:00:00Z");
-  const placement = parsePlacement("/2025-01-15");
+  const placement = parsePlacement("2025-01-15");
   const result = validateEventDateConsistency(startAt, placement);
   assertEquals(result.type, "ok");
 });
 
 Deno.test("validateEventDateConsistency - rejects mismatched dates", () => {
   const startAt = parseDateTime("2025-01-15T14:00:00Z");
-  const placement = parsePlacement("/2025-01-16");
+  const placement = parsePlacement("2025-01-16");
   const result = validateEventDateConsistency(startAt, placement);
   assertEquals(result.type, "error");
   assertEquals(result.error.kind, "date_consistency");
@@ -210,7 +210,7 @@ Deno.test("validateEventDateConsistency - rejects mismatched dates", () => {
 
 Deno.test("validateEventDateConsistency - skips validation for item placement", () => {
   const startAt = parseDateTime("2025-01-15T14:00:00Z");
-  const placement = parsePlacement("/<some-uuid>");
+  const placement = parsePlacement("<some-uuid>");
   const result = validateEventDateConsistency(startAt, placement);
   assertEquals(result.type, "ok");
 });
@@ -304,7 +304,7 @@ Deno.test("CreateItemWorkflow - creates event with startAt and duration", async 
     itemType: "event",
     startAt: startAt.value,
     duration: duration.value,
-    parentPlacement: parsePlacement("/2025-01-15").value,
+    parentPlacement: parsePlacement("2025-01-15").value,
     createdAt: /* ... */,
   }, deps);
 
@@ -319,7 +319,7 @@ Deno.test("CreateItemWorkflow - rejects event with mismatched startAt date", asy
     title: "Team meeting",
     itemType: "event",
     startAt: startAt.value,
-    parentPlacement: parsePlacement("/2025-01-16").value,  // Wrong date
+    parentPlacement: parsePlacement("2025-01-16").value,  // Wrong date
     createdAt: /* ... */,
   }, deps);
 
