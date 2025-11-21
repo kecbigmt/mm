@@ -83,10 +83,42 @@ const gitCommit = async (workspaceDir: string, message: string): Promise<void> =
     stdout: "piped",
     stderr: "piped",
   });
-  const { success } = await command.output();
+  const { success, stdout, stderr } = await command.output();
   if (!success) {
-    throw new Error(`Failed to commit: ${message}`);
+    const stdoutText = new TextDecoder().decode(stdout);
+    const stderrText = new TextDecoder().decode(stderr);
+    throw new Error(
+      `Failed to commit: ${message}\nstdout: ${stdoutText}\nstderr: ${stderrText}`,
+    );
   }
+};
+
+/**
+ * Git helper: Clean gitignored state files and rebuild index after branch switch
+ * This ensures .state.json and .index/ are consistent with the current branch
+ */
+const cleanGitIgnoredState = async (
+  testHome: string,
+  workspaceDir: string,
+): Promise<void> => {
+  // Remove .state.json
+  const stateFile = join(workspaceDir, ".state.json");
+  try {
+    await Deno.remove(stateFile);
+  } catch {
+    // File might not exist, that's okay
+  }
+
+  // Remove .index directory
+  const indexDir = join(workspaceDir, ".index");
+  try {
+    await Deno.remove(indexDir, { recursive: true });
+  } catch {
+    // Directory might not exist, that's okay
+  }
+
+  // Rebuild index from item frontmatter
+  await runCommand(testHome, ["doctor", "rebuild-index"]);
 };
 
 /**
@@ -632,6 +664,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
       args: ["checkout", "-b", "feature-A"],
       cwd: workspaceDir,
     }).output();
+    await cleanGitIgnoredState(ctx.testHome, workspaceDir);
 
     // Add item on branch A
     const _resultA = await runCommand(ctx.testHome, ["note", "Feature A memo"]);
@@ -643,12 +676,14 @@ describe("Scenario 15: Git-friendly diffs", () => {
       args: ["checkout", "main"],
       cwd: workspaceDir,
     }).output();
+    await cleanGitIgnoredState(ctx.testHome, workspaceDir);
 
     // Create branch B
     await new Deno.Command("git", {
       args: ["checkout", "-b", "feature-B"],
       cwd: workspaceDir,
     }).output();
+    await cleanGitIgnoredState(ctx.testHome, workspaceDir);
 
     // Add item on branch B
     const _resultB = await runCommand(ctx.testHome, ["note", "Feature B memo"]);
@@ -660,6 +695,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
       args: ["checkout", "main"],
       cwd: workspaceDir,
     }).output();
+    await cleanGitIgnoredState(ctx.testHome, workspaceDir);
 
     const mergeA = await new Deno.Command("git", {
       args: ["merge", "feature-A"],
@@ -698,6 +734,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
       args: ["checkout", "-b", "edit-A"],
       cwd: workspaceDir,
     }).output();
+    await cleanGitIgnoredState(ctx.testHome, workspaceDir);
 
     // Edit on branch A - read, parse, update body
     const contentA = await Deno.readTextFile(itemFilePath);
@@ -717,11 +754,13 @@ describe("Scenario 15: Git-friendly diffs", () => {
       args: ["checkout", "main"],
       cwd: workspaceDir,
     }).output();
+    await cleanGitIgnoredState(ctx.testHome, workspaceDir);
 
     await new Deno.Command("git", {
       args: ["checkout", "-b", "edit-B"],
       cwd: workspaceDir,
     }).output();
+    await cleanGitIgnoredState(ctx.testHome, workspaceDir);
 
     // Edit same file on branch B - read, parse, update body
     const contentB = await Deno.readTextFile(itemFilePath);
@@ -741,6 +780,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
       args: ["checkout", "main"],
       cwd: workspaceDir,
     }).output();
+    await cleanGitIgnoredState(ctx.testHome, workspaceDir);
 
     const mergeA = await new Deno.Command("git", {
       args: ["merge", "edit-A"],
@@ -804,6 +844,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
       args: ["checkout", "-b", "move-sibling1"],
       cwd: workspaceDir,
     }).output();
+    await cleanGitIgnoredState(ctx.testHome, workspaceDir);
 
     await runCommand(ctx.testHome, [
       "mv",
@@ -817,11 +858,13 @@ describe("Scenario 15: Git-friendly diffs", () => {
       args: ["checkout", "main"],
       cwd: workspaceDir,
     }).output();
+    await cleanGitIgnoredState(ctx.testHome, workspaceDir);
 
     await new Deno.Command("git", {
       args: ["checkout", "-b", "move-sibling2"],
       cwd: workspaceDir,
     }).output();
+    await cleanGitIgnoredState(ctx.testHome, workspaceDir);
 
     await runCommand(ctx.testHome, [
       "mv",
@@ -835,6 +878,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
       args: ["checkout", "main"],
       cwd: workspaceDir,
     }).output();
+    await cleanGitIgnoredState(ctx.testHome, workspaceDir);
 
     const mergeA = await new Deno.Command("git", {
       args: ["merge", "move-sibling1"],
