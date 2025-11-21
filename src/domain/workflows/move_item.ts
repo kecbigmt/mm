@@ -293,10 +293,48 @@ export const MoveItemWorkflow = {
       const refItem = refItemResult.value;
       targetPlacement = refItem.data.placement;
 
-      // Generate rank after/before reference item
-      const rankResult = isAfter
-        ? deps.rankService.nextRank(refItem.data.rank)
-        : deps.rankService.prevRank(refItem.data.rank);
+      // Load all siblings at the target placement to find adjacent items
+      const siblingsResult = await deps.itemRepository.listByPlacement({
+        kind: "single",
+        at: targetPlacement,
+      });
+      if (siblingsResult.type === "error") {
+        return Result.error(siblingsResult.error);
+      }
+
+      const siblings = siblingsResult.value;
+      // Sort siblings by rank to find adjacent items
+      const sortedSiblings = siblings.slice().sort((a, b) =>
+        deps.rankService.compareRanks(a.data.rank, b.data.rank)
+      );
+
+      // Find the reference item's index in sorted siblings
+      const refIndex = sortedSiblings.findIndex((s) =>
+        s.data.id.toString() === refItem.data.id.toString()
+      );
+
+      let rankResult;
+      if (isAfter) {
+        // Moving after reference item: find next item and generate rank between
+        const nextItem = sortedSiblings[refIndex + 1];
+        if (nextItem) {
+          // Generate rank between reference item and next item
+          rankResult = deps.rankService.betweenRanks(refItem.data.rank, nextItem.data.rank);
+        } else {
+          // No next item, append after reference item
+          rankResult = deps.rankService.nextRank(refItem.data.rank);
+        }
+      } else {
+        // Moving before reference item: find previous item and generate rank between
+        const prevItem = sortedSiblings[refIndex - 1];
+        if (prevItem) {
+          // Generate rank between previous item and reference item
+          rankResult = deps.rankService.betweenRanks(prevItem.data.rank, refItem.data.rank);
+        } else {
+          // No previous item, prepend before reference item
+          rankResult = deps.rankService.prevRank(refItem.data.rank);
+        }
+      }
 
       if (rankResult.type === "error") {
         return Result.error(createValidationError("MoveItem", rankResult.error.issues));
