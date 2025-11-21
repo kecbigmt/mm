@@ -1,5 +1,5 @@
-import { assertEquals } from "@std/assert";
-import { CreateItemWorkflow } from "./create_item.ts";
+import { assert, assertEquals } from "@std/assert";
+import { CreateItemWorkflow, validateEventDateConsistency } from "./create_item.ts";
 import { Result } from "../../shared/result.ts";
 import { createItem, Item } from "../models/item.ts";
 import {
@@ -10,6 +10,7 @@ import {
   itemRankFromString,
   itemStatusOpen,
   itemTitleFromString,
+  parseDuration,
   parsePlacement,
 } from "../primitives/mod.ts";
 import { createRankService, RankGenerator, RankService } from "../services/rank_service.ts";
@@ -252,5 +253,133 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
       secondResult.error.issues.some((issue) => issue.message.includes("already exists")),
       true,
     );
+  }
+});
+
+// Event date consistency validation tests
+Deno.test("validateEventDateConsistency - accepts matching dates", () => {
+  const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z"));
+  const placement = Result.unwrap(parsePlacement("2025-01-15"));
+  const result = validateEventDateConsistency(startAt, placement);
+  assertEquals(result.type, "ok");
+});
+
+Deno.test("validateEventDateConsistency - rejects mismatched dates", () => {
+  const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z"));
+  const placement = Result.unwrap(parsePlacement("2025-01-16"));
+  const result = validateEventDateConsistency(startAt, placement);
+  assertEquals(result.type, "error");
+  if (result.type === "error") {
+    assertEquals(result.error.kind, "date_consistency");
+  }
+});
+
+Deno.test("validateEventDateConsistency - skips validation for item placement", () => {
+  const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z"));
+  // Using a UUID-like string as item placement
+  const placement = Result.unwrap(parsePlacement("019965a7-2789-740a-b8c1-1415904fd120"));
+  const result = validateEventDateConsistency(startAt, placement);
+  assertEquals(result.type, "ok");
+});
+
+// CreateItemWorkflow with scheduling fields
+Deno.test("CreateItemWorkflow - creates task with dueAt", async () => {
+  const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+  const rankService = createTestRankService();
+  const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
+
+  const parentPlacement = Result.unwrap(parsePlacement("2025-01-15"));
+  const createdAt = Result.unwrap(parseDateTime("2025-01-15T10:00:00Z"));
+  const dueAt = Result.unwrap(parseDateTime("2025-01-20T23:59:59Z"));
+
+  const result = await CreateItemWorkflow.execute({
+    title: "Review PR",
+    itemType: "task",
+    dueAt,
+    parentPlacement,
+    createdAt,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService,
+  });
+
+  if (result.type !== "ok") {
+    throw new Error(`expected ok result, received ${JSON.stringify(result.error)}`);
+  }
+
+  assertEquals(result.value.item.data.dueAt, dueAt);
+});
+
+Deno.test("CreateItemWorkflow - creates event with startAt and duration", async () => {
+  const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+  const rankService = createTestRankService();
+  const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
+
+  const parentPlacement = Result.unwrap(parsePlacement("2025-01-15"));
+  const createdAt = Result.unwrap(parseDateTime("2025-01-15T10:00:00Z"));
+  const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z"));
+  const duration = Result.unwrap(parseDuration("2h"));
+
+  const result = await CreateItemWorkflow.execute({
+    title: "Team meeting",
+    itemType: "event",
+    startAt,
+    duration,
+    parentPlacement,
+    createdAt,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService,
+  });
+
+  if (result.type !== "ok") {
+    throw new Error(`expected ok result, received ${JSON.stringify(result.error)}`);
+  }
+
+  assertEquals(result.value.item.data.startAt, startAt);
+  assertEquals(result.value.item.data.duration, duration);
+});
+
+Deno.test("CreateItemWorkflow - rejects event with mismatched startAt date", async () => {
+  const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+  const rankService = createTestRankService();
+  const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
+
+  const parentPlacement = Result.unwrap(parsePlacement("2025-01-16"));
+  const createdAt = Result.unwrap(parseDateTime("2025-01-16T10:00:00Z"));
+  const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z")); // Wrong date
+
+  const result = await CreateItemWorkflow.execute({
+    title: "Team meeting",
+    itemType: "event",
+    startAt,
+    parentPlacement,
+    createdAt,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService,
+  });
+
+  assertEquals(result.type, "error");
+  if (result.type === "error") {
+    assertEquals(result.error.kind, "validation");
+    if (result.error.kind === "validation") {
+      assert(result.error.issues.some((i) => i.code === "date_time_inconsistency"));
+    }
   }
 });
