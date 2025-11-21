@@ -45,12 +45,12 @@ their union as a single Node algebraic data type. Items are created under a date
 - Identified by **UUID v7** (creation timestamp embedded).
 - Created under the **date Container** matching its creation date.
 - Can be **moved** to another container; the physical file location remains under its original date;
-  frontmatter (`placement`, `rank`) and edge files are updated. After move, it is **excluded** from the
-  original date's listing.
+  frontmatter (`placement`, `rank`) and edge files are updated. After move, it is **excluded** from
+  the original date's listing.
 - Has per-container **rank (LexoRank)** for ordering.
 - May also act as a container (can have children).
-- Frontmatter fields: `id`, `kind`, `status`, `placement`, `rank`, `created_at`, `updated_at`, optional
-  `alias`, `tags`, `schema`, `extra`.
+- Frontmatter fields: `id`, `kind`, `status`, `placement`, `rank`, `created_at`, `updated_at`,
+  optional `alias`, `tags`, `schema`, `extra`.
 - State transitions: `close`, `reopen`.
 
 ### Workspace
@@ -93,18 +93,19 @@ their union as a single Node algebraic data type. Items are created under a date
 
 - **Single file per Item**: `<uuid>.md` contains both metadata (Frontmatter) and content (Markdown
   body).
-- **Frontmatter is authoritative**: The Item's `placement` and `rank` in Frontmatter are the source of
-  truth.
+- **Frontmatter is authoritative**: The Item's `placement` and `rank` in Frontmatter are the source
+  of truth.
 - **`.index/graph` is rebuildable cache**: Edge files mirror Frontmatter placement for efficient
-  traversal; regenerated via `mm doctor --rebuild-index`.
+  traversal; regenerated via `mm doctor rebuild-index`.
 - **Git-ignored index**: `.index/` directory is not committed; each machine rebuilds it locally.
 
 ## 5) Ordering & Ranks
 
-- **Frontmatter `rank`**: ordering within the Item's current placement (stored in `placement` field).
+- **Frontmatter `rank`**: ordering within the Item's current placement (stored in `placement`
+  field).
 - **Edge files**: mirror the `rank` from Frontmatter for efficient traversal.
 - LexoRank (string) supports stable insertions (`head`, `tail`, `before:<id>`, `after:<id>`).
-  Periodic rebalancing may be performed by maintenance (`mm doctor --reindex`).
+  Periodic rebalancing may be performed by maintenance (`mm doctor rebalance-rank <paths...>`).
 
 ## 6) Movement & Placement
 
@@ -179,11 +180,13 @@ before:<id> | after:<id>
 
 **Frontmatter validation:**
 
-- Required fields present: `id`, `kind`, `status`, `placement`, `rank`, `created_at`, `updated_at`, `schema`.
+- Required fields present: `id`, `kind`, `status`, `placement`, `rank`, `created_at`, `updated_at`,
+  `schema`.
 - `id` matches filename `<uuid>.md` and is valid UUID v7.
 - `kind` is one of allowed values (e.g., `note`, `task`, `event`).
 - `status` is one of allowed values (e.g., `open`, `closed`).
-- `placement` is normalized (no relative tokens like `today`, no aliases; only absolute dates and UUIDs).
+- `placement` is normalized (no relative tokens like `today`, no aliases; only absolute dates and
+  UUIDs).
 - `rank` is valid LexoRank format.
 - `created_at`, `updated_at` are valid ISO-8601 timestamps.
 - `schema` is present (e.g., `mm.item.frontmatter/2`).
@@ -199,7 +202,10 @@ before:<id> | after:<id>
 
 **Maintenance:**
 
-- `mm doctor --rebuild-index`: Rebuild `.index/graph` from all Frontmatter data.
+- `mm doctor check`: Validate workspace integrity (inspection only, no modifications).
+- `mm doctor rebuild-index`: Rebuild `.index/graph` and `.index/aliases` from all Frontmatter data.
+- `mm doctor rebalance-rank <paths...>`: Rebalance LexoRank values for items in specified paths to
+  restore insertion headroom.
 
 ## 13) Error Handling (CLI)
 
@@ -211,5 +217,4 @@ before:<id> | after:<id>
 ## 14) Future Work (optional)
 
 - Background index for full-text/tag search (not stored in Git).
-- Bulk rank rebalancing heuristics.
 - Optional `mm doctor --fix` for safe autofixes.
