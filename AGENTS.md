@@ -24,6 +24,19 @@ is under `docs/`, with detailed product steerage in `docs/steering/design.md`.
 - `deno task test` – execute all unit and integration tests. Use `deno run` sparingly; prefer the
   tasks so flags match repository defaults.
 
+### Test Execution Strategy
+
+**For efficiency, use targeted tests during development and full test suite for final verification:**
+
+- **During development** (incremental verification):
+  - `deno task test:file <path>` – Run specific test files only
+  - Example: `deno task test:file src/domain/workflows/create_item_test.ts`
+  - Example: `deno task test:file tests/e2e/scenarios/task_creation_test.ts`
+  - Use patterns: `deno task test:file tests/e2e/scenarios/*creation_test.ts`
+
+- **Before commits** (full verification):
+  - `deno task test` – Complete test suite (runs `test:unit` + `test:e2e`)
+
 ## Coding Style & Naming Conventions
 
 Follow Deno formatting via `deno fmt` (2-space indent, 100 column width) and lint with `deno lint`.
