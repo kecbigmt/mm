@@ -104,7 +104,7 @@ const extractDateFromPlacement = (placement: Placement): string | null => {
  * Only validates for calendar-based placements (date kind)
  * Skips validation for item-based placements (item kind)
  */
-export const validateEventDateConsistency = (
+const validateEventDateConsistency = (
   startAt: DateTime,
   parentPlacement: Placement,
 ): Result<void, DateConsistencyValidationError> => {

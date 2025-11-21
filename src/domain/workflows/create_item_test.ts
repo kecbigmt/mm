@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { CreateItemWorkflow, validateEventDateConsistency } from "./create_item.ts";
+import { CreateItemWorkflow } from "./create_item.ts";
 import { Result } from "../../shared/result.ts";
 import { createItem, Item } from "../models/item.ts";
 import {
@@ -256,32 +256,6 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
   }
 });
 
-// Event date consistency validation tests
-Deno.test("validateEventDateConsistency - accepts matching dates", () => {
-  const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z"));
-  const placement = Result.unwrap(parsePlacement("2025-01-15"));
-  const result = validateEventDateConsistency(startAt, placement);
-  assertEquals(result.type, "ok");
-});
-
-Deno.test("validateEventDateConsistency - rejects mismatched dates", () => {
-  const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z"));
-  const placement = Result.unwrap(parsePlacement("2025-01-16"));
-  const result = validateEventDateConsistency(startAt, placement);
-  assertEquals(result.type, "error");
-  if (result.type === "error") {
-    assertEquals(result.error.kind, "date_consistency");
-  }
-});
-
-Deno.test("validateEventDateConsistency - skips validation for item placement", () => {
-  const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z"));
-  // Using a UUID-like string as item placement
-  const placement = Result.unwrap(parsePlacement("019965a7-2789-740a-b8c1-1415904fd120"));
-  const result = validateEventDateConsistency(startAt, placement);
-  assertEquals(result.type, "ok");
-});
-
 // CreateItemWorkflow with scheduling fields
 Deno.test("CreateItemWorkflow - creates task with dueAt", async () => {
   const repository = new InMemoryItemRepository();
@@ -381,5 +355,57 @@ Deno.test("CreateItemWorkflow - rejects event with mismatched startAt date", asy
     if (result.error.kind === "validation") {
       assert(result.error.issues.some((i) => i.code === "date_time_inconsistency"));
     }
+  }
+});
+
+Deno.test("CreateItemWorkflow - allows event with different date for item placement", async () => {
+  const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+  const rankService = createTestRankService();
+  const idService1 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd110");
+  const idService2 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
+
+  // Create a parent item under a date
+  const parentItemResult = await CreateItemWorkflow.execute({
+    title: "Project",
+    itemType: "note",
+    parentPlacement: Result.unwrap(parsePlacement("2025-01-10")),
+    createdAt: Result.unwrap(parseDateTime("2025-01-10T10:00:00Z")),
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService1,
+  });
+
+  if (parentItemResult.type !== "ok") {
+    throw new Error("Failed to create parent item");
+  }
+
+  const parentId = parentItemResult.value.item.data.id;
+  const itemPlacement = Result.unwrap(parsePlacement(parentId.toString()));
+  const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z")); // Different date - OK for item placement
+
+  // Create event under item placement with different date
+  const result = await CreateItemWorkflow.execute({
+    title: "Team meeting",
+    itemType: "event",
+    startAt,
+    parentPlacement: itemPlacement,
+    createdAt: Result.unwrap(parseDateTime("2025-01-15T10:00:00Z")),
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService2,
+  });
+
+  // Should succeed because validation is skipped for item placements
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.item.data.startAt, startAt);
   }
 });
