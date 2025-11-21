@@ -25,20 +25,61 @@ Build a standalone binary with `deno task compile`, or install the CLI globally 
 
 #### `note [title]`
 
-Create a new note.
+Create a new note. Alias: `n`
 
 ```sh
 mm note "My note title"
-mm note --body "Note content" --date today "Weekly Review"
+mm n --body "Note content" "Weekly Review"
 ```
 
 Options:
 
 - `-b, --body <body>` - Body text
-- `-p, --project <project>` - Project tag
+- `-p, --parent <path>` - Parent container (default: today)
 - `-c, --context <context>` - Context tag
-- `-d, --date <date>` - Note date (flexible: YYYY-MM-DD, today, tomorrow, etc.)
+- `-a, --alias <slug>` - Human-readable alias
 - `-e, --edit` - Open editor after creation
+
+#### `task [title]`
+
+Create a new task. Alias: `t`
+
+```sh
+mm task "Review PR" --due-at "2025-01-20T17:00:00Z"
+mm t "Fix bug" --context work
+```
+
+Options:
+
+- `-b, --body <body>` - Body text
+- `-p, --parent <path>` - Parent container (default: today)
+- `-c, --context <context>` - Context tag
+- `-a, --alias <slug>` - Human-readable alias
+- `-d, --due-at <datetime>` - Due date/time (ISO 8601 format)
+- `-e, --edit` - Open editor after creation
+
+#### `event [title]`
+
+Create a new event. Alias: `ev`
+
+```sh
+mm event "Team meeting" --start-at "2025-01-15T14:00:00Z" --duration 2h
+mm ev "Lunch" --start-at "2025-01-15T12:00:00Z" --duration 1h
+```
+
+Options:
+
+- `-b, --body <body>` - Body text
+- `-p, --parent <path>` - Parent container (default: today)
+- `-c, --context <context>` - Context tag
+- `-a, --alias <slug>` - Human-readable alias
+- `-s, --start-at <datetime>` - Start date/time (ISO 8601 format)
+- `-d, --duration <duration>` - Duration (e.g., 30m, 2h, 1h30m)
+- `-e, --edit` - Open editor after creation
+
+**Note:** For events with `--start-at`, the date portion must match the parent placement date for
+calendar-based placements (e.g., `/2025-01-15`). This validation is skipped for item-based
+placements.
 
 ### Managing Item Status
 
