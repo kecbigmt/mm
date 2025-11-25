@@ -5,6 +5,7 @@ import {
   ValidationError,
 } from "../../shared/errors.ts";
 import { Item } from "../models/item.ts";
+import { createAlias } from "../models/alias.ts";
 import {
   AliasSlug,
   DateTime,
@@ -94,6 +95,11 @@ export const EditItemWorkflow = {
     let updatedItem = item;
     const issues: Array<{ field: string; message: string }> = [];
 
+    // Track alias changes for index updates
+    const oldAlias = item.data.alias;
+    let newAlias: AliasSlug | undefined = oldAlias;
+    let aliasChanged = false;
+
     if (input.updates.title !== undefined) {
       const titleResult = parseItemTitle(input.updates.title);
       if (titleResult.type === "error") {
@@ -136,6 +142,12 @@ export const EditItemWorkflow = {
         }
       }
       if (issues.length === 0 || !issues.some((i) => i.field === "alias")) {
+        const oldAliasStr = oldAlias?.toString();
+        const newAliasStr = aliasValue?.toString();
+        if (oldAliasStr !== newAliasStr) {
+          aliasChanged = true;
+          newAlias = aliasValue;
+        }
         updatedItem = updatedItem.setAlias(aliasValue, input.updatedAt);
       }
     }
@@ -220,6 +232,30 @@ export const EditItemWorkflow = {
           ),
         ),
       );
+    }
+
+    // Update alias index if alias changed
+    if (aliasChanged) {
+      // Delete old alias if it exists
+      if (oldAlias) {
+        const deleteResult = await deps.aliasRepository.delete(oldAlias);
+        if (deleteResult.type === "error") {
+          return Result.error(deleteResult.error);
+        }
+      }
+
+      // Save new alias if it exists
+      if (newAlias) {
+        const aliasModel = createAlias({
+          slug: newAlias,
+          itemId: item.data.id,
+          createdAt: input.updatedAt,
+        });
+        const aliasSaveResult = await deps.aliasRepository.save(aliasModel);
+        if (aliasSaveResult.type === "error") {
+          return Result.error(aliasSaveResult.error);
+        }
+      }
     }
 
     const saveResult = await deps.itemRepository.save(updatedItem);

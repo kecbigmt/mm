@@ -4,6 +4,7 @@ import { Item } from "../models/item.ts";
 import { EditItemWorkflow } from "./edit_item.ts";
 import { createItem } from "../models/item.ts";
 import {
+  AliasSlug,
   aliasSlugFromString,
   createItemIcon,
   DateTime,
@@ -295,4 +296,206 @@ Deno.test("EditItemWorkflow - should handle invalid title", async () => {
   if (result.type === "error" && "kind" in result.error) {
     assertEquals(result.error.kind, "ValidationError");
   }
+});
+
+Deno.test("EditItemWorkflow - should update alias index when alias changes", async () => {
+  const itemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd120"));
+  const oldAliasSlug = Result.unwrap(aliasSlugFromString("old-alias"));
+  const now = Result.unwrap(dateTimeFromDate(new Date()));
+  const originalItem = createTestItem(itemId, "Test Item", now);
+  const itemWithAlias = originalItem.setAlias(oldAliasSlug, now);
+
+  let deletedAlias: typeof oldAliasSlug | undefined;
+  let savedAlias: Alias | undefined;
+
+  const mockItemRepository: ItemRepository = {
+    load: (id: ItemId) => {
+      if (id.equals(itemId)) {
+        return Promise.resolve(Result.ok(itemWithAlias));
+      }
+      return Promise.resolve(
+        Result.error(createRepositoryError("item", "load", "Item not found")),
+      );
+    },
+    save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
+    delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
+    listByPlacement: () => Promise.resolve(Result.ok([])),
+  };
+
+  const mockAliasRepository: AliasRepository = {
+    load: (_slug) =>
+      Promise.resolve(Result.error(
+        createRepositoryError("alias", "load", "Alias not found"),
+      )),
+    save: (alias: Alias) => {
+      savedAlias = alias;
+      return Promise.resolve(Result.ok(undefined));
+    },
+    delete: (slug) => {
+      deletedAlias = slug;
+      return Promise.resolve(Result.ok(undefined));
+    },
+    list: () => Promise.resolve(Result.ok([])),
+  };
+
+  const result = await EditItemWorkflow.execute(
+    {
+      itemLocator: itemId.toString(),
+      updates: {
+        alias: "new-alias",
+      },
+      updatedAt: now,
+    },
+    {
+      itemRepository: mockItemRepository,
+      aliasRepository: mockAliasRepository,
+    },
+  );
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.data.alias?.toString(), "new-alias");
+  }
+
+  // Verify old alias was deleted
+  assertExists(deletedAlias);
+  assertEquals(deletedAlias.toString(), "old-alias");
+
+  // Verify new alias was saved
+  assertExists(savedAlias);
+  assertEquals(savedAlias.data.slug.toString(), "new-alias");
+  assertEquals(savedAlias.data.itemId.equals(itemId), true);
+});
+
+Deno.test("EditItemWorkflow - should delete alias index when alias is cleared", async () => {
+  const itemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd120"));
+  const oldAliasSlug = Result.unwrap(aliasSlugFromString("old-alias"));
+  const now = Result.unwrap(dateTimeFromDate(new Date()));
+  const originalItem = createTestItem(itemId, "Test Item", now);
+  const itemWithAlias = originalItem.setAlias(oldAliasSlug, now);
+
+  let deletedAlias: typeof oldAliasSlug | undefined;
+  let savedAlias: Alias | undefined;
+
+  const mockItemRepository: ItemRepository = {
+    load: (id: ItemId) => {
+      if (id.equals(itemId)) {
+        return Promise.resolve(Result.ok(itemWithAlias));
+      }
+      return Promise.resolve(
+        Result.error(createRepositoryError("item", "load", "Item not found")),
+      );
+    },
+    save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
+    delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
+    listByPlacement: () => Promise.resolve(Result.ok([])),
+  };
+
+  const mockAliasRepository: AliasRepository = {
+    load: (_slug) =>
+      Promise.resolve(Result.error(
+        createRepositoryError("alias", "load", "Alias not found"),
+      )),
+    save: (alias: Alias) => {
+      savedAlias = alias;
+      return Promise.resolve(Result.ok(undefined));
+    },
+    delete: (slug) => {
+      deletedAlias = slug;
+      return Promise.resolve(Result.ok(undefined));
+    },
+    list: () => Promise.resolve(Result.ok([])),
+  };
+
+  const result = await EditItemWorkflow.execute(
+    {
+      itemLocator: itemId.toString(),
+      updates: {
+        alias: "", // Clear alias
+      },
+      updatedAt: now,
+    },
+    {
+      itemRepository: mockItemRepository,
+      aliasRepository: mockAliasRepository,
+    },
+  );
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.data.alias, undefined);
+  }
+
+  // Verify old alias was deleted
+  assertExists(deletedAlias);
+  assertEquals(deletedAlias.toString(), "old-alias");
+
+  // Verify no new alias was saved
+  assertEquals(savedAlias, undefined);
+});
+
+Deno.test("EditItemWorkflow - should save alias index when alias is added", async () => {
+  const itemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd120"));
+  const now = Result.unwrap(dateTimeFromDate(new Date()));
+  const originalItem = createTestItem(itemId, "Test Item", now);
+
+  let deletedAlias: AliasSlug | undefined;
+  let savedAlias: Alias | undefined;
+
+  const mockItemRepository: ItemRepository = {
+    load: (id: ItemId) => {
+      if (id.equals(itemId)) {
+        return Promise.resolve(Result.ok(originalItem));
+      }
+      return Promise.resolve(
+        Result.error(createRepositoryError("item", "load", "Item not found")),
+      );
+    },
+    save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
+    delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
+    listByPlacement: () => Promise.resolve(Result.ok([])),
+  };
+
+  const mockAliasRepository: AliasRepository = {
+    load: (_slug) =>
+      Promise.resolve(Result.error(
+        createRepositoryError("alias", "load", "Alias not found"),
+      )),
+    save: (alias: Alias) => {
+      savedAlias = alias;
+      return Promise.resolve(Result.ok(undefined));
+    },
+    delete: (slug) => {
+      deletedAlias = slug;
+      return Promise.resolve(Result.ok(undefined));
+    },
+    list: () => Promise.resolve(Result.ok([])),
+  };
+
+  const result = await EditItemWorkflow.execute(
+    {
+      itemLocator: itemId.toString(),
+      updates: {
+        alias: "new-alias",
+      },
+      updatedAt: now,
+    },
+    {
+      itemRepository: mockItemRepository,
+      aliasRepository: mockAliasRepository,
+    },
+  );
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.data.alias?.toString(), "new-alias");
+  }
+
+  // Verify no alias was deleted (since there was no old alias)
+  assertEquals(deletedAlias, undefined);
+
+  // Verify new alias was saved
+  assertExists(savedAlias);
+  assertEquals(savedAlias.data.slug.toString(), "new-alias");
+  assertEquals(savedAlias.data.itemId.equals(itemId), true);
 });
