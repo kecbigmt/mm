@@ -5,10 +5,11 @@ import { dateTimeFromDate } from "../../../domain/primitives/date_time.ts";
 import { deriveFilePathFromId } from "../../../infrastructure/fileSystem/item_repository.ts";
 
 const hasMetadataOptions = (options: Record<string, unknown>): boolean => {
-  return !!(
-    options.title || options.icon || options.body ||
-    options.startAt || options.duration || options.dueAt ||
-    options.alias || options.context
+  return (
+    options.title !== undefined || options.icon !== undefined || options.body !== undefined ||
+    options.startAt !== undefined || options.duration !== undefined ||
+    options.dueAt !== undefined ||
+    options.alias !== undefined || options.context !== undefined
   );
 };
 

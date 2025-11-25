@@ -14,6 +14,7 @@ import {
   itemRankFromString,
   itemStatusOpen,
   itemTitleFromString,
+  parseDuration,
   parsePlacement,
 } from "../primitives/mod.ts";
 import { createRepositoryError } from "../repositories/repository_error.ts";
@@ -498,4 +499,63 @@ Deno.test("EditItemWorkflow - should save alias index when alias is added", asyn
   assertExists(savedAlias);
   assertEquals(savedAlias.data.slug.toString(), "new-alias");
   assertEquals(savedAlias.data.itemId.equals(itemId), true);
+});
+
+Deno.test("EditItemWorkflow - should preserve existing schedule fields on partial update", async () => {
+  const itemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd120"));
+  const now = Result.unwrap(dateTimeFromDate(new Date()));
+  const startAt = Result.unwrap(dateTimeFromDate(new Date("2025-01-15T10:00:00Z")));
+  const duration = Result.unwrap(parseDuration("2h"));
+  const dueAt = Result.unwrap(dateTimeFromDate(new Date("2025-01-20T18:00:00Z")));
+
+  const originalItem = createTestItem(itemId, "Test Item", now);
+  const itemWithSchedule = originalItem.schedule({ startAt, duration, dueAt }, now);
+
+  const mockItemRepository: ItemRepository = {
+    load: (id: ItemId) => {
+      if (id.equals(itemId)) {
+        return Promise.resolve(Result.ok(itemWithSchedule));
+      }
+      return Promise.resolve(
+        Result.error(createRepositoryError("item", "load", "Item not found")),
+      );
+    },
+    save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
+    delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
+    listByPlacement: () => Promise.resolve(Result.ok([])),
+  };
+
+  const mockAliasRepository: AliasRepository = {
+    load: (_slug) =>
+      Promise.resolve(Result.error(
+        createRepositoryError("alias", "load", "Alias not found"),
+      )),
+    save: (_alias) => Promise.resolve(Result.ok(undefined)),
+    delete: (_slug) => Promise.resolve(Result.ok(undefined)),
+    list: () => Promise.resolve(Result.ok([])),
+  };
+
+  // Update only duration
+  const result = await EditItemWorkflow.execute(
+    {
+      itemLocator: itemId.toString(),
+      updates: {
+        duration: "30m",
+      },
+      updatedAt: now,
+    },
+    {
+      itemRepository: mockItemRepository,
+      aliasRepository: mockAliasRepository,
+    },
+  );
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    // Duration should be updated
+    assertEquals(result.value.data.duration?.toString(), "30m");
+    // startAt and dueAt should be preserved
+    assertEquals(result.value.data.startAt?.toString(), startAt.toString());
+    assertEquals(result.value.data.dueAt?.toString(), dueAt.toString());
+  }
 });

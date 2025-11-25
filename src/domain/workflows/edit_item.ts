@@ -174,7 +174,12 @@ export const EditItemWorkflow = {
       startAt?: DateTime;
       duration?: Duration;
       dueAt?: DateTime;
-    } = {};
+    } = {
+      // Preserve existing values by default
+      startAt: updatedItem.data.startAt,
+      duration: updatedItem.data.duration,
+      dueAt: updatedItem.data.dueAt,
+    };
     let hasScheduleUpdates = false;
 
     if (input.updates.startAt !== undefined) {
