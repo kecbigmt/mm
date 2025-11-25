@@ -2,29 +2,11 @@ import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import { parseAliasSlug } from "../../../domain/primitives/alias_slug.ts";
-import { join } from "@std/path";
+import { deriveFilePathFromId } from "../../../infrastructure/fileSystem/item_repository.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
 ): string => item.data.alias ? item.data.alias.toString() : item.data.id.toString().slice(-7);
-
-const formatSegmentForTimezone = (
-  date: Date,
-  timezone: { toString(): string },
-): [string, string, string] => {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone.toString(),
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = formatter.formatToParts(date);
-  const year = parts.find((p) => p.type === "year")?.value ?? String(date.getFullYear());
-  const month = parts.find((p) => p.type === "month")?.value ??
-    String(date.getMonth() + 1).padStart(2, "0");
-  const day = parts.find((p) => p.type === "day")?.value ?? String(date.getDate()).padStart(2, "0");
-  return [year, month, day];
-};
 
 export function createWhereCommand() {
   return new Command()
@@ -94,17 +76,12 @@ export function createWhereCommand() {
       console.log(`  Logical:  ${logicalPath}`);
       console.log(`  Rank:     ${item.data.rank.toString()}`);
 
-      const idStr = item.data.id.toString();
-      const normalized = idStr.replace(/-/g, "").toLowerCase();
-      if (normalized.length === 32 && normalized[12] === "7") {
-        const millisecondsHex = normalized.slice(0, 12);
-        const value = Number.parseInt(millisecondsHex, 16);
-        if (!Number.isNaN(value)) {
-          const date = new Date(value);
-          const [year, month, day] = formatSegmentForTimezone(date, deps.timezone);
-          const physicalPath = join(deps.root, "items", year, month, day, idStr);
-          console.log(`  Physical: ${physicalPath}`);
-        }
+      const physicalPath = deriveFilePathFromId(
+        { root: deps.root, timezone: deps.timezone },
+        item.data.id.toString(),
+      );
+      if (physicalPath) {
+        console.log(`  Physical: ${physicalPath}`);
       }
     });
 }
