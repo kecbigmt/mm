@@ -11,6 +11,12 @@ Deno.test("createCanonicalKey normalizes compatibility characters", () => {
   assertEquals(key.toString(), "officefi");
 });
 
+Deno.test("createCanonicalKey strips diacritics", () => {
+  const withDiacritics = createCanonicalKey("tëst-item");
+  const ascii = createCanonicalKey("test-item");
+  assertEquals(withDiacritics.toString(), ascii.toString());
+});
+
 Deno.test("canonicalKeyFromString collapses equivalent sequences", () => {
   const composed = canonicalKeyFromString("Ångström");
   const decomposed = canonicalKeyFromString(`A\u{030A}ngstro\u{0308}m`);
