@@ -97,6 +97,7 @@ const generateDateRange = (
   const fromDate = from.toDate();
 
   // Start from 'to' and work backwards (newest first)
+  // Use UTC dates to avoid DST issues
   let current = toDate;
   while (current >= fromDate && dates.length < limit) {
     const iso = current.toISOString().slice(0, 10);
@@ -104,7 +105,10 @@ const generateDateRange = (
     if (dayResult.type === "ok") {
       dates.push(dayResult.value);
     }
-    current = new Date(current.getTime() - 24 * 60 * 60 * 1000);
+    // Use setUTCDate to correctly decrement by one day in UTC
+    const prev = new Date(current);
+    prev.setUTCDate(current.getUTCDate() - 1);
+    current = prev;
   }
 
   return { dates, capped, requested };
