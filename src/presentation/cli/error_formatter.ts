@@ -1,21 +1,17 @@
 import { ValidationError } from "../../shared/errors.ts";
+import { bold, red } from "@std/fmt/colors";
 
-/**
- * Check if debug mode is enabled via MM_DEBUG environment variable
- */
-export function isDebugMode(): boolean {
-  const debug = Deno.env.get("MM_DEBUG");
-  return debug === "1" || debug === "true";
-}
+const ERROR_PREFIX = `${bold(red("error"))}: `;
 
 /**
  * Format error message for user display
- * In debug mode: shows full technical details
- * In normal mode: shows only user-friendly message
+ * In debug mode: shows full technical details (no color)
+ * In normal mode: shows only user-friendly message (red color)
+ *
+ * @param error - The error to format
+ * @param isDebug - Whether to show debug details (default: false)
  */
-export function formatError(error: unknown): string {
-  const debug = isDebugMode();
-
+export function formatError(error: unknown, isDebug = false): string {
   // Handle ValidationError
   if (
     typeof error === "object" && error !== null &&
@@ -24,34 +20,44 @@ export function formatError(error: unknown): string {
   ) {
     const validationError = error as ValidationError<string>;
 
-    if (debug) {
-      // Debug mode: show full technical details
+    if (isDebug) {
+      // Debug mode: show full technical details (no color)
       return validationError.toString();
     } else {
-      // Normal mode: show only the core message(s) from issues
+      // Normal mode: show only the core message(s) from issues with "error" prefix (bold+red)
       if (validationError.issues.length > 0) {
-        return validationError.issues.map((issue) => issue.message).join("\n");
+        const messages = validationError.issues.map((issue) => issue.message).join("\n");
+        return `${ERROR_PREFIX}${messages}`;
       }
-      return validationError.message;
+      return `${ERROR_PREFIX}${validationError.message}`;
     }
   }
 
-  // Handle errors with message property
-  if (
-    typeof error === "object" && error !== null &&
-    "message" in error && typeof error.message === "string"
-  ) {
-    return error.message;
-  }
+  // Handle unexpected errors (not user-facing ValidationErrors)
+  // In debug mode: show technical details
+  // In normal mode: hide details and show generic message
 
-  // Handle errors with toString
-  if (
-    typeof error === "object" && error !== null &&
-    "toString" in error && typeof error.toString === "function"
-  ) {
-    return error.toString();
-  }
+  if (isDebug) {
+    // Handle errors with message property
+    if (
+      typeof error === "object" && error !== null &&
+      "message" in error && typeof error.message === "string"
+    ) {
+      return error.message;
+    }
 
-  // Fallback
-  return String(error);
+    // Handle errors with toString
+    if (
+      typeof error === "object" && error !== null &&
+      "toString" in error && typeof error.toString === "function"
+    ) {
+      return error.toString();
+    }
+
+    // Fallback
+    return String(error);
+  } else {
+    // Normal mode: don't expose internal error details
+    return `${ERROR_PREFIX}An unexpected error occurred.`;
+  }
 }
