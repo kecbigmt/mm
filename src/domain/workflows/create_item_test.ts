@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertExists } from "@std/assert";
 import { CreateItemWorkflow } from "./create_item.ts";
 import { Result } from "../../shared/result.ts";
 import { createItem, Item } from "../models/item.ts";
@@ -366,6 +366,48 @@ Deno.test("CreateItemWorkflow - rejects event with mismatched startAt date", asy
     if (result.error.kind === "validation") {
       assert(result.error.issues.some((i) => i.code === "date_time_inconsistency"));
     }
+  }
+});
+
+Deno.test("CreateItemWorkflow - accepts event when startAt crosses UTC day boundary", async () => {
+  const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+  const rankService = createTestRankService();
+  const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
+
+  // Use PST (UTC-8) timezone
+  const pstTimezone = Result.unwrap(timezoneIdentifierFromString("America/Los_Angeles"));
+  const parentPlacement = Result.unwrap(parsePlacement("2025-01-15"));
+  const createdAt = Result.unwrap(parseDateTime("2025-01-15T10:00:00-08:00"));
+
+  // 20:00 in PST on 2025-01-15 = 04:00 UTC on 2025-01-16 (crosses day boundary)
+  // But in workspace timezone (PST), it's still 2025-01-15, so validation should pass
+  const startAt = Result.unwrap(parseDateTime("2025-01-15T20:00:00-08:00"));
+
+  const result = await CreateItemWorkflow.execute({
+    title: "Evening event",
+    itemType: "event",
+    startAt,
+    parentPlacement,
+    createdAt,
+    timezone: pstTimezone,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService,
+  });
+
+  // Should succeed because date is validated in workspace timezone (PST), not UTC
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    const startAtValue = result.value.item.data.startAt;
+    assertExists(startAtValue);
+    assertEquals(startAtValue, startAt);
+    // Verify the ISO string is in UTC (next day)
+    assertEquals(startAtValue.data.iso.substring(0, 10), "2025-01-16");
   }
 });
 
