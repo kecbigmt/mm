@@ -40,6 +40,29 @@ export const formatItemIcon = (icon: ItemIcon, status: ItemStatus): string => {
 };
 
 /**
+ * Returns a plain text token for an item icon (for print mode).
+ *
+ * - note: [note] / [note:closed]
+ * - task: [task] / [task:done]
+ * - event: [event]
+ */
+const formatItemIconPlain = (icon: ItemIcon, status: ItemStatus): string => {
+  const iconValue = icon.toString();
+  const isClosed = status.isClosed();
+
+  switch (iconValue) {
+    case "note":
+      return isClosed ? "[note:closed]" : "[note]";
+    case "task":
+      return isClosed ? "[task:done]" : "[task]";
+    case "event":
+      return "[event]";
+    default:
+      return "[note]";
+  }
+};
+
+/**
  * Formats a time in HH:MM format in the given timezone.
  */
 const formatTimeInTimezone = (date: Date, timezone: TimezoneIdentifier): string => {
@@ -53,7 +76,7 @@ const formatTimeInTimezone = (date: Date, timezone: TimezoneIdentifier): string 
 };
 
 /**
- * Formats the event time portion of an item line.
+ * Formats the event time portion of an item line (colored mode with emoji).
  *
  * - With startAt only: 🕒(HH:MM)
  * - With startAt and duration: 🕒(HH:MM-HH:MM)
@@ -78,25 +101,70 @@ const formatEventTime = (item: Item, timezone: TimezoneIdentifier): string => {
 };
 
 /**
+ * Formats the event time portion of an item line (print mode with plain text).
+ *
+ * - With startAt only: [event](HH:MM)
+ * - With startAt and duration: [event](HH:MM-HH:MM)
+ * - Without startAt: [event]
+ */
+const formatEventTimePlain = (item: Item, timezone: TimezoneIdentifier): string => {
+  const { startAt, duration } = item.data;
+
+  if (!startAt) {
+    return "[event]";
+  }
+
+  const startTime = formatTimeInTimezone(startAt.toDate(), timezone);
+
+  if (duration) {
+    const endDate = startAt.addDuration(duration);
+    const endTime = formatTimeInTimezone(endDate.toDate(), timezone);
+    return `[event](${startTime}-${endTime})`;
+  }
+
+  return `[event](${startTime})`;
+};
+
+/**
  * Formats a single item line.
  *
- * Template: <icon> <alias-or-id> <title> <time?> <context?> <due?>
+ * Colored mode template: <icon> <alias-or-id> <title> <context?> <due?>
+ * Print mode template: <date> <icon> <alias-or-id> <title> <context?> <due?>
  *
+ * - date: YYYY-MM-DD (print mode only, derived from placement)
+ * - icon: emoji (colored) or plain text token (print)
  * - alias-or-id: alias if present, else full UUID (cyan in colored mode)
  * - context: dim @tag format if present
  * - due: dim →YYYY-MM-DD format if dueAt exists
  */
-export const formatItemLine = (item: Item, options: ListFormatterOptions): string => {
+export const formatItemLine = (
+  item: Item,
+  options: ListFormatterOptions,
+  dateStr?: string,
+): string => {
   const { printMode, timezone } = options;
   const { icon, status, alias, title, context, dueAt } = item.data;
 
   const parts: string[] = [];
 
+  // Date column (print mode only)
+  if (printMode && dateStr) {
+    parts.push(dateStr);
+  }
+
   // Icon (with event time if applicable)
-  if (icon.toString() === "event") {
-    parts.push(formatEventTime(item, timezone));
+  if (printMode) {
+    if (icon.toString() === "event") {
+      parts.push(formatEventTimePlain(item, timezone));
+    } else {
+      parts.push(formatItemIconPlain(icon, status));
+    }
   } else {
-    parts.push(formatItemIcon(icon, status));
+    if (icon.toString() === "event") {
+      parts.push(formatEventTime(item, timezone));
+    } else {
+      parts.push(formatItemIcon(icon, status));
+    }
   }
 
   // Alias or UUID
@@ -178,14 +246,16 @@ export const formatDateHeader = (
 /**
  * Formats a section stub line.
  *
- * Format: 📁 <section-prefix>/ (items: <count>, sections: <count>)
+ * Colored mode: 📁 <section-prefix>/ (items: <count>, sections: <count>)
+ * Print mode: [section] <section-prefix>/ (items: <count>, sections: <count>)
  */
 export const formatSectionStub = (
   summary: SectionSummary,
   relativePath: string,
-  _options: ListFormatterOptions,
+  options: ListFormatterOptions,
 ): string => {
-  return `📁 ${relativePath} (items: ${summary.itemCount}, sections: ${summary.sectionCount})`;
+  const icon = options.printMode ? "[section]" : "📁";
+  return `${icon} ${relativePath} (items: ${summary.itemCount}, sections: ${summary.sectionCount})`;
 };
 
 /**
