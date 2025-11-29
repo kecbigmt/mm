@@ -1,4 +1,4 @@
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 import { buildPartitions, formatWarning, type PartitionWarning } from "./build_partitions.ts";
 import { type Item, parseItem } from "../../../domain/models/item.ts";
 import { type CalendarDay, parseCalendarDay } from "../../../domain/primitives/calendar_day.ts";
