@@ -45,8 +45,14 @@ Options:
 Create a new task. Alias: `t`
 
 ```sh
+# With full ISO 8601 (UTC)
 mm task "Review PR" --due-at "2025-01-20T17:00:00Z"
-mm t "Fix bug" --context work
+
+# With local time (no timezone)
+mm task "Review PR" --due-at "2025-01-20T17:00"
+
+# With time only (uses today's date)
+mm t "Fix bug" --due-at "17:00" --context work
 ```
 
 Options:
@@ -55,7 +61,10 @@ Options:
 - `-p, --parent <path>` - Parent container (default: today)
 - `-c, --context <context>` - Context tag
 - `-a, --alias <slug>` - Human-readable alias
-- `-d, --due-at <datetime>` - Due date/time (ISO 8601 format)
+- `-d, --due-at <datetime>` - Due date/time in one of these formats:
+  - ISO 8601 with timezone: `2025-01-20T17:00:00Z` or `2025-01-20T17:00:00+09:00`
+  - ISO 8601 local time: `2025-01-20T17:00` (interpreted as local time)
+  - Time only: `17:00` or `17:00:00` (uses parent placement date or today)
 - `-e, --edit` - Open editor after creation
 
 #### `event [title]`
@@ -63,8 +72,14 @@ Options:
 Create a new event. Alias: `ev`
 
 ```sh
+# With full ISO 8601 (UTC)
 mm event "Team meeting" --start-at "2025-01-15T14:00:00Z" --duration 2h
-mm ev "Lunch" --start-at "2025-01-15T12:00:00Z" --duration 1h
+
+# With local time (no timezone)
+mm event "Team meeting" --start-at "2025-11-21T15:00" --duration 1h
+
+# With time only (uses parent date)
+mm event "Lunch" --start-at "12:00" --duration 1h
 ```
 
 Options:
@@ -73,7 +88,10 @@ Options:
 - `-p, --parent <path>` - Parent container (default: today)
 - `-c, --context <context>` - Context tag
 - `-a, --alias <slug>` - Human-readable alias
-- `-s, --start-at <datetime>` - Start date/time (ISO 8601 format)
+- `-s, --start-at <datetime>` - Start date/time in one of these formats:
+  - ISO 8601 with timezone: `2025-01-15T14:00:00Z` or `2025-01-15T14:00:00+09:00`
+  - ISO 8601 local time: `2025-01-15T14:00` (interpreted as local time)
+  - Time only: `14:00` or `14:00:00` (uses parent placement date or today)
 - `-d, --duration <duration>` - Duration (e.g., 30m, 2h, 1h30m)
 - `-e, --edit` - Open editor after creation
 
