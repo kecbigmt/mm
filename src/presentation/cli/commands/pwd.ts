@@ -2,6 +2,7 @@ import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { formatPlacementForDisplay } from "../../../domain/services/placement_display_service.ts";
+import { formatError } from "../error_formatter.ts";
 
 export function createPwdCommand() {
   return new Command()
@@ -12,9 +13,9 @@ export function createPwdCommand() {
       const depsResult = await loadCliDependencies(workspaceOption);
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(depsResult.error.error.message);
+          console.error(formatError(depsResult.error.error));
         } else {
-          console.error(depsResult.error.message);
+          console.error(formatError(depsResult.error));
         }
         return;
       }
@@ -31,7 +32,7 @@ export function createPwdCommand() {
       );
 
       if (cwdResult.type === "error") {
-        console.error(cwdResult.error.message);
+        console.error(formatError(cwdResult.error));
         return;
       }
 
@@ -40,7 +41,7 @@ export function createPwdCommand() {
         itemRepository: deps.itemRepository,
       });
       if (displayResult.type === "error") {
-        console.error(displayResult.error.message);
+        console.error(formatError(displayResult.error));
         return;
       }
       console.log(displayResult.value);

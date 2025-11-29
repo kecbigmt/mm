@@ -21,6 +21,7 @@ import {
   type ListFormatterOptions,
 } from "../formatters/list_formatter.ts";
 import { outputWithPager } from "../pager.ts";
+import { formatError } from "../error_formatter.ts";
 
 type LsOptions = {
   workspace?: string;
@@ -86,9 +87,9 @@ export function createLsCommand() {
       const depsResult = await loadCliDependencies(options.workspace);
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(depsResult.error.error.message);
+          console.error(formatError(depsResult.error.error));
         } else {
-          console.error(depsResult.error.message);
+          console.error(formatError(depsResult.error));
         }
         return;
       }
@@ -105,7 +106,7 @@ export function createLsCommand() {
       );
 
       if (cwdResult.type === "error") {
-        console.error(cwdResult.error.message);
+        console.error(formatError(cwdResult.error));
         return;
       }
 
@@ -121,7 +122,7 @@ export function createLsCommand() {
         // Parse and resolve locator expression
         const rangeExprResult = parseRangeExpression(locatorArg);
         if (rangeExprResult.type === "error") {
-          console.error(rangeExprResult.error.message);
+          console.error(formatError(rangeExprResult.error));
           return;
         }
 
@@ -134,7 +135,7 @@ export function createLsCommand() {
 
         const resolveResult = await pathResolver.resolveRange(cwd, rangeExprResult.value);
         if (resolveResult.type === "error") {
-          console.error(resolveResult.error.message);
+          console.error(formatError(resolveResult.error));
           return;
         }
 
@@ -185,7 +186,7 @@ export function createLsCommand() {
       );
 
       if (workflowResult.type === "error") {
-        console.error(workflowResult.error.message);
+        console.error(formatError(workflowResult.error));
         return;
       }
 

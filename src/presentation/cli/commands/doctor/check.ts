@@ -12,6 +12,7 @@ import {
 import { Item } from "../../../../domain/models/item.ts";
 import { Alias } from "../../../../domain/models/alias.ts";
 import { parseItemId } from "../../../../domain/primitives/item_id.ts";
+import { formatError } from "../../error_formatter.ts";
 
 /**
  * Item validation issue (parse errors during scanning)
@@ -63,9 +64,9 @@ export function createCheckCommand() {
 
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(depsResult.error.error.message);
+          console.error(formatError(depsResult.error.error));
         } else {
-          console.error(depsResult.error.message);
+          console.error(formatError(depsResult.error));
         }
         Deno.exit(2);
       }

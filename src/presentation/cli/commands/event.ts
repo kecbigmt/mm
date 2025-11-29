@@ -5,6 +5,7 @@ import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { parsePathExpression } from "../path_expression.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
+import { formatError } from "../error_formatter.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -36,9 +37,9 @@ export function createEventCommand() {
       const depsResult = await loadCliDependencies(workspaceOption);
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(depsResult.error.error.message);
+          console.error(formatError(depsResult.error.error));
         } else {
-          console.error(depsResult.error.message);
+          console.error(formatError(depsResult.error));
         }
         return;
       }
@@ -59,7 +60,7 @@ export function createEventCommand() {
         now,
       );
       if (cwdResult.type === "error") {
-        console.error(cwdResult.error.message);
+        console.error(formatError(cwdResult.error));
         return;
       }
 
@@ -101,7 +102,7 @@ export function createEventCommand() {
 
       const createdAtResult = dateTimeFromDate(now);
       if (createdAtResult.type === "error") {
-        console.error(createdAtResult.error.message);
+        console.error(formatError(createdAtResult.error));
         return;
       }
 
@@ -177,10 +178,10 @@ export function createEventCommand() {
               "The start time's date must match the parent placement date.",
             );
           }
-          console.error(workflowResult.error.message);
+          console.error(formatError(workflowResult.error));
           reportValidationIssues(workflowResult.error.issues);
         } else {
-          console.error(workflowResult.error.error.message);
+          console.error(formatError(workflowResult.error.error));
         }
         return;
       }

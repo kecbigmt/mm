@@ -3,6 +3,7 @@ import { loadCliDependencies } from "../dependencies.ts";
 import { MoveItemWorkflow } from "../../../domain/workflows/move_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
+import { formatError } from "../error_formatter.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -18,9 +19,9 @@ export function createMvCommand() {
       const depsResult = await loadCliDependencies(workspaceOption);
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(depsResult.error.error.message);
+          console.error(formatError(depsResult.error.error));
         } else {
-          console.error(depsResult.error.message);
+          console.error(formatError(depsResult.error));
         }
         return;
       }
@@ -37,13 +38,13 @@ export function createMvCommand() {
       );
 
       if (cwdResult.type === "error") {
-        console.error(cwdResult.error.message);
+        console.error(formatError(cwdResult.error));
         return;
       }
 
       const occurredAtResult = dateTimeFromDate(now);
       if (occurredAtResult.type === "error") {
-        console.error(occurredAtResult.error.message);
+        console.error(formatError(occurredAtResult.error));
         return;
       }
 
@@ -64,7 +65,7 @@ export function createMvCommand() {
       );
 
       if (workflowResult.type === "error") {
-        console.error(workflowResult.error.message);
+        console.error(formatError(workflowResult.error));
         return;
       }
 

@@ -3,6 +3,7 @@ import { loadCliDependencies } from "../dependencies.ts";
 import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import { parseAliasSlug } from "../../../domain/primitives/alias_slug.ts";
 import { deriveFilePathFromId } from "../../../infrastructure/fileSystem/item_repository.ts";
+import { formatError } from "../error_formatter.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -18,9 +19,9 @@ export function createWhereCommand() {
       const depsResult = await loadCliDependencies(workspaceOption);
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(depsResult.error.error.message);
+          console.error(formatError(depsResult.error.error));
         } else {
-          console.error(depsResult.error.message);
+          console.error(formatError(depsResult.error));
         }
         return;
       }
@@ -35,7 +36,7 @@ export function createWhereCommand() {
         // It's a valid UUID
         const loadResult = await deps.itemRepository.load(uuidResult.value);
         if (loadResult.type === "error") {
-          console.error(loadResult.error.message);
+          console.error(formatError(loadResult.error));
           return;
         }
         item = loadResult.value;
@@ -45,14 +46,14 @@ export function createWhereCommand() {
         if (aliasResult.type === "ok") {
           const aliasLoadResult = await deps.aliasRepository.load(aliasResult.value);
           if (aliasLoadResult.type === "error") {
-            console.error(aliasLoadResult.error.message);
+            console.error(formatError(aliasLoadResult.error));
             return;
           }
           const alias = aliasLoadResult.value;
           if (alias) {
             const itemLoadResult = await deps.itemRepository.load(alias.data.itemId);
             if (itemLoadResult.type === "error") {
-              console.error(itemLoadResult.error.message);
+              console.error(formatError(itemLoadResult.error));
               return;
             }
             item = itemLoadResult.value;

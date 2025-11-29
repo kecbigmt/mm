@@ -4,6 +4,7 @@ import { CwdResolutionService } from "../../../domain/services/cwd_resolution_se
 import { parsePathExpression } from "../path_expression.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import { formatPlacementForDisplay } from "../../../domain/services/placement_display_service.ts";
+import { formatError } from "../error_formatter.ts";
 
 export function createCdCommand() {
   return new Command()
@@ -15,9 +16,9 @@ export function createCdCommand() {
       const depsResult = await loadCliDependencies(workspaceOption);
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(depsResult.error.error.message);
+          console.error(formatError(depsResult.error.error));
         } else {
-          console.error(depsResult.error.message);
+          console.error(formatError(depsResult.error));
         }
         return;
       }
@@ -34,7 +35,7 @@ export function createCdCommand() {
           now,
         );
         if (cwdResult.type === "error") {
-          console.error(cwdResult.error.message);
+          console.error(formatError(cwdResult.error));
           return;
         }
         // Display placement with aliases
@@ -42,7 +43,7 @@ export function createCdCommand() {
           itemRepository: deps.itemRepository,
         });
         if (displayResult.type === "error") {
-          console.error(displayResult.error.message);
+          console.error(formatError(displayResult.error));
           return;
         }
         console.log(displayResult.value);
@@ -58,17 +59,14 @@ export function createCdCommand() {
         now,
       );
       if (cwdPlacementResult.type === "error") {
-        console.error(cwdPlacementResult.error.message);
+        console.error(formatError(cwdPlacementResult.error));
         return;
       }
 
       // Parse path expression
       const exprResult = parsePathExpression(pathArg);
       if (exprResult.type === "error") {
-        console.error(
-          "Invalid path expression:",
-          exprResult.error.issues.map((i) => i.message).join(", "),
-        );
+        console.error(formatError(exprResult.error));
         return;
       }
 
@@ -87,10 +85,7 @@ export function createCdCommand() {
       );
 
       if (placementResult.type === "error") {
-        console.error(
-          "Failed to resolve path:",
-          placementResult.error.issues.map((i) => i.message).join(", "),
-        );
+        console.error(formatError(placementResult.error));
         return;
       }
 
@@ -103,7 +98,7 @@ export function createCdCommand() {
       );
 
       if (setResult.type === "error") {
-        console.error(setResult.error.message);
+        console.error(formatError(setResult.error));
         return;
       }
 
@@ -112,7 +107,7 @@ export function createCdCommand() {
         itemRepository: deps.itemRepository,
       });
       if (displayResult.type === "error") {
-        console.error(displayResult.error.message);
+        console.error(formatError(displayResult.error));
         return;
       }
       console.log(displayResult.value);
