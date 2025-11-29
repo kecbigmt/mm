@@ -130,6 +130,20 @@ export function createEditCommand() {
           const oldAliasStr = oldAlias?.toString();
           const newAliasStr = newAlias?.toString();
           if (oldAliasStr !== newAliasStr) {
+            // Check for alias collision before updating
+            if (newAlias) {
+              const existingAliasResult = await deps.aliasRepository.load(newAlias);
+              if (existingAliasResult.type === "ok" && existingAliasResult.value) {
+                // Alias exists and points to a different item
+                if (!existingAliasResult.value.data.itemId.equals(updatedItem.data.id)) {
+                  console.error(
+                    `Alias '${newAlias.toString()}' is already in use by another item`,
+                  );
+                  Deno.exit(1);
+                }
+              }
+            }
+
             // Delete old alias if it exists
             if (oldAlias) {
               const deleteResult = await deps.aliasRepository.delete(oldAlias);
