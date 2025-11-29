@@ -3,6 +3,7 @@ import { Result } from "../../shared/result.ts";
 import {
   createFileSystemAliasRepository,
   createFileSystemItemRepository,
+  createFileSystemSectionQueryService,
   createFileSystemWorkspaceRepository,
 } from "../../infrastructure/fileSystem/mod.ts";
 import { createSha256HashingService } from "../../infrastructure/hash/sha256_hashing_service.ts";
@@ -28,6 +29,7 @@ import {
   createAliasAutoGenerator,
 } from "../../domain/services/alias_auto_generator.ts";
 import { createCryptoRandomSource } from "../../infrastructure/random/crypto_random_source.ts";
+import type { SectionQueryService } from "../../domain/services/section_query_service.ts";
 
 export type CliDependencies = Readonly<{
   readonly root: string;
@@ -38,6 +40,7 @@ export type CliDependencies = Readonly<{
   readonly aliasAutoGenerator: AliasAutoGenerator;
   readonly workspaceRepository: WorkspaceRepository;
   readonly stateRepository: StateRepository;
+  readonly sectionQueryService: SectionQueryService;
   readonly rankService: RankService;
   readonly idGenerationService: IdGenerationService;
 }>;
@@ -226,6 +229,7 @@ export const loadCliDependencies = async (
   const aliasRepository = createFileSystemAliasRepository({ root, hashingService });
   const aliasAutoGenerator = createAliasAutoGenerator(createCryptoRandomSource());
   const stateRepository = createFileSystemStateRepository({ workspaceRoot: root });
+  const sectionQueryService = createFileSystemSectionQueryService({ root });
   const rankService = createRankService(createLexoRankGenerator());
   const idGenerationService = createIdGenerationService(createUuidV7Generator());
 
@@ -238,6 +242,7 @@ export const loadCliDependencies = async (
     aliasAutoGenerator,
     workspaceRepository,
     stateRepository,
+    sectionQueryService,
     rankService,
     idGenerationService,
   });

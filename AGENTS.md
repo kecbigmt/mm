@@ -90,6 +90,30 @@ verification steps (`deno task test`). When UI or CLI output changes, attach `--
 before/after snippets. Link design context from `docs/steering/design.md` or relevant steering notes
 to help reviewers trace intent.
 
+### Commit Message Structure
+
+Write commit messages that convey **intent and purpose**, not implementation details (which are
+visible in the diff).
+
+- **Title (line 1)**: Express what changed and **why it matters** in this commit. Use imperative
+  mood, be concise.
+- **Body (line 3+)**: Explain **why this change is necessary** in the broader context. What goal
+  does this commit (along with related commits) aim to achieve? Add background only if it helps
+  understanding.
+
+Keep messages concise—avoid redundancy with what the code already shows. Avoid symbolic references
+(e.g., "Workstream A", "Phase 2") that require reading other documents to understand. Avoid messages
+that merely restate code changes (e.g., "add field", "update logic", "refactor code").
+
+Example:
+```
+feat(domain): define SectionQueryService interface
+
+Enable the CLI to show section stubs without loading item bodies.
+This allows nested section summaries to be rendered efficiently
+and decouples section queries from storage implementation.
+```
+
 ## Domain Design Notes
 
 Respect the domain patterns from the prototype: prefer `Result` over exceptions, model illegal
