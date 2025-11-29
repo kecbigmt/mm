@@ -20,6 +20,7 @@ import {
   formatSectionStub,
   type ListFormatterOptions,
 } from "../formatters/list_formatter.ts";
+import { outputWithPager } from "../pager.ts";
 
 type LsOptions = {
   workspace?: string;
@@ -69,103 +70,6 @@ const formatDateString = (date: Date): string => {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-};
-
-/**
- * Parse a shell-like command string into command and arguments.
- * Handles simple quoting (single and double quotes) and backslash escapes.
- * For example: "less -FR" -> ["less", "-FR"]
- *              "bat --paging always" -> ["bat", "--paging", "always"]
- */
-const parseShellCommand = (cmd: string): string[] => {
-  const tokens: string[] = [];
-  let current = "";
-  let inSingleQuote = false;
-  let inDoubleQuote = false;
-  let escape = false;
-
-  for (const char of cmd) {
-    if (escape) {
-      current += char;
-      escape = false;
-      continue;
-    }
-
-    if (char === "\\") {
-      escape = true;
-      continue;
-    }
-
-    if (char === "'" && !inDoubleQuote) {
-      inSingleQuote = !inSingleQuote;
-      continue;
-    }
-
-    if (char === '"' && !inSingleQuote) {
-      inDoubleQuote = !inDoubleQuote;
-      continue;
-    }
-
-    if (char === " " && !inSingleQuote && !inDoubleQuote) {
-      if (current.length > 0) {
-        tokens.push(current);
-        current = "";
-      }
-      continue;
-    }
-
-    current += char;
-  }
-
-  if (current.length > 0) {
-    tokens.push(current);
-  }
-
-  return tokens;
-};
-
-/**
- * Output text through a pager (PAGER env or less -R fallback).
- * Falls back to direct output if pager is unavailable.
- */
-const outputWithPager = async (text: string): Promise<void> => {
-  const pagerEnv = Deno.env.get("PAGER");
-
-  let pagerCmd: string;
-  let pagerArgs: string[];
-
-  if (pagerEnv) {
-    const tokens = parseShellCommand(pagerEnv);
-    if (tokens.length === 0) {
-      // Empty PAGER, fall back to less -R
-      pagerCmd = "less";
-      pagerArgs = ["-R"];
-    } else {
-      pagerCmd = tokens[0];
-      pagerArgs = tokens.slice(1);
-    }
-  } else {
-    pagerCmd = "less";
-    pagerArgs = ["-R"];
-  }
-
-  try {
-    const command = new Deno.Command(pagerCmd, {
-      args: pagerArgs,
-      stdin: "piped",
-      stdout: "inherit",
-      stderr: "inherit",
-    });
-
-    const process = command.spawn();
-    const writer = process.stdin.getWriter();
-    await writer.write(new TextEncoder().encode(text));
-    await writer.close();
-    await process.status;
-  } catch {
-    console.error("warning: pager unavailable, outputting directly");
-    console.log(text);
-  }
 };
 
 export function createLsCommand() {
