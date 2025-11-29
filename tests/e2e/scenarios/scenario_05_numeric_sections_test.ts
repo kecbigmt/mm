@@ -23,6 +23,7 @@ import { assertEquals } from "@std/assert";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
+  extractItemLines,
   initWorkspace,
   runCommand,
   setupTestEnvironment,
@@ -109,11 +110,11 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     const lsResult = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
 
-    const lines = lsResult.stdout.split("\n").filter((line) => line.trim() !== "");
-    assertEquals(lines.length, 3, "Should list 3 pages");
-    assertEquals(lines[0].includes("Page 1"), true, "First item should be Page 1");
-    assertEquals(lines[1].includes("Page 2"), true, "Second item should be Page 2");
-    assertEquals(lines[2].includes("Page 3"), true, "Third item should be Page 3");
+    const itemLines = extractItemLines(lsResult.stdout);
+    assertEquals(itemLines.length, 3, "Should list 3 pages");
+    assertEquals(itemLines[0].includes("Page 1"), true, "First item should be Page 1");
+    assertEquals(itemLines[1].includes("Page 2"), true, "Second item should be Page 2");
+    assertEquals(itemLines[2].includes("Page 3"), true, "Third item should be Page 3");
   });
 
   it("navigates up sections using relative path", async () => {
@@ -191,9 +192,9 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     const lsResult = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
 
-    const lines = lsResult.stdout.split("\n").filter((line) => line.trim() !== "");
-    assertEquals(lines.length, 1, "Should list 1 sub-page");
-    assertEquals(lines[0].includes("Sub-page 1"), true, "Should list Sub-page 1");
+    const itemLines = extractItemLines(lsResult.stdout);
+    assertEquals(itemLines.length, 1, "Should list 1 sub-page");
+    assertEquals(itemLines[0].includes("Sub-page 1"), true, "Should list Sub-page 1");
   });
 
   it("executes full flow: create hierarchy → navigate → list", async () => {
@@ -221,8 +222,8 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     // Step 7: List items
     const ls1Result = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(ls1Result.success, true, "ls should succeed");
-    const lines1 = ls1Result.stdout.split("\n").filter((line) => line.trim() !== "");
-    assertEquals(lines1.length, 3, "Should list 3 pages");
+    const itemLines1 = extractItemLines(ls1Result.stdout);
+    assertEquals(itemLines1.length, 3, "Should list 3 pages");
 
     // Step 8: Navigate up
     await runCommand(ctx.testHome, ["cd", "../"]);
@@ -239,8 +240,8 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     // Step 12: List items
     const ls2Result = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(ls2Result.success, true, "ls should succeed");
-    const lines2 = ls2Result.stdout.split("\n").filter((line) => line.trim() !== "");
-    assertEquals(lines2.length, 1, "Should list 1 sub-page");
+    const itemLines2 = extractItemLines(ls2Result.stdout);
+    assertEquals(itemLines2.length, 1, "Should list 1 sub-page");
 
     // Step 13: Verify final CWD
     const finalPwdResult = await runCommand(ctx.testHome, ["pwd"]);

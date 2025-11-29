@@ -24,6 +24,7 @@ import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
+  extractItemLines,
   getCurrentDateFromCli,
   getLatestItemId,
   getWorkspacePath,
@@ -296,7 +297,7 @@ describe("E2E: Event creation", () => {
     await runCommand(ctx.testHome, ["event", "Event 3"]);
 
     const lsResult = await runCommand(ctx.testHome, ["ls"]);
-    const lines = lsResult.stdout.split("\n").filter((line) => line.trim() !== "");
+    const lines = extractItemLines(lsResult.stdout);
     assertEquals(lines.length, 3, "Should list 3 events");
 
     assertEquals(lines[0].includes("Event 1"), true);
