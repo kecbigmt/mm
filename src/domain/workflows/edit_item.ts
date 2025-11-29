@@ -242,7 +242,10 @@ export const EditItemWorkflow = {
     // Check for alias collision before updating
     if (aliasChanged && newAlias) {
       const existingAliasResult = await deps.aliasRepository.load(newAlias);
-      if (existingAliasResult.type === "ok" && existingAliasResult.value) {
+      if (existingAliasResult.type === "error") {
+        return Result.error(existingAliasResult.error);
+      }
+      if (existingAliasResult.value) {
         // Alias exists and points to a different item
         if (!existingAliasResult.value.data.itemId.equals(item.data.id)) {
           return Result.error(

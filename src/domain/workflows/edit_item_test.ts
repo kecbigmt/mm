@@ -324,10 +324,7 @@ Deno.test("EditItemWorkflow - should update alias index when alias changes", asy
   };
 
   const mockAliasRepository: AliasRepository = {
-    load: (_slug) =>
-      Promise.resolve(Result.error(
-        createRepositoryError("alias", "load", "Alias not found"),
-      )),
+    load: (_slug) => Promise.resolve(Result.ok(undefined)),
     save: (alias: Alias) => {
       savedAlias = alias;
       return Promise.resolve(Result.ok(undefined));
@@ -458,10 +455,7 @@ Deno.test("EditItemWorkflow - should save alias index when alias is added", asyn
   };
 
   const mockAliasRepository: AliasRepository = {
-    load: (_slug) =>
-      Promise.resolve(Result.error(
-        createRepositoryError("alias", "load", "Alias not found"),
-      )),
+    load: (_slug) => Promise.resolve(Result.ok(undefined)),
     save: (alias: Alias) => {
       savedAlias = alias;
       return Promise.resolve(Result.ok(undefined));
