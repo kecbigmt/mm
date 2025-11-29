@@ -1,5 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { parseDateTime } from "./date_time.ts";
+import { timezoneIdentifierFromString } from "./timezone_identifier.ts";
+import { Result } from "../../shared/result.ts";
 
 Deno.test("parseDateTime - parses ISO 8601 with timezone (Z)", () => {
   const result = parseDateTime("2025-11-21T15:00:00Z");
@@ -44,7 +46,7 @@ Deno.test("parseDateTime - parses ISO 8601 without timezone with seconds", () =>
 
 Deno.test("parseDateTime - parses time-only format (HH:MM) with today as reference", () => {
   const today = new Date(2025, 10, 21, 10, 0, 0); // November 21, 2025, 10:00
-  const result = parseDateTime("15:30", today);
+  const result = parseDateTime("15:30", { referenceDate: today });
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     const date = result.value.toDate();
@@ -59,7 +61,7 @@ Deno.test("parseDateTime - parses time-only format (HH:MM) with today as referen
 
 Deno.test("parseDateTime - parses time-only format (HH:MM:SS)", () => {
   const today = new Date(2025, 10, 21);
-  const result = parseDateTime("15:30:45", today);
+  const result = parseDateTime("15:30:45", { referenceDate: today });
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     const date = result.value.toDate();
@@ -94,7 +96,7 @@ Deno.test("parseDateTime - rejects invalid format", () => {
 
 Deno.test("parseDateTime - accepts 25:00 as 01:00 next day (JavaScript Date behavior)", () => {
   const today = new Date(2025, 10, 21);
-  const result = parseDateTime("25:00", today);
+  const result = parseDateTime("25:00", { referenceDate: today });
   // JavaScript Date accepts 25:00 and interprets as 01:00 next day
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -121,5 +123,47 @@ Deno.test("parseDateTime - returns DateTime if already DateTime", () => {
     if (second.type === "ok") {
       assertEquals(first.value.equals(second.value), true);
     }
+  }
+});
+
+Deno.test("parseDateTime - time-only format uses workspace timezone (PST) not host timezone", () => {
+  // Test scenario: workspace is PST (UTC-8), host might be different
+  // Use noon UTC to ensure stable date when formatted in workspace timezone
+  const referenceDate = new Date(Date.UTC(2025, 1, 10, 12, 0, 0)); // 2025-02-10T12:00:00Z
+  const timezone = Result.unwrap(timezoneIdentifierFromString("America/Los_Angeles"));
+
+  // Parse 09:00 in PST timezone
+  const result = parseDateTime("09:00", {
+    referenceDate,
+    timezone,
+  });
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    const isoString = result.value.data.iso;
+    // Reference date 2025-02-10T12:00:00Z formatted in PST is 2025-02-10
+    // So 09:00 PST on 2025-02-10 = 2025-02-10T17:00:00.000Z (PST is UTC-8)
+    assertEquals(isoString, "2025-02-10T17:00:00.000Z");
+  }
+});
+
+Deno.test("parseDateTime - time-only format uses workspace timezone (JST) not host timezone", () => {
+  // Test scenario: workspace is JST (UTC+9), host might be different
+  // Use noon UTC to ensure stable date when formatted in workspace timezone
+  const referenceDate = new Date(Date.UTC(2025, 1, 10, 12, 0, 0)); // 2025-02-10T12:00:00Z
+  const timezone = Result.unwrap(timezoneIdentifierFromString("Asia/Tokyo"));
+
+  // Parse 09:00 in JST timezone
+  const result = parseDateTime("09:00", {
+    referenceDate,
+    timezone,
+  });
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    const isoString = result.value.data.iso;
+    // Reference date 2025-02-10T12:00:00Z formatted in JST is 2025-02-10
+    // So 09:00 JST on 2025-02-10 = 2025-02-10T00:00:00.000Z (JST is UTC+9)
+    assertEquals(isoString, "2025-02-10T00:00:00.000Z");
   }
 });
