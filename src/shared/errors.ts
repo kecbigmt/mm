@@ -20,8 +20,8 @@ function validationToString(this: ValidationError<string>): string {
   const issues = this.issues
     .map((issue) => {
       const path = issue.path.length > 0 ? issue.path.join(".") + ": " : "";
-      const code = issue.code ? `[${issue.code}] ` : "";
-      return `${path}${code}${issue.message}`;
+      const code = issue.code ? ` (code: ${issue.code})` : "";
+      return `${path}${issue.message}${code}`;
     })
     .join(", ");
   return `${this.kind}(${this.objectKind}): ${issues || this.message}`;

@@ -3,6 +3,8 @@ import { loadCliDependencies } from "../dependencies.ts";
 import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import { parseAliasSlug } from "../../../domain/primitives/alias_slug.ts";
 import { deriveFilePathFromId } from "../../../infrastructure/fileSystem/item_repository.ts";
+import { formatError } from "../error_formatter.ts";
+import { isDebugMode } from "../debug.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -14,13 +16,14 @@ export function createWhereCommand() {
     .arguments("<locator:string>")
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .action(async (options: Record<string, unknown>, locatorArg: string) => {
+      const debug = isDebugMode();
       const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
       const depsResult = await loadCliDependencies(workspaceOption);
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(depsResult.error.error.message);
+          console.error(formatError(depsResult.error.error, debug));
         } else {
-          console.error(depsResult.error.message);
+          console.error(formatError(depsResult.error, debug));
         }
         return;
       }
@@ -35,7 +38,7 @@ export function createWhereCommand() {
         // It's a valid UUID
         const loadResult = await deps.itemRepository.load(uuidResult.value);
         if (loadResult.type === "error") {
-          console.error(loadResult.error.message);
+          console.error(formatError(loadResult.error, debug));
           return;
         }
         item = loadResult.value;
@@ -45,14 +48,14 @@ export function createWhereCommand() {
         if (aliasResult.type === "ok") {
           const aliasLoadResult = await deps.aliasRepository.load(aliasResult.value);
           if (aliasLoadResult.type === "error") {
-            console.error(aliasLoadResult.error.message);
+            console.error(formatError(aliasLoadResult.error, debug));
             return;
           }
           const alias = aliasLoadResult.value;
           if (alias) {
             const itemLoadResult = await deps.itemRepository.load(alias.data.itemId);
             if (itemLoadResult.type === "error") {
-              console.error(itemLoadResult.error.message);
+              console.error(formatError(itemLoadResult.error, debug));
               return;
             }
             item = itemLoadResult.value;

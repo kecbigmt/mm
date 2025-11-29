@@ -5,6 +5,8 @@ import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { parsePathExpression } from "../path_expression.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
+import { formatError } from "../error_formatter.ts";
+import { isDebugMode } from "../debug.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -30,13 +32,14 @@ export function createNoteCommand() {
     .option("-a, --alias <alias:string>", "Alias for the item")
     .option("-e, --edit", "Open editor after creation")
     .action(async (options: Record<string, unknown>, title?: string) => {
+      const debug = isDebugMode();
       const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
       const depsResult = await loadCliDependencies(workspaceOption);
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(depsResult.error.error.message);
+          console.error(formatError(depsResult.error.error, debug));
         } else {
-          console.error(depsResult.error.message);
+          console.error(formatError(depsResult.error, debug));
         }
         return;
       }
@@ -57,7 +60,7 @@ export function createNoteCommand() {
         now,
       );
       if (cwdResult.type === "error") {
-        console.error(cwdResult.error.message);
+        console.error(formatError(cwdResult.error, debug));
         return;
       }
 
@@ -99,7 +102,7 @@ export function createNoteCommand() {
 
       const createdAtResult = dateTimeFromDate(now);
       if (createdAtResult.type === "error") {
-        console.error(createdAtResult.error.message);
+        console.error(formatError(createdAtResult.error, debug));
         return;
       }
 
@@ -126,10 +129,10 @@ export function createNoteCommand() {
 
       if (workflowResult.type === "error") {
         if (workflowResult.error.kind === "validation") {
-          console.error(workflowResult.error.message);
+          console.error(formatError(workflowResult.error, debug));
           reportValidationIssues(workflowResult.error.issues);
         } else {
-          console.error(workflowResult.error.error.message);
+          console.error(formatError(workflowResult.error.error, debug));
         }
         return;
       }
