@@ -22,6 +22,7 @@ import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
+  extractItemLines,
   getCurrentDateFromCli,
   getLatestItemId,
   getWorkspacePath,
@@ -229,7 +230,7 @@ describe("E2E: Task creation", () => {
     await runCommand(ctx.testHome, ["task", "Task 3"]);
 
     const lsResult = await runCommand(ctx.testHome, ["ls"]);
-    const lines = lsResult.stdout.split("\n").filter((line) => line.trim() !== "");
+    const lines = extractItemLines(lsResult.stdout);
     assertEquals(lines.length, 3, "Should list 3 tasks");
 
     assertEquals(lines[0].includes("Task 1"), true);

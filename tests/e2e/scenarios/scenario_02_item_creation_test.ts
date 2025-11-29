@@ -26,6 +26,7 @@ import { join } from "@std/path";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
+  extractItemLines,
   getCurrentDateFromCli,
   getWorkspacePath,
   initWorkspace,
@@ -72,16 +73,24 @@ describe("Scenario 2: Item creation and listing", () => {
     const lsResult = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
 
-    const lines = lsResult.stdout.split("\n").filter((line) => line.trim() !== "");
-    assertEquals(lines.length, 3, "Should list 3 items");
+    const itemLines = extractItemLines(lsResult.stdout);
+    assertEquals(itemLines.length, 3, "Should list 3 items");
 
-    assertEquals(lines[0].includes("Morning tasks"), true, "First item should be Morning tasks");
     assertEquals(
-      lines[1].includes("Afternoon tasks"),
+      itemLines[0].includes("Morning tasks"),
+      true,
+      "First item should be Morning tasks",
+    );
+    assertEquals(
+      itemLines[1].includes("Afternoon tasks"),
       true,
       "Second item should be Afternoon tasks",
     );
-    assertEquals(lines[2].includes("Evening tasks"), true, "Third item should be Evening tasks");
+    assertEquals(
+      itemLines[2].includes("Evening tasks"),
+      true,
+      "Third item should be Evening tasks",
+    );
   });
 
   it("shows items in creation order", async () => {
@@ -90,11 +99,11 @@ describe("Scenario 2: Item creation and listing", () => {
     await runCommand(ctx.testHome, ["note", "Third"]);
 
     const lsResult = await runCommand(ctx.testHome, ["ls"]);
-    const lines = lsResult.stdout.split("\n").filter((line) => line.trim() !== "");
+    const itemLines = extractItemLines(lsResult.stdout);
 
-    assertEquals(lines[0].includes("First"), true);
-    assertEquals(lines[1].includes("Second"), true);
-    assertEquals(lines[2].includes("Third"), true);
+    assertEquals(itemLines[0].includes("First"), true);
+    assertEquals(itemLines[1].includes("Second"), true);
+    assertEquals(itemLines[2].includes("Third"), true);
   });
 
   it("creates correct file structure on disk", async () => {
@@ -218,12 +227,12 @@ describe("Scenario 2: Item creation and listing", () => {
     }
 
     const lsResult = await runCommand(ctx.testHome, ["ls"]);
-    const lines = lsResult.stdout.split("\n").filter((line) => line.trim() !== "");
-    assertEquals(lines.length, 5, "Should list 5 items");
+    const itemLines = extractItemLines(lsResult.stdout);
+    assertEquals(itemLines.length, 5, "Should list 5 items");
 
     for (let i = 0; i < 5; i++) {
       assertEquals(
-        lines[i].includes(`Task ${i + 1}`),
+        itemLines[i].includes(`Task ${i + 1}`),
         true,
         `Item ${i + 1} should be Task ${i + 1}`,
       );

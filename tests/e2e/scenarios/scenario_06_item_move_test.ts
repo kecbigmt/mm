@@ -21,6 +21,7 @@ import { assertEquals, assertExists } from "@std/assert";
 import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
+  extractItemLines,
   getCurrentDateFromCli,
   getItemIdByTitle,
   initWorkspace,
@@ -57,7 +58,7 @@ describe("Scenario 6: Item movement (move)", () => {
     // Verify initial order: A, B, C
     const ls1Result = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(ls1Result.success, true, `ls failed: ${ls1Result.stderr}`);
-    const lines1 = ls1Result.stdout.split("\n").filter((line) => line.trim() !== "");
+    const lines1 = extractItemLines(ls1Result.stdout);
     assertEquals(lines1.length, 3, "Should list 3 items");
     assertEquals(lines1[0].includes("タスクA"), true, "First item should be タスクA");
     assertEquals(lines1[1].includes("タスクB"), true, "Second item should be タスクB");
@@ -89,7 +90,7 @@ describe("Scenario 6: Item movement (move)", () => {
     // Verify new order: C, A, B
     const ls2Result = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(ls2Result.success, true, `ls failed: ${ls2Result.stderr}`);
-    const lines2 = ls2Result.stdout.split("\n").filter((line) => line.trim() !== "");
+    const lines2 = extractItemLines(ls2Result.stdout);
     assertEquals(
       lines2.length,
       3,
@@ -121,7 +122,7 @@ describe("Scenario 6: Item movement (move)", () => {
 
     // Verify order: C, A, B
     const ls1Result = await runCommand(ctx.testHome, ["ls"]);
-    const lines1 = ls1Result.stdout.split("\n").filter((line) => line.trim() !== "");
+    const lines1 = extractItemLines(ls1Result.stdout);
     assertEquals(lines1[0].includes("タスクC"), true, "First item should be タスクC");
     assertEquals(lines1[1].includes("タスクA"), true, "Second item should be タスクA");
     assertEquals(lines1[2].includes("タスクB"), true, "Third item should be タスクB");
@@ -136,7 +137,7 @@ describe("Scenario 6: Item movement (move)", () => {
 
     // Verify order: C, A, B (should remain the same since A is already after C)
     const ls2Result = await runCommand(ctx.testHome, ["ls"]);
-    const lines2 = ls2Result.stdout.split("\n").filter((line) => line.trim() !== "");
+    const lines2 = extractItemLines(ls2Result.stdout);
     assertEquals(lines2.length, 3, "Should list 3 items");
     assertEquals(lines2[0].includes("タスクC"), true, "First item should be タスクC");
     assertEquals(lines2[1].includes("タスクA"), true, "Second item should be タスクA");
@@ -175,7 +176,7 @@ describe("Scenario 6: Item movement (move)", () => {
     // Verify task A is in project/1
     const lsResult = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
-    const lines = lsResult.stdout.split("\n").filter((line) => line.trim() !== "");
+    const lines = extractItemLines(lsResult.stdout);
     assertEquals(lines.length, 1, "Should list 1 item");
     assertEquals(lines[0].includes("タスクA"), true, "Should list タスクA");
 
@@ -185,7 +186,7 @@ describe("Scenario 6: Item movement (move)", () => {
     // Verify task A is no longer in today
     const lsTodayResult = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(lsTodayResult.success, true, `ls failed: ${lsTodayResult.stderr}`);
-    const todayLines = lsTodayResult.stdout.split("\n").filter((line) => line.trim() !== "");
+    const todayLines = extractItemLines(lsTodayResult.stdout);
     const hasTaskA = todayLines.some((line) => line.includes("タスクA"));
     assertEquals(hasTaskA, false, "タスクA should not be in today's list");
   });
@@ -207,7 +208,7 @@ describe("Scenario 6: Item movement (move)", () => {
     // Step 5: Verify initial order
     const ls1Result = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(ls1Result.success, true, "Initial ls should succeed");
-    const lines1 = ls1Result.stdout.split("\n").filter((line) => line.trim() !== "");
+    const lines1 = extractItemLines(ls1Result.stdout);
     assertEquals(lines1.length, 3, "Should list 3 items initially");
     assertEquals(lines1[0].includes("タスクA"), true, "First item should be タスクA");
     assertEquals(lines1[1].includes("タスクB"), true, "Second item should be タスクB");
@@ -224,7 +225,7 @@ describe("Scenario 6: Item movement (move)", () => {
     // Step 7: Verify new order
     const ls2Result = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(ls2Result.success, true, "Second ls should succeed");
-    const lines2 = ls2Result.stdout.split("\n").filter((line) => line.trim() !== "");
+    const lines2 = extractItemLines(ls2Result.stdout);
     assertEquals(lines2[0].includes("タスクC"), true, "First item should be タスクC");
     assertEquals(lines2[1].includes("タスクA"), true, "Second item should be タスクA");
     assertEquals(lines2[2].includes("タスクB"), true, "Third item should be タスクB");
@@ -239,7 +240,7 @@ describe("Scenario 6: Item movement (move)", () => {
     // Step 9: Verify order (should remain C, A, B)
     const ls3Result = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(ls3Result.success, true, "Third ls should succeed");
-    const lines3 = ls3Result.stdout.split("\n").filter((line) => line.trim() !== "");
+    const lines3 = extractItemLines(ls3Result.stdout);
     assertEquals(lines3[0].includes("タスクC"), true, "First item should be タスクC");
     assertEquals(lines3[1].includes("タスクA"), true, "Second item should be タスクA");
     assertEquals(lines3[2].includes("タスクB"), true, "Third item should be タスクB");
@@ -264,7 +265,7 @@ describe("Scenario 6: Item movement (move)", () => {
     // Step 13: Verify task A is in project/1
     const ls4Result = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(ls4Result.success, true, "ls in project/1 should succeed");
-    const lines4 = ls4Result.stdout.split("\n").filter((line) => line.trim() !== "");
+    const lines4 = extractItemLines(ls4Result.stdout);
     assertEquals(lines4.length, 1, "Should list 1 item in project/1");
     assertEquals(lines4[0].includes("タスクA"), true, "Should list タスクA");
 
@@ -274,7 +275,7 @@ describe("Scenario 6: Item movement (move)", () => {
     // Step 15: Verify task A is no longer in today
     const ls5Result = await runCommand(ctx.testHome, ["ls"]);
     assertEquals(ls5Result.success, true, "Final ls should succeed");
-    const lines5 = ls5Result.stdout.split("\n").filter((line) => line.trim() !== "");
+    const lines5 = extractItemLines(ls5Result.stdout);
     const hasTaskA = lines5.some((line) => line.includes("タスクA"));
     assertEquals(hasTaskA, false, "タスクA should not be in today's list");
     const hasTaskB = lines5.some((line) => line.includes("タスクB"));
