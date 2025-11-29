@@ -12,6 +12,7 @@ import {
   itemTitleFromString,
   parseDuration,
   parsePlacement,
+  timezoneIdentifierFromString,
 } from "../primitives/mod.ts";
 import { createRankService, RankGenerator, RankService } from "../services/rank_service.ts";
 import { createIdGenerationService } from "../services/id_generation_service.ts";
@@ -23,6 +24,8 @@ import {
   createAliasAutoGenerator,
   RandomSource,
 } from "../services/alias_auto_generator.ts";
+
+const TEST_TIMEZONE = Result.unwrap(timezoneIdentifierFromString("UTC"));
 
 const createTestRankService = (): RankService => {
   const generator: RankGenerator = {
@@ -86,6 +89,7 @@ Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async 
     itemType: "note",
     parentPlacement,
     createdAt,
+    timezone: TEST_TIMEZONE,
   }, {
     itemRepository: repository,
     aliasRepository,
@@ -131,6 +135,7 @@ Deno.test("CreateItemWorkflow appends rank after existing siblings", async () =>
     itemType: "note",
     parentPlacement,
     createdAt,
+    timezone: TEST_TIMEZONE,
   }, {
     itemRepository: repository,
     aliasRepository,
@@ -174,6 +179,7 @@ Deno.test("CreateItemWorkflow saves alias when provided", async () => {
     alias: "chapter1",
     parentPlacement,
     createdAt,
+    timezone: TEST_TIMEZONE,
   }, {
     itemRepository: repository,
     aliasRepository,
@@ -216,6 +222,7 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
     alias: "chapter1",
     parentPlacement,
     createdAt,
+    timezone: TEST_TIMEZONE,
   }, {
     itemRepository: repository,
     aliasRepository,
@@ -235,6 +242,7 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
     alias: "chapter1",
     parentPlacement,
     createdAt,
+    timezone: TEST_TIMEZONE,
   }, {
     itemRepository: repository,
     aliasRepository,
@@ -274,6 +282,7 @@ Deno.test("CreateItemWorkflow - creates task with dueAt", async () => {
     dueAt,
     parentPlacement,
     createdAt,
+    timezone: TEST_TIMEZONE,
   }, {
     itemRepository: repository,
     aliasRepository,
@@ -308,6 +317,7 @@ Deno.test("CreateItemWorkflow - creates event with startAt and duration", async 
     duration,
     parentPlacement,
     createdAt,
+    timezone: TEST_TIMEZONE,
   }, {
     itemRepository: repository,
     aliasRepository,
@@ -341,6 +351,7 @@ Deno.test("CreateItemWorkflow - rejects event with mismatched startAt date", asy
     startAt,
     parentPlacement,
     createdAt,
+    timezone: TEST_TIMEZONE,
   }, {
     itemRepository: repository,
     aliasRepository,
@@ -372,6 +383,7 @@ Deno.test("CreateItemWorkflow - allows event with different date for item placem
     itemType: "note",
     parentPlacement: Result.unwrap(parsePlacement("2025-01-10")),
     createdAt: Result.unwrap(parseDateTime("2025-01-10T10:00:00Z")),
+    timezone: TEST_TIMEZONE,
   }, {
     itemRepository: repository,
     aliasRepository,
@@ -395,6 +407,7 @@ Deno.test("CreateItemWorkflow - allows event with different date for item placem
     startAt,
     parentPlacement: itemPlacement,
     createdAt: Result.unwrap(parseDateTime("2025-01-15T10:00:00Z")),
+    timezone: TEST_TIMEZONE,
   }, {
     itemRepository: repository,
     aliasRepository,
