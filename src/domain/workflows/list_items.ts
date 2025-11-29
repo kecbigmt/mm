@@ -9,12 +9,17 @@ import { createPathResolver } from "../services/path_resolver.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
+import type { ItemIconValue } from "../primitives/item_icon.ts";
+
+export type ListItemsStatusFilter = "open" | "closed" | "all";
 
 export type ListItemsInput = Readonly<{
   expression?: string; // PathExpression or RangeExpression as string
   cwd: Placement;
   timezone?: TimezoneIdentifier;
   today?: Date;
+  status?: ListItemsStatusFilter; // default: "open"
+  icon?: ItemIconValue; // note, task, or event
 }>;
 
 export type ListItemsDependencies = Readonly<{
@@ -87,8 +92,46 @@ export const ListItemsWorkflow = {
       return Result.error(itemsResult.error);
     }
 
+    // Apply filters
+    const statusFilter = input.status ?? "open";
+    let filtered = itemsResult.value;
+
+    // Status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((item) =>
+        statusFilter === "open" ? item.data.status.isOpen() : item.data.status.isClosed()
+      );
+    }
+
+    // Icon filter
+    if (input.icon) {
+      const targetIcon = input.icon;
+      filtered = filtered.filter((item) => item.data.icon.toString() === targetIcon);
+    }
+
+    // Sort: rank ascending, then createdAt ascending, then id ascending
+    const sorted = [...filtered].sort((a, b) => {
+      // 1. rank ascending
+      const rankCmp = a.data.rank.compare(b.data.rank);
+      if (rankCmp !== 0) return rankCmp;
+
+      // 2. createdAt ascending
+      const aCreated = a.data.createdAt.toString();
+      const bCreated = b.data.createdAt.toString();
+      if (aCreated < bCreated) return -1;
+      if (aCreated > bCreated) return 1;
+
+      // 3. id ascending (final tie-break)
+      const aId = a.data.id.toString();
+      const bId = b.data.id.toString();
+      if (aId < bId) return -1;
+      if (aId > bId) return 1;
+
+      return 0;
+    });
+
     return Result.ok({
-      items: itemsResult.value,
+      items: sorted,
     });
   },
 };
