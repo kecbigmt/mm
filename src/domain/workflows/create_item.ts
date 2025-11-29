@@ -14,6 +14,7 @@ import {
   PlacementRange,
   TagSlug,
   tagSlugFromString,
+  TimezoneIdentifier,
 } from "../primitives/mod.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
@@ -31,6 +32,7 @@ export type CreateItemInput = Readonly<{
   alias?: string;
   parentPlacement: Placement;
   createdAt: DateTime;
+  timezone: TimezoneIdentifier;
   // Scheduling fields
   startAt?: DateTime;
   duration?: Duration;
@@ -82,10 +84,19 @@ const repositoryFailure = (error: RepositoryError): CreateItemRepositoryError =>
 });
 
 /**
- * Extracts the date portion (YYYY-MM-DD) from a DateTime ISO string
+ * Extracts the date portion (YYYY-MM-DD) from a DateTime in the given timezone
+ * Converts UTC datetime to local date in the workspace timezone
  */
-const extractDateFromDateTime = (dateTime: DateTime): string => {
-  return dateTime.data.iso.substring(0, 10);
+const extractDateFromDateTime = (dateTime: DateTime, timezone: TimezoneIdentifier): string => {
+  const date = dateTime.toDate();
+  // Format date in the workspace timezone
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone.toString(),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(date); // Returns YYYY-MM-DD
 };
 
 /**
@@ -103,12 +114,15 @@ const extractDateFromPlacement = (placement: Placement): string | null => {
  * Validates that the event's startAt date matches the parent placement date
  * Only validates for calendar-based placements (date kind)
  * Skips validation for item-based placements (item kind)
+ *
+ * Date comparison is done in the workspace timezone to handle day boundaries correctly
  */
 const validateEventDateConsistency = (
   startAt: DateTime,
   parentPlacement: Placement,
+  timezone: TimezoneIdentifier,
 ): Result<void, DateConsistencyValidationError> => {
-  const startDate = extractDateFromDateTime(startAt);
+  const startDate = extractDateFromDateTime(startAt, timezone);
   const placementDate = extractDateFromPlacement(parentPlacement);
 
   // Skip validation for item-based placements
@@ -219,6 +233,7 @@ export const CreateItemWorkflow = {
       const consistencyResult = validateEventDateConsistency(
         input.startAt,
         input.parentPlacement,
+        input.timezone,
       );
       if (consistencyResult.type === "error") {
         issues.push(...consistencyResult.error.issues);
