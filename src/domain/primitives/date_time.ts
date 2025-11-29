@@ -194,7 +194,9 @@ export const parseDateTime = (
       const dateStr = formatter.format(base); // YYYY-MM-DD in workspace timezone
 
       // Build an ISO string representing the local time in the workspace timezone
-      const localTimeStr = `${dateStr}T${hour.padStart(2, "0")}:${minute.padStart(2, "0")}:${second.padStart(2, "0")}`;
+      const localTimeStr = `${dateStr}T${hour.padStart(2, "0")}:${minute.padStart(2, "0")}:${
+        second.padStart(2, "0")
+      }`;
 
       // Use a two-step approach to find the UTC timestamp:
       // 1. Parse as if it were UTC to get a candidate timestamp
@@ -216,7 +218,8 @@ export const parseDateTime = (
         checkParts.map((p) => [p.type, p.value]),
       );
 
-      const producedLocalTime = `${checkMap.year}-${checkMap.month}-${checkMap.day}T${checkMap.hour}:${checkMap.minute}:${checkMap.second}`;
+      const producedLocalTime =
+        `${checkMap.year}-${checkMap.month}-${checkMap.day}T${checkMap.hour}:${checkMap.minute}:${checkMap.second}`;
 
       // 3. Calculate the difference and adjust
       const wantedUtc = new Date(`${localTimeStr}Z`).getTime();
