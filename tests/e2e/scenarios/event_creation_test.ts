@@ -303,4 +303,38 @@ describe("E2E: Event creation", () => {
     assertEquals(lines[1].includes("Event 2"), true);
     assertEquals(lines[2].includes("Event 3"), true);
   });
+
+  it("uses parent placement date for time-only format", async () => {
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const result = await runCommand(ctx.testHome, [
+      "event",
+      "Time only event",
+      "--start-at",
+      "15:00",
+    ]);
+    assertEquals(result.success, true, `Failed to create event: ${result.stderr}`);
+
+    // Verify the stored startAt uses today's date
+    const workspaceDir = getWorkspacePath(ctx.testHome, "test-workspace");
+    const [year, month, day] = today.split("-");
+    const itemsBaseDir = join(workspaceDir, "items", year, month, day);
+
+    const itemFiles: string[] = [];
+    for await (const entry of Deno.readDir(itemsBaseDir)) {
+      if (entry.isFile && entry.name.endsWith(".md")) {
+        itemFiles.push(entry.name);
+      }
+    }
+
+    const itemFilePath = join(itemsBaseDir, itemFiles[0]);
+    const fileContent = await Deno.readTextFile(itemFilePath);
+    const parseResult = parseFrontmatter<{ start_at?: string }>(fileContent);
+
+    assertEquals(parseResult.type, "ok");
+    if (parseResult.type === "ok") {
+      const { frontmatter } = parseResult.value;
+      // The stored startAt should include today's date
+      assertEquals(frontmatter.start_at?.startsWith(today), true);
+    }
+  });
 });
