@@ -29,6 +29,7 @@
     "@std/cli": "jsr:@std/cli@1.0.14",
     "@std/yaml": "jsr:@std/yaml@1.0.10",
     "@std/streams": "jsr:@std/streams@1.0.13",
+    "@std/fmt/colors": "jsr:@std/fmt@1.0.6/colors",
     "@cliffy/command": "jsr:@cliffy/command@1.0.0-rc.8",
     "@std/testing": "jsr:@std/testing@^1.0.15",
     "@std/testing/bdd": "jsr:@std/testing@1.0.15/bdd",
