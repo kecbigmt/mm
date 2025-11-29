@@ -13,6 +13,7 @@ import { createLsCommand } from "./presentation/cli/commands/ls.ts";
 import { createWhereCommand } from "./presentation/cli/commands/where.ts";
 import { createMvCommand } from "./presentation/cli/commands/mv.ts";
 import { createDoctorCommand } from "./presentation/cli/commands/doctor/mod.ts";
+import { createEditCommand } from "./presentation/cli/commands/edit.ts";
 
 async function main() {
   const cli = new Command()
@@ -24,6 +25,7 @@ async function main() {
     .command("event", createEventCommand().description("Create a new event")).alias("ev")
     .command("close", createCloseCommand().description("Close items"))
     .command("reopen", createReopenCommand().description("Reopen closed items"))
+    .command("edit", createEditCommand().description("Edit an item")).alias("e")
     .command("workspace", createWorkspaceCommand().description("Workspace management")).alias("ws")
     .command("cd", createCdCommand().description("Change current working directory"))
     .command("pwd", createPwdCommand().description("Print current working directory"))

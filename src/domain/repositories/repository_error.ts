@@ -6,7 +6,8 @@ export type RepositoryScope =
   | "alias"
   | "tag"
   | "config"
-  | "state";
+  | "state"
+  | "section";
 
 export type RepositoryOperation =
   | "load"

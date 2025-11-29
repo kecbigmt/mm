@@ -82,7 +82,16 @@ workspace fixtures.
 - Unit tests for all value objects and smart constructors
 - Integration tests for workflows and business logic
 - All tests must pass before commits: `deno task test`
+- Favor TDD (red/green/refactor). In the red phase, scaffold the target symbols (empty bodies) so errors reflect behavior, not missing references (i.e., avoid “function not found” reds).
 
+## Specs & Plans (design.md / plan.md)
+
+- Keep design docs English-only; communication may be in other languages, but specs stay in English.
+- Make limits and policies explicit (caps, warnings, error vs warn paths).
+- Partition responsibilities clearly: domain returns flat data; presentation handles partitioning/formatting.
+- Plans should be LLM-friendly: small, serializable tasks, note parallelizable parts; prefer pure functions and DTOs for testability.
+- Include warning examples and DoD; prefer fixed constants over env-config unless required.
+- Design docs should include: scope/in-scope vs out-of-scope, inputs/outputs and concrete examples, acceptance criteria, high-level e2e scenarios, file/dir layout decisions, and key interfaces/types (method signatures) for new pieces. Include sample warnings/errors when relevant.
 ## Commit & Pull Request Guidelines
 
 **Before every commit, run `deno lint` and `deno fmt`** to ensure code quality and consistency. All
@@ -93,6 +102,30 @@ passing tests. Pull requests should summarize domain impact, list affected modul
 verification steps (`deno task test`). When UI or CLI output changes, attach `--print` samples or
 before/after snippets. Link design context from `docs/steering/design.md` or relevant steering notes
 to help reviewers trace intent.
+
+### Commit Message Structure
+
+Write commit messages that convey **intent and purpose**, not implementation details (which are
+visible in the diff).
+
+- **Title (line 1)**: Express what changed and **why it matters** in this commit. Use imperative
+  mood, be concise.
+- **Body (line 3+)**: Explain **why this change is necessary** in the broader context. What goal
+  does this commit (along with related commits) aim to achieve? Add background only if it helps
+  understanding.
+
+Keep messages concise—avoid redundancy with what the code already shows. Avoid symbolic references
+(e.g., "Workstream A", "Phase 2") that require reading other documents to understand. Avoid messages
+that merely restate code changes (e.g., "add field", "update logic", "refactor code").
+
+Example:
+```
+feat(domain): define SectionQueryService interface
+
+Enable the CLI to show section stubs without loading item bodies.
+This allows nested section summaries to be rendered efficiently
+and decouples section queries from storage implementation.
+```
 
 ## Domain Design Notes
 

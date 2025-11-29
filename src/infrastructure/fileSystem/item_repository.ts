@@ -52,7 +52,7 @@ const parseDateSegments = (iso: string): [string, string, string] => {
   return [year, month, day];
 };
 
-const formatSegmentsForTimezone = (
+export const formatSegmentsForTimezone = (
   date: Date,
   timezone: TimezoneIdentifier,
 ): [string, string, string] => {
@@ -274,7 +274,7 @@ const loadItemFromFile = async (
   return parseSnapshot(snapshot);
 };
 
-const timestampFromUuidV7 = (id: string): number | undefined => {
+export const timestampFromUuidV7 = (id: string): number | undefined => {
   const normalized = id.replace(/-/g, "").toLowerCase();
   if (normalized.length !== 32) {
     return undefined;
@@ -287,7 +287,7 @@ const timestampFromUuidV7 = (id: string): number | undefined => {
   return Number.isNaN(value) ? undefined : value;
 };
 
-const deriveFilePathFromId = (
+export const deriveFilePathFromId = (
   dependencies: FileSystemItemRepositoryDependencies,
   id: string,
 ): string | undefined => {

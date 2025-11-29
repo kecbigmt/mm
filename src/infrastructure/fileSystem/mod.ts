@@ -15,3 +15,6 @@ export { createFileSystemStateRepository } from "./state_repository.ts";
 
 export { createWorkspaceScanner } from "./workspace_scanner.ts";
 export type { ScanError, WorkspaceScanner } from "./workspace_scanner.ts";
+
+export { createFileSystemSectionQueryService } from "./section_query_service.ts";
+export type { FileSystemSectionQueryServiceDependencies } from "./section_query_service.ts";
