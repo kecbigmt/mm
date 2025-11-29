@@ -55,7 +55,8 @@ const parseShellCommand = (cmd: string): string[] => {
 
 /**
  * Resolve pager command and arguments from PAGER environment variable.
- * Falls back to "less -R" if PAGER is unset or empty.
+ * Falls back to "less -R -F" if PAGER is unset or empty.
+ * -R preserves colors, -F auto-exits if content fits on one screen.
  */
 const resolvePagerCommand = (
   pagerEnv: string | undefined,
@@ -63,11 +64,11 @@ const resolvePagerCommand = (
   if (pagerEnv) {
     const tokens = parseShellCommand(pagerEnv);
     if (tokens.length === 0) {
-      return { cmd: "less", args: ["-R"] };
+      return { cmd: "less", args: ["-R", "-F"] };
     }
     return { cmd: tokens[0], args: tokens.slice(1) };
   }
-  return { cmd: "less", args: ["-R"] };
+  return { cmd: "less", args: ["-R", "-F"] };
 };
 
 /**
@@ -96,7 +97,7 @@ const defaultPagerSpawner: PagerSpawner = (cmd, args) => {
 
 /**
  * Output text through a pager. Testable version with injectable spawner.
- * Returns { usedPager: true } on success, { usedPager: false, warning: string } on fallback.
+ * Returns { usedPager: true } on success, { usedPager: false, warning } on failure.
  */
 export const outputWithPagerCore = async (
   text: string,

@@ -48,12 +48,7 @@ describe("outputWithPagerCore", () => {
     const { spawner, calls, writtenData } = createMockSpawner();
     const output = createMockOutput();
 
-    const result = await outputWithPagerCore(
-      "test content",
-      "less -FR",
-      spawner,
-      output,
-    );
+    const result = await outputWithPagerCore("test content", "less -FR", spawner, output);
 
     assertEquals(result.usedPager, true);
     assertEquals(calls.length, 1);
@@ -62,14 +57,14 @@ describe("outputWithPagerCore", () => {
     assertEquals(new TextDecoder().decode(writtenData[0]), "test content");
   });
 
-  it("falls back to less -R when PAGER is undefined", async () => {
+  it("falls back to less -R -F when PAGER is undefined", async () => {
     const { spawner, calls } = createMockSpawner();
     const output = createMockOutput();
 
     await outputWithPagerCore("content", undefined, spawner, output);
 
     assertEquals(calls[0].cmd, "less");
-    assertEquals(calls[0].args, ["-R"]);
+    assertEquals(calls[0].args, ["-R", "-F"]);
   });
 
   it("outputs warning and text directly when spawner throws", async () => {
