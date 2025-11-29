@@ -239,7 +239,34 @@ export const EditItemWorkflow = {
       );
     }
 
-    // Update alias index if alias changed
+    // Check for alias collision before updating
+    if (aliasChanged && newAlias) {
+      const existingAliasResult = await deps.aliasRepository.load(newAlias);
+      if (existingAliasResult.type === "ok" && existingAliasResult.value) {
+        // Alias exists and points to a different item
+        if (!existingAliasResult.value.data.itemId.equals(item.data.id)) {
+          return Result.error(
+            createValidationError("EditItem", [
+              createValidationIssue(
+                `Alias '${newAlias.toString()}' is already in use by another item`,
+                {
+                  code: "conflict",
+                  path: ["alias"],
+                },
+              ),
+            ]),
+          );
+        }
+      }
+    }
+
+    // Save item first to ensure it succeeds before updating indexes
+    const saveResult = await deps.itemRepository.save(updatedItem);
+    if (saveResult.type === "error") {
+      return Result.error(saveResult.error);
+    }
+
+    // Update alias index after successful item save
     if (aliasChanged) {
       // Delete old alias if it exists
       if (oldAlias) {
@@ -261,11 +288,6 @@ export const EditItemWorkflow = {
           return Result.error(aliasSaveResult.error);
         }
       }
-    }
-
-    const saveResult = await deps.itemRepository.save(updatedItem);
-    if (saveResult.type === "error") {
-      return Result.error(saveResult.error);
     }
 
     return Result.ok(updatedItem);

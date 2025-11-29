@@ -559,3 +559,65 @@ Deno.test("EditItemWorkflow - should preserve existing schedule fields on partia
     assertEquals(result.value.data.dueAt?.toString(), dueAt.toString());
   }
 });
+
+Deno.test("EditItemWorkflow - should reject alias collision", async () => {
+  const itemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd120"));
+  const otherItemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd999"));
+  const conflictingAlias = Result.unwrap(aliasSlugFromString("existing-alias"));
+  const now = Result.unwrap(dateTimeFromDate(new Date()));
+  const originalItem = createTestItem(itemId, "Test Item", now);
+
+  // Mock alias that belongs to another item
+  const existingAliasModel = createAlias({
+    slug: conflictingAlias,
+    itemId: otherItemId,
+    createdAt: now,
+  });
+
+  const mockItemRepository: ItemRepository = {
+    load: (id: ItemId) => {
+      if (id.equals(itemId)) {
+        return Promise.resolve(Result.ok(originalItem));
+      }
+      return Promise.resolve(
+        Result.error(createRepositoryError("item", "load", "Item not found")),
+      );
+    },
+    save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
+    delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
+    listByPlacement: () => Promise.resolve(Result.ok([])),
+  };
+
+  const mockAliasRepository: AliasRepository = {
+    load: (slug) => {
+      if (slug.equals(conflictingAlias)) {
+        return Promise.resolve(Result.ok(existingAliasModel));
+      }
+      return Promise.resolve(Result.ok(undefined));
+    },
+    save: (_alias) => Promise.resolve(Result.ok(undefined)),
+    delete: (_slug) => Promise.resolve(Result.ok(undefined)),
+    list: () => Promise.resolve(Result.ok([])),
+  };
+
+  const result = await EditItemWorkflow.execute(
+    {
+      itemLocator: itemId.toString(),
+      updates: {
+        alias: "existing-alias",
+      },
+      updatedAt: now,
+    },
+    {
+      itemRepository: mockItemRepository,
+      aliasRepository: mockAliasRepository,
+    },
+  );
+
+  assertEquals(result.type, "error");
+  if (
+    result.type === "error" && "kind" in result.error && result.error.kind === "ValidationError"
+  ) {
+    assertEquals(result.error.issues[0]?.code, "conflict");
+  }
+});
