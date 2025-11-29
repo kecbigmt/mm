@@ -133,7 +133,13 @@ export function createEditCommand() {
             // Check for alias collision before updating
             if (newAlias) {
               const existingAliasResult = await deps.aliasRepository.load(newAlias);
-              if (existingAliasResult.type === "ok" && existingAliasResult.value) {
+              if (existingAliasResult.type === "error") {
+                console.error(
+                  `Failed to check alias collision: ${existingAliasResult.error.message}`,
+                );
+                Deno.exit(1);
+              }
+              if (existingAliasResult.value) {
                 // Alias exists and points to a different item
                 if (!existingAliasResult.value.data.itemId.equals(updatedItem.data.id)) {
                   console.error(
