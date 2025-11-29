@@ -185,16 +185,20 @@ export const EditItemWorkflow = {
     let hasScheduleUpdates = false;
 
     // Extract reference date from item placement for time-only formats
-    // Create in UTC to match how parseDateTime processes time-only input
+    // Use a neutral time (noon UTC) to avoid day shifts when formatting in workspace timezone
     let referenceDate = input.updatedAt.toDate();
     if (updatedItem.data.placement.head.kind === "date") {
       const dateStr = updatedItem.data.placement.head.date.toString();
       const [year, month, day] = dateStr.split("-").map(Number);
-      referenceDate = new Date(Date.UTC(year, month - 1, day));
+      // Use noon UTC to ensure the date remains stable when formatted in any timezone
+      referenceDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
     }
 
     if (input.updates.startAt !== undefined) {
-      const startAtResult = parseDateTime(input.updates.startAt, referenceDate);
+      const startAtResult = parseDateTime(input.updates.startAt, {
+        referenceDate,
+        timezone: input.timezone,
+      });
       if (startAtResult.type === "error") {
         issues.push({
           field: "startAt",
@@ -220,7 +224,10 @@ export const EditItemWorkflow = {
     }
 
     if (input.updates.dueAt !== undefined) {
-      const dueAtResult = parseDateTime(input.updates.dueAt, referenceDate);
+      const dueAtResult = parseDateTime(input.updates.dueAt, {
+        referenceDate,
+        timezone: input.timezone,
+      });
       if (dueAtResult.type === "error") {
         issues.push({
           field: "dueAt",

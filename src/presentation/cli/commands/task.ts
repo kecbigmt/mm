@@ -113,14 +113,18 @@ export function createTaskCommand() {
       let dueAt = undefined;
       if (typeof options.dueAt === "string") {
         // Extract reference date from parent placement for time-only formats
+        // Use noon UTC to avoid day shifts when formatting in workspace timezone
         let referenceDate = now;
         if (parentPlacement.head.kind === "date") {
           const dateStr = parentPlacement.head.date.toString();
           const [year, month, day] = dateStr.split("-").map(Number);
-          referenceDate = new Date(year, month - 1, day);
+          referenceDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
         }
 
-        const dueAtResult = parseDateTime(options.dueAt, referenceDate);
+        const dueAtResult = parseDateTime(options.dueAt, {
+          referenceDate,
+          timezone: deps.timezone,
+        });
         if (dueAtResult.type === "error") {
           console.error("Invalid due-at format:");
           reportValidationIssues(dueAtResult.error.issues);
