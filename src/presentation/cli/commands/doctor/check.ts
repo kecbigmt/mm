@@ -13,6 +13,7 @@ import { Item } from "../../../../domain/models/item.ts";
 import { Alias } from "../../../../domain/models/alias.ts";
 import { parseItemId } from "../../../../domain/primitives/item_id.ts";
 import { formatError } from "../../error_formatter.ts";
+import { isDebugMode } from "../../debug.ts";
 
 /**
  * Item validation issue (parse errors during scanning)
@@ -59,14 +60,15 @@ export function createCheckCommand() {
     .description("Inspect workspace integrity without modifications")
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .action(async (options: Record<string, unknown>) => {
+      const debug = isDebugMode();
       const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
       const depsResult = await loadCliDependencies(workspaceOption);
 
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(formatError(depsResult.error.error));
+          console.error(formatError(depsResult.error.error, debug));
         } else {
-          console.error(formatError(depsResult.error));
+          console.error(formatError(depsResult.error, debug));
         }
         Deno.exit(2);
       }

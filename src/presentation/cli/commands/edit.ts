@@ -4,6 +4,7 @@ import { EditItemWorkflow } from "../../../domain/workflows/edit_item.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/date_time.ts";
 import { deriveFilePathFromId } from "../../../infrastructure/fileSystem/item_repository.ts";
 import { formatError } from "../error_formatter.ts";
+import { isDebugMode } from "../debug.ts";
 
 const hasMetadataOptions = (options: Record<string, unknown>): boolean => {
   return (
@@ -56,13 +57,14 @@ export function createEditCommand() {
     .option("-c, --context <context:string>", "Update context tag")
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .action(async (options: Record<string, unknown>, itemLocator: string) => {
+      const debug = isDebugMode();
       const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
       const depsResult = await loadCliDependencies(workspaceOption);
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(formatError(depsResult.error.error));
+          console.error(formatError(depsResult.error.error, debug));
         } else {
-          console.error(formatError(depsResult.error));
+          console.error(formatError(depsResult.error, debug));
         }
         Deno.exit(1);
       }
@@ -71,7 +73,7 @@ export function createEditCommand() {
       const now = new Date();
       const occurredAtResult = dateTimeFromDate(now);
       if (occurredAtResult.type === "error") {
-        console.error(formatError(occurredAtResult.error));
+        console.error(formatError(occurredAtResult.error, debug));
         Deno.exit(1);
       }
 
@@ -93,7 +95,7 @@ export function createEditCommand() {
           if ("kind" in loadResult.error && loadResult.error.kind === "ValidationError") {
             console.error(loadResult.error.issues[0]?.message ?? "Validation error");
           } else if ("kind" in loadResult.error && loadResult.error.kind === "RepositoryError") {
-            console.error(formatError(loadResult.error));
+            console.error(formatError(loadResult.error, debug));
           } else {
             console.error("Unknown error");
           }
@@ -227,7 +229,7 @@ export function createEditCommand() {
             console.error(issue.message);
           }
         } else if ("kind" in result.error && result.error.kind === "RepositoryError") {
-          console.error(formatError(result.error));
+          console.error(formatError(result.error, debug));
         } else {
           console.error("Unknown error");
         }

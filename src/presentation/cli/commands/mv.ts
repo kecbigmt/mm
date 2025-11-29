@@ -4,6 +4,7 @@ import { MoveItemWorkflow } from "../../../domain/workflows/move_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
 import { formatError } from "../error_formatter.ts";
+import { isDebugMode } from "../debug.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -15,13 +16,14 @@ export function createMvCommand() {
     .arguments("<locator:string> <placement:string>")
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .action(async (options: Record<string, unknown>, itemLocator: string, placement: string) => {
+      const debug = isDebugMode();
       const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
       const depsResult = await loadCliDependencies(workspaceOption);
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(formatError(depsResult.error.error));
+          console.error(formatError(depsResult.error.error, debug));
         } else {
-          console.error(formatError(depsResult.error));
+          console.error(formatError(depsResult.error, debug));
         }
         return;
       }
@@ -38,13 +40,13 @@ export function createMvCommand() {
       );
 
       if (cwdResult.type === "error") {
-        console.error(formatError(cwdResult.error));
+        console.error(formatError(cwdResult.error, debug));
         return;
       }
 
       const occurredAtResult = dateTimeFromDate(now);
       if (occurredAtResult.type === "error") {
-        console.error(formatError(occurredAtResult.error));
+        console.error(formatError(occurredAtResult.error, debug));
         return;
       }
 
@@ -65,7 +67,7 @@ export function createMvCommand() {
       );
 
       if (workflowResult.type === "error") {
-        console.error(formatError(workflowResult.error));
+        console.error(formatError(workflowResult.error, debug));
         return;
       }
 

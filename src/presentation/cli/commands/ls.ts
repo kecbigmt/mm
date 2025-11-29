@@ -22,6 +22,7 @@ import {
 } from "../formatters/list_formatter.ts";
 import { outputWithPager } from "../pager.ts";
 import { formatError } from "../error_formatter.ts";
+import { isDebugMode } from "../debug.ts";
 
 type LsOptions = {
   workspace?: string;
@@ -84,12 +85,13 @@ export function createLsCommand() {
     .option("-p, --print", "Plain output without colors (includes ISO date)")
     .option("--no-pager", "Do not use pager")
     .action(async (options: LsOptions, locatorArg?: string) => {
+      const debug = isDebugMode();
       const depsResult = await loadCliDependencies(options.workspace);
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(formatError(depsResult.error.error));
+          console.error(formatError(depsResult.error.error, debug));
         } else {
-          console.error(formatError(depsResult.error));
+          console.error(formatError(depsResult.error, debug));
         }
         return;
       }
@@ -106,7 +108,7 @@ export function createLsCommand() {
       );
 
       if (cwdResult.type === "error") {
-        console.error(formatError(cwdResult.error));
+        console.error(formatError(cwdResult.error, debug));
         return;
       }
 
@@ -122,7 +124,7 @@ export function createLsCommand() {
         // Parse and resolve locator expression
         const rangeExprResult = parseRangeExpression(locatorArg);
         if (rangeExprResult.type === "error") {
-          console.error(formatError(rangeExprResult.error));
+          console.error(formatError(rangeExprResult.error, debug));
           return;
         }
 
@@ -135,7 +137,7 @@ export function createLsCommand() {
 
         const resolveResult = await pathResolver.resolveRange(cwd, rangeExprResult.value);
         if (resolveResult.type === "error") {
-          console.error(formatError(resolveResult.error));
+          console.error(formatError(resolveResult.error, debug));
           return;
         }
 
@@ -186,7 +188,7 @@ export function createLsCommand() {
       );
 
       if (workflowResult.type === "error") {
-        console.error(formatError(workflowResult.error));
+        console.error(formatError(workflowResult.error, debug));
         return;
       }
 

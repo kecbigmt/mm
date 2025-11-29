@@ -4,6 +4,7 @@ import { ChangeItemStatusWorkflow } from "../../../domain/workflows/change_item_
 import { dateTimeFromDate } from "../../../domain/primitives/date_time.ts";
 import { Item } from "../../../domain/models/item.ts";
 import { formatError } from "../error_formatter.ts";
+import { isDebugMode } from "../debug.ts";
 
 const formatItemLabel = (item: Item): string =>
   item.data.alias ? item.data.alias.toString() : item.data.id.toString();
@@ -14,13 +15,14 @@ export function createCloseCommand() {
     .arguments("<ids...:string>")
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .action(async (options: Record<string, unknown>, ...ids: string[]) => {
+      const debug = isDebugMode();
       const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
       const depsResult = await loadCliDependencies(workspaceOption);
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
-          console.error(formatError(depsResult.error.error));
+          console.error(formatError(depsResult.error.error, debug));
         } else {
-          console.error(formatError(depsResult.error));
+          console.error(formatError(depsResult.error, debug));
         }
         return;
       }
@@ -35,7 +37,7 @@ export function createCloseCommand() {
       const now = new Date();
       const occurredAtResult = dateTimeFromDate(now);
       if (occurredAtResult.type === "error") {
-        console.error(formatError(occurredAtResult.error));
+        console.error(formatError(occurredAtResult.error, debug));
         return;
       }
 
@@ -49,7 +51,7 @@ export function createCloseCommand() {
       });
 
       if (workflowResult.type === "error") {
-        console.error(formatError(workflowResult.error));
+        console.error(formatError(workflowResult.error, debug));
         return;
       }
 

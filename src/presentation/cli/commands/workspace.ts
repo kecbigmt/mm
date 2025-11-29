@@ -7,12 +7,13 @@ import { createFileSystemWorkspaceRepository } from "../../../infrastructure/fil
 import { parseTimezoneIdentifier } from "../../../domain/primitives/timezone_identifier.ts";
 import { CliDependencyError } from "../dependencies.ts";
 import { formatError } from "../error_formatter.ts";
+import { isDebugMode } from "../debug.ts";
 
-const reportError = (error: CliDependencyError): void => {
+const reportError = (error: CliDependencyError, debug: boolean): void => {
   if (error.type === "repository") {
-    console.error(formatError(error.error));
+    console.error(formatError(error.error, debug));
   } else {
-    console.error(formatError(error));
+    console.error(formatError(error, debug));
   }
 };
 
@@ -41,23 +42,24 @@ const formatIssues = (
 ): string => issues.map((issue) => issue.message).join(", ");
 
 const listAction = async () => {
+  const debug = isDebugMode();
   const envResult = resolveEnvironment();
   if (envResult.type === "error") {
-    reportError(envResult.error);
+    reportError(envResult.error, debug);
     return;
   }
   const env = envResult.value;
 
   const currentResult = await env.config.getCurrentWorkspace();
   if (currentResult.type === "error") {
-    console.error(formatError(currentResult.error));
+    console.error(formatError(currentResult.error, debug));
     return;
   }
   const current = currentResult.value ?? "home";
 
   const listResult = await env.repository.list();
   if (listResult.type === "error") {
-    console.error(formatError(listResult.error));
+    console.error(formatError(listResult.error, debug));
     return;
   }
 
@@ -83,9 +85,10 @@ const initAction = async (
   options: Record<string, unknown>,
   name: string,
 ) => {
+  const debug = isDebugMode();
   const envResult = resolveEnvironment();
   if (envResult.type === "error") {
-    reportError(envResult.error);
+    reportError(envResult.error, debug);
     return;
   }
   const env = envResult.value;
@@ -106,7 +109,7 @@ const initAction = async (
 
   const existsResult = await env.repository.exists(parsedName.value);
   if (existsResult.type === "error") {
-    console.error(formatError(existsResult.error));
+    console.error(formatError(existsResult.error, debug));
     return;
   }
   if (existsResult.value) {
@@ -116,13 +119,13 @@ const initAction = async (
 
   const createResult = await env.repository.create(parsedName.value, timezoneResult.value);
   if (createResult.type === "error") {
-    console.error(formatError(createResult.error));
+    console.error(formatError(createResult.error, debug));
     return;
   }
 
   const setResult = await env.config.setCurrentWorkspace(parsedName.value.toString());
   if (setResult.type === "error") {
-    console.error(formatError(setResult.error));
+    console.error(formatError(setResult.error, debug));
     return;
   }
 
@@ -132,9 +135,10 @@ const initAction = async (
 const useAction = async (
   name: string,
 ) => {
+  const debug = isDebugMode();
   const envResult = resolveEnvironment();
   if (envResult.type === "error") {
-    reportError(envResult.error);
+    reportError(envResult.error, debug);
     return;
   }
   const env = envResult.value;
@@ -147,7 +151,7 @@ const useAction = async (
 
   const existsResult = await env.repository.exists(parsedName.value);
   if (existsResult.type === "error") {
-    console.error(formatError(existsResult.error));
+    console.error(formatError(existsResult.error, debug));
     return;
   }
 
@@ -160,7 +164,7 @@ const useAction = async (
     }
     const createResult = await env.repository.create(parsedName.value, timezoneResult.value);
     if (createResult.type === "error") {
-      console.error(formatError(createResult.error));
+      console.error(formatError(createResult.error, debug));
       return;
     }
     wasCreated = true;
@@ -168,7 +172,7 @@ const useAction = async (
 
   const setResult = await env.config.setCurrentWorkspace(parsedName.value.toString());
   if (setResult.type === "error") {
-    console.error(formatError(setResult.error));
+    console.error(formatError(setResult.error, debug));
     return;
   }
 
