@@ -109,9 +109,18 @@ export function createTaskCommand() {
       const aliasOption = typeof options.alias === "string" ? options.alias : undefined;
 
       // Parse dueAt if provided
+      // For time-only formats (HH:MM), use parent placement date as reference
       let dueAt = undefined;
       if (typeof options.dueAt === "string") {
-        const dueAtResult = parseDateTime(options.dueAt);
+        // Extract reference date from parent placement for time-only formats
+        let referenceDate = now;
+        if (parentPlacement.head.kind === "date") {
+          const dateStr = parentPlacement.head.date.toString();
+          const [year, month, day] = dateStr.split("-").map(Number);
+          referenceDate = new Date(year, month - 1, day);
+        }
+
+        const dueAtResult = parseDateTime(options.dueAt, referenceDate);
         if (dueAtResult.type === "error") {
           console.error("Invalid due-at format:");
           reportValidationIssues(dueAtResult.error.issues);

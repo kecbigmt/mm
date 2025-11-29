@@ -110,9 +110,18 @@ export function createEventCommand() {
       const aliasOption = typeof options.alias === "string" ? options.alias : undefined;
 
       // Parse startAt if provided
+      // For time-only formats (HH:MM), use parent placement date as reference
       let startAt = undefined;
       if (typeof options.startAt === "string") {
-        const startAtResult = parseDateTime(options.startAt);
+        // Extract reference date from parent placement for time-only formats
+        let referenceDate = now;
+        if (parentPlacement.head.kind === "date") {
+          const dateStr = parentPlacement.head.date.toString();
+          const [year, month, day] = dateStr.split("-").map(Number);
+          referenceDate = new Date(year, month - 1, day);
+        }
+
+        const startAtResult = parseDateTime(options.startAt, referenceDate);
         if (startAtResult.type === "error") {
           console.error("Invalid start-at format:");
           reportValidationIssues(startAtResult.error.issues);
