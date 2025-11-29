@@ -68,9 +68,8 @@ const formatItemPrint = (item: Item, dateStr: string): string => {
 };
 
 const getPlacementDate = (item: Item): string => {
-  const placement = item.data.placement;
-  const head = placement.data.head;
-  if (head.type === "date") {
+  const head = item.data.placement.head;
+  if (head.kind === "date") {
     return head.date.toString();
   }
   return "";
