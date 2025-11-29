@@ -84,11 +84,19 @@ export type DateTimeValidationError = ValidationError<typeof DATE_TIME_KIND>;
 export const isDateTime = (value: unknown): value is DateTime =>
   typeof value === "object" && value !== null && DATE_TIME_BRAND in value;
 
-const ISO_DATETIME_REGEX =
+// ISO 8601 with timezone (Z or +HH:MM or -HH:MM)
+const ISO_DATETIME_WITH_TZ_REGEX =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:?\d{2})$/;
+
+// ISO 8601 without timezone (local time)
+const ISO_DATETIME_WITHOUT_TZ_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d{3})?$/;
+
+// Time only (HH:MM or HH:MM:SS)
+const TIME_ONLY_REGEX = /^(\d{2}):(\d{2})(?::(\d{2}))?$/;
 
 export const parseDateTime = (
   input: unknown,
+  referenceDate?: Date,
 ): Result<DateTime, DateTimeValidationError> => {
   if (isDateTime(input)) {
     return Result.ok(input);
@@ -106,30 +114,104 @@ export const parseDateTime = (
   }
 
   const candidate = input.trim();
-  if (!ISO_DATETIME_REGEX.test(candidate)) {
-    return Result.error(
-      createValidationError(DATE_TIME_KIND, [
-        createValidationIssue("expected ISO-8601 string", {
+
+  // Try ISO 8601 with timezone first (existing behavior)
+  if (ISO_DATETIME_WITH_TZ_REGEX.test(candidate)) {
+    const parsed = new Date(candidate);
+    if (Number.isNaN(parsed.getTime())) {
+      return Result.error(
+        createValidationError(DATE_TIME_KIND, [
+          createValidationIssue("invalid datetime value", {
+            path: ["iso"],
+            code: "invalid_datetime",
+          }),
+        ]),
+      );
+    }
+    return Result.ok(instantiate(parsed));
+  }
+
+  // Try ISO 8601 without timezone (treat as local time)
+  if (ISO_DATETIME_WITHOUT_TZ_REGEX.test(candidate)) {
+    // Parse as local time by constructing Date from components
+    const match = candidate.match(
+      /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.(\d{3}))?$/,
+    );
+    if (!match) {
+      return Result.error(
+        createValidationError(DATE_TIME_KIND, [
+          createValidationIssue("failed to parse datetime components", {
+            path: ["iso"],
+            code: "parse_error",
+          }),
+        ]),
+      );
+    }
+
+    const [, year, month, day, hour, minute, second = "0", ms = "0"] = match;
+    const parsed = new Date(
+      parseInt(year),
+      parseInt(month) - 1,
+      parseInt(day),
+      parseInt(hour),
+      parseInt(minute),
+      parseInt(second),
+      parseInt(ms),
+    );
+
+    if (Number.isNaN(parsed.getTime())) {
+      return Result.error(
+        createValidationError(DATE_TIME_KIND, [
+          createValidationIssue("invalid datetime value", {
+            path: ["iso"],
+            code: "invalid_datetime",
+          }),
+        ]),
+      );
+    }
+    return Result.ok(instantiate(parsed));
+  }
+
+  // Try time-only format (HH:MM or HH:MM:SS)
+  const timeMatch = candidate.match(TIME_ONLY_REGEX);
+  if (timeMatch) {
+    const [, hour, minute, second = "0"] = timeMatch;
+    const base = referenceDate || new Date();
+    const parsed = new Date(
+      base.getFullYear(),
+      base.getMonth(),
+      base.getDate(),
+      parseInt(hour),
+      parseInt(minute),
+      parseInt(second),
+      0,
+    );
+
+    if (Number.isNaN(parsed.getTime())) {
+      return Result.error(
+        createValidationError(DATE_TIME_KIND, [
+          createValidationIssue("invalid time value", {
+            path: ["iso"],
+            code: "invalid_time",
+          }),
+        ]),
+      );
+    }
+    return Result.ok(instantiate(parsed));
+  }
+
+  // No format matched
+  return Result.error(
+    createValidationError(DATE_TIME_KIND, [
+      createValidationIssue(
+        "expected ISO-8601 string (with or without timezone) or time format (HH:MM)",
+        {
           path: ["iso"],
           code: "format",
-        }),
-      ]),
-    );
-  }
-
-  const parsed = new Date(candidate);
-  if (Number.isNaN(parsed.getTime())) {
-    return Result.error(
-      createValidationError(DATE_TIME_KIND, [
-        createValidationIssue("invalid datetime value", {
-          path: ["iso"],
-          code: "invalid_datetime",
-        }),
-      ]),
-    );
-  }
-
-  return Result.ok(instantiate(parsed));
+        },
+      ),
+    ]),
+  );
 };
 
 export const dateTimeFromDate = (
