@@ -69,7 +69,16 @@ workspace fixtures.
 - Unit tests for all value objects and smart constructors
 - Integration tests for workflows and business logic
 - All tests must pass before commits: `deno task test`
+- Favor TDD (red/green/refactor). In the red phase, scaffold the target symbols (empty bodies) so errors reflect behavior, not missing references (i.e., avoid “function not found” reds).
 
+## Specs & Plans (design.md / plan.md)
+
+- Keep design docs English-only; communication may be in other languages, but specs stay in English.
+- Make limits and policies explicit (caps, warnings, error vs warn paths).
+- Partition responsibilities clearly: domain returns flat data; presentation handles partitioning/formatting.
+- Plans should be LLM-friendly: small, serializable tasks, note parallelizable parts; prefer pure functions and DTOs for testability.
+- Include warning examples and DoD; prefer fixed constants over env-config unless required.
+- Design docs should include: scope/in-scope vs out-of-scope, inputs/outputs and concrete examples, acceptance criteria, high-level e2e scenarios, file/dir layout decisions, and key interfaces/types (method signatures) for new pieces. Include sample warnings/errors when relevant.
 ## Commit & Pull Request Guidelines
 
 **Before every commit, run `deno lint` and `deno fmt`** to ensure code quality and consistency. All
