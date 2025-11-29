@@ -21,7 +21,8 @@ const launchEditor = async (filePath: string): Promise<void> => {
     stdout: "inherit",
     stderr: "inherit",
   });
-  const status = await command.output();
+  const child = command.spawn();
+  const status = await child.status;
   if (!status.success) {
     throw new Error(`Editor '${editor}' exited with non-zero status`);
   }
