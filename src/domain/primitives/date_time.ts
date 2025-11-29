@@ -5,6 +5,7 @@ import {
   ValidationError,
 } from "../../shared/errors.ts";
 import { Duration } from "./duration.ts";
+import { TimezoneIdentifier } from "./timezone_identifier.ts";
 
 const DATE_TIME_KIND = "DateTime" as const;
 const DATE_TIME_BRAND: unique symbol = Symbol(DATE_TIME_KIND);
@@ -96,7 +97,10 @@ const TIME_ONLY_REGEX = /^(\d{2}):(\d{2})(?::(\d{2}))?$/;
 
 export const parseDateTime = (
   input: unknown,
-  referenceDate?: Date,
+  options?: {
+    referenceDate?: Date;
+    timezone?: TimezoneIdentifier;
+  },
 ): Result<DateTime, DateTimeValidationError> => {
   if (isDateTime(input)) {
     return Result.ok(input);
@@ -176,7 +180,65 @@ export const parseDateTime = (
   const timeMatch = candidate.match(TIME_ONLY_REGEX);
   if (timeMatch) {
     const [, hour, minute, second = "0"] = timeMatch;
-    const base = referenceDate || new Date();
+    const base = options?.referenceDate || new Date();
+
+    // If timezone is provided, interpret time in that timezone
+    if (options?.timezone) {
+      // Extract date components from reference date in the workspace timezone
+      const formatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone: options.timezone.toString(),
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+      const dateStr = formatter.format(base); // YYYY-MM-DD in workspace timezone
+
+      // Build an ISO string representing the local time in the workspace timezone
+      const localTimeStr = `${dateStr}T${hour.padStart(2, "0")}:${minute.padStart(2, "0")}:${second.padStart(2, "0")}`;
+
+      // Use a two-step approach to find the UTC timestamp:
+      // 1. Parse as if it were UTC to get a candidate timestamp
+      const candidateUtc = new Date(`${localTimeStr}Z`).getTime();
+
+      // 2. Format the candidate in the workspace timezone to see what local time it produces
+      const checkParts = new Intl.DateTimeFormat("en-US", {
+        timeZone: options.timezone.toString(),
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      }).formatToParts(new Date(candidateUtc));
+
+      const checkMap = Object.fromEntries(
+        checkParts.map((p) => [p.type, p.value]),
+      );
+
+      const producedLocalTime = `${checkMap.year}-${checkMap.month}-${checkMap.day}T${checkMap.hour}:${checkMap.minute}:${checkMap.second}`;
+
+      // 3. Calculate the difference and adjust
+      const wantedUtc = new Date(`${localTimeStr}Z`).getTime();
+      const producedUtc = new Date(`${producedLocalTime}Z`).getTime();
+      const correction = wantedUtc - producedUtc;
+
+      const parsed = new Date(candidateUtc + correction);
+
+      if (Number.isNaN(parsed.getTime())) {
+        return Result.error(
+          createValidationError(DATE_TIME_KIND, [
+            createValidationIssue("invalid time value", {
+              path: ["iso"],
+              code: "invalid_time",
+            }),
+          ]),
+        );
+      }
+      return Result.ok(instantiate(parsed));
+    }
+
+    // No timezone provided: use host timezone (backward compatible)
     const parsed = new Date(
       base.getFullYear(),
       base.getMonth(),
