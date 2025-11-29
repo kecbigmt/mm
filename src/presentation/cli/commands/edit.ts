@@ -112,41 +112,50 @@ export function createEditCommand() {
         try {
           await launchEditor(filePath);
           const reloadResult = await deps.itemRepository.load(item.data.id);
-          if (reloadResult.type === "ok" && reloadResult.value) {
-            const updatedItem = reloadResult.value;
-            const newAlias = updatedItem.data.alias;
 
-            // Update alias index if alias changed
-            const oldAliasStr = oldAlias?.toString();
-            const newAliasStr = newAlias?.toString();
-            if (oldAliasStr !== newAliasStr) {
-              // Delete old alias if it exists
-              if (oldAlias) {
-                const deleteResult = await deps.aliasRepository.delete(oldAlias);
-                if (deleteResult.type === "error") {
-                  console.error(`Failed to delete old alias: ${deleteResult.error.message}`);
-                  Deno.exit(1);
-                }
-              }
+          if (reloadResult.type === "error") {
+            console.error(`Failed to reload item after edit: ${reloadResult.error.message}`);
+            Deno.exit(1);
+          }
 
-              // Save new alias if it exists
-              if (newAlias) {
-                const { createAlias } = await import("../../../domain/models/alias.ts");
-                const aliasModel = createAlias({
-                  slug: newAlias,
-                  itemId: updatedItem.data.id,
-                  createdAt: occurredAtResult.value,
-                });
-                const aliasSaveResult = await deps.aliasRepository.save(aliasModel);
-                if (aliasSaveResult.type === "error") {
-                  console.error(`Failed to save new alias: ${aliasSaveResult.error.message}`);
-                  Deno.exit(1);
-                }
+          if (!reloadResult.value) {
+            console.error("Failed to reload item after edit: item not found");
+            Deno.exit(1);
+          }
+
+          const updatedItem = reloadResult.value;
+          const newAlias = updatedItem.data.alias;
+
+          // Update alias index if alias changed
+          const oldAliasStr = oldAlias?.toString();
+          const newAliasStr = newAlias?.toString();
+          if (oldAliasStr !== newAliasStr) {
+            // Delete old alias if it exists
+            if (oldAlias) {
+              const deleteResult = await deps.aliasRepository.delete(oldAlias);
+              if (deleteResult.type === "error") {
+                console.error(`Failed to delete old alias: ${deleteResult.error.message}`);
+                Deno.exit(1);
               }
             }
 
-            console.log(`✅ Updated ${formatItem(updatedItem)}`);
+            // Save new alias if it exists
+            if (newAlias) {
+              const { createAlias } = await import("../../../domain/models/alias.ts");
+              const aliasModel = createAlias({
+                slug: newAlias,
+                itemId: updatedItem.data.id,
+                createdAt: occurredAtResult.value,
+              });
+              const aliasSaveResult = await deps.aliasRepository.save(aliasModel);
+              if (aliasSaveResult.type === "error") {
+                console.error(`Failed to save new alias: ${aliasSaveResult.error.message}`);
+                Deno.exit(1);
+              }
+            }
           }
+
+          console.log(`✅ Updated ${formatItem(updatedItem)}`);
         } catch (error) {
           console.error(
             `Failed to edit item: ${error instanceof Error ? error.message : String(error)}`,
