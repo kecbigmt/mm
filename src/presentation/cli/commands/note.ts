@@ -115,6 +115,7 @@ export function createNoteCommand() {
         alias: aliasOption,
         parentPlacement: parentPlacement,
         createdAt: createdAtResult.value,
+        timezone: deps.timezone,
       }, {
         itemRepository: deps.itemRepository,
         aliasRepository: deps.aliasRepository,

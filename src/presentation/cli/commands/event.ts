@@ -152,6 +152,7 @@ export function createEventCommand() {
         duration,
         parentPlacement: parentPlacement,
         createdAt: createdAtResult.value,
+        timezone: deps.timezone,
       }, {
         itemRepository: deps.itemRepository,
         aliasRepository: deps.aliasRepository,

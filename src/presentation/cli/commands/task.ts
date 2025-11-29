@@ -138,6 +138,7 @@ export function createTaskCommand() {
         dueAt,
         parentPlacement: parentPlacement,
         createdAt: createdAtResult.value,
+        timezone: deps.timezone,
       }, {
         itemRepository: deps.itemRepository,
         aliasRepository: deps.aliasRepository,
