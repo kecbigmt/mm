@@ -16,11 +16,14 @@ import {
   itemTitleFromString,
   parseDuration,
   parsePlacement,
+  timezoneIdentifierFromString,
 } from "../primitives/mod.ts";
 import { createRepositoryError } from "../repositories/repository_error.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
 import { Alias, createAlias } from "../models/alias.ts";
+
+const TEST_TIMEZONE = Result.unwrap(timezoneIdentifierFromString("UTC"));
 
 const createTestItem = (
   id: ItemId,
@@ -78,6 +81,7 @@ Deno.test("EditItemWorkflow - should update item title", async () => {
         title: "Updated Title",
       },
       updatedAt: now,
+      timezone: TEST_TIMEZONE,
     },
     {
       itemRepository: mockItemRepository,
@@ -138,6 +142,7 @@ Deno.test("EditItemWorkflow - should update item via alias", async () => {
         title: "Updated via Alias",
       },
       updatedAt: now,
+      timezone: TEST_TIMEZONE,
     },
     {
       itemRepository: mockItemRepository,
@@ -189,6 +194,7 @@ Deno.test("EditItemWorkflow - should update multiple fields", async () => {
         body: "New body content",
       },
       updatedAt: now,
+      timezone: TEST_TIMEZONE,
     },
     {
       itemRepository: mockItemRepository,
@@ -233,6 +239,7 @@ Deno.test("EditItemWorkflow - should return error for non-existent item", async 
         title: "Updated Title",
       },
       updatedAt: now,
+      timezone: TEST_TIMEZONE,
     },
     {
       itemRepository: mockItemRepository,
@@ -286,6 +293,7 @@ Deno.test("EditItemWorkflow - should handle invalid title", async () => {
         title: "",
       },
       updatedAt: now,
+      timezone: TEST_TIMEZONE,
     },
     {
       itemRepository: mockItemRepository,
@@ -343,6 +351,7 @@ Deno.test("EditItemWorkflow - should update alias index when alias changes", asy
         alias: "new-alias",
       },
       updatedAt: now,
+      timezone: TEST_TIMEZONE,
     },
     {
       itemRepository: mockItemRepository,
@@ -412,6 +421,7 @@ Deno.test("EditItemWorkflow - should delete alias index when alias is cleared", 
         alias: "", // Clear alias
       },
       updatedAt: now,
+      timezone: TEST_TIMEZONE,
     },
     {
       itemRepository: mockItemRepository,
@@ -474,6 +484,7 @@ Deno.test("EditItemWorkflow - should save alias index when alias is added", asyn
         alias: "new-alias",
       },
       updatedAt: now,
+      timezone: TEST_TIMEZONE,
     },
     {
       itemRepository: mockItemRepository,
@@ -537,6 +548,7 @@ Deno.test("EditItemWorkflow - should preserve existing schedule fields on partia
         duration: "30m",
       },
       updatedAt: now,
+      timezone: TEST_TIMEZONE,
     },
     {
       itemRepository: mockItemRepository,
@@ -601,6 +613,7 @@ Deno.test("EditItemWorkflow - should reject alias collision", async () => {
         alias: "existing-alias",
       },
       updatedAt: now,
+      timezone: TEST_TIMEZONE,
     },
     {
       itemRepository: mockItemRepository,
@@ -613,5 +626,245 @@ Deno.test("EditItemWorkflow - should reject alias collision", async () => {
     result.type === "error" && "kind" in result.error && result.error.kind === "ValidationError"
   ) {
     assertEquals(result.error.issues[0]?.code, "conflict");
+  }
+});
+
+Deno.test("EditItemWorkflow - should use placement date for time-only startAt", async () => {
+  const itemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd120"));
+  const now = Result.unwrap(dateTimeFromDate(new Date()));
+  const placement = Result.unwrap(parsePlacement("2025-02-10"));
+  const rank = Result.unwrap(itemRankFromString("a0"));
+
+  const originalItem = createItem({
+    id: itemId,
+    title: Result.unwrap(itemTitleFromString("Event")),
+    icon: createItemIcon("event"),
+    status: itemStatusOpen(),
+    placement,
+    rank,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const mockItemRepository: ItemRepository = {
+    load: (_id) => Promise.resolve(Result.ok(originalItem)),
+    save: (_item) => Promise.resolve(Result.ok(undefined)),
+    delete: (_id) => Promise.resolve(Result.ok(undefined)),
+    listByPlacement: (_range) => Promise.resolve(Result.ok([])),
+  };
+
+  const mockAliasRepository: AliasRepository = {
+    load: (_slug) => Promise.resolve(Result.ok(undefined)),
+    save: (_alias) => Promise.resolve(Result.ok(undefined)),
+    delete: (_slug) => Promise.resolve(Result.ok(undefined)),
+    list: () => Promise.resolve(Result.ok([])),
+  };
+
+  const result = await EditItemWorkflow.execute(
+    {
+      itemLocator: itemId.toString(),
+      updates: {
+        startAt: "09:00", // Time-only format
+      },
+      updatedAt: now,
+      timezone: TEST_TIMEZONE,
+    },
+    {
+      itemRepository: mockItemRepository,
+      aliasRepository: mockAliasRepository,
+    },
+  );
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertExists(result.value.data.startAt);
+    // Should use placement date (2025-02-10) instead of today
+    const isoString = result.value.data.startAt.data.iso;
+    // Time-only input is interpreted in system timezone
+    // Verify the date portion is correct (UTC representation)
+    assertEquals(isoString.substring(0, 10), "2025-02-10");
+  }
+});
+
+Deno.test("EditItemWorkflow - should use placement date for time-only dueAt", async () => {
+  const itemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd120"));
+  const now = Result.unwrap(dateTimeFromDate(new Date()));
+  const placement = Result.unwrap(parsePlacement("2025-02-15"));
+  const rank = Result.unwrap(itemRankFromString("a0"));
+
+  const originalItem = createItem({
+    id: itemId,
+    title: Result.unwrap(itemTitleFromString("Task")),
+    icon: createItemIcon("task"),
+    status: itemStatusOpen(),
+    placement,
+    rank,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const mockItemRepository: ItemRepository = {
+    load: (_id) => Promise.resolve(Result.ok(originalItem)),
+    save: (_item) => Promise.resolve(Result.ok(undefined)),
+    delete: (_id) => Promise.resolve(Result.ok(undefined)),
+    listByPlacement: (_range) => Promise.resolve(Result.ok([])),
+  };
+
+  const mockAliasRepository: AliasRepository = {
+    load: (_slug) => Promise.resolve(Result.ok(undefined)),
+    save: (_alias) => Promise.resolve(Result.ok(undefined)),
+    delete: (_slug) => Promise.resolve(Result.ok(undefined)),
+    list: () => Promise.resolve(Result.ok([])),
+  };
+
+  const result = await EditItemWorkflow.execute(
+    {
+      itemLocator: itemId.toString(),
+      updates: {
+        dueAt: "17:00", // Time-only format
+      },
+      updatedAt: now,
+      timezone: TEST_TIMEZONE,
+    },
+    {
+      itemRepository: mockItemRepository,
+      aliasRepository: mockAliasRepository,
+    },
+  );
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertExists(result.value.data.dueAt);
+    // Should use placement date (2025-02-15) instead of today
+    const isoString = result.value.data.dueAt.data.iso;
+    // Time-only input is interpreted in system timezone
+    // Verify the date portion is correct (UTC representation)
+    assertEquals(isoString.substring(0, 10), "2025-02-15");
+  }
+});
+
+Deno.test("EditItemWorkflow - time-only startAt uses workspace timezone (PST)", async () => {
+  const itemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd120"));
+  const title = Result.unwrap(itemTitleFromString("Event"));
+  const icon = createItemIcon("event");
+  const status = itemStatusOpen();
+  const placement = Result.unwrap(parsePlacement("2025-02-10"));
+  const rank = Result.unwrap(itemRankFromString("a"));
+  const now = Result.unwrap(dateTimeFromDate(new Date("2025-02-10T12:00:00Z")));
+
+  const originalItem = createItem({
+    id: itemId,
+    title,
+    icon,
+    status,
+    placement,
+    rank,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const mockItemRepository: ItemRepository = {
+    load: (_id) => Promise.resolve(Result.ok(originalItem)),
+    save: (_item) => Promise.resolve(Result.ok(undefined)),
+    delete: (_id) => Promise.resolve(Result.ok(undefined)),
+    listByPlacement: (_range) => Promise.resolve(Result.ok([])),
+  };
+
+  const mockAliasRepository: AliasRepository = {
+    load: (_slug) => Promise.resolve(Result.ok(undefined)),
+    save: (_alias) => Promise.resolve(Result.ok(undefined)),
+    delete: (_slug) => Promise.resolve(Result.ok(undefined)),
+    list: () => Promise.resolve(Result.ok([])),
+  };
+
+  // Workspace timezone is PST (UTC-8)
+  const pstTimezone = Result.unwrap(timezoneIdentifierFromString("America/Los_Angeles"));
+
+  const result = await EditItemWorkflow.execute(
+    {
+      itemLocator: itemId.toString(),
+      updates: {
+        startAt: "09:00", // Time-only format
+      },
+      updatedAt: now,
+      timezone: pstTimezone,
+    },
+    {
+      itemRepository: mockItemRepository,
+      aliasRepository: mockAliasRepository,
+    },
+  );
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertExists(result.value.data.startAt);
+    const isoString = result.value.data.startAt.data.iso;
+    // Placement date is 2025-02-10
+    // Reference date uses noon UTC to ensure stable date in workspace timezone
+    // So 09:00 PST on 2025-02-10 = 2025-02-10T17:00:00.000Z
+    assertEquals(isoString, "2025-02-10T17:00:00.000Z");
+  }
+});
+
+Deno.test("EditItemWorkflow - time-only dueAt uses workspace timezone (JST)", async () => {
+  const itemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd121"));
+  const title = Result.unwrap(itemTitleFromString("Task"));
+  const icon = createItemIcon("task");
+  const status = itemStatusOpen();
+  const placement = Result.unwrap(parsePlacement("2025-02-10"));
+  const rank = Result.unwrap(itemRankFromString("a"));
+  const now = Result.unwrap(dateTimeFromDate(new Date("2025-02-10T12:00:00Z")));
+
+  const originalItem = createItem({
+    id: itemId,
+    title,
+    icon,
+    status,
+    placement,
+    rank,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const mockItemRepository: ItemRepository = {
+    load: (_id) => Promise.resolve(Result.ok(originalItem)),
+    save: (_item) => Promise.resolve(Result.ok(undefined)),
+    delete: (_id) => Promise.resolve(Result.ok(undefined)),
+    listByPlacement: (_range) => Promise.resolve(Result.ok([])),
+  };
+
+  const mockAliasRepository: AliasRepository = {
+    load: (_slug) => Promise.resolve(Result.ok(undefined)),
+    save: (_alias) => Promise.resolve(Result.ok(undefined)),
+    delete: (_slug) => Promise.resolve(Result.ok(undefined)),
+    list: () => Promise.resolve(Result.ok([])),
+  };
+
+  // Workspace timezone is JST (UTC+9)
+  const jstTimezone = Result.unwrap(timezoneIdentifierFromString("Asia/Tokyo"));
+
+  const result = await EditItemWorkflow.execute(
+    {
+      itemLocator: itemId.toString(),
+      updates: {
+        dueAt: "09:00", // Time-only format
+      },
+      updatedAt: now,
+      timezone: jstTimezone,
+    },
+    {
+      itemRepository: mockItemRepository,
+      aliasRepository: mockAliasRepository,
+    },
+  );
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertExists(result.value.data.dueAt);
+    const isoString = result.value.data.dueAt.data.iso;
+    // Placement date is 2025-02-10
+    // Reference date uses noon UTC to ensure stable date in workspace timezone
+    // So 09:00 JST on 2025-02-10 = 2025-02-10T00:00:00.000Z
+    assertEquals(isoString, "2025-02-10T00:00:00.000Z");
   }
 });

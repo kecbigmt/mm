@@ -5,6 +5,7 @@ import {
   AliasSlug,
   createItemIcon,
   DateTime,
+  Duration,
   ItemId,
   itemStatusOpen,
   itemTitleFromString,
@@ -13,6 +14,7 @@ import {
   PlacementRange,
   TagSlug,
   tagSlugFromString,
+  TimezoneIdentifier,
 } from "../primitives/mod.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
@@ -30,6 +32,11 @@ export type CreateItemInput = Readonly<{
   alias?: string;
   parentPlacement: Placement;
   createdAt: DateTime;
+  timezone: TimezoneIdentifier;
+  // Scheduling fields
+  startAt?: DateTime;
+  duration?: Duration;
+  dueAt?: DateTime;
 }>;
 
 export type CreateItemDependencies = Readonly<{
@@ -51,6 +58,12 @@ export type CreateItemRepositoryError = Readonly<{
   error: RepositoryError;
 }>;
 
+export type DateConsistencyValidationError = Readonly<{
+  kind: "date_consistency";
+  message: string;
+  issues: ReadonlyArray<ValidationIssue>;
+}>;
+
 export type CreateItemError = CreateItemValidationError | CreateItemRepositoryError;
 
 export type CreateItemResult = Readonly<{
@@ -69,6 +82,72 @@ const repositoryFailure = (error: RepositoryError): CreateItemRepositoryError =>
   kind: "repository",
   error,
 });
+
+/**
+ * Extracts the date portion (YYYY-MM-DD) from a DateTime in the given timezone
+ * Converts UTC datetime to local date in the workspace timezone
+ */
+const extractDateFromDateTime = (dateTime: DateTime, timezone: TimezoneIdentifier): string => {
+  const date = dateTime.toDate();
+  // Format date in the workspace timezone
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone.toString(),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(date); // Returns YYYY-MM-DD
+};
+
+/**
+ * Extracts the date string from a Placement if it's a date-based placement
+ * Returns null for item-based placements
+ */
+const extractDateFromPlacement = (placement: Placement): string | null => {
+  if (placement.head.kind === "date") {
+    return placement.head.date.toString();
+  }
+  return null;
+};
+
+/**
+ * Validates that the event's startAt date matches the parent placement date
+ * Only validates for calendar-based placements (date kind)
+ * Skips validation for item-based placements (item kind)
+ *
+ * Date comparison is done in the workspace timezone to handle day boundaries correctly
+ */
+const validateEventDateConsistency = (
+  startAt: DateTime,
+  parentPlacement: Placement,
+  timezone: TimezoneIdentifier,
+): Result<void, DateConsistencyValidationError> => {
+  const startDate = extractDateFromDateTime(startAt, timezone);
+  const placementDate = extractDateFromPlacement(parentPlacement);
+
+  // Skip validation for item-based placements
+  if (placementDate === null) {
+    return Result.ok(undefined);
+  }
+
+  if (startDate !== placementDate) {
+    return Result.error({
+      kind: "date_consistency",
+      message: "event startAt date must match placement date",
+      issues: [
+        createValidationIssue(
+          `startAt date '${startDate}' does not match placement date '${placementDate}'`,
+          {
+            code: "date_time_inconsistency",
+            path: ["startAt"],
+          },
+        ),
+      ],
+    });
+  }
+
+  return Result.ok(undefined);
+};
 
 export const CreateItemWorkflow = {
   execute: async (
@@ -147,6 +226,18 @@ export const CreateItemWorkflow = {
         // Alias exists, try again
       }
       // If no unique alias found after retries, continue without alias
+    }
+
+    // Validate event date consistency if event with startAt
+    if (input.itemType === "event" && input.startAt) {
+      const consistencyResult = validateEventDateConsistency(
+        input.startAt,
+        input.parentPlacement,
+        input.timezone,
+      );
+      if (consistencyResult.type === "error") {
+        issues.push(...consistencyResult.error.issues);
+      }
     }
 
     const idResult = deps.idGenerationService.generateId();
@@ -233,7 +324,20 @@ export const CreateItemWorkflow = {
       alias,
     });
 
-    const saveResult = await deps.itemRepository.save(item);
+    // Apply schedule if any scheduling fields are provided
+    let itemWithSchedule = item;
+    if (input.startAt || input.duration || input.dueAt) {
+      itemWithSchedule = item.schedule(
+        {
+          startAt: input.startAt,
+          duration: input.duration,
+          dueAt: input.dueAt,
+        },
+        input.createdAt,
+      );
+    }
+
+    const saveResult = await deps.itemRepository.save(itemWithSchedule);
     if (saveResult.type === "error") {
       return Result.error(repositoryFailure(saveResult.error));
     }
@@ -251,6 +355,6 @@ export const CreateItemWorkflow = {
       }
     }
 
-    return Result.ok({ item });
+    return Result.ok({ item: itemWithSchedule });
   },
 };

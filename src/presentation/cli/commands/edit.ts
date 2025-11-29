@@ -80,6 +80,7 @@ export function createEditCommand() {
             itemLocator,
             updates: {},
             updatedAt: occurredAtResult.value,
+            timezone: deps.timezone,
           },
           {
             itemRepository: deps.itemRepository,
@@ -211,6 +212,7 @@ export function createEditCommand() {
           itemLocator,
           updates,
           updatedAt: occurredAtResult.value,
+          timezone: deps.timezone,
         },
         {
           itemRepository: deps.itemRepository,
