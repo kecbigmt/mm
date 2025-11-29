@@ -2,8 +2,24 @@ import { Command, EnumType } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { ListItemsStatusFilter, ListItemsWorkflow } from "../../../domain/workflows/list_items.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
-import type { Item } from "../../../domain/models/item.ts";
 import type { ItemIconValue } from "../../../domain/primitives/item_icon.ts";
+import { parseRangeExpression } from "../path_expression.ts";
+import { createPathResolver } from "../../../domain/services/path_resolver.ts";
+import {
+  createDateRange,
+  type PlacementRange,
+} from "../../../domain/primitives/placement_range.ts";
+import { parseCalendarDay } from "../../../domain/primitives/calendar_day.ts";
+import { createPlacement } from "../../../domain/primitives/placement.ts";
+import type { SectionSummary } from "../../../domain/services/section_query_service.ts";
+import { buildPartitions, formatWarning } from "../partitioning/build_partitions.ts";
+import {
+  formatDateHeader,
+  formatItemHeadHeader,
+  formatItemLine,
+  formatSectionStub,
+  type ListFormatterOptions,
+} from "../formatters/list_formatter.ts";
 
 type LsOptions = {
   workspace?: string;
@@ -15,64 +31,141 @@ type LsOptions = {
 
 const itemTypeEnum = new EnumType(["note", "task", "event"]);
 
-const getItemIcon = (item: Item, isClosed: boolean): string => {
-  const icon = item.data.icon.toString();
-  switch (icon) {
-    case "note":
-      return isClosed ? "🗞️" : "📝";
-    case "task":
-      return isClosed ? "✅" : "✔️";
-    case "event":
-      return "🕒";
-    default:
-      return "📄";
-  }
+const DEFAULT_DATE_WINDOW_DAYS = 7;
+
+/**
+ * Compute today's date in the given timezone.
+ */
+const computeTodayInTimezone = (now: Date, timezone: string): Date => {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(now);
+  const lookup = new Map(parts.map((part) => [part.type, part.value]));
+  return new Date(
+    Number(lookup.get("year")),
+    Number(lookup.get("month")) - 1,
+    Number(lookup.get("day")),
+  );
 };
 
-const formatItemColored = (item: Item): string => {
-  const isClosed = item.data.status.isClosed();
-  const icon = getItemIcon(item, isClosed);
-  const alias = item.data.alias?.toString();
-  const id = item.data.id.toString();
-  const label = alias || id;
-  const title = item.data.title.toString();
-  const context = item.data.context?.toString();
-  const dueAt = item.data.dueAt?.toString().slice(0, 10); // YYYY-MM-DD
-
-  let line = `${icon} ${label} ${title}`;
-  if (context) {
-    line += ` @${context}`;
-  }
-  if (dueAt) {
-    line += ` →${dueAt}`;
-  }
-  return line;
+/**
+ * Add days to a date (handles month/year boundaries).
+ */
+const addDays = (date: Date, days: number): Date => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
 };
 
-const formatItemPrint = (item: Item, dateStr: string): string => {
-  const alias = item.data.alias?.toString();
-  const id = item.data.id.toString();
-  const label = alias || id;
-  const title = item.data.title.toString();
-  const context = item.data.context?.toString();
-  const dueAt = item.data.dueAt?.toString().slice(0, 10);
-
-  let line = `${dateStr} ${label} ${title}`;
-  if (context) {
-    line += ` @${context}`;
-  }
-  if (dueAt) {
-    line += ` ->${dueAt}`;
-  }
-  return line;
+/**
+ * Format a Date as YYYY-MM-DD string.
+ */
+const formatDateString = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 };
 
-const getPlacementDate = (item: Item): string => {
-  const head = item.data.placement.head;
-  if (head.kind === "date") {
-    return head.date.toString();
+/**
+ * Parse a shell-like command string into command and arguments.
+ * Handles simple quoting (single and double quotes) and backslash escapes.
+ * For example: "less -FR" -> ["less", "-FR"]
+ *              "bat --paging always" -> ["bat", "--paging", "always"]
+ */
+const parseShellCommand = (cmd: string): string[] => {
+  const tokens: string[] = [];
+  let current = "";
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let escape = false;
+
+  for (const char of cmd) {
+    if (escape) {
+      current += char;
+      escape = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escape = true;
+      continue;
+    }
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      continue;
+    }
+
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      continue;
+    }
+
+    if (char === " " && !inSingleQuote && !inDoubleQuote) {
+      if (current.length > 0) {
+        tokens.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    current += char;
   }
-  return "";
+
+  if (current.length > 0) {
+    tokens.push(current);
+  }
+
+  return tokens;
+};
+
+/**
+ * Output text through a pager (PAGER env or less -R fallback).
+ * Falls back to direct output if pager is unavailable.
+ */
+const outputWithPager = async (text: string): Promise<void> => {
+  const pagerEnv = Deno.env.get("PAGER");
+
+  let pagerCmd: string;
+  let pagerArgs: string[];
+
+  if (pagerEnv) {
+    const tokens = parseShellCommand(pagerEnv);
+    if (tokens.length === 0) {
+      // Empty PAGER, fall back to less -R
+      pagerCmd = "less";
+      pagerArgs = ["-R"];
+    } else {
+      pagerCmd = tokens[0];
+      pagerArgs = tokens.slice(1);
+    }
+  } else {
+    pagerCmd = "less";
+    pagerArgs = ["-R"];
+  }
+
+  try {
+    const command = new Deno.Command(pagerCmd, {
+      args: pagerArgs,
+      stdin: "piped",
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+
+    const process = command.spawn();
+    const writer = process.stdin.getWriter();
+    await writer.write(new TextEncoder().encode(text));
+    await writer.close();
+    await process.status;
+  } catch {
+    console.error("warning: pager unavailable, outputting directly");
+    console.log(text);
+  }
 };
 
 export function createLsCommand() {
@@ -112,12 +205,70 @@ export function createLsCommand() {
         return;
       }
 
+      const cwd = cwdResult.value;
       const statusFilter: ListItemsStatusFilter = options.all ? "all" : "open";
+      const isPrintMode = options.print === true;
 
+      // Resolve PlacementRange and effective expression for workflow
+      let placementRange: PlacementRange;
+      let effectiveExpression: string | undefined;
+
+      if (locatorArg) {
+        // Parse and resolve locator expression
+        const rangeExprResult = parseRangeExpression(locatorArg);
+        if (rangeExprResult.type === "error") {
+          console.error(rangeExprResult.error.message);
+          return;
+        }
+
+        const pathResolver = createPathResolver({
+          aliasRepository: deps.aliasRepository,
+          itemRepository: deps.itemRepository,
+          timezone: deps.timezone,
+          today: now,
+        });
+
+        const resolveResult = await pathResolver.resolveRange(cwd, rangeExprResult.value);
+        if (resolveResult.type === "error") {
+          console.error(resolveResult.error.message);
+          return;
+        }
+
+        placementRange = resolveResult.value;
+        effectiveExpression = locatorArg;
+      } else {
+        // If cwd is an item-head section, use cwd as the target
+        // Otherwise, default to today-7d..today+7d date range
+        if (cwd.head.kind === "item") {
+          placementRange = { kind: "single", at: cwd };
+          effectiveExpression = ".";
+        } else {
+          const todayResult = computeTodayInTimezone(now, deps.timezone.toString());
+          const fromDate = addDays(todayResult, -DEFAULT_DATE_WINDOW_DAYS);
+          const toDate = addDays(todayResult, DEFAULT_DATE_WINDOW_DAYS);
+
+          const fromDateStr = formatDateString(fromDate);
+          const toDateStr = formatDateString(toDate);
+
+          const fromResult = parseCalendarDay(fromDateStr);
+          const toResult = parseCalendarDay(toDateStr);
+
+          if (fromResult.type === "error" || toResult.type === "error") {
+            console.error("Failed to compute default date range");
+            return;
+          }
+
+          placementRange = createDateRange(fromResult.value, toResult.value);
+          // Build expression for workflow
+          effectiveExpression = `${fromDateStr}..${toDateStr}`;
+        }
+      }
+
+      // Execute workflow to get items
       const workflowResult = await ListItemsWorkflow.execute(
         {
-          expression: locatorArg,
-          cwd: cwdResult.value,
+          expression: effectiveExpression,
+          cwd,
           today: now,
           timezone: deps.timezone,
           status: statusFilter,
@@ -136,20 +287,166 @@ export function createLsCommand() {
 
       const { items } = workflowResult.value;
 
-      if (items.length === 0) {
+      // Query sections for numeric ranges
+      let sections: ReadonlyArray<SectionSummary> = [];
+      if (placementRange.kind === "numericRange" || placementRange.kind === "single") {
+        const parent = placementRange.kind === "numericRange"
+          ? placementRange.parent
+          : placementRange.at;
+
+        const sectionsResult = await deps.sectionQueryService.listSections(parent);
+        if (sectionsResult.type === "error") {
+          console.error(`Failed to query sections: ${sectionsResult.error.message}`);
+          return;
+        }
+        sections = sectionsResult.value;
+      }
+
+      // Look up alias by item ID (simple implementation)
+      const aliasMap = new Map<string, string>();
+      for (const item of items) {
+        const alias = item.data.alias?.toString();
+        if (alias) {
+          aliasMap.set(item.data.id.toString(), alias);
+        }
+      }
+
+      // For item-head ranges, try to get the parent item's alias
+      if (
+        (placementRange.kind === "numericRange" || placementRange.kind === "single") &&
+        (placementRange.kind === "numericRange"
+          ? placementRange.parent.head.kind === "item"
+          : placementRange.at.head.kind === "item")
+      ) {
+        const parentId = placementRange.kind === "numericRange"
+          ? placementRange.parent.head.kind === "item"
+            ? placementRange.parent.head.id.toString()
+            : null
+          : placementRange.at.head.kind === "item"
+          ? placementRange.at.head.id.toString()
+          : null;
+
+        if (parentId && !aliasMap.has(parentId)) {
+          // Get the parent item ID from the placement range
+          const parentItemId = placementRange.kind === "numericRange" &&
+              placementRange.parent.head.kind === "item"
+            ? placementRange.parent.head.id
+            : placementRange.kind === "single" && placementRange.at.head.kind === "item"
+            ? placementRange.at.head.id
+            : null;
+
+          if (parentItemId) {
+            const parentItemResult = await deps.itemRepository.load(parentItemId);
+            if (parentItemResult.type === "ok" && parentItemResult.value) {
+              const parentAlias = parentItemResult.value.data.alias?.toString();
+              if (parentAlias) {
+                aliasMap.set(parentId, parentAlias);
+              }
+            }
+          }
+        }
+      }
+
+      const lookupAlias = (id: string): string | undefined => aliasMap.get(id);
+
+      // Build display label function for item sections
+      const getDisplayLabel = (
+        parent: ReturnType<typeof createPlacement>,
+        sectionPrefix: number,
+      ): string => {
+        const headStr = parent.head.kind === "date"
+          ? parent.head.date.toString()
+          : (lookupAlias(parent.head.id.toString()) ?? parent.head.id.toString());
+
+        if (parent.section.length === 0) {
+          return `${headStr}/${sectionPrefix}`;
+        }
+
+        return `${headStr}/${parent.section.join("/")}/${sectionPrefix}`;
+      };
+
+      // Build partitions
+      const partitionResult = buildPartitions({
+        items,
+        range: placementRange,
+        sections,
+        getDisplayLabel,
+      });
+
+      // Emit warnings to stderr
+      for (const warning of partitionResult.warnings) {
+        console.error(formatWarning(warning));
+      }
+
+      const { partitions } = partitionResult;
+
+      // Check for empty result
+      if (partitions.length === 0) {
         console.log("(empty)");
         return;
       }
 
-      const isPrintMode = options.print === true;
+      // Format and output
+      const formatterOptions: ListFormatterOptions = {
+        printMode: isPrintMode,
+        timezone: deps.timezone,
+      };
 
-      for (const item of items) {
-        if (isPrintMode) {
-          const dateStr = getPlacementDate(item);
-          console.log(formatItemPrint(item, dateStr));
+      const outputLines: string[] = [];
+
+      for (const partition of partitions) {
+        // Format header
+        if (partition.header.kind === "date") {
+          outputLines.push(formatDateHeader(partition.header.date, now, formatterOptions));
         } else {
-          console.log(formatItemColored(item));
+          outputLines.push(
+            formatItemHeadHeader(
+              partition.header.displayLabel,
+              undefined,
+              formatterOptions,
+            ),
+          );
         }
+
+        // Format items
+        for (const item of partition.items) {
+          const dateStr = item.data.placement.head.kind === "date"
+            ? item.data.placement.head.date.toString()
+            : undefined;
+          outputLines.push(formatItemLine(item, formatterOptions, dateStr));
+        }
+
+        // Format stubs
+        for (const stub of partition.stubs) {
+          const stubSummary: SectionSummary = {
+            placement: createPlacement(
+              partition.header.kind === "date"
+                ? { kind: "date", date: partition.header.date }
+                : partition.header.parent.head,
+              [],
+            ),
+            itemCount: stub.itemCount,
+            sectionCount: stub.sectionCount,
+          };
+          outputLines.push(formatSectionStub(stubSummary, stub.relativePath, formatterOptions));
+        }
+
+        // Add empty line between partitions
+        outputLines.push("");
+      }
+
+      // Remove trailing empty line
+      while (outputLines.length > 0 && outputLines[outputLines.length - 1] === "") {
+        outputLines.pop();
+      }
+
+      const output = outputLines.join("\n");
+
+      // Output handling: pager/no-pager/print
+      if (isPrintMode || options.noPager) {
+        console.log(output);
+      } else {
+        await outputWithPager(output);
       }
     });
 }

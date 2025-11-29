@@ -2,7 +2,7 @@ import type { Item } from "../../../domain/models/item.ts";
 import type { PlacementRange } from "../../../domain/primitives/placement_range.ts";
 import type { SectionSummary } from "../../../domain/services/section_query_service.ts";
 import { type CalendarDay, parseCalendarDay } from "../../../domain/primitives/calendar_day.ts";
-import type { Placement } from "../../../domain/primitives/placement.ts";
+import { createPlacement, type Placement } from "../../../domain/primitives/placement.ts";
 
 /**
  * Partition header for grouping items in ls output.
@@ -130,6 +130,7 @@ const buildSinglePartition = (
   items: ReadonlyArray<Item>,
   at: Placement,
   sections: ReadonlyArray<SectionSummary>,
+  getDisplayLabel?: (parent: Placement, sectionPrefix: number) => string,
 ): PartitionResult => {
   const warnings: PartitionWarning[] = [];
 
@@ -167,14 +168,20 @@ const buildSinglePartition = (
   if (at.head.kind === "date") {
     header = { kind: "date", date: at.head.date };
   } else {
-    // Item head with optional section
-    const displayLabel = at.section.length > 0
+    // Item head with optional section - use getDisplayLabel if available
+    const sectionPrefix = at.section.length > 0 ? at.section[at.section.length - 1] : 0;
+    const parent = at.section.length > 0
+      ? createPlacement(at.head, at.section.slice(0, -1))
+      : createPlacement(at.head, []);
+    const displayLabel = getDisplayLabel
+      ? getDisplayLabel(parent, sectionPrefix)
+      : at.section.length > 0
       ? `${at.head.id.toString()}/${at.section.join("/")}`
       : at.head.id.toString();
     header = {
       kind: "itemSection",
       parent: at,
-      sectionPrefix: at.section.length > 0 ? at.section[at.section.length - 1] : 0,
+      sectionPrefix,
       displayLabel,
     };
   }
@@ -413,7 +420,7 @@ export const buildPartitions = (input: BuildPartitionsInput): PartitionResult =>
 
   switch (range.kind) {
     case "single":
-      return buildSinglePartition(items, range.at, sections);
+      return buildSinglePartition(items, range.at, sections, getDisplayLabel);
 
     case "dateRange":
       return buildDateRangePartitions(items, range.from, range.to, limit);
