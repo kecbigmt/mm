@@ -260,3 +260,21 @@ Deno.test("Item.setContext updates context", () => {
   assertEquals(updated.data.context?.toString(), "deep-work");
   assert(updated.data.updatedAt.equals(updatedAt));
 });
+
+Deno.test("Item.snooze sets snoozeUntil", () => {
+  const item = unwrapOk(parseItem(baseSnapshot()), "parse item");
+  const snoozeUntil = unwrapOk(parseDateTime("2024-09-21T18:00:00Z"), "parse snoozeUntil");
+  const occurredAt = unwrapOk(parseDateTime("2024-09-21T10:00:00Z"), "parse occurredAt");
+  const snoozed = item.snooze(snoozeUntil, occurredAt);
+  assert(snoozed.data.snoozeUntil?.equals(snoozeUntil));
+  assert(snoozed.data.updatedAt.equals(occurredAt));
+});
+
+Deno.test("Item.snooze clears snoozeUntil when undefined", () => {
+  const snapshot = baseSnapshot({ snoozeUntil: "2024-09-21T18:00:00Z" });
+  const item = unwrapOk(parseItem(snapshot), "parse item");
+  const occurredAt = unwrapOk(parseDateTime("2024-09-21T19:00:00Z"), "parse occurredAt");
+  const unsnoozed = item.snooze(undefined, occurredAt);
+  assertEquals(unsnoozed.data.snoozeUntil, undefined);
+  assert(unsnoozed.data.updatedAt.equals(occurredAt));
+});

@@ -54,6 +54,7 @@ export type ItemData = Readonly<{
   readonly startAt?: DateTime;
   readonly duration?: Duration;
   readonly dueAt?: DateTime;
+  readonly snoozeUntil?: DateTime;
   readonly alias?: AliasSlug;
   readonly context?: TagSlug;
   readonly body?: string;
@@ -78,6 +79,7 @@ export type Item = Readonly<{
     }>,
     updatedAt: DateTime,
   ): Item;
+  snooze(snoozeUntil: DateTime | undefined, occurredAt: DateTime): Item;
   setAlias(alias: AliasSlug | undefined, updatedAt: DateTime): Item;
   setContext(context: TagSlug | undefined, updatedAt: DateTime): Item;
   toJSON(): ItemSnapshot;
@@ -96,6 +98,7 @@ export type ItemSnapshot = Readonly<{
   readonly startAt?: string;
   readonly duration?: string;
   readonly dueAt?: string;
+  readonly snoozeUntil?: string;
   readonly alias?: string;
   readonly context?: string;
   readonly body?: string;
@@ -254,6 +257,19 @@ const instantiate = (
     return instantiate(next, this.edges);
   };
 
+  const snooze = function (
+    this: Item,
+    snoozeUntil: DateTime | undefined,
+    occurredAt: DateTime,
+  ): Item {
+    const next = {
+      ...this.data,
+      snoozeUntil,
+      updatedAt: occurredAt,
+    } as ItemData;
+    return instantiate(next, this.edges);
+  };
+
   const setAlias = function (
     this: Item,
     alias: AliasSlug | undefined,
@@ -309,6 +325,7 @@ const instantiate = (
       startAt: this.data.startAt?.toString(),
       duration: this.data.duration?.toString(),
       dueAt: this.data.dueAt?.toString(),
+      snoozeUntil: this.data.snoozeUntil?.toString(),
       alias: this.data.alias?.toString(),
       context: this.data.context?.toString(),
       body: this.data.body,
@@ -328,6 +345,7 @@ const instantiate = (
     changeIcon,
     setBody,
     schedule,
+    snooze,
     setAlias,
     setContext,
     toJSON,
@@ -442,6 +460,16 @@ export const parseItem = (
     }
   }
 
+  let snoozeUntil: DateTime | undefined;
+  if (snapshot.snoozeUntil !== undefined) {
+    const result = parseDateTime(snapshot.snoozeUntil);
+    if (result.type === "error") {
+      issues.push(...prefixIssues("snoozeUntil", result.error));
+    } else {
+      snoozeUntil = result.value;
+    }
+  }
+
   let alias: AliasSlug | undefined;
   if (snapshot.alias !== undefined) {
     const result = parseAliasSlug(snapshot.alias);
@@ -506,6 +534,7 @@ export const parseItem = (
     startAt,
     duration,
     dueAt,
+    snoozeUntil,
     alias,
     context,
     body: snapshot.body?.trim() ?? undefined,
