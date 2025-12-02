@@ -119,12 +119,30 @@ export function createSnoozeCommand() {
       const label = formatItemLabel(item);
 
       if (item.data.snoozeUntil) {
+        // Format snoozeUntil in workspace timezone (YYYY-MM-DD HH:MM)
+        const date = item.data.snoozeUntil.toDate();
+        const dateFormatter = new Intl.DateTimeFormat("en-CA", {
+          timeZone: deps.timezone.toString(),
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        });
+        const timeFormatter = new Intl.DateTimeFormat("en-US", {
+          timeZone: deps.timezone.toString(),
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        });
+        const datePart = dateFormatter.format(date); // YYYY-MM-DD
+        const timePart = timeFormatter.format(date); // HH:MM
+        const formattedTime = `${datePart} ${timePart}`;
+
         console.log(
-          `✅ Snoozed [${label}] ${item.data.title.toString()} until ${item.data.snoozeUntil.toString()}`,
+          `💤 [${label}] "${item.data.title.toString()}" is snoozing until ${formattedTime}`,
         );
       } else {
         console.log(
-          `✅ Unsnoozed [${label}] ${item.data.title.toString()}`,
+          `[${label}] "${item.data.title.toString()}" is no longer snoozing`,
         );
       }
     });

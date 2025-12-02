@@ -62,7 +62,7 @@ describe("Scenario: Snooze Feature", () => {
     const snoozeResult = await runCommand(ctx.testHome, ["snooze", taskId]);
     assertEquals(snoozeResult.success, true, `Snooze failed: ${snoozeResult.stderr}`);
     assertEquals(
-      snoozeResult.stdout.includes("Snoozed"),
+      snoozeResult.stdout.includes("is snoozing until"),
       true,
       `Snooze should report success: ${snoozeResult.stdout}`,
     );
@@ -98,7 +98,7 @@ describe("Scenario: Snooze Feature", () => {
     const snoozeResult = await runCommand(ctx.testHome, ["snooze", taskId, "2h"]);
     assertEquals(snoozeResult.success, true, `Snooze failed: ${snoozeResult.stderr}`);
     assertEquals(
-      snoozeResult.stdout.includes("Snoozed"),
+      snoozeResult.stdout.includes("is snoozing until"),
       true,
       `Snooze should report success: ${snoozeResult.stdout}`,
     );
@@ -166,7 +166,7 @@ describe("Scenario: Snooze Feature", () => {
     const unsnoozeResult = await runCommand(ctx.testHome, ["snooze", taskId, "--clear"]);
     assertEquals(unsnoozeResult.success, true, `Unsnooze failed: ${unsnoozeResult.stderr}`);
     assertEquals(
-      unsnoozeResult.stdout.includes("Unsnoozed"),
+      unsnoozeResult.stdout.includes("is no longer snoozing"),
       true,
       `Unsnooze should report success: ${unsnoozeResult.stdout}`,
     );
@@ -262,7 +262,7 @@ describe("Scenario: Snooze Feature", () => {
     const snResult = await runCommand(ctx.testHome, ["sn", taskId, "1h"]);
     assertEquals(snResult.success, true, `sn alias failed: ${snResult.stderr}`);
     assertEquals(
-      snResult.stdout.includes("Snoozed"),
+      snResult.stdout.includes("is snoozing until"),
       true,
       `sn alias should work: ${snResult.stdout}`,
     );
