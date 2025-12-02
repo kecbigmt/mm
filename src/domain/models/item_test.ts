@@ -278,3 +278,23 @@ Deno.test("Item.snooze clears snoozeUntil when undefined", () => {
   assertEquals(unsnoozed.data.snoozeUntil, undefined);
   assert(unsnoozed.data.updatedAt.equals(occurredAt));
 });
+
+Deno.test("Item.isSnoozing returns false when not snoozed", () => {
+  const item = unwrapOk(parseItem(baseSnapshot()), "parse item");
+  const now = unwrapOk(parseDateTime("2024-09-21T10:00:00Z"), "parse now");
+  assertEquals(item.isSnoozing(now), false);
+});
+
+Deno.test("Item.isSnoozing returns true when snoozeUntil is in the future", () => {
+  const snapshot = baseSnapshot({ snoozeUntil: "2024-09-21T18:00:00Z" });
+  const item = unwrapOk(parseItem(snapshot), "parse item");
+  const now = unwrapOk(parseDateTime("2024-09-21T10:00:00Z"), "parse now");
+  assertEquals(item.isSnoozing(now), true);
+});
+
+Deno.test("Item.isSnoozing returns false when snoozeUntil has passed", () => {
+  const snapshot = baseSnapshot({ snoozeUntil: "2024-09-21T08:00:00Z" });
+  const item = unwrapOk(parseItem(snapshot), "parse item");
+  const now = unwrapOk(parseDateTime("2024-09-21T10:00:00Z"), "parse now");
+  assertEquals(item.isSnoozing(now), false);
+});

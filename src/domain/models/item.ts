@@ -80,6 +80,7 @@ export type Item = Readonly<{
     updatedAt: DateTime,
   ): Item;
   snooze(snoozeUntil: DateTime | undefined, occurredAt: DateTime): Item;
+  isSnoozing(now: DateTime): boolean;
   setAlias(alias: AliasSlug | undefined, updatedAt: DateTime): Item;
   setContext(context: TagSlug | undefined, updatedAt: DateTime): Item;
   toJSON(): ItemSnapshot;
@@ -270,6 +271,13 @@ const instantiate = (
     return instantiate(next, this.edges);
   };
 
+  const isSnoozing = function (this: Item, now: DateTime): boolean {
+    if (!this.data.snoozeUntil) {
+      return false;
+    }
+    return this.data.snoozeUntil.isAfter(now);
+  };
+
   const setAlias = function (
     this: Item,
     alias: AliasSlug | undefined,
@@ -346,6 +354,7 @@ const instantiate = (
     setBody,
     schedule,
     snooze,
+    isSnoozing,
     setAlias,
     setContext,
     toJSON,
