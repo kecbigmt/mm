@@ -135,7 +135,7 @@ export const parseDateTime = (
     return Result.ok(instantiate(parsed));
   }
 
-  // Try ISO 8601 without timezone (treat as local time)
+  // Try ISO 8601 without timezone (treat as local time, or use timezone option)
   if (ISO_DATETIME_WITHOUT_TZ_REGEX.test(candidate)) {
     // Parse as local time by constructing Date from components
     const match = candidate.match(
@@ -153,6 +153,50 @@ export const parseDateTime = (
     }
 
     const [, year, month, day, hour, minute, second = "0", ms = "0"] = match;
+
+    // If timezone is provided, interpret datetime in that timezone
+    if (options?.timezone) {
+      const dateStr = `${year}-${month}-${day}`;
+      const timeStr = `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}:${
+        second.padStart(2, "0")
+      }`;
+      const localTimeStr = `${dateStr}T${timeStr}`;
+
+      // Same approach as time-only format: use two-step correction
+      const candidateUtc = new Date(`${localTimeStr}Z`);
+      const formatter = new Intl.DateTimeFormat("en-CA", {
+        timeZone: options.timezone.toString(),
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      });
+      const actualLocal = formatter.format(candidateUtc);
+      const [actualDate, actualTime] = actualLocal.split(", ");
+      const actualStr = `${actualDate}T${actualTime}`;
+
+      if (actualStr !== localTimeStr) {
+        const diff = new Date(`${actualStr}Z`).getTime() - candidateUtc.getTime();
+        const corrected = new Date(candidateUtc.getTime() - diff);
+        if (Number.isNaN(corrected.getTime())) {
+          return Result.error(
+            createValidationError(DATE_TIME_KIND, [
+              createValidationIssue("failed to compute timezone-adjusted datetime", {
+                path: ["iso"],
+                code: "timezone_adjustment_failed",
+              }),
+            ]),
+          );
+        }
+        return Result.ok(instantiate(corrected));
+      }
+      return Result.ok(instantiate(candidateUtc));
+    }
+
+    // No timezone provided, use system local time
     const parsed = new Date(
       parseInt(year),
       parseInt(month) - 1,
