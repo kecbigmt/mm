@@ -46,7 +46,7 @@ const formatItem = (
 export function createEditCommand() {
   return new Command()
     .description("Edit an item")
-    .arguments("<locator:string>")
+    .arguments("<id:string>")
     .option("--title <title:string>", "Update title")
     .option("--icon <icon:string>", "Update icon")
     .option("--body <body:string>", "Update body")
@@ -56,7 +56,7 @@ export function createEditCommand() {
     .option("--alias <alias:string>", "Update alias")
     .option("-c, --context <context:string>", "Update context tag")
     .option("-w, --workspace <workspace:string>", "Workspace to override")
-    .action(async (options: Record<string, unknown>, itemLocator: string) => {
+    .action(async (options: Record<string, unknown>, itemRef: string) => {
       const debug = isDebugMode();
       const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
       const depsResult = await loadCliDependencies(workspaceOption);
@@ -80,7 +80,7 @@ export function createEditCommand() {
       if (!hasMetadataOptions(options)) {
         const loadResult = await EditItemWorkflow.execute(
           {
-            itemLocator,
+            itemLocator: itemRef,
             updates: {},
             updatedAt: occurredAtResult.value,
             timezone: deps.timezone,
@@ -110,7 +110,7 @@ export function createEditCommand() {
         );
 
         if (!filePath) {
-          console.error(`Could not determine file path for item: ${itemLocator}`);
+          console.error(`Could not determine file path for item: ${itemRef}`);
           Deno.exit(1);
         }
 
@@ -212,7 +212,7 @@ export function createEditCommand() {
 
       const result = await EditItemWorkflow.execute(
         {
-          itemLocator,
+          itemLocator: itemRef,
           updates,
           updatedAt: occurredAtResult.value,
           timezone: deps.timezone,

@@ -1,0 +1,99 @@
+import { Command } from "@cliffy/command";
+import { loadCliDependencies } from "../dependencies.ts";
+import { MoveItemWorkflow } from "../../../domain/workflows/move_item.ts";
+import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
+import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
+import { formatError } from "../error_formatter.ts";
+import { isDebugMode } from "../debug.ts";
+
+const formatItemLabel = (
+  item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
+): string => item.data.alias ? item.data.alias.toString() : item.data.id.toString().slice(-7);
+
+export function createMoveCommand() {
+  return new Command()
+    .description("Move items to a new placement")
+    .arguments("<args...:string>")
+    .option("-w, --workspace <workspace:string>", "Workspace to override")
+    .action(async (options: Record<string, unknown>, ...args: string[]) => {
+      // Parse arguments: all but last are item refs, last is placement
+      if (args.length < 2) {
+        console.error("Error: At least one item id and a placement are required");
+        return;
+      }
+
+      const itemRefs = args.slice(0, -1);
+      const placement = args[args.length - 1];
+
+      const debug = isDebugMode();
+      const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
+      const depsResult = await loadCliDependencies(workspaceOption);
+      if (depsResult.type === "error") {
+        if (depsResult.error.type === "repository") {
+          console.error(formatError(depsResult.error.error, debug));
+        } else {
+          console.error(formatError(depsResult.error, debug));
+        }
+        return;
+      }
+
+      const deps = depsResult.value;
+      const now = new Date();
+
+      const cwdResult = await CwdResolutionService.getCwd(
+        {
+          stateRepository: deps.stateRepository,
+          itemRepository: deps.itemRepository,
+        },
+        now,
+      );
+
+      if (cwdResult.type === "error") {
+        console.error(formatError(cwdResult.error, debug));
+        return;
+      }
+
+      const occurredAtResult = dateTimeFromDate(now);
+      if (occurredAtResult.type === "error") {
+        console.error(formatError(occurredAtResult.error, debug));
+        return;
+      }
+
+      // Move each item in order
+      // For multiple items, after the first, use after:<previous-id> to maintain order
+      let previousItemId: string | null = null;
+
+      for (const itemRef of itemRefs) {
+        const targetExpression = previousItemId ? `after:${previousItemId}` : placement;
+
+        const workflowResult = await MoveItemWorkflow.execute(
+          {
+            itemExpression: itemRef,
+            targetExpression,
+            cwd: cwdResult.value,
+            today: now,
+            occurredAt: occurredAtResult.value,
+            timezone: deps.timezone,
+          },
+          {
+            itemRepository: deps.itemRepository,
+            aliasRepository: deps.aliasRepository,
+            rankService: deps.rankService,
+          },
+        );
+
+        if (workflowResult.type === "error") {
+          console.error(formatError(workflowResult.error, debug));
+          return;
+        }
+
+        const { item } = workflowResult.value;
+        previousItemId = item.data.id.toString();
+
+        const label = formatItemLabel(item);
+        console.log(
+          `✅ Moved [${label}] ${item.data.title.toString()} to ${item.data.placement.toString()}`,
+        );
+      }
+    });
+}
