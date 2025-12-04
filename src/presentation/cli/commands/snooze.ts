@@ -107,6 +107,7 @@ export function createSnoozeCommand() {
         },
         {
           itemRepository: deps.itemRepository,
+          rankService: deps.rankService,
         },
       );
 

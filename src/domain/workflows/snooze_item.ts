@@ -10,6 +10,8 @@ import type { RepositoryError } from "../repositories/repository_error.ts";
 import type { DateTime, ItemId, TimezoneIdentifier } from "../primitives/mod.ts";
 import { createDurationFromHours } from "../primitives/duration.ts";
 import { parsePlacement } from "../primitives/placement.ts";
+import type { RankService } from "../services/rank_service.ts";
+import { createSingleRange } from "../primitives/placement_range.ts";
 
 export type SnoozeItemInput = Readonly<{
   itemId: ItemId;
@@ -21,6 +23,7 @@ export type SnoozeItemInput = Readonly<{
 
 export type SnoozeItemDependencies = Readonly<{
   itemRepository: ItemRepository;
+  rankService: RankService;
 }>;
 
 export type SnoozeItemValidationError = ValidationError<"SnoozeItem">;
@@ -109,16 +112,38 @@ const execute = async (
   // Check if current placement is a date (not an item UUID)
   const isDatePlacement = /^\d{4}-\d{2}-\d{2}$/.test(currentPlacementStr);
   if (isDatePlacement && snoozeUntilDay > currentPlacementStr) {
-    // Move item to snoozeUntil date
+    // Move item to snoozeUntil date at the bottom (after all existing items)
     const newPlacementResult = parsePlacement(snoozeUntilDay);
     if (newPlacementResult.type === "error") {
       return Result.error(
         createValidationError("SnoozeItem", newPlacementResult.error.issues),
       );
     }
+
+    // Get existing items at the target date to determine rank
+    const targetRange = createSingleRange(newPlacementResult.value);
+    const targetItemsResult = await itemRepository.listByPlacement(targetRange);
+    if (targetItemsResult.type === "error") {
+      return Result.error(targetItemsResult.error);
+    }
+
+    // Calculate rank: if no items, use middle; otherwise, use next after last item
+    const targetItems = targetItemsResult.value;
+    const rankResult = targetItems.length === 0
+      ? dependencies.rankService.middleRank()
+      : dependencies.rankService.nextRank(
+        targetItems[targetItems.length - 1].data.rank,
+      );
+
+    if (rankResult.type === "error") {
+      return Result.error(
+        createValidationError("SnoozeItem", rankResult.error.issues),
+      );
+    }
+
     snoozedItem = snoozedItem.relocate(
       newPlacementResult.value,
-      snoozedItem.data.rank,
+      rankResult.value,
       occurredAt,
     );
   }

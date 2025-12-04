@@ -9,8 +9,28 @@ import {
   timezoneIdentifierFromString,
 } from "../primitives/mod.ts";
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
+import { createRankService, type RankGenerator } from "../services/rank_service.ts";
 
 const TEST_TIMEZONE = Result.unwrap(timezoneIdentifierFromString("UTC"));
+
+const createTestRankService = () => {
+  const generator: RankGenerator = {
+    min: () => "a",
+    max: () => "z",
+    middle: () => "m",
+    between: (first: string, second: string) => {
+      const mid = String.fromCharCode(
+        Math.floor((first.charCodeAt(0) + second.charCodeAt(0)) / 2),
+      );
+      return mid;
+    },
+    next: (rank: string) => String.fromCharCode(rank.charCodeAt(0) + 1),
+    prev: (rank: string) => String.fromCharCode(rank.charCodeAt(0) - 1),
+    compare: (first: string, second: string) => first.localeCompare(second),
+  };
+
+  return createRankService(generator);
+};
 
 const createTestItem = async (
   itemRepository: InMemoryItemRepository,
@@ -34,6 +54,7 @@ const createTestItem = async (
 
 Deno.test("SnoozeItemWorkflow: snoozes item with default duration (8h)", async () => {
   const itemRepository = new InMemoryItemRepository();
+  const rankService = createTestRankService();
 
   const item = await createTestItem(itemRepository, {
     id: "01936d9a-0000-7000-8000-000000000001",
@@ -49,6 +70,7 @@ Deno.test("SnoozeItemWorkflow: snoozes item with default duration (8h)", async (
     occurredAt,
   }, {
     itemRepository,
+    rankService,
   });
 
   assertEquals(result.type, "ok");
@@ -63,6 +85,7 @@ Deno.test("SnoozeItemWorkflow: snoozes item with default duration (8h)", async (
 
 Deno.test("SnoozeItemWorkflow: snoozes item to tomorrow and moves placement", async () => {
   const itemRepository = new InMemoryItemRepository();
+  const rankService = createTestRankService();
 
   const item = await createTestItem(itemRepository, {
     id: "01936d9a-0000-7000-8000-000000000002",
@@ -79,6 +102,7 @@ Deno.test("SnoozeItemWorkflow: snoozes item to tomorrow and moves placement", as
     occurredAt,
   }, {
     itemRepository,
+    rankService,
   });
 
   assertEquals(result.type, "ok");
@@ -93,6 +117,7 @@ Deno.test("SnoozeItemWorkflow: snoozes item to tomorrow and moves placement", as
 
 Deno.test("SnoozeItemWorkflow: unsnoozes item when clear flag is true", async () => {
   const itemRepository = new InMemoryItemRepository();
+  const rankService = createTestRankService();
 
   const item = await createTestItem(itemRepository, {
     id: "01936d9a-0000-7000-8000-000000000003",
@@ -110,6 +135,7 @@ Deno.test("SnoozeItemWorkflow: unsnoozes item when clear flag is true", async ()
     occurredAt,
   }, {
     itemRepository,
+    rankService,
   });
 
   assertEquals(result.type, "ok");
