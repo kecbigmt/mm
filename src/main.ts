@@ -14,6 +14,7 @@ import { createWhereCommand } from "./presentation/cli/commands/where.ts";
 import { createMvCommand } from "./presentation/cli/commands/mv.ts";
 import { createDoctorCommand } from "./presentation/cli/commands/doctor/mod.ts";
 import { createEditCommand } from "./presentation/cli/commands/edit.ts";
+import { createSnoozeCommand } from "./presentation/cli/commands/snooze.ts";
 
 async function main() {
   const cli = new Command()
@@ -35,6 +36,8 @@ async function main() {
       createWhereCommand().description("Show logical and physical paths for an item"),
     )
     .command("mv", createMvCommand().description("Move item to a new placement"))
+    .command("snooze", createSnoozeCommand().description("Snooze item until a future datetime"))
+    .alias("sn")
     .command("doctor", createDoctorCommand().description("Workspace validation and maintenance"));
 
   await cli.parse(Deno.args);

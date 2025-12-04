@@ -38,6 +38,7 @@ type ItemFrontmatter = Readonly<{
   start_at?: string;
   duration?: string;
   due_at?: string;
+  snooze_until?: string;
   alias?: string;
   context?: string;
   tags?: string[];
@@ -145,6 +146,7 @@ const writeItemFile = async (
     start_at: snapshot.startAt,
     duration: snapshot.duration,
     due_at: snapshot.dueAt,
+    snooze_until: snapshot.snoozeUntil,
     alias: snapshot.alias,
     context: snapshot.context,
     schema: "mm.item.frontmatter/2",
@@ -264,6 +266,7 @@ const loadItemFromFile = async (
     startAt: frontmatter.start_at,
     duration: frontmatter.duration,
     dueAt: frontmatter.due_at,
+    snoozeUntil: frontmatter.snooze_until,
     alias: frontmatter.alias,
     context: frontmatter.context,
     title,

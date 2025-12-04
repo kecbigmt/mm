@@ -10,6 +10,7 @@ import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
 import type { ItemIconValue } from "../primitives/item_icon.ts";
+import { dateTimeFromDate } from "../primitives/date_time.ts";
 
 export type ListItemsStatusFilter = "open" | "closed" | "all";
 
@@ -101,6 +102,19 @@ export const ListItemsWorkflow = {
       filtered = filtered.filter((item) =>
         statusFilter === "open" ? item.data.status.isOpen() : item.data.status.isClosed()
       );
+    }
+
+    // Snooze filter (only when status is not "all")
+    if (statusFilter !== "all") {
+      const nowResult = dateTimeFromDate(today);
+      if (nowResult.type === "error") {
+        return Result.error(
+          createValidationError("ListItems", nowResult.error.issues),
+        );
+      }
+      const now = nowResult.value;
+
+      filtered = filtered.filter((item) => !item.isSnoozing(now));
     }
 
     // Icon filter
