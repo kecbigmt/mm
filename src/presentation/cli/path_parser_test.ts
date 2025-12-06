@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { parsePathExpression, parseRangeExpression } from "./path_expression.ts";
+import { parsePathExpression, parseRangeExpression } from "./path_parser.ts";
 
 Deno.test("path_expression.parsePathExpression - absolute path", () => {
   const result = parsePathExpression("/2025-11-15");

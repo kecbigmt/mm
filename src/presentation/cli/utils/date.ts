@@ -1,10 +1,7 @@
 import { Result } from "../../../shared/result.ts";
-import {
-  CalendarDay,
-  calendarDayFromComponents,
-  parseCalendarDay,
-} from "../../../domain/primitives/calendar_day.ts";
+import { CalendarDay, calendarDayFromComponents } from "../../../domain/primitives/calendar_day.ts";
 import { TimezoneIdentifier } from "../../../domain/primitives/timezone_identifier.ts";
+import { resolveRelativeDate } from "../../../domain/services/date_resolver.ts";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -54,25 +51,14 @@ const parseToken = (
   timezone: TimezoneIdentifier,
   reference: Date,
 ): TokenParseResult => {
-  const normalized = token.trim().toLowerCase();
-  if (normalized === "today" || normalized === "td") {
-    return calendarDayFromDate(timezone, reference);
-  }
-  if (normalized === "tomorrow" || normalized === "tm") {
-    return calendarDayFromDate(timezone, new Date(reference.getTime() + ONE_DAY_MS));
-  }
-  if (normalized === "yesterday" || normalized === "yd") {
-    return calendarDayFromDate(timezone, new Date(reference.getTime() - ONE_DAY_MS));
-  }
-
-  const parsed = parseCalendarDay(token);
-  if (parsed.type === "error") {
+  const result = resolveRelativeDate(token, timezone, reference);
+  if (result.type === "error") {
     return Result.error({
       type: "invalid-date",
-      message: `Invalid date: ${token}. Use YYYY-MM-DD or tokens like today, tomorrow, yesterday`,
+      message: result.error.issues.map((issue) => issue.message).join("; "),
     });
   }
-  return Result.ok(parsed.value);
+  return Result.ok(result.value);
 };
 
 const addDays = (day: CalendarDay, offset: number): TokenParseResult => {
