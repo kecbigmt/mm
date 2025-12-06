@@ -13,9 +13,9 @@ const formatItemLabel = (
 export function createWhereCommand() {
   return new Command()
     .description("Show logical and physical paths for an item")
-    .arguments("<locator:string>")
+    .arguments("<id:string>")
     .option("-w, --workspace <workspace:string>", "Workspace to override")
-    .action(async (options: Record<string, unknown>, locatorArg: string) => {
+    .action(async (options: Record<string, unknown>, itemRef: string) => {
       const debug = isDebugMode();
       const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
       const depsResult = await loadCliDependencies(workspaceOption);
@@ -32,7 +32,7 @@ export function createWhereCommand() {
 
       // Try to resolve as UUID first, then as alias
       let item;
-      const uuidResult = parseItemId(locatorArg);
+      const uuidResult = parseItemId(itemRef);
 
       if (uuidResult.type === "ok") {
         // It's a valid UUID
@@ -44,7 +44,7 @@ export function createWhereCommand() {
         item = loadResult.value;
       } else {
         // Try as alias
-        const aliasResult = parseAliasSlug(locatorArg);
+        const aliasResult = parseAliasSlug(itemRef);
         if (aliasResult.type === "ok") {
           const aliasLoadResult = await deps.aliasRepository.load(aliasResult.value);
           if (aliasLoadResult.type === "error") {
@@ -64,7 +64,7 @@ export function createWhereCommand() {
       }
 
       if (!item) {
-        console.error(`Item not found: ${locatorArg}`);
+        console.error(`Item not found: ${itemRef}`);
         return;
       }
 

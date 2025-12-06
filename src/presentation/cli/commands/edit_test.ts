@@ -5,7 +5,7 @@ Deno.test("Edit command - should have correct structure", () => {
   const command = createEditCommand();
 
   assertEquals(command.getDescription(), "Edit an item");
-  assertEquals(command.getArguments()[0]?.name, "locator");
+  assertEquals(command.getArguments()[0]?.name, "id");
   assertEquals(command.getArguments()[0]?.type, "string");
 
   const options = command.getOptions();
