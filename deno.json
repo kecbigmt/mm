@@ -11,7 +11,8 @@
     "bench:unit": "deno bench --allow-read --allow-write --allow-env src/",
     "bench:e2e": "deno bench --allow-read --allow-write --allow-env --allow-run tests/performance/",
     "compile": "deno compile --config=deno.json --allow-read --allow-write --allow-env --allow-run --output=mm src/main.ts",
-    "install": "deno install --global --config=deno.json --allow-read --allow-write --allow-env --allow-run --force --name mm src/main.ts"
+    "install": "deno install --global --config=deno.json --allow-read --allow-write --allow-env --allow-run --force --name mm src/main.ts",
+    "check-docs": "./scripts/check-docs.sh"
   },
   "compilerOptions": {
     "strict": true
