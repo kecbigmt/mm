@@ -6,7 +6,7 @@ import { assertEquals } from "@std/assert";
 import { createPathResolver } from "./path_resolver.ts";
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
 import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.ts";
-import { parsePathExpression } from "../../presentation/cli/path_expression.ts";
+import { parsePathExpression } from "../../presentation/cli/path_parser.ts";
 import { createItem } from "../models/item.ts";
 import {
   createDatePlacement,
@@ -238,7 +238,7 @@ Deno.test("PathResolver - returns error for reversed numeric range (5..3)", asyn
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
 
   // Try to resolve range using absolute path 2025-11-16/5..3 (reversed)
-  const { parseRangeExpression } = await import("../../presentation/cli/path_expression.ts");
+  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-16/5..3"));
   const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
 
@@ -262,7 +262,7 @@ Deno.test("PathResolver - returns error for large reversed numeric range (10..1)
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
 
   // Try to resolve range 2025-11-16/10..1 (large reversed range)
-  const { parseRangeExpression } = await import("../../presentation/cli/path_expression.ts");
+  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-16/10..1"));
   const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
 
@@ -286,7 +286,7 @@ Deno.test("PathResolver - returns error for adjacent reversed numeric range (2..
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
 
   // Try to resolve range 2025-11-16/2..1 (adjacent reversed)
-  const { parseRangeExpression } = await import("../../presentation/cli/path_expression.ts");
+  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-16/2..1"));
   const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
 
@@ -402,7 +402,7 @@ Deno.test("PathResolver - returns error for different date parents", async () =>
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
 
   // Try to resolve range with different date parents (2025-11-15/1..2025-11-16/3)
-  const { parseRangeExpression } = await import("../../presentation/cli/path_expression.ts");
+  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-15/1..2025-11-16/3"));
   const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
 
@@ -454,7 +454,7 @@ Deno.test("PathResolver - returns error for different item parents", async () =>
   }));
 
   // Try to resolve range with different item parents (itemA/1..itemB/3)
-  const { parseRangeExpression } = await import("../../presentation/cli/path_expression.ts");
+  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(
     parseRangeExpression(`${itemA.toString()}/1..${itemB.toString()}/3`),
   );

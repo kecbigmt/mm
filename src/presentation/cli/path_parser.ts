@@ -1,85 +1,17 @@
 import { Result } from "../../shared/result.ts";
+import { createValidationError, createValidationIssue } from "../../shared/errors.ts";
 import {
-  createValidationError,
-  createValidationIssue,
-  ValidationError,
-  ValidationIssue,
-} from "../../shared/errors.ts";
+  PATH_EXPRESSION_KIND_VALUE,
+  PathExpression,
+  PathExpressionValidationError,
+  PathToken,
+  RANGE_EXPRESSION_KIND_VALUE,
+  RangeExpression,
+  RangeExpressionValidationError,
+} from "../../domain/primitives/path_types.ts";
+import { isDateExpression } from "../../domain/services/date_resolver.ts";
 
-const PATH_EXPRESSION_KIND = "PathExpression" as const;
-const RANGE_EXPRESSION_KIND = "RangeExpression" as const;
-
-/**
- * PathToken represents a single segment in a CLI path expression
- * These are user-facing tokens that may contain syntactic sugar
- */
-export type PathToken =
-  | Readonly<{ readonly kind: "dot" }> // "."
-  | Readonly<{ readonly kind: "dotdot" }> // ".."
-  | Readonly<{ readonly kind: "relativeDate"; readonly expr: string }> // "today", "td", "+2w", "~mon"
-  | Readonly<{ readonly kind: "idOrAlias"; readonly value: string }> // UUID or alias
-  | Readonly<{ readonly kind: "numeric"; readonly value: number }>; // section number
-
-/**
- * PathExpression represents a CLI path input with potential syntactic sugar
- * This is the raw user input before resolution to a canonical Placement
- *
- * Examples:
- * - "/2025-11-15" → { isAbsolute: true, segments: [{ kind: "relativeDate", expr: "2025-11-15" }] }
- * - "today" → { isAbsolute: false, segments: [{ kind: "relativeDate", expr: "today" }] }
- * - "../book/1" → { isAbsolute: false, segments: [{ kind: "dotdot" }, { kind: "idOrAlias", value: "book" }, { kind: "numeric", value: 1 }] }
- * - "." → { isAbsolute: false, segments: [{ kind: "dot" }] }
- */
-export type PathExpression = Readonly<{
-  readonly kind: typeof PATH_EXPRESSION_KIND;
-  readonly isAbsolute: boolean;
-  readonly segments: ReadonlyArray<PathToken>;
-}>;
-
-/**
- * RangeExpression represents a CLI range input
- * Can be a single path or a range between two paths
- *
- * Examples:
- * - "2025-11-15" → { kind: "single", path: ... }
- * - "2025-11-15..2025-11-30" → { kind: "range", from: ..., to: ... }
- * - "book/1..5" → { kind: "range", from: "book/1", to: "book/5" }
- */
-export type RangeExpression =
-  | Readonly<{
-    readonly kind: "single";
-    readonly path: PathExpression;
-  }>
-  | Readonly<{
-    readonly kind: "range";
-    readonly from: PathExpression;
-    readonly to: PathExpression;
-  }>;
-
-export type PathExpressionValidationError = ValidationError<typeof PATH_EXPRESSION_KIND>;
-export type RangeExpressionValidationError = ValidationError<typeof RANGE_EXPRESSION_KIND>;
-
-const RELATIVE_DATE_KEYWORDS = new Set([
-  "today",
-  "td",
-  "tomorrow",
-  "tm",
-  "yesterday",
-  "yd",
-]);
-
-const RELATIVE_PERIOD_REGEX = /^([~+])(\d+)([dwmy])$/u;
-const RELATIVE_WEEKDAY_REGEX = /^([~+])(mon|tue|wed|thu|fri|sat|sun)$/u;
-const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/u;
 const NUMERIC_REGEX = /^[1-9]\d*$/u;
-
-const isRelativeDateToken = (token: string): boolean => {
-  const normalized = token.toLowerCase();
-  return RELATIVE_DATE_KEYWORDS.has(normalized) ||
-    RELATIVE_PERIOD_REGEX.test(normalized) ||
-    RELATIVE_WEEKDAY_REGEX.test(normalized) ||
-    DATE_REGEX.test(normalized);
-};
 
 const parsePathToken = (token: string): PathToken => {
   if (token === ".") {
@@ -91,7 +23,7 @@ const parsePathToken = (token: string): PathToken => {
   if (NUMERIC_REGEX.test(token)) {
     return { kind: "numeric", value: Number(token) };
   }
-  if (isRelativeDateToken(token)) {
+  if (isDateExpression(token)) {
     return { kind: "relativeDate", expr: token };
   }
   // Default to idOrAlias (UUID or alias slug)
@@ -99,14 +31,14 @@ const parsePathToken = (token: string): PathToken => {
 };
 
 const buildPathExpressionError = (
-  issues: ReadonlyArray<ValidationIssue>,
+  issues: ReadonlyArray<ReturnType<typeof createValidationIssue>>,
 ): Result<PathExpression, PathExpressionValidationError> =>
-  Result.error(createValidationError(PATH_EXPRESSION_KIND, issues));
+  Result.error(createValidationError(PATH_EXPRESSION_KIND_VALUE, issues));
 
 const buildRangeExpressionError = (
-  issues: ReadonlyArray<ValidationIssue>,
+  issues: ReadonlyArray<ReturnType<typeof createValidationIssue>>,
 ): Result<RangeExpression, RangeExpressionValidationError> =>
-  Result.error(createValidationError(RANGE_EXPRESSION_KIND, issues));
+  Result.error(createValidationError(RANGE_EXPRESSION_KIND_VALUE, issues));
 
 /**
  * Parse a CLI path string to a PathExpression
@@ -149,7 +81,7 @@ export const parsePathExpression = (
 
   return Result.ok(
     Object.freeze({
-      kind: PATH_EXPRESSION_KIND,
+      kind: PATH_EXPRESSION_KIND_VALUE,
       isAbsolute,
       segments: Object.freeze(segments),
     }),
@@ -325,14 +257,3 @@ export const parseRangeExpression = (
     }),
   );
 };
-
-export const isPathExpression = (value: unknown): value is PathExpression =>
-  typeof value === "object" &&
-  value !== null &&
-  (value as PathExpression).kind === PATH_EXPRESSION_KIND;
-
-export const isRangeExpression = (value: unknown): value is RangeExpression =>
-  typeof value === "object" &&
-  value !== null &&
-  ((value as RangeExpression).kind === "single" ||
-    (value as RangeExpression).kind === "range");

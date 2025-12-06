@@ -4,13 +4,8 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
+import { PathExpression, PathToken, RangeExpression } from "../primitives/path_types.ts";
 import {
-  PathExpression,
-  PathToken,
-  RangeExpression,
-} from "../../presentation/cli/path_expression.ts";
-import {
-  CalendarDay,
   createDatePlacement,
   createDateRange,
   createItemPlacement,
@@ -26,6 +21,7 @@ import {
 } from "../primitives/mod.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
+import { resolveRelativeDate as resolveDateExpression } from "./date_resolver.ts";
 
 const PATH_RESOLVER_ERROR_KIND = "PathResolver" as const;
 
@@ -73,175 +69,6 @@ export const createPathResolver = (
 ): PathResolver => {
   const { aliasRepository, timezone } = dependencies;
   const today = dependencies.today ?? new Date();
-
-  // Relative date resolution logic (copied from path.ts)
-  const RELATIVE_DAY_KEYWORDS = new Map<string, number>([
-    ["today", 0],
-    ["td", 0],
-    ["tomorrow", 1],
-    ["tm", 1],
-    ["yesterday", -1],
-    ["yd", -1],
-  ]);
-
-  const RELATIVE_PERIOD_REGEX = /^([~+])(\d+)([dwmy])$/u;
-  const RELATIVE_WEEKDAY_REGEX = /^([~+])(mon|tue|wed|thu|fri|sat|sun)$/u;
-
-  const WEEKDAY_INDEX: Record<string, number> = {
-    sun: 0,
-    mon: 1,
-    tue: 2,
-    wed: 3,
-    thu: 4,
-    fri: 5,
-    sat: 6,
-  };
-
-  // Get today's date components in the workspace timezone
-  const getTodayComponents = (date: Date): { year: number; month: number; day: number } => {
-    const formatter = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone.toString(),
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-    const parts = formatter.formatToParts(date);
-    const lookup = new Map(parts.map((part) => [part.type, part.value]));
-    return {
-      year: Number.parseInt(lookup.get("year") || "1970", 10),
-      month: Number.parseInt(lookup.get("month") || "01", 10),
-      day: Number.parseInt(lookup.get("day") || "01", 10),
-    };
-  };
-
-  // Get the day of week (0=Sun, 6=Sat) for a date in the workspace timezone
-  const getDayOfWeek = (date: Date): number => {
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone.toString(),
-      weekday: "short",
-    });
-    const weekday = formatter.format(date).toLowerCase();
-    const weekdayMap: Record<string, number> = {
-      sun: 0,
-      mon: 1,
-      tue: 2,
-      wed: 3,
-      thu: 4,
-      fri: 5,
-      sat: 6,
-    };
-    return weekdayMap[weekday] ?? 0;
-  };
-
-  const formatDateString = (year: number, month: number, day: number): string =>
-    `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-
-  const resolveRelativeDate = (expr: string): Result<CalendarDay, PathResolverError> => {
-    const normalized = expr.trim().toLowerCase();
-
-    // Check for simple keywords
-    const keywordOffset = RELATIVE_DAY_KEYWORDS.get(normalized);
-    if (keywordOffset !== undefined) {
-      const { year, month, day } = getTodayComponents(today);
-      // Create a date in local time for proper day arithmetic
-      const base = new Date(year, month - 1, day);
-      base.setDate(base.getDate() + keywordOffset);
-      const dateStr = formatDateString(base.getFullYear(), base.getMonth() + 1, base.getDate());
-      const result = parseCalendarDay(dateStr);
-      if (result.type === "error") {
-        return Result.error(
-          createValidationError(PATH_RESOLVER_ERROR_KIND, result.error.issues),
-        );
-      }
-      return result;
-    }
-
-    // Check for period syntax (+2w, ~3d, etc.)
-    const periodMatch = normalized.match(RELATIVE_PERIOD_REGEX);
-    if (periodMatch) {
-      const [, operator, magnitudeRaw, unit] = periodMatch;
-      const magnitude = Number.parseInt(magnitudeRaw, 10);
-      const direction = operator === "+" ? 1 : -1;
-      const { year, month, day } = getTodayComponents(today);
-      const base = new Date(year, month - 1, day);
-
-      let dateStr: string;
-      switch (unit) {
-        case "d":
-          base.setDate(base.getDate() + direction * magnitude);
-          dateStr = formatDateString(base.getFullYear(), base.getMonth() + 1, base.getDate());
-          break;
-        case "w":
-          base.setDate(base.getDate() + direction * magnitude * 7);
-          dateStr = formatDateString(base.getFullYear(), base.getMonth() + 1, base.getDate());
-          break;
-        case "m":
-          base.setMonth(base.getMonth() + direction * magnitude);
-          dateStr = formatDateString(base.getFullYear(), base.getMonth() + 1, base.getDate());
-          break;
-        case "y":
-          base.setFullYear(base.getFullYear() + direction * magnitude);
-          dateStr = formatDateString(base.getFullYear(), base.getMonth() + 1, base.getDate());
-          break;
-        default:
-          return Result.error(
-            createValidationError(PATH_RESOLVER_ERROR_KIND, [
-              createValidationIssue(`unknown period unit: ${unit}`, {
-                code: "unknown_period",
-                path: ["relativeDate"],
-              }),
-            ]),
-          );
-      }
-
-      const result = parseCalendarDay(dateStr);
-      if (result.type === "error") {
-        return Result.error(
-          createValidationError(PATH_RESOLVER_ERROR_KIND, result.error.issues),
-        );
-      }
-      return result;
-    }
-
-    // Check for weekday syntax (~mon, +fri, etc.)
-    const weekdayMatch = normalized.match(RELATIVE_WEEKDAY_REGEX);
-    if (weekdayMatch) {
-      const [, operator, weekdayRaw] = weekdayMatch;
-      const targetIndex = WEEKDAY_INDEX[weekdayRaw];
-      const baseIndex = getDayOfWeek(today);
-      const { year, month, day } = getTodayComponents(today);
-      const base = new Date(year, month - 1, day);
-
-      let delta: number;
-      if (operator === "+") {
-        delta = (targetIndex - baseIndex + 7) % 7;
-        if (delta === 0) delta = 7;
-      } else {
-        delta = (baseIndex - targetIndex + 7) % 7;
-        if (delta === 0) delta = 7;
-        delta = -delta;
-      }
-
-      base.setDate(base.getDate() + delta);
-      const dateStr = formatDateString(base.getFullYear(), base.getMonth() + 1, base.getDate());
-      const result = parseCalendarDay(dateStr);
-      if (result.type === "error") {
-        return Result.error(
-          createValidationError(PATH_RESOLVER_ERROR_KIND, result.error.issues),
-        );
-      }
-      return result;
-    }
-
-    // Try parsing as a literal date
-    const result = parseCalendarDay(expr);
-    if (result.type === "error") {
-      return Result.error(
-        createValidationError(PATH_RESOLVER_ERROR_KIND, result.error.issues),
-      );
-    }
-    return result;
-  };
 
   const resolveToken = async (
     token: PathToken,
@@ -308,9 +135,11 @@ export const createPathResolver = (
       }
 
       case "relativeDate": {
-        const dateResult = resolveRelativeDate(token.expr);
+        const dateResult = resolveDateExpression(token.expr, timezone, today);
         if (dateResult.type === "error") {
-          return dateResult;
+          return Result.error(
+            createValidationError(PATH_RESOLVER_ERROR_KIND, dateResult.error.issues),
+          );
         }
         return Result.ok(createDatePlacement(dateResult.value, []));
       }

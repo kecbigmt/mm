@@ -3,7 +3,7 @@ import { loadCliDependencies } from "../dependencies.ts";
 import { ListItemsStatusFilter, ListItemsWorkflow } from "../../../domain/workflows/list_items.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import type { ItemIconValue } from "../../../domain/primitives/item_icon.ts";
-import { parseRangeExpression } from "../path_expression.ts";
+import { parseRangeExpression } from "../path_parser.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import {
   createDateRange,

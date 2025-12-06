@@ -1,7 +1,7 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
-import { parsePathExpression } from "../path_expression.ts";
+import { parsePathExpression } from "../path_parser.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import { formatPlacementForDisplay } from "../../../domain/services/placement_display_service.ts";
 import { formatError } from "../error_formatter.ts";

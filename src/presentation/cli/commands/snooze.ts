@@ -3,7 +3,7 @@ import { loadCliDependencies } from "../dependencies.ts";
 import { SnoozeItemWorkflow } from "../../../domain/workflows/snooze_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
-import { parsePathExpression } from "../path_expression.ts";
+import { parsePathExpression } from "../path_parser.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import { parseFutureDateTime } from "../utils/future_date_time.ts";
 

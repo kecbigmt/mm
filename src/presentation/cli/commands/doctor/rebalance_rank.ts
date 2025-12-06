@@ -15,7 +15,7 @@ import {
 import { updateAllRanks } from "../../../../infrastructure/fileSystem/item_updater.ts";
 import { Item } from "../../../../domain/models/item.ts";
 import { parseDateTime } from "../../../../domain/primitives/mod.ts";
-import { parseRangeExpression } from "../../path_expression.ts";
+import { parseRangeExpression } from "../../path_parser.ts";
 import { createPathResolver } from "../../../../domain/services/path_resolver.ts";
 import { CwdResolutionService } from "../../../../domain/services/cwd_resolution_service.ts";
 
