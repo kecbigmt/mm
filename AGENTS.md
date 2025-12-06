@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+**Role**: This is the **minimal constitution** for agent behavior—essential project conventions, coding standards, testing practices, and commit guidelines. For detailed workflows, see `docs/steering/development-workflow.md`. For document structure, see `docs/AGENTS.md`.
+
 ## Project Overview
 
 mm is a personal knowledgement CLI tool with built-in MCP server.
@@ -92,10 +94,19 @@ workspace fixtures.
 - Plans should be LLM-friendly: small, serializable tasks, note parallelizable parts; prefer pure functions and DTOs for testability.
 - Include warning examples and DoD; prefer fixed constants over env-config unless required.
 - Design docs should include: scope/in-scope vs out-of-scope, inputs/outputs and concrete examples, acceptance criteria, high-level e2e scenarios, file/dir layout decisions, and key interfaces/types (method signatures) for new pieces. Include sample warnings/errors when relevant.
+
+## Development Workflow
+
+Follow the workflow defined in `docs/steering/development-workflow.md`.
+
 ## Commit & Pull Request Guidelines
 
-**Before every commit, run `deno lint` and `deno fmt`** to ensure code quality and consistency. All
-code must pass linting and formatting checks before being committed.
+**Before every commit**:
+- Run `deno lint` and `deno fmt` to ensure code quality and consistency
+- Run `deno task check-docs` to verify documentation length limits (if AGENTS.md, CLAUDE.md, GEMINI.md, or docs/steering/*.md changed)
+  - Requires [uv](https://docs.astral.sh/uv/): `curl -LsSf https://astral.sh/uv/install.sh | sh`
+
+All checks must pass before being committed.
 
 Adopt Conventional Commits (`feat: add node relocation workflow`). Keep each commit small, with
 passing tests. Pull requests should summarize domain impact, list affected modules, and include
@@ -133,3 +144,30 @@ Respect the domain patterns from the prototype: prefer `Result` over exceptions,
 states out of existence, and propagate context-rich validation issues via `createValidationError`.
 When introducing new value objects, back them with branded primitives and exhaustive parsing; demo
 usage in tests and CLI workflows before wiring infrastructure.
+
+## Documentation Guidelines
+
+**Single Source of Truth**: Each piece of information must exist in exactly one place. Duplication leads to inconsistency.
+
+**Strict No-Duplication Policy**: The following files must NEVER contain duplicate information:
+* All `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` files (project root, subdirectories)
+* `docs/steering/*.md`
+
+Cross-reference instead of duplicating. Use clear references like "See `docs/AGENTS.md` for file structure."
+
+**Length Limits**:
+* Tokens (primary constraint):
+  * Target: ≤1000 tokens per file
+  * Maximum: ≤2500 tokens per file (CI fails)
+* Lines (secondary guideline):
+  * Target: ≤100 lines per file
+  * 250+ lines triggers warning
+
+Token count is the primary constraint. If a document exceeds 2500 tokens, it must be split into multiple focused documents.
+
+**Role Declaration**: Every document must declare its specific role at the top to prevent overlap:
+```markdown
+**Role**: This document defines [specific responsibility]. For [other concern], see [reference].
+```
+
+**Enforcement**: CI checks document length on every commit. Pull requests violating these limits will fail.

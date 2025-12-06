@@ -1,3 +1,9 @@
+# Project Design
+
+**Role**: This document defines the **product design, domain model, and architecture**—the foundational knowledge about what mm is, how it works, and core design decisions. This is a stock-type document maintained throughout the project lifecycle.
+
+---
+
 ## 1) Overview
 
 mm is a personal knowledgement CLI tool with built-in MCP server.
