@@ -1,9 +1,18 @@
 import { Result } from "../../shared/result.ts";
 
-export type VersionControlError = {
-  kind: "VersionControlError";
-  message: string;
-};
+import { BaseError } from "../../shared/errors.ts";
+
+export type VersionControlError = BaseError<"VersionControlError">;
+
+export const createVersionControlError = (
+  message: string,
+  options?: { cause?: unknown },
+): VersionControlError => ({
+  kind: "VersionControlError",
+  message,
+  cause: options?.cause,
+  toString: () => `VersionControlError: ${message}`,
+});
 
 export interface VersionControlService {
   init(cwd: string): Promise<Result<void, VersionControlError>>;

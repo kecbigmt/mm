@@ -1,6 +1,8 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { SyncInitWorkflow } from "../../../domain/workflows/sync_init.ts";
+import { formatError } from "../error_formatter.ts";
+import { isDebugMode } from "../debug.ts";
 
 export const createSyncCommand = () => {
   const initCommand = new Command()
@@ -44,7 +46,9 @@ export const createSyncCommand = () => {
       );
 
       if (result.type === "error") {
-        console.error("Sync init failed:", result.error);
+        const error = result.error;
+        const debug = isDebugMode();
+        console.error(formatError(error, debug));
         Deno.exit(1);
       }
 

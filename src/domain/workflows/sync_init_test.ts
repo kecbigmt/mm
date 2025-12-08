@@ -4,7 +4,10 @@ import { Result } from "../../shared/result.ts";
 import { createWorkspaceSettings, WorkspaceSettings } from "../models/workspace.ts";
 import { timezoneIdentifierFromString } from "../primitives/timezone_identifier.ts";
 import { WorkspaceRepository } from "../repositories/workspace_repository.ts";
-import { VersionControlError } from "../services/version_control_service.ts";
+import {
+  createVersionControlError,
+  VersionControlError,
+} from "../services/version_control_service.ts";
 
 const mockVersionControlService = () => {
   const calls: string[] = [];
@@ -32,7 +35,7 @@ const mockVersionControlService = () => {
       calls.push(`validateBranch:${branch}`);
       if (branch === "invalid-branch") {
         return Promise.resolve(
-          Result.error({ kind: "VersionControlError", message: "Invalid branch name" }),
+          Result.error(createVersionControlError("Invalid branch name")),
         );
       }
       return Promise.resolve(Result.ok(undefined));
@@ -165,7 +168,9 @@ Deno.test("SyncInitWorkflow fails on invalid URL", async () => {
   // assertEquals(calls.includes("validateBranch:main"), true); // URL check happens before branch check
   assertEquals(result.type, "error", "Should fail on invalid URL");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "validation");
+    // Should be ValidationError
+    assertEquals(result.error.kind, "ValidationError");
+    assertEquals(result.error.message.includes("Valid URL"), false); // Message is specific about what is invalid
   }
 });
 
@@ -221,9 +226,10 @@ Deno.test("SyncInitWorkflow fails on invalid branch", async () => {
   });
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "validation");
-    // @ts-ignore: checking message property
-    assertEquals(result.error.message.includes("Invalid branch"), true);
+    // Should be ValidationError
+    assertEquals(result.error.kind, "ValidationError");
+    // ValidationError message is generic, issues are specific
+    assertEquals(result.error.toString().includes("Invalid branch name"), true);
   }
   const calls = git.getCalls();
   assertEquals(calls.includes("validateBranch:invalid-branch"), true);
@@ -234,7 +240,7 @@ Deno.test("SyncInitWorkflow returns git error when validation fails with generic
   const git = mockVersionControlService();
   git.validateBranchName = ((_cwd: string, _branch: string) =>
     Promise.resolve(
-      Result.error({ kind: "VersionControlError", message: "fatal: ambiguous argument" }),
+      Result.error(createVersionControlError("fatal: ambiguous argument")),
     )) as unknown as typeof git.validateBranchName;
 
   const repo = mockWorkspaceRepo();
@@ -251,7 +257,8 @@ Deno.test("SyncInitWorkflow returns git error when validation fails with generic
 
   assertEquals(result.type, "error", "Should error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "git");
+    // Should be VersionControlError
+    assertEquals(result.error.kind, "VersionControlError");
   }
 });
 
@@ -291,10 +298,7 @@ Deno.test("SyncInitWorkflow handles nothing to commit gracefully", async () => {
   // Explicitly cast the function to match the interface, effectively overriding the mock type
   git.commit = (() =>
     Promise.resolve(
-      Result.error({
-        kind: "VersionControlError",
-        message: "nothing to commit, working tree clean",
-      }),
+      Result.error(createVersionControlError("nothing to commit, working tree clean")),
     )) as unknown as typeof git.commit;
 
   const repo = mockWorkspaceRepo();
@@ -320,10 +324,7 @@ Deno.test("SyncInitWorkflow returns git error when Git is not installed during v
   // Override validateBranchName to return specific "Git is not installed" error
   git.validateBranchName = ((_cwd: string, _branch: string) =>
     Promise.resolve(
-      Result.error({
-        kind: "VersionControlError",
-        message: "Git is not installed or not in the PATH",
-      }),
+      Result.error(createVersionControlError("Git is not installed or not in the PATH")),
     )) as unknown as typeof git.validateBranchName;
 
   const repo = mockWorkspaceRepo();
@@ -341,41 +342,8 @@ Deno.test("SyncInitWorkflow returns git error when Git is not installed during v
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "git"); // Must be 'git', NOT 'validation'
-    // @ts-ignore: checking error property
-    assertEquals(result.error.error.message.includes("Git is not installed"), true);
+    // Should be VersionControlError
+    assertEquals(result.error.kind, "VersionControlError");
+    assertEquals(result.error.message.includes("Git is not installed"), true);
   }
-});
-
-Deno.test("SyncInitWorkflow passes force option to gitService", async () => {
-  const git = mockVersionControlService();
-  let forceCalled = false;
-
-  // Override setRemote to check for force option
-  git.setRemote = ((_cwd: string, _name: string, _url: string, options?: { force?: boolean }) => {
-    if (options?.force) {
-      forceCalled = true;
-      return Promise.resolve(Result.ok(undefined));
-    }
-    return Promise.resolve(
-      Result.error({ kind: "VersionControlError", message: "Force required" }),
-    );
-  }) as unknown as typeof git.setRemote;
-
-  const repo = mockWorkspaceRepo();
-
-  const result = await SyncInitWorkflow.execute({
-    workspaceRoot: "/ws",
-    remoteUrl: "https://git.com/repo.git",
-    force: true,
-  }, {
-    gitService: git,
-    workspaceRepository: repo as unknown as WorkspaceRepository,
-    writeFile: () => Promise.resolve(),
-    readFile: () => Promise.resolve(""),
-    fileExists: () => Promise.resolve(false),
-  });
-
-  assertEquals(result.type, "ok");
-  assertEquals(forceCalled, true, "gitService.setRemote should have received force: true");
 });

@@ -1,8 +1,9 @@
 import { Result } from "../../shared/result.ts";
 import { VersionControlError, VersionControlService } from "../services/version_control_service.ts";
 import { WorkspaceRepository } from "../repositories/workspace_repository.ts";
-import { RepositoryError } from "../repositories/repository_error.ts";
+import { createRepositoryError, RepositoryError } from "../repositories/repository_error.ts";
 import { createWorkspaceSettings } from "../models/workspace.ts";
+import { createValidationError, ValidationError } from "../../shared/errors.ts";
 
 export type SyncInitInput = {
   workspaceRoot: string;
@@ -20,10 +21,9 @@ export type SyncInitDependencies = {
 };
 
 export type SyncInitError =
-  | { kind: "git"; error: VersionControlError }
-  | { kind: "repository"; error: RepositoryError }
-  | { kind: "validation"; message: string }
-  | { kind: "fs"; message: string };
+  | VersionControlError
+  | RepositoryError
+  | ValidationError<string>;
 
 const GITIGNORE_CONTENT = `# mm local state / caches
 .state.json
@@ -41,28 +41,28 @@ export const SyncInitWorkflow = {
     deps: SyncInitDependencies,
   ): Promise<Result<void, SyncInitError>> => {
     // 0. Validate Input
-    // Expanded regex to allow https, http, git, ssh, file, and scp-like syntax (git@...)
-    // Also allows local paths starting with / or ./ or ../
     const validUrlRegex = /^(?:(?:https?|git|ssh|file):\/\/|git@[^:]+:|\/|\.\.?\/)/;
     if (!input.remoteUrl.match(validUrlRegex)) {
-      return Result.error({ kind: "validation", message: "Invalid Git URL format" });
+      return Result.error(createValidationError("SyncInitInput", [
+        { message: "Invalid Git URL format", path: ["remoteUrl"] },
+      ]));
     }
 
     const branch = input.branch ?? "main";
     const branchCheck = await deps.gitService.validateBranchName(input.workspaceRoot, branch);
-    // If checking fails, determine if it is a validation error or a git error
     if (branchCheck.type === "error") {
       if (branchCheck.error.message.includes("Invalid branch name")) {
-        return Result.error({ kind: "validation", message: `Invalid branch name: ${branch}` });
+        return Result.error(createValidationError("SyncInitInput", [
+          { message: `Invalid branch name: ${branch}`, path: ["branch"] },
+        ]));
       }
-      // System error (e.g. git not installed, permission denied)
-      return Result.error({ kind: "git", error: branchCheck.error });
+      return Result.error(branchCheck.error);
     }
 
     // 1. Init Repo
     const initResult = await deps.gitService.init(input.workspaceRoot);
     if (initResult.type === "error") {
-      return Result.error({ kind: "git", error: initResult.error });
+      return Result.error(initResult.error);
     }
 
     // 2. Configure Remote
@@ -73,13 +73,13 @@ export const SyncInitWorkflow = {
       { force: input.force },
     );
     if (remoteResult.type === "error") {
-      return Result.error({ kind: "git", error: remoteResult.error });
+      return Result.error(remoteResult.error);
     }
 
     // 3. Update Workspace Config
     const settingsResult = await deps.workspaceRepository.load(input.workspaceRoot);
     if (settingsResult.type === "error") {
-      return Result.error({ kind: "repository", error: settingsResult.error });
+      return Result.error(settingsResult.error);
     }
     const currentSettings = settingsResult.value;
     const newSettings = createWorkspaceSettings({
@@ -93,48 +93,54 @@ export const SyncInitWorkflow = {
     });
     const saveResult = await deps.workspaceRepository.save(input.workspaceRoot, newSettings);
     if (saveResult.type === "error") {
-      return Result.error({ kind: "repository", error: saveResult.error });
+      return Result.error(saveResult.error);
     }
 
     // 4. Create/Update .gitignore
     const gitignorePath = `${input.workspaceRoot}/.gitignore`;
-    const gitignoreExists = await deps.fileExists(gitignorePath);
-    const requiredEntries = [".state.json", ".index/", ".tmp/", ".DS_Store", "*.swp"];
+    try {
+      const gitignoreExists = await deps.fileExists(gitignorePath);
+      const requiredEntries = [".state.json", ".index/", ".tmp/", ".DS_Store", "*.swp"];
 
-    let finalGitignoreContent = GITIGNORE_CONTENT;
+      let finalGitignoreContent = GITIGNORE_CONTENT;
 
-    if (gitignoreExists) {
-      const currentContent = await deps.readFile(gitignorePath);
-      // If header is missing AND critical file .state.json is missing, might as well append the whole block
-      if (
-        !currentContent.includes("# mm local state / caches") &&
-        !currentContent.includes(".state.json")
-      ) {
-        finalGitignoreContent = currentContent + "\n" + GITIGNORE_CONTENT;
-      } else {
-        // Strict check for missing entries
-        const missingLines: string[] = [];
-        for (const line of requiredEntries) {
-          if (!currentContent.includes(line)) {
-            missingLines.push(line);
+      if (gitignoreExists) {
+        const currentContent = await deps.readFile(gitignorePath);
+        if (
+          !currentContent.includes("# mm local state / caches") &&
+          !currentContent.includes(".state.json")
+        ) {
+          finalGitignoreContent = currentContent + "\n" + GITIGNORE_CONTENT;
+        } else {
+          const missingLines: string[] = [];
+          for (const line of requiredEntries) {
+            if (!currentContent.includes(line)) {
+              missingLines.push(line);
+            }
+          }
+          if (missingLines.length > 0) {
+            finalGitignoreContent = currentContent + "\n# mm missing entries\n" +
+              missingLines.join("\n") + "\n";
+          } else {
+            finalGitignoreContent = currentContent;
           }
         }
-        if (missingLines.length > 0) {
-          finalGitignoreContent = currentContent + "\n# mm missing entries\n" +
-            missingLines.join("\n") + "\n";
-        } else {
-          finalGitignoreContent = currentContent;
-        }
       }
+
+      await deps.writeFile(gitignorePath, finalGitignoreContent);
+    } catch (e) {
+      return Result.error(createRepositoryError(
+        "workspace",
+        "ensure",
+        "Failed to create .gitignore",
+        { cause: e },
+      ));
     }
 
-    await deps.writeFile(gitignorePath, finalGitignoreContent);
-
     // 5. Initial Commit
-    // Use "." to safely add all valid workspace files (respecting gitignore)
     const stageResult = await deps.gitService.stage(input.workspaceRoot, ["."]);
     if (stageResult.type === "error") {
-      return Result.error({ kind: "git", error: stageResult.error });
+      return Result.error(stageResult.error);
     }
 
     const commitResult = await deps.gitService.commit(
@@ -142,12 +148,11 @@ export const SyncInitWorkflow = {
       "mm: initialize workspace git repository",
     );
     if (commitResult.type === "error") {
-      // Check if error is "nothing to commit"
       const msg = commitResult.error.message.toLowerCase();
       if (msg.includes("nothing to commit") || msg.includes("clean")) {
         // Idempotent success
       } else {
-        return Result.error({ kind: "git", error: commitResult.error });
+        return Result.error(commitResult.error);
       }
     }
 

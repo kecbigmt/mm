@@ -15,7 +15,7 @@ export function formatError(error: unknown, isDebug = false): string {
   // Handle ValidationError
   if (
     typeof error === "object" && error !== null &&
-    "kind" in error && error.kind === "ValidationError" &&
+    "kind" in error && (error as { kind: string }).kind === "ValidationError" &&
     "toString" in error && typeof error.toString === "function"
   ) {
     const validationError = error as ValidationError<string>;
@@ -31,6 +31,23 @@ export function formatError(error: unknown, isDebug = false): string {
       }
       return `${ERROR_PREFIX}${validationError.message}`;
     }
+  }
+
+  // Handle any BaseError-like object (has string kind and message)
+  if (
+    typeof error === "object" && error !== null &&
+    "kind" in error && typeof (error as { kind: unknown }).kind === "string" &&
+    "message" in error && typeof (error as { message: unknown }).message === "string"
+  ) {
+    const baseError = error as { kind: string; message: string; toString?(): string };
+
+    if (isDebug) {
+      if (typeof baseError.toString === "function") {
+        return baseError.toString();
+      }
+      return `${baseError.kind}: ${baseError.message}`;
+    }
+    return `${ERROR_PREFIX}${baseError.message}`;
   }
 
   // Handle unexpected errors (not user-facing ValidationErrors)
