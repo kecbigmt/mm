@@ -4,6 +4,7 @@ import { createRepositoryError, WorkspaceRepository } from "../../domain/reposit
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
 import {
   createWorkspaceSettings,
+  DEFAULT_GIT_SETTINGS,
   parseWorkspaceSettings,
   WorkspaceSettings,
 } from "../../domain/models/workspace.ts";
@@ -188,7 +189,7 @@ export const createFileSystemWorkspaceRepository = (
       return ensureResult;
     }
 
-    const settings = createWorkspaceSettings({ timezone });
+    const settings = createWorkspaceSettings({ timezone, git: DEFAULT_GIT_SETTINGS });
     return save(root, settings);
   };
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write --allow-env
+#!/usr/bin/env -S deno run --allow-read --allow-write --allow-env --allow-run
 
 import { Command } from "@cliffy/command";
 import { createNoteCommand } from "./presentation/cli/commands/note.ts";
@@ -15,6 +15,7 @@ import { createMoveCommand } from "./presentation/cli/commands/move.ts";
 import { createDoctorCommand } from "./presentation/cli/commands/doctor/mod.ts";
 import { createEditCommand } from "./presentation/cli/commands/edit.ts";
 import { createSnoozeCommand } from "./presentation/cli/commands/snooze.ts";
+import { createSyncCommand } from "./presentation/cli/commands/sync.ts";
 
 async function main() {
   const cli = new Command()
@@ -38,7 +39,8 @@ async function main() {
     .command("move", createMoveCommand().description("Move items to a new placement")).alias("mv")
     .command("snooze", createSnoozeCommand().description("Snooze item until a future datetime"))
     .alias("sn")
-    .command("doctor", createDoctorCommand().description("Workspace validation and maintenance"));
+    .command("doctor", createDoctorCommand().description("Workspace validation and maintenance"))
+    .command("sync", createSyncCommand().description("Sync with remote repository"));
 
   await cli.parse(Deno.args);
 }
