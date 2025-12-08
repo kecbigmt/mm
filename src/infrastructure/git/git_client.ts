@@ -15,13 +15,16 @@ export const createGitVersionControlService = (): VersionControlService => {
       const command = new Deno.Command(cmd, {
         args,
         cwd,
+        stdout: "piped",
         stderr: "piped",
       });
-      const { code, stderr } = await command.output();
+      const { code, stdout, stderr } = await command.output();
       if (code !== 0) {
+        const outStr = new TextDecoder().decode(stdout);
+        const errStr = new TextDecoder().decode(stderr);
         return Result.error({
           kind: "VersionControlError",
-          message: `${errorPrefix}: ${new TextDecoder().decode(stderr)}`,
+          message: `${errorPrefix}: ${outStr} ${errStr}`,
         });
       }
       return Result.ok(undefined);
