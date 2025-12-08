@@ -219,6 +219,46 @@ export const createGitVersionControlService = (): VersionControlService => {
     }
   };
 
+  const checkoutBranch = async (
+    cwd: string,
+    branch: string,
+    create: boolean,
+  ): Promise<Result<void, VersionControlError>> => {
+    try {
+      // Check if branch exists
+      const checkCommand = new Deno.Command("git", {
+        args: ["rev-parse", "--verify", branch],
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { code } = await checkCommand.output();
+      const branchExists = code === 0;
+
+      if (branchExists) {
+        // Branch exists, checkout
+        return safeExecute("git", ["checkout", branch], cwd, "git checkout failed");
+      } else {
+        // Branch doesn't exist
+        if (create) {
+          // Create and checkout new branch
+          return safeExecute("git", ["checkout", "-b", branch], cwd, "git checkout -b failed");
+        } else {
+          return Result.error(
+            createVersionControlError(`Branch '${branch}' does not exist and create flag is false`),
+          );
+        }
+      }
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+      }
+      return Result.error(
+        createVersionControlError(`git checkout failed: ${error}`, { cause: error }),
+      );
+    }
+  };
+
   return {
     init,
     setRemote,
@@ -227,5 +267,6 @@ export const createGitVersionControlService = (): VersionControlService => {
     validateBranchName,
     push,
     getCurrentBranch,
+    checkoutBranch,
   };
 };

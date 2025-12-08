@@ -32,4 +32,9 @@ export interface VersionControlService {
     options?: { force?: boolean },
   ): Promise<Result<string, VersionControlError>>;
   getCurrentBranch(cwd: string): Promise<Result<string, VersionControlError>>;
+  checkoutBranch(
+    cwd: string,
+    branch: string,
+    create: boolean,
+  ): Promise<Result<void, VersionControlError>>;
 }
