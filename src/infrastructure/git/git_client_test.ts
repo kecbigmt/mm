@@ -37,14 +37,16 @@ Deno.test("GitClient integration", async (t) => {
       assert(result.type === "error");
       assert(result.error.message.includes("already exists with different URL"));
       assert(result.error.message.includes("force"));
-      
+
       // Verify config didn't change (still previous)
       const config = await Deno.readTextFile(join(tmpDir, ".git/config"));
       assert(config.includes("url = https://example.com/repo.git"));
     });
 
     await t.step("setRemote succeeds on conflicting remote with force option", async () => {
-      const result = await client.setRemote(tmpDir, "origin", "https://example.com/other.git", { force: true });
+      const result = await client.setRemote(tmpDir, "origin", "https://example.com/other.git", {
+        force: true,
+      });
       assert(result.type === "ok");
 
       const config = await Deno.readTextFile(join(tmpDir, ".git/config"));
