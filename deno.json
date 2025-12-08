@@ -1,7 +1,7 @@
 {
   "tasks": {
-    "start": "deno run src/main.ts",
-    "dev": "deno run --watch src/main.ts",
+    "start": "deno run --allow-run src/main.ts",
+    "dev": "deno run --watch --allow-run src/main.ts",
     "test": "deno task test:all",
     "test:file": "deno test --allow-read --allow-write --allow-env --allow-run",
     "test:unit": "deno test --fail-fast=1 --allow-read --allow-write --allow-env --allow-run src/",

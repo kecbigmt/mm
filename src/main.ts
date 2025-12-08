@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write --allow-env
+#!/usr/bin/env -S deno run --allow-read --allow-write --allow-env --allow-run
 
 import { Command } from "@cliffy/command";
 import { createNoteCommand } from "./presentation/cli/commands/note.ts";
