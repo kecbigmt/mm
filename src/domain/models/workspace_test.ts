@@ -37,7 +37,38 @@ Deno.test("parseWorkspaceSettings validates timezone", () => {
 
 Deno.test("createWorkspaceSettings preserves timezone identifier", () => {
   const timezone = expectOk(timezoneIdentifierFromString("Europe/London"));
-  const settings = createWorkspaceSettings({ timezone });
+  const settings = createWorkspaceSettings({
+    timezone,
+    git: { enabled: false, remote: null, branch: "main", syncMode: "auto-commit" },
+  });
   assertEquals(settings.data.timezone, timezone);
   assertEquals(settings.toJSON().timezone, "Europe/London");
+});
+
+Deno.test("parseWorkspaceSettings defaults git settings when missing", () => {
+  const okResult = parseWorkspaceSettings({ timezone: "Asia/Tokyo" });
+  const settings = expectOk(okResult);
+
+  assertEquals(settings.data.git.enabled, false);
+  assertEquals(settings.data.git.remote, null);
+  assertEquals(settings.data.git.branch, "main");
+  assertEquals(settings.data.git.syncMode, "auto-commit");
+});
+
+Deno.test("parseWorkspaceSettings parses git settings", () => {
+  const okResult = parseWorkspaceSettings({
+    timezone: "Asia/Tokyo",
+    git: {
+      enabled: true,
+      remote: "https://github.com/user/repo.git",
+      branch: "develop",
+      sync_mode: "auto-sync",
+    },
+  });
+  const settings = expectOk(okResult);
+
+  assertEquals(settings.data.git.enabled, true);
+  assertEquals(settings.data.git.remote, "https://github.com/user/repo.git");
+  assertEquals(settings.data.git.branch, "develop");
+  assertEquals(settings.data.git.syncMode, "auto-sync");
 });
