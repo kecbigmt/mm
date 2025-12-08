@@ -48,15 +48,20 @@ export const SyncInitWorkflow = {
       ]));
     }
 
-    const branch = input.branch ?? "main";
-    const branchCheck = await deps.gitService.validateBranchName(input.workspaceRoot, branch);
-    if (branchCheck.type === "error") {
-      if (branchCheck.error.message.includes("Invalid branch name")) {
-        return Result.error(createValidationError("SyncInitInput", [
-          { message: `Invalid branch name: ${branch}`, path: ["branch"] },
-        ]));
+    // Validate branch name if provided
+    if (input.branch) {
+      const branchCheck = await deps.gitService.validateBranchName(
+        input.workspaceRoot,
+        input.branch,
+      );
+      if (branchCheck.type === "error") {
+        if (branchCheck.error.message.includes("Invalid branch name")) {
+          return Result.error(createValidationError("SyncInitInput", [
+            { message: `Invalid branch name: ${input.branch}`, path: ["branch"] },
+          ]));
+        }
+        return Result.error(branchCheck.error);
       }
-      return Result.error(branchCheck.error);
     }
 
     // 1. Init Repo
@@ -65,7 +70,29 @@ export const SyncInitWorkflow = {
       return Result.error(initResult.error);
     }
 
-    // 2. Configure Remote
+    // 2. Handle branch
+    let actualBranch: string;
+    if (input.branch) {
+      // Branch specified: checkout or create
+      const checkoutResult = await deps.gitService.checkoutBranch(
+        input.workspaceRoot,
+        input.branch,
+        true, // create if not exists
+      );
+      if (checkoutResult.type === "error") {
+        return Result.error(checkoutResult.error);
+      }
+      actualBranch = input.branch;
+    } else {
+      // No branch specified: use current branch
+      const currentBranchResult = await deps.gitService.getCurrentBranch(input.workspaceRoot);
+      if (currentBranchResult.type === "error") {
+        return Result.error(currentBranchResult.error);
+      }
+      actualBranch = currentBranchResult.value;
+    }
+
+    // 3. Configure Remote
     const remoteResult = await deps.gitService.setRemote(
       input.workspaceRoot,
       "origin",
@@ -76,7 +103,7 @@ export const SyncInitWorkflow = {
       return Result.error(remoteResult.error);
     }
 
-    // 3. Update Workspace Config
+    // 4. Update Workspace Config
     const settingsResult = await deps.workspaceRepository.load(input.workspaceRoot);
     if (settingsResult.type === "error") {
       return Result.error(settingsResult.error);
@@ -87,7 +114,7 @@ export const SyncInitWorkflow = {
       git: {
         enabled: true,
         remote: input.remoteUrl,
-        branch: branch,
+        branch: actualBranch,
         syncMode: "auto-commit",
       },
     });
@@ -96,7 +123,7 @@ export const SyncInitWorkflow = {
       return Result.error(saveResult.error);
     }
 
-    // 4. Create/Update .gitignore
+    // 5. Create/Update .gitignore
     const gitignorePath = `${input.workspaceRoot}/.gitignore`;
     try {
       const gitignoreExists = await deps.fileExists(gitignorePath);
@@ -137,7 +164,7 @@ export const SyncInitWorkflow = {
       ));
     }
 
-    // 5. Initial Commit
+    // 6. Initial Commit
     const stageResult = await deps.gitService.stage(input.workspaceRoot, ["."]);
     if (stageResult.type === "error") {
       return Result.error(stageResult.error);

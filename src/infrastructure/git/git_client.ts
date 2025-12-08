@@ -160,11 +160,114 @@ export const createGitVersionControlService = (): VersionControlService => {
     }
   };
 
+  const push = async (
+    cwd: string,
+    remote: string,
+    branch: string,
+    options?: { force?: boolean },
+  ): Promise<Result<string, VersionControlError>> => {
+    const args = ["push", remote, branch];
+    if (options?.force) {
+      args.push("--force");
+    }
+    try {
+      const command = new Deno.Command("git", {
+        args,
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { code, stdout, stderr } = await command.output();
+      const outStr = new TextDecoder().decode(stdout);
+      const errStr = new TextDecoder().decode(stderr);
+
+      if (code !== 0) {
+        return Result.error(createVersionControlError(`git push failed: ${outStr} ${errStr}`));
+      }
+      // Git pushはstderrにメッセージを出力することがある
+      return Result.ok(errStr || outStr);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+      }
+      return Result.error(createVersionControlError(`git push failed: ${error}`, { cause: error }));
+    }
+  };
+
+  const getCurrentBranch = async (cwd: string): Promise<Result<string, VersionControlError>> => {
+    try {
+      // Use symbolic-ref to get branch name even before first commit
+      const command = new Deno.Command("git", {
+        args: ["symbolic-ref", "--short", "HEAD"],
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { code, stdout, stderr } = await command.output();
+      if (code !== 0) {
+        const errStr = new TextDecoder().decode(stderr);
+        return Result.error(createVersionControlError(`git symbolic-ref failed: ${errStr}`));
+      }
+      const branch = new TextDecoder().decode(stdout).trim();
+      return Result.ok(branch);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+      }
+      return Result.error(
+        createVersionControlError(`git symbolic-ref failed: ${error}`, { cause: error }),
+      );
+    }
+  };
+
+  const checkoutBranch = async (
+    cwd: string,
+    branch: string,
+    create: boolean,
+  ): Promise<Result<void, VersionControlError>> => {
+    try {
+      // Check if branch exists
+      const checkCommand = new Deno.Command("git", {
+        args: ["rev-parse", "--verify", branch],
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { code } = await checkCommand.output();
+      const branchExists = code === 0;
+
+      if (branchExists) {
+        // Branch exists, checkout
+        return safeExecute("git", ["checkout", branch], cwd, "git checkout failed");
+      } else {
+        // Branch doesn't exist
+        if (create) {
+          // Create and checkout new branch
+          return safeExecute("git", ["checkout", "-b", branch], cwd, "git checkout -b failed");
+        } else {
+          return Result.error(
+            createVersionControlError(`Branch '${branch}' does not exist and create flag is false`),
+          );
+        }
+      }
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+      }
+      return Result.error(
+        createVersionControlError(`git checkout failed: ${error}`, { cause: error }),
+      );
+    }
+  };
+
   return {
     init,
     setRemote,
     stage,
     commit,
     validateBranchName,
+    push,
+    getCurrentBranch,
+    checkoutBranch,
   };
 };

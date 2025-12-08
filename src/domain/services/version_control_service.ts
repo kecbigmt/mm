@@ -25,4 +25,16 @@ export interface VersionControlService {
   stage(cwd: string, paths: string[]): Promise<Result<void, VersionControlError>>;
   commit(cwd: string, message: string): Promise<Result<void, VersionControlError>>;
   validateBranchName(cwd: string, branch: string): Promise<Result<void, VersionControlError>>;
+  push(
+    cwd: string,
+    remote: string,
+    branch: string,
+    options?: { force?: boolean },
+  ): Promise<Result<string, VersionControlError>>;
+  getCurrentBranch(cwd: string): Promise<Result<string, VersionControlError>>;
+  checkoutBranch(
+    cwd: string,
+    branch: string,
+    create: boolean,
+  ): Promise<Result<void, VersionControlError>>;
 }

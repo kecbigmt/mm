@@ -40,6 +40,27 @@ const mockVersionControlService = () => {
       }
       return Promise.resolve(Result.ok(undefined));
     },
+    push: (
+      _cwd: string,
+      _remote: string,
+      _branch: string,
+      _options?: { force?: boolean },
+    ): Promise<Result<string, VersionControlError>> => {
+      calls.push("push");
+      return Promise.resolve(Result.ok("Everything up-to-date\n"));
+    },
+    getCurrentBranch: (_cwd: string): Promise<Result<string, VersionControlError>> => {
+      calls.push("getCurrentBranch");
+      return Promise.resolve(Result.ok("main"));
+    },
+    checkoutBranch: (
+      _cwd: string,
+      branch: string,
+      _create: boolean,
+    ): Promise<Result<void, VersionControlError>> => {
+      calls.push(`checkoutBranch:${branch}`);
+      return Promise.resolve(Result.ok(undefined));
+    },
     getCalls: () => calls,
   };
 };
@@ -146,7 +167,8 @@ Deno.test("SyncInitWorkflow appends to .gitignore if exists", async () => {
   assertEquals(gitignore.includes(".state.json"), true);
 
   const calls = git.getCalls();
-  assertEquals(calls.includes("validateBranch:main"), true);
+  // No branch specified, should call getCurrentBranch instead of validateBranch
+  assertEquals(calls.includes("getCurrentBranch"), true);
 });
 
 Deno.test("SyncInitWorkflow fails on invalid URL", async () => {
@@ -189,7 +211,8 @@ Deno.test("SyncInitWorkflow allows ssh URL", async () => {
     fileExists: () => Promise.resolve(false),
   });
   assertEquals(result.type, "ok");
-  assertEquals(git.getCalls().includes("validateBranch:main"), true);
+  // No branch specified, should call getCurrentBranch instead of validateBranch
+  assertEquals(git.getCalls().includes("getCurrentBranch"), true);
   assertEquals(git.getCalls().includes("remote:git@github.com:user/repo.git"), true);
 
   git.getCalls().length = 0; // Clear calls for the next execution
@@ -205,7 +228,8 @@ Deno.test("SyncInitWorkflow allows ssh URL", async () => {
     fileExists: () => Promise.resolve(false),
   });
   assertEquals(result2.type, "ok");
-  assertEquals(git.getCalls().includes("validateBranch:main"), true);
+  // No branch specified, should call getCurrentBranch instead of validateBranch
+  assertEquals(git.getCalls().includes("getCurrentBranch"), true);
   assertEquals(git.getCalls().includes("remote:ssh://git@github.com/user/repo.git"), true);
 });
 
@@ -247,6 +271,7 @@ Deno.test("SyncInitWorkflow returns git error when validation fails with generic
   const result = await SyncInitWorkflow.execute({
     workspaceRoot: "/ws",
     remoteUrl: "https://url",
+    branch: "main", // Explicitly specify branch to trigger validation
   }, {
     gitService: git,
     workspaceRepository: repo as unknown as WorkspaceRepository,
@@ -290,7 +315,8 @@ Deno.test("SyncInitWorkflow ensures critical .gitignore entries even if file exi
   assertEquals(content.includes(".DS_Store"), true);
 
   const calls = git.getCalls();
-  assertEquals(calls.includes("validateBranch:main"), true);
+  // No branch specified, should call getCurrentBranch instead of validateBranch
+  assertEquals(calls.includes("getCurrentBranch"), true);
 });
 
 Deno.test("SyncInitWorkflow handles nothing to commit gracefully", async () => {
@@ -316,7 +342,8 @@ Deno.test("SyncInitWorkflow handles nothing to commit gracefully", async () => {
 
   assertEquals(result.type, "ok", "Should succeed even if nothing to commit");
   const calls = git.getCalls();
-  assertEquals(calls.includes("validateBranch:main"), true);
+  // No branch specified, should call getCurrentBranch instead of validateBranch
+  assertEquals(calls.includes("getCurrentBranch"), true);
 });
 
 Deno.test("SyncInitWorkflow returns git error when Git is not installed during validation", async () => {
@@ -332,6 +359,7 @@ Deno.test("SyncInitWorkflow returns git error when Git is not installed during v
   const result = await SyncInitWorkflow.execute({
     workspaceRoot: "/ws",
     remoteUrl: "https://git.com/repo.git",
+    branch: "main", // Explicitly specify branch to trigger validation
   }, {
     gitService: git,
     workspaceRepository: repo as unknown as WorkspaceRepository,

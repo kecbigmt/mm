@@ -40,7 +40,7 @@ async function main() {
     .command("snooze", createSnoozeCommand().description("Snooze item until a future datetime"))
     .alias("sn")
     .command("doctor", createDoctorCommand().description("Workspace validation and maintenance"))
-    .command("sync", createSyncCommand().description("Sync with remote repository"));
+    .command("sync", createSyncCommand());
 
   await cli.parse(Deno.args);
 }
