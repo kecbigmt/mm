@@ -1,6 +1,7 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { SyncInitWorkflow } from "../../../domain/workflows/sync_init.ts";
+import { SyncPushWorkflow } from "../../../domain/workflows/sync_push.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 
@@ -55,7 +56,43 @@ export const createSyncCommand = () => {
       console.log("Workspace git repository initialized and configured.");
     });
 
+  const pushCommand = new Command()
+    .description("Push local commits to remote repository")
+    .option("-w, --workspace <workspace:string>", "Workspace to override")
+    .option("-f, --force", "Force push to remote")
+    .action(async (options: Record<string, unknown>) => {
+      const workspace = typeof options.workspace === "string" ? options.workspace : undefined;
+      const force = options.force === true;
+      const depsResult = await loadCliDependencies(workspace);
+      if (depsResult.type === "error") {
+        console.error(depsResult.error);
+        Deno.exit(1);
+      }
+      const deps = depsResult.value;
+
+      const result = await SyncPushWorkflow.execute(
+        {
+          workspaceRoot: deps.root,
+          force,
+        },
+        {
+          gitService: deps.versionControlService,
+          workspaceRepository: deps.workspaceRepository,
+        },
+      );
+
+      if (result.type === "error") {
+        const error = result.error;
+        const debug = isDebugMode();
+        console.error(formatError(error, debug));
+        Deno.exit(1);
+      }
+
+      console.log(result.value.trim());
+    });
+
   return new Command()
     .description("Sync workspace with remote repository")
-    .command("init", initCommand);
+    .command("init", initCommand)
+    .command("push", pushCommand);
 };
