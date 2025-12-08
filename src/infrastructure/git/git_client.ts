@@ -196,8 +196,9 @@ export const createGitVersionControlService = (): VersionControlService => {
 
   const getCurrentBranch = async (cwd: string): Promise<Result<string, VersionControlError>> => {
     try {
+      // Use symbolic-ref to get branch name even before first commit
       const command = new Deno.Command("git", {
-        args: ["rev-parse", "--abbrev-ref", "HEAD"],
+        args: ["symbolic-ref", "--short", "HEAD"],
         cwd,
         stdout: "piped",
         stderr: "piped",
@@ -205,7 +206,7 @@ export const createGitVersionControlService = (): VersionControlService => {
       const { code, stdout, stderr } = await command.output();
       if (code !== 0) {
         const errStr = new TextDecoder().decode(stderr);
-        return Result.error(createVersionControlError(`git rev-parse failed: ${errStr}`));
+        return Result.error(createVersionControlError(`git symbolic-ref failed: ${errStr}`));
       }
       const branch = new TextDecoder().decode(stdout).trim();
       return Result.ok(branch);
@@ -214,7 +215,7 @@ export const createGitVersionControlService = (): VersionControlService => {
         return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
       }
       return Result.error(
-        createVersionControlError(`git rev-parse failed: ${error}`, { cause: error }),
+        createVersionControlError(`git symbolic-ref failed: ${error}`, { cause: error }),
       );
     }
   };
