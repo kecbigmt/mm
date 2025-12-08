@@ -57,6 +57,14 @@ const mockVersionControlService = () => {
       calls.push(`getCurrentBranch`);
       return Promise.resolve(Result.ok(currentBranch));
     },
+    checkoutBranch: (
+      _cwd: string,
+      branch: string,
+      _create: boolean,
+    ): Promise<Result<void, VersionControlError>> => {
+      calls.push(`checkoutBranch:${branch}`);
+      return Promise.resolve(Result.ok(undefined));
+    },
     getCalls: () => calls,
     setFailPush: (fail: boolean) => {
       shouldFailPush = fail;
