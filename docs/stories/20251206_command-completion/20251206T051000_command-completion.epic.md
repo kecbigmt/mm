@@ -13,31 +13,37 @@ Target version: mm v0.2.0
 
 *   **`completions` command**: A new CLI command that outputs completion scripts for Bash and Zsh.
 *   **Shell Completion Scripts**: Logic to auto-complete commands, subcommands, flags, and arguments.
-*   **Recent Item Caching**: A mechanism to store IDs and aliases of recently accessed/modified items.
-    *   **Triggers**: A centralized hook mechanism to ensure *any* command execution that references an item updates the cache.
+*   **Recent Item Caching**: A mechanism to store IDs, aliases, and tags of recently accessed/modified items.
+    *   **Triggers**: A centralized hook mechanism to ensure *any* command execution that references or displays items updates the cache.
+    *   **Cache Sources**:
+        *   Command arguments (IDs, aliases, tags explicitly used)
+        *   Command results (items created, displayed, or modified)
 *   **Workspace-based Caching**: Cache files stored within the declared workspace (`.index/completion_cache.jsonl`).
 *   **Typed Cache Format**: JSON Lines format to distinguish between IDs, Aliases, and Tags, allowing for better validation and filtering.
 *   **Atomic Updates**: Concurrency-safe cache writing (atomic rename).
-*   **Pluggable List Source**: A new flag or hidden command (e.g., `mm completions --emit-source`) to provide machine-readable candidates for fallback.
+*   **Cache-Only Completion**: Shell completion relies exclusively on cache; no fallback mechanism.
 
 ### Out of Scope (future work)
 
 *   Fish or PowerShell support.
 *   Context-aware filtering (e.g., filtering `close` candidates to only 'open' items) beyond basic ID availability.
 *   "Short ID" logic (current domain uses strictly UUIDv7 and Aliases).
+*   Fallback mechanisms (e.g., querying all items from `.index/` when cache is empty).
+*   Full item enumeration commands for completion (completion relies solely on cache).
 
 ---
 
 ## 1. Motivation & Goals
 
-The previous prototype relied on `mm list` output parsing for completion, which was fragile and limited to "open" items. Users need to interact with items they just closed or historically accessed.
+Users frequently need to reference items (by ID, alias, or tag) across multiple commands. Typing full UUIDs or remembering exact aliases is cumbersome. Shell completion should suggest recently used items to accelerate workflows.
 
 Design goals:
 
-1.  **Recall**: Allow completion of items (UUIDs/Aliases) not currently valid in the default view (e.g., closed items).
+1.  **Recall**: Allow completion of recently accessed items (IDs/Aliases/Tags), including closed items.
 2.  **Performance**: Sub-shell-latency (<50ms) lookups via a pre-computed local cache.
 3.  **Reliability**: Atomic writes and correct workspace resolution.
-4.  **Correctness**: Use machine-readable sources rather than screen scraping.
+4.  **Simplicity**: Cache-only approach; natural usage (`mm ls`, `mm note`, etc.) builds the cache over time.
+5.  **Scalability**: Avoid full item enumeration; cache grows organically based on actual usage.
 
 ---
 
@@ -88,28 +94,16 @@ We will implement a **Cache Middleware** (or Command Interceptor) in the Present
 
 ### 3.2 Shell Scripts (The "Reader")
 
-The generated Zsh/Bash scripts will employ a **Fast Path / Slow Path** strategy:
+The generated Zsh/Bash scripts will employ a **cache-only** strategy:
 
-1.  **Fast Path (Optimization)**:
-    *   Attempt to locate `.index/completion_cache.jsonl` in `.mm` or parent directories (optimistic CWD check).
-    *   If found, use a **robust regex** (`grep`) to extract `value` fields where `type` matches.
+1.  **Cache Lookup**:
+    *   Locate `.index/completion_cache.jsonl` by traversing upward from CWD.
+    *   Use **robust regex** (`grep`/`sed`) to extract `value` fields where `type` matches.
     *   *Goal*: Low latency (< 20ms) for common case (inside workspace).
-2.  **Slow Path (Primary/Fallback)**:
-    *   If file missing, empty, or CWD check fails, call `mm completions --emit-source --filter <type>`.
-    *   This leverages the CLI's internal workspace resolution (finding `MM_HOME` etc.) to guarantee correctness if run from outside the workspace structure.
-    *   Preferred for correctness; if the helper remains fast enough, consider skipping cache parsing entirely and always using it.
-
-### 3.3 Internal Helper: `mm completions --emit-source`
-
-An internal (hidden) flag for the `completions` command, used by the shell script as a reliable fallback.
-
-*   **Usage**: `mm completions --emit-source [--filter <id|alias|tag>]`
-*   **Behavior**:
-    1.  Resolves workspace via standard CLI mechanisms (`MM_HOME`, state, etc.).
-    2.  Fetches **ALL** available candidates (Open + Closed items from DB, all Tags).
-    3.  Outputs **Plain Text** (one value per line) to standard output.
-        *   This avoids JSON parsing in the shell for the fallback path.
-*   **Goal**: Correctness & Reliability. Used when cache is unavailable or invalid.
+2.  **No Cache Behavior**:
+    *   If cache file is missing or empty, no completion candidates are provided.
+    *   Users must run commands (`mm ls`, `mm note`, etc.) to populate the cache.
+    *   This keeps the implementation simple and avoids scalability risks of full enumeration.
 
 ---
 
@@ -118,13 +112,16 @@ An internal (hidden) flag for the `completions` command, used by the shell scrip
 ### 4.1 New Command
 
 ```bash
-mm completions [shell]
+mm completions [bash|zsh]
 ```
+
+Outputs shell completion script to stdout for installation.
 
 ### 4.2 Behavior Changes
 
-*   **Stateful Completion**: Completion candidates evolve based on usage.
-*   **No Short IDs**: Completion will suggest full UUIDs or Aliases. Users typically type Aliases or copy-paste UUIDs; completion helps with Aliases and previously seen UUIDs.
+*   **Stateful Completion**: Completion candidates evolve based on usage. Natural command usage (`mm ls`, `mm note`, etc.) populates the cache.
+*   **Cache-Only**: If cache is empty (e.g., fresh install), no completion candidates are provided until commands are run.
+*   **No Short IDs**: Completion suggests full UUIDs or Aliases. Users typically type Aliases or copy-paste UUIDs; completion helps with Aliases and previously seen UUIDs.
 
 ---
 
@@ -135,16 +132,20 @@ mm completions [shell]
 Implement a `CommandRunner` or `Middleware` that wraps the `cliffy` ActionHandler.
 It inspects `options` and arguments for known patterns (UUID regex, Alias format) or consumes a Structured Result object if available.
 
-### 5.2 Helper Commands
+### 5.2 Cache Population Strategy
 
-*   `mm workspace info --path`: Fast command to print workspace root (for shell script).
-*   `mm items --json --ids-only`: Fast dump of valid IDs/Aliases.
+Commands update the cache by extracting:
+*   **From arguments**: ItemId, AliasSlug, TagSlug patterns in command-line arguments.
+*   **From results**: Items created, displayed, or modified by the command (e.g., `mm note` creates an item; `mm ls` displays items).
+
+This ensures natural usage builds the cache organically.
 
 ### 5.3 Alternatives Considered
 
 *   **Reuse `.index` directly**: Rejected due to latency (>50ms parsing thousands of files) and lack of recency history.
 *   **Short IDs**: Rejected as the domain uses strictly UUIDv7. "Shortening" is a display-only concern, not unique addressing in the domain currently.
 *   **Simple Text Cache**: Rejected in favor of JSONL to allow distinguishing `alias` vs `tag` and managing staleness/renames better.
+*   **Fallback to full enumeration (`--emit-source`)**: Rejected due to scalability concerns (aliases are auto-assigned to all items, making enumeration expensive). Cache-only approach is simpler and safer; natural usage builds the cache.
 
 ---
 
@@ -172,7 +173,7 @@ It inspects `options` and arguments for known patterns (UUID regex, Alias format
 
 ## 8. Shell Snippet (Conceptual)
 
-*Note*: Shell extraction ignores `canonical_key`/`target` (handled by compaction). For maximum robustness, you may always use `mm completions --emit-source` instead of parsing the cache.
+*Note*: Shell extraction ignores `canonical_key`/`target` (handled by compaction).
 
 ```zsh
 _mm_find_cache_file() {
@@ -192,35 +193,33 @@ _mm_find_cache_file() {
 }
 
 _mm_get_candidates() {
-    local type="$1" # 'id' or 'tag'
+    local type="$1" # 'id', 'alias', or 'tag'
     local cache_file="$(_mm_find_cache_file)"
-    
+
     if [[ -n "$cache_file" ]]; then
-        # Fast path: Robust Regex extraction from JSONL
+        # Robust Regex extraction from JSONL
         # Matches: "type":"<type>"..."value":"<value>"
         grep "\"type\":\"$type\"" "$cache_file" | \
         sed -E 's/.*"value":"([^"]+)".*/\1/'
-    else
-        # Slow path / Fallback: CLI Helper (Plain Text output)
-        mm completions --emit-source --filter "$type"
     fi
+    # No fallback: if cache is missing/empty, no candidates are provided
 }
 ```
 ## 9. Manual Verification
 
-1.  **Fresh Install**:
+1.  **Fresh Install (No Cache)**:
     *   Run `mm completions zsh > ~/.zshrc_mm`.
     *   Start new shell.
-    *   Verify `mm edit <TAB>` falls back to `mm completions --emit-source` and shows *Open + Closed* items (or all available candidates).
+    *   Verify `mm edit <TAB>` provides no completion candidates (cache is empty).
 2.  **Cache Population**:
-    *   Run `mm note "Hello"`.
-    *   Run `mm list`.
-    *   Check `.index/completion_cache.jsonl` exists and contains the new note UUID.
-3.  **Completion usage**:
-    *   Type `mm edit <TAB>` -> UUID should be suggested.
-4.  **Fallback**:
-    *   Delete `.index/completion_cache.jsonl`.
-    *   Type `mm edit <TAB>` -> Should run `mm completions --emit-source` (verified by latency or process list) and suggest open/closed items.
+    *   Run `mm note "Hello"` to create an item.
+    *   Check `.index/completion_cache.jsonl` exists and contains the new note's ID, alias, and any tags.
+3.  **Completion After Cache Population**:
+    *   Type `mm edit <TAB>` -> The newly created item's ID and alias should be suggested.
+4.  **Cache Growth Through Usage**:
+    *   Run `mm ls` to display items.
+    *   Check cache file now includes IDs/aliases/tags of displayed items.
+    *   Verify `mm edit <TAB>` suggests these items.
 
 ---
 
