@@ -160,11 +160,72 @@ export const createGitVersionControlService = (): VersionControlService => {
     }
   };
 
+  const push = async (
+    cwd: string,
+    remote: string,
+    branch: string,
+    options?: { force?: boolean },
+  ): Promise<Result<string, VersionControlError>> => {
+    const args = ["push", remote, branch];
+    if (options?.force) {
+      args.push("--force");
+    }
+    try {
+      const command = new Deno.Command("git", {
+        args,
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { code, stdout, stderr } = await command.output();
+      const outStr = new TextDecoder().decode(stdout);
+      const errStr = new TextDecoder().decode(stderr);
+
+      if (code !== 0) {
+        return Result.error(createVersionControlError(`git push failed: ${outStr} ${errStr}`));
+      }
+      // Git pushはstderrにメッセージを出力することがある
+      return Result.ok(errStr || outStr);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+      }
+      return Result.error(createVersionControlError(`git push failed: ${error}`, { cause: error }));
+    }
+  };
+
+  const getCurrentBranch = async (cwd: string): Promise<Result<string, VersionControlError>> => {
+    try {
+      const command = new Deno.Command("git", {
+        args: ["rev-parse", "--abbrev-ref", "HEAD"],
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { code, stdout, stderr } = await command.output();
+      if (code !== 0) {
+        const errStr = new TextDecoder().decode(stderr);
+        return Result.error(createVersionControlError(`git rev-parse failed: ${errStr}`));
+      }
+      const branch = new TextDecoder().decode(stdout).trim();
+      return Result.ok(branch);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+      }
+      return Result.error(
+        createVersionControlError(`git rev-parse failed: ${error}`, { cause: error }),
+      );
+    }
+  };
+
   return {
     init,
     setRemote,
     stage,
     commit,
     validateBranchName,
+    push,
+    getCurrentBranch,
   };
 };
