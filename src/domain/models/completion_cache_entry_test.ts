@@ -1,8 +1,5 @@
 import { assertEquals } from "@std/assert";
-import {
-  createAliasEntry,
-  createTagEntry,
-} from "./completion_cache_entry.ts";
+import { createAliasEntry, createTagEntry } from "./completion_cache_entry.ts";
 
 Deno.test("CompletionCacheEntry - createAliasEntry", () => {
   const timestamp = "2025-12-08T06:00:00Z";
