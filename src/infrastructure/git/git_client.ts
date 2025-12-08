@@ -133,17 +133,21 @@ export const createGitVersionControlService = (): VersionControlService => {
         stderr: "piped",
       });
       const { code, stderr } = await command.output();
+      const stderrStr = new TextDecoder().decode(stderr);
       if (code === 0) {
         return Result.ok(undefined);
       }
-      if (code === 1) {
-        // Exit code 1 means invalid ref format
+      if (
+        code === 1 ||
+        stderrStr.includes("not a valid branch name")
+      ) {
+        // Exit code 1 or explicit error message means invalid ref format
         return Result.error(createVersionControlError("Invalid branch name"));
       }
       // Any other exit code is a system/git error
       return Result.error(
         createVersionControlError(
-          `git check-ref-format failed: ${new TextDecoder().decode(stderr)}`,
+          `git check-ref-format failed: ${stderrStr}`,
         ),
       );
     } catch (error) {
