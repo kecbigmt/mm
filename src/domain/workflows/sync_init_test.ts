@@ -40,6 +40,19 @@ const mockVersionControlService = () => {
       }
       return Promise.resolve(Result.ok(undefined));
     },
+    push: (
+      _cwd: string,
+      _remote: string,
+      _branch: string,
+      _options?: { force?: boolean },
+    ): Promise<Result<string, VersionControlError>> => {
+      calls.push("push");
+      return Promise.resolve(Result.ok("Everything up-to-date\n"));
+    },
+    getCurrentBranch: (_cwd: string): Promise<Result<string, VersionControlError>> => {
+      calls.push("getCurrentBranch");
+      return Promise.resolve(Result.ok("main"));
+    },
     getCalls: () => calls,
   };
 };
