@@ -13,10 +13,10 @@ Target version: mm v0.2.0
 
 *   **`completions` command**: A new CLI command that outputs completion scripts for Bash and Zsh.
 *   **Shell Completion Scripts**: Logic to auto-complete commands, subcommands, flags, and arguments.
-*   **Recent Item Caching**: A mechanism to store IDs, aliases, and tags of recently accessed/modified items.
+*   **Recent Item Caching**: A mechanism to store aliases and context tags of recently accessed/modified items.
     *   **Triggers**: A centralized hook mechanism to ensure *any* command execution that references or displays items updates the cache.
     *   **Cache Sources**:
-        *   Command arguments (IDs, aliases, tags explicitly used)
+        *   Command arguments (aliases, context tags explicitly used)
         *   Command results (items created, displayed, or modified)
 *   **Workspace-based Caching**: Cache files stored within the declared workspace (`.index/completion_cache.jsonl`).
 *   **Typed Cache Format**: JSON Lines format to distinguish between IDs, Aliases, and Tags, allowing for better validation and filtering.
@@ -35,11 +35,11 @@ Target version: mm v0.2.0
 
 ## 1. Motivation & Goals
 
-Users frequently need to reference items (by ID, alias, or tag) across multiple commands. Typing full UUIDs or remembering exact aliases is cumbersome. Shell completion should suggest recently used items to accelerate workflows.
+Users frequently need to reference items (by alias or context tag) across multiple commands. Typing or remembering exact aliases and tags is cumbersome. Shell completion should suggest recently used items to accelerate workflows.
 
 Design goals:
 
-1.  **Recall**: Allow completion of recently accessed items (IDs/Aliases/Tags), including closed items.
+1.  **Recall**: Allow completion of recently accessed aliases and context tags, including those from closed items.
 2.  **Performance**: Sub-shell-latency (<50ms) lookups via a pre-computed local cache.
 3.  **Reliability**: Atomic writes and correct workspace resolution.
 4.  **Simplicity**: Cache-only approach; natural usage (`mm ls`, `mm note`, etc.) builds the cache over time.
@@ -50,8 +50,9 @@ Design goals:
 ## 2. Terminology
 
 *   **Completion Cache**: A JSONL file storing entries for completion candidates.
-*   **Entry Type**: `id` (UUID), `alias` (User Alias), `tag` (Context/Tag).
-*   **Canonical Key**: The stable identifier (UUID for items, generated key for aliases/tags).
+*   **Entry Type**: `alias` (Item Alias), `tag` (Context Tag).
+*   **Canonical Key**: The stable identifier (alias slug or tag slug).
+*   **Target**: For aliases, the UUID of the item the alias points to (used for tracking alias updates).
 
 ---
 
@@ -66,23 +67,22 @@ We will implement a **Cache Middleware** (or Command Interceptor) in the Present
     *   If no workspace is active, no cache is written.
 *   **Format**: JSON Lines (JSONL).
     *   **Schema**:
-        *   `type`: "id" | "alias" | "tag" (Required)
-        *   `value`: string (The text to suggest, e.g. alias name or UUID) (Required)
-        *   `canonical_key`: string (Stable identifier, e.g. UUID for items, canonical tag key) (Required)
-        *   `target`: string (Optional, for aliases: the UUID they point to)
+        *   `type`: "alias" | "tag" (Required)
+        *   `value`: string (The text to suggest, e.g. alias name or tag name) (Required)
+        *   `canonical_key`: string (Stable identifier: alias slug or tag slug) (Required)
+        *   `target`: string (For aliases: the UUID they point to; omitted for tags) (Required for aliases)
         *   `last_seen`: string (UTC ISO 8601 timestamp) (Required)
-    
-    *   *Note*: `canonical_key` and `target` are primarily used by the **Compaction Service** to handle deduplication and alias updates. The shell reader primarily consumes `value`.
+
+    *   *Note*: `canonical_key` and `target` are primarily used by the **Compaction Service** to handle deduplication and alias updates. The shell reader primarily consumes `value`. IDs are not cached for completion since they are long UUIDs not meant for manual typing.
 
     ```json
-    {"type":"id","value":"0193bb...","canonical_key":"0193bb...","last_seen":"2025-12-06T12:00:00Z"}
     {"type":"alias","value":"todo","canonical_key":"todo","target":"0193bb...","last_seen":"2025-12-06T12:00:00Z"}
     {"type":"tag","value":"work","canonical_key":"work","last_seen":"2025-12-06T12:00:00Z"}
     ```
 
-*   **Update Trigger**: 
-    *   The `Command` classes or their runner will be wrapped. 
-    *   After successful execution, any `ItemId`, `AliasSlug`, or `TagSlug` present in the Input/Output arguments or Result will be extracted and upserted into the cache.
+*   **Update Trigger**:
+    *   The `Command` classes or their runner will be wrapped.
+    *   After successful execution, any `AliasSlug` or `TagSlug` present in the Input/Output arguments or Result will be extracted and upserted into the cache.
 *   **Concurrency**: 
     *   Read existing cache (if small) or append-only log.
     *   Periodically (e.g., every 10 writes or >50KB), compact the cache:
@@ -121,7 +121,7 @@ Outputs shell completion script to stdout for installation.
 
 *   **Stateful Completion**: Completion candidates evolve based on usage. Natural command usage (`mm ls`, `mm note`, etc.) populates the cache.
 *   **Cache-Only**: If cache is empty (e.g., fresh install), no completion candidates are provided until commands are run.
-*   **No Short IDs**: Completion suggests full UUIDs or Aliases. Users typically type Aliases or copy-paste UUIDs; completion helps with Aliases and previously seen UUIDs.
+*   **Aliases and Tags Only**: Completion suggests aliases and context tags. IDs are not suggested since they are long UUIDs not meant for manual typing.
 
 ---
 
@@ -130,13 +130,13 @@ Outputs shell completion script to stdout for installation.
 ### 5.1 Command Interceptors
 
 Implement a `CommandRunner` or `Middleware` that wraps the `cliffy` ActionHandler.
-It inspects `options` and arguments for known patterns (UUID regex, Alias format) or consumes a Structured Result object if available.
+It inspects `options` and arguments for known patterns (Alias format, Tag format) or consumes a Structured Result object if available.
 
 ### 5.2 Cache Population Strategy
 
 Commands update the cache by extracting:
-*   **From arguments**: ItemId, AliasSlug, TagSlug patterns in command-line arguments.
-*   **From results**: Items created, displayed, or modified by the command (e.g., `mm note` creates an item; `mm ls` displays items).
+*   **From arguments**: AliasSlug, TagSlug patterns in command-line arguments.
+*   **From results**: Items created, displayed, or modified by the command (extract their aliases and tags).
 
 This ensures natural usage builds the cache organically.
 
@@ -193,7 +193,7 @@ _mm_find_cache_file() {
 }
 
 _mm_get_candidates() {
-    local type="$1" # 'id', 'alias', or 'tag'
+    local type="$1" # 'alias' or 'tag'
     local cache_file="$(_mm_find_cache_file)"
 
     if [[ -n "$cache_file" ]]; then
@@ -212,14 +212,14 @@ _mm_get_candidates() {
     *   Start new shell.
     *   Verify `mm edit <TAB>` provides no completion candidates (cache is empty).
 2.  **Cache Population**:
-    *   Run `mm note "Hello"` to create an item.
-    *   Check `.index/completion_cache.jsonl` exists and contains the new note's ID, alias, and any tags.
+    *   Run `mm note "Hello" --context work` to create an item.
+    *   Check `.index/completion_cache.jsonl` exists and contains the new note's alias and the "work" tag.
 3.  **Completion After Cache Population**:
-    *   Type `mm edit <TAB>` -> The newly created item's ID and alias should be suggested.
+    *   Type `mm edit <TAB>` -> The newly created item's alias should be suggested.
 4.  **Cache Growth Through Usage**:
     *   Run `mm ls` to display items.
-    *   Check cache file now includes IDs/aliases/tags of displayed items.
-    *   Verify `mm edit <TAB>` suggests these items.
+    *   Check cache file now includes aliases and context tags of displayed items.
+    *   Verify `mm edit <TAB>` suggests these aliases and `mm note --context <TAB>` suggests the tags.
 
 ---
 
