@@ -30,6 +30,8 @@ import {
 } from "../../domain/services/alias_auto_generator.ts";
 import { createCryptoRandomSource } from "../../infrastructure/random/crypto_random_source.ts";
 import type { SectionQueryService } from "../../domain/services/section_query_service.ts";
+import { VersionControlService } from "../../domain/services/version_control_service.ts";
+import { createGitVersionControlService } from "../../infrastructure/git/git_client.ts";
 
 export type CliDependencies = Readonly<{
   readonly root: string;
@@ -43,6 +45,7 @@ export type CliDependencies = Readonly<{
   readonly sectionQueryService: SectionQueryService;
   readonly rankService: RankService;
   readonly idGenerationService: IdGenerationService;
+  readonly versionControlService: VersionControlService;
 }>;
 
 export type CliDependencyError =
@@ -232,6 +235,7 @@ export const loadCliDependencies = async (
   const sectionQueryService = createFileSystemSectionQueryService({ root });
   const rankService = createRankService(createLexoRankGenerator());
   const idGenerationService = createIdGenerationService(createUuidV7Generator());
+  const versionControlService = createGitVersionControlService();
 
   return Result.ok({
     root,
@@ -245,5 +249,6 @@ export const loadCliDependencies = async (
     sectionQueryService,
     rankService,
     idGenerationService,
+    versionControlService,
   });
 };
