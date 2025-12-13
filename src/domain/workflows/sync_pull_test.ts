@@ -5,7 +5,7 @@ import { createWorkspaceSettings, WorkspaceSettings } from "../models/workspace.
 import { timezoneIdentifierFromString } from "../primitives/timezone_identifier.ts";
 import { WorkspaceRepository } from "../repositories/workspace_repository.ts";
 import {
-  createVersionControlError,
+  createVersionControlCommandFailedError,
   VersionControlError,
 } from "../services/version_control_service.ts";
 
@@ -57,7 +57,9 @@ const mockVersionControlService = () => {
     ): Promise<Result<string, VersionControlError>> => {
       calls.push(`pull:${remote}:${branch}`);
       if (shouldFailPull) {
-        return Promise.resolve(Result.error(createVersionControlError(pullErrorMessage)));
+        return Promise.resolve(
+          Result.error(createVersionControlCommandFailedError(pullErrorMessage)),
+        );
       }
       return Promise.resolve(Result.ok("Already up to date.\n"));
     },
@@ -305,7 +307,7 @@ Deno.test("SyncPullWorkflow fails on non-fast-forward update", async () => {
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "VersionControlError");
+    assertEquals(result.error.kind, "VersionControlCommandFailedError");
     assertEquals(result.error.message.includes("Not possible to fast-forward"), true);
   }
   assertEquals(git.getCalls(), [
@@ -331,7 +333,7 @@ Deno.test("SyncPullWorkflow fails when pull command fails", async () => {
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "VersionControlError");
+    assertEquals(result.error.kind, "VersionControlCommandFailedError");
     assertEquals(result.error.message.includes("Could not resolve host"), true);
   }
   assertEquals(git.getCalls(), [

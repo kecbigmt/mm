@@ -1,6 +1,8 @@
 import { Result } from "../../shared/result.ts";
 import {
-  createVersionControlError,
+  createVersionControlCommandFailedError,
+  createVersionControlNotAvailableError,
+  createVersionControlNotInitializedError,
   VersionControlError,
   VersionControlService,
 } from "../../domain/services/version_control_service.ts";
@@ -23,14 +25,18 @@ export const createGitVersionControlService = (): VersionControlService => {
       if (code !== 0) {
         const outStr = new TextDecoder().decode(stdout);
         const errStr = new TextDecoder().decode(stderr);
-        return Result.error(createVersionControlError(`${errorPrefix}: ${outStr} ${errStr}`));
+        return Result.error(
+          createVersionControlCommandFailedError(`${errorPrefix}: ${outStr} ${errStr}`),
+        );
       }
       return Result.ok(undefined);
     } catch (error) {
       if (error instanceof Deno.errors.NotFound) {
-        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+        return Result.error(createVersionControlNotAvailableError());
       }
-      return Result.error(createVersionControlError(`${errorPrefix}: ${error}`, { cause: error }));
+      return Result.error(
+        createVersionControlCommandFailedError(`${errorPrefix}: ${error}`, { cause: error }),
+      );
     }
   };
 
@@ -54,7 +60,7 @@ export const createGitVersionControlService = (): VersionControlService => {
       const { code, stdout, stderr } = await command.output();
       if (code !== 0) {
         return Result.error(
-          createVersionControlError(
+          createVersionControlCommandFailedError(
             `git remote list failed: ${new TextDecoder().decode(stderr)}`,
           ),
         );
@@ -76,7 +82,7 @@ export const createGitVersionControlService = (): VersionControlService => {
         const getUrlOutput = await getUrlCmd.output();
         if (getUrlOutput.code !== 0) {
           return Result.error(
-            createVersionControlError(
+            createVersionControlCommandFailedError(
               `git remote get-url failed: ${new TextDecoder().decode(getUrlOutput.stderr)}`,
             ),
           );
@@ -89,7 +95,7 @@ export const createGitVersionControlService = (): VersionControlService => {
 
         if (!options?.force) {
           return Result.error(
-            createVersionControlError(
+            createVersionControlCommandFailedError(
               `Remote '${name}' already exists with different URL: '${existingUrl}'. Expected: '${url}'. Use --force to overwrite.`,
             ),
           );
@@ -108,10 +114,12 @@ export const createGitVersionControlService = (): VersionControlService => {
       return safeExecute("git", ["remote", "add", name, url], cwd, "git remote add failed");
     } catch (error) {
       if (error instanceof Deno.errors.NotFound) {
-        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+        return Result.error(createVersionControlNotAvailableError());
       }
       return Result.error(
-        createVersionControlError(`git remote operation failed: ${error}`, { cause: error }),
+        createVersionControlCommandFailedError(`git remote operation failed: ${error}`, {
+          cause: error,
+        }),
       );
     }
   };
@@ -142,20 +150,22 @@ export const createGitVersionControlService = (): VersionControlService => {
         stderrStr.includes("not a valid branch name")
       ) {
         // Exit code 1 or explicit error message means invalid ref format
-        return Result.error(createVersionControlError("Invalid branch name"));
+        return Result.error(createVersionControlCommandFailedError("Invalid branch name"));
       }
       // Any other exit code is a system/git error
       return Result.error(
-        createVersionControlError(
+        createVersionControlCommandFailedError(
           `git check-ref-format failed: ${stderrStr}`,
         ),
       );
     } catch (error) {
       if (error instanceof Deno.errors.NotFound) {
-        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+        return Result.error(createVersionControlNotAvailableError());
       }
       return Result.error(
-        createVersionControlError(`git check-ref-format failed: ${error}`, { cause: error }),
+        createVersionControlCommandFailedError(`git check-ref-format failed: ${error}`, {
+          cause: error,
+        }),
       );
     }
   };
@@ -182,15 +192,19 @@ export const createGitVersionControlService = (): VersionControlService => {
       const errStr = new TextDecoder().decode(stderr);
 
       if (code !== 0) {
-        return Result.error(createVersionControlError(`git push failed: ${outStr} ${errStr}`));
+        return Result.error(
+          createVersionControlCommandFailedError(`git push failed: ${outStr} ${errStr}`),
+        );
       }
       // Git pushはstderrにメッセージを出力することがある
       return Result.ok(errStr || outStr);
     } catch (error) {
       if (error instanceof Deno.errors.NotFound) {
-        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+        return Result.error(createVersionControlNotAvailableError());
       }
-      return Result.error(createVersionControlError(`git push failed: ${error}`, { cause: error }));
+      return Result.error(
+        createVersionControlCommandFailedError(`git push failed: ${error}`, { cause: error }),
+      );
     }
   };
 
@@ -206,16 +220,20 @@ export const createGitVersionControlService = (): VersionControlService => {
       const { code, stdout, stderr } = await command.output();
       if (code !== 0) {
         const errStr = new TextDecoder().decode(stderr);
-        return Result.error(createVersionControlError(`git symbolic-ref failed: ${errStr}`));
+        return Result.error(
+          createVersionControlCommandFailedError(`git symbolic-ref failed: ${errStr}`),
+        );
       }
       const branch = new TextDecoder().decode(stdout).trim();
       return Result.ok(branch);
     } catch (error) {
       if (error instanceof Deno.errors.NotFound) {
-        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+        return Result.error(createVersionControlNotAvailableError());
       }
       return Result.error(
-        createVersionControlError(`git symbolic-ref failed: ${error}`, { cause: error }),
+        createVersionControlCommandFailedError(`git symbolic-ref failed: ${error}`, {
+          cause: error,
+        }),
       );
     }
   };
@@ -246,16 +264,18 @@ export const createGitVersionControlService = (): VersionControlService => {
           return safeExecute("git", ["checkout", "-b", branch], cwd, "git checkout -b failed");
         } else {
           return Result.error(
-            createVersionControlError(`Branch '${branch}' does not exist and create flag is false`),
+            createVersionControlCommandFailedError(
+              `Branch '${branch}' does not exist and create flag is false`,
+            ),
           );
         }
       }
     } catch (error) {
       if (error instanceof Deno.errors.NotFound) {
-        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+        return Result.error(createVersionControlNotAvailableError());
       }
       return Result.error(
-        createVersionControlError(`git checkout failed: ${error}`, { cause: error }),
+        createVersionControlCommandFailedError(`git checkout failed: ${error}`, { cause: error }),
       );
     }
   };
@@ -277,7 +297,9 @@ export const createGitVersionControlService = (): VersionControlService => {
       const errStr = new TextDecoder().decode(stderr);
 
       if (code !== 0) {
-        return Result.error(createVersionControlError(`git pull failed: ${outStr} ${errStr}`));
+        return Result.error(
+          createVersionControlCommandFailedError(`git pull failed: ${outStr} ${errStr}`),
+        );
       }
       // Git pull outputs progress to stderr and result to stdout
       // Combine both to show complete output
@@ -287,9 +309,11 @@ export const createGitVersionControlService = (): VersionControlService => {
       return Result.ok(output);
     } catch (error) {
       if (error instanceof Deno.errors.NotFound) {
-        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+        return Result.error(createVersionControlNotAvailableError());
       }
-      return Result.error(createVersionControlError(`git pull failed: ${error}`, { cause: error }));
+      return Result.error(
+        createVersionControlCommandFailedError(`git pull failed: ${error}`, { cause: error }),
+      );
     }
   };
 
@@ -306,7 +330,11 @@ export const createGitVersionControlService = (): VersionControlService => {
       const { code, stdout, stderr } = await command.output();
       if (code !== 0) {
         const errStr = new TextDecoder().decode(stderr);
-        return Result.error(createVersionControlError(`git status failed: ${errStr}`));
+        // Check if it's a "not a git repository" error
+        if (errStr.includes("not a git repository")) {
+          return Result.error(createVersionControlNotInitializedError());
+        }
+        return Result.error(createVersionControlCommandFailedError(`git status failed: ${errStr}`));
       }
       const output = new TextDecoder().decode(stdout);
       // Filter out untracked files (lines starting with "??")
@@ -318,10 +346,10 @@ export const createGitVersionControlService = (): VersionControlService => {
       return Result.ok(trackedChanges.length > 0);
     } catch (error) {
       if (error instanceof Deno.errors.NotFound) {
-        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+        return Result.error(createVersionControlNotAvailableError());
       }
       return Result.error(
-        createVersionControlError(`git status failed: ${error}`, { cause: error }),
+        createVersionControlCommandFailedError(`git status failed: ${error}`, { cause: error }),
       );
     }
   };
@@ -341,7 +369,7 @@ export const createGitVersionControlService = (): VersionControlService => {
       const fetchOutput = await fetchCommand.output();
       if (fetchOutput.code !== 0) {
         const errStr = new TextDecoder().decode(fetchOutput.stderr);
-        return Result.error(createVersionControlError(`git fetch failed: ${errStr}`));
+        return Result.error(createVersionControlCommandFailedError(`git fetch failed: ${errStr}`));
       }
 
       // Get remote HEAD using symbolic-ref
@@ -355,7 +383,7 @@ export const createGitVersionControlService = (): VersionControlService => {
       if (code !== 0) {
         const errStr = new TextDecoder().decode(stderr);
         return Result.error(
-          createVersionControlError(
+          createVersionControlCommandFailedError(
             `Failed to resolve remote default branch: ${errStr}`,
           ),
         );
@@ -365,7 +393,7 @@ export const createGitVersionControlService = (): VersionControlService => {
       const branchMatch = symbolicRef.match(/^refs\/remotes\/[^/]+\/(.+)$/);
       if (!branchMatch) {
         return Result.error(
-          createVersionControlError(
+          createVersionControlCommandFailedError(
             `Invalid symbolic-ref format: ${symbolicRef}`,
           ),
         );
@@ -373,10 +401,10 @@ export const createGitVersionControlService = (): VersionControlService => {
       return Result.ok(branchMatch[1]);
     } catch (error) {
       if (error instanceof Deno.errors.NotFound) {
-        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+        return Result.error(createVersionControlNotAvailableError());
       }
       return Result.error(
-        createVersionControlError(`Failed to get remote default branch: ${error}`, {
+        createVersionControlCommandFailedError(`Failed to get remote default branch: ${error}`, {
           cause: error,
         }),
       );

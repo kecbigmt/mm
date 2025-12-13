@@ -5,7 +5,7 @@ import { createWorkspaceSettings, WorkspaceSettings } from "../models/workspace.
 import { timezoneIdentifierFromString } from "../primitives/timezone_identifier.ts";
 import { WorkspaceRepository } from "../repositories/workspace_repository.ts";
 import {
-  createVersionControlError,
+  createVersionControlCommandFailedError,
   VersionControlError,
 } from "../services/version_control_service.ts";
 
@@ -48,7 +48,7 @@ const mockVersionControlService = () => {
       calls.push(`push:${remote}:${branch}${forceFlag}`);
       if (shouldFailPush) {
         return Promise.resolve(
-          Result.error(createVersionControlError("git push failed: rejected")),
+          Result.error(createVersionControlCommandFailedError("git push failed: rejected")),
         );
       }
       return Promise.resolve(Result.ok("Everything up-to-date\n"));
@@ -248,7 +248,7 @@ Deno.test("SyncPushWorkflow fails when push is rejected", async () => {
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "VersionControlError");
+    assertEquals(result.error.kind, "VersionControlCommandFailedError");
     assertEquals(result.error.message, "git push failed: rejected");
   }
   assertEquals(git.getCalls(), ["getCurrentBranch", "push:origin:main"]);

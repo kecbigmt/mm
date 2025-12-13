@@ -118,6 +118,12 @@ export const createSyncCommand = () => {
         const error = result.error;
         const debug = isDebugMode();
         console.error(formatError(error, debug));
+
+        // Provide actionable guidance for specific error types
+        if (error.kind === "VersionControlNotInitializedError") {
+          console.error("\nRun 'mm sync init <remote-url>' or 'git init' to initialize.");
+        }
+
         Deno.exit(1);
       }
 
