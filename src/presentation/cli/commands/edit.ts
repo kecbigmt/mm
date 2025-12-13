@@ -131,9 +131,6 @@ export function createEditCommand() {
 
           const updatedItem = reloadResult.value;
 
-          // Update cache with edited item
-          await deps.cacheUpdateService.updateFromItem(updatedItem);
-
           const newAlias = updatedItem.data.alias;
 
           // Update alias index if alias changed
@@ -184,6 +181,9 @@ export function createEditCommand() {
               }
             }
           }
+
+          // Update cache after all validations and persists succeed
+          await deps.cacheUpdateService.updateFromItem(updatedItem);
 
           console.log(`✅ Updated ${formatItem(updatedItem)}`);
         } catch (error) {
