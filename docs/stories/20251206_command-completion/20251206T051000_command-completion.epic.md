@@ -13,39 +13,45 @@ Target version: mm v0.2.0
 
 *   **`completions` command**: A new CLI command that outputs completion scripts for Bash and Zsh.
 *   **Shell Completion Scripts**: Logic to auto-complete commands, subcommands, flags, and arguments.
-*   **Recent Item Caching**: A mechanism to store IDs and aliases of recently accessed/modified items.
-    *   **Triggers**: A centralized hook mechanism to ensure *any* command execution that references an item updates the cache.
-*   **Workspace-based Caching**: Cache files stored within the declared workspace (`.index/completion_cache.jsonl`).
-*   **Typed Cache Format**: JSON Lines format to distinguish between IDs, Aliases, and Tags, allowing for better validation and filtering.
-*   **Atomic Updates**: Concurrency-safe cache writing (atomic rename).
-*   **Pluggable List Source**: A new flag or hidden command (e.g., `mm completions --emit-source`) to provide machine-readable candidates for fallback.
+*   **Recent Item Caching**: A mechanism to store aliases and context tags of recently accessed/modified items.
+    *   **Triggers**: Commands update cache after successful execution.
+    *   **Cache Sources**:
+        *   Command results only (items created, displayed, or modified)
+        *   Note: Arguments are NOT cached separately to avoid caching failed commands
+*   **Workspace-based Caching**: Cache files stored within the declared workspace (`.index/completion_aliases.txt` and `.index/completion_context_tags.txt`).
+*   **Simple Text Format**: Plain text files, one value per line. File order represents recency (newest at end).
+*   **Cache-Only Completion**: Shell completion relies exclusively on cache; no fallback mechanism.
 
 ### Out of Scope (future work)
 
 *   Fish or PowerShell support.
 *   Context-aware filtering (e.g., filtering `close` candidates to only 'open' items) beyond basic ID availability.
 *   "Short ID" logic (current domain uses strictly UUIDv7 and Aliases).
+*   Fallback mechanisms (e.g., querying all items from `.index/` when cache is empty).
+*   Full item enumeration commands for completion (completion relies solely on cache).
 
 ---
 
 ## 1. Motivation & Goals
 
-The previous prototype relied on `mm list` output parsing for completion, which was fragile and limited to "open" items. Users need to interact with items they just closed or historically accessed.
+Users frequently need to reference items (by alias or context tag) across multiple commands. Typing or remembering exact aliases and tags is cumbersome. Shell completion should suggest recently used items to accelerate workflows.
 
 Design goals:
 
-1.  **Recall**: Allow completion of items (UUIDs/Aliases) not currently valid in the default view (e.g., closed items).
+1.  **Recall**: Allow completion of recently accessed aliases and context tags, including those from closed items.
 2.  **Performance**: Sub-shell-latency (<50ms) lookups via a pre-computed local cache.
 3.  **Reliability**: Atomic writes and correct workspace resolution.
-4.  **Correctness**: Use machine-readable sources rather than screen scraping.
+4.  **Simplicity**: Cache-only approach; natural usage (`mm ls`, `mm note`, etc.) builds the cache over time.
+5.  **Scalability**: Avoid full item enumeration; cache grows organically based on actual usage.
 
 ---
 
 ## 2. Terminology
 
-*   **Completion Cache**: A JSONL file storing entries for completion candidates.
-*   **Entry Type**: `id` (UUID), `alias` (User Alias), `tag` (Context/Tag).
-*   **Canonical Key**: The stable identifier (UUID for items, generated key for aliases/tags).
+*   **Completion Cache**: Two plain text files storing completion candidates.
+*   **Aliases Cache**: `completion_aliases.txt` - one alias per line.
+*   **Context Tags Cache**: `completion_context_tags.txt` - one tag per line.
+*   **Recency**: File order (newest entries at end of file).
 
 ---
 
@@ -53,63 +59,52 @@ Design goals:
 
 ### 3.1 Caching Mechanism (The "Writer")
 
-We will implement a **Cache Middleware** (or Command Interceptor) in the Presentation layer.
+Cache updates are handled by **CacheUpdateService** integrated into commands.
 
-*   **File Location**: 
-    *   `<workspace_root>/.index/completion_cache.jsonl`
+*   **File Locations**:
+    *   `<workspace_root>/.index/completion_aliases.txt`
+    *   `<workspace_root>/.index/completion_context_tags.txt`
     *   If no workspace is active, no cache is written.
-*   **Format**: JSON Lines (JSONL).
-    *   **Schema**:
-        *   `type`: "id" | "alias" | "tag" (Required)
-        *   `value`: string (The text to suggest, e.g. alias name or UUID) (Required)
-        *   `canonical_key`: string (Stable identifier, e.g. UUID for items, canonical tag key) (Required)
-        *   `target`: string (Optional, for aliases: the UUID they point to)
-        *   `last_seen`: string (UTC ISO 8601 timestamp) (Required)
-    
-    *   *Note*: `canonical_key` and `target` are primarily used by the **Compaction Service** to handle deduplication and alias updates. The shell reader primarily consumes `value`.
+*   **Format**: Plain text, one value per line.
+    *   Aliases file contains alias values (e.g., `todo`, `meeting-notes`)
+    *   Context tags file contains tag values (e.g., `work`, `personal`)
+    *   No metadata fields - file order represents recency (newest at end)
+    *   IDs are not cached since UUIDs are not meant for manual typing
 
-    ```json
-    {"type":"id","value":"0193bb...","canonical_key":"0193bb...","last_seen":"2025-12-06T12:00:00Z"}
-    {"type":"alias","value":"todo","canonical_key":"todo","target":"0193bb...","last_seen":"2025-12-06T12:00:00Z"}
-    {"type":"tag","value":"work","canonical_key":"work","last_seen":"2025-12-06T12:00:00Z"}
+    ```text
+    # completion_aliases.txt
+    todo
+    meeting-notes
+    project-x
+
+    # completion_context_tags.txt
+    work
+    personal
+    urgent
     ```
 
-*   **Update Trigger**: 
-    *   The `Command` classes or their runner will be wrapped. 
-    *   After successful execution, any `ItemId`, `AliasSlug`, or `TagSlug` present in the Input/Output arguments or Result will be extracted and upserted into the cache.
-*   **Concurrency**: 
-    *   Read existing cache (if small) or append-only log.
-    *   Periodically (e.g., every 10 writes or >50KB), compact the cache:
-        1.  Read all lines.
-        2.  Deduplicate by `(type, canonical_key)`, keeping most recent `last_seen`. (Updates aliases to new targets if changed).
-        3.  Sort by recency (newest first).
-        4.  Truncate to `MAX_ENTRIES` (e.g., 1000).
-        5.  Write to `.tmp`, then atomic `rename` to target.
+*   **Update Trigger**:
+    *   Commands call `CacheUpdateService` after successful execution
+    *   Extracts aliases and context tags from created/displayed/modified items
+    *   Only successful command results are cached (not arguments)
+*   **Deduplication & Truncation**:
+    *   **Tail-only deduplication**: Check last N lines (N = number of new entries) to avoid duplicates
+    *   **Auto-truncation**: When file exceeds 1000 lines, remove oldest entries to maintain limit
+    *   Both operations occur during each append (no separate compaction phase)
+    *   Trade-off: Allows some duplicates for better performance vs full-file scanning
 
 ### 3.2 Shell Scripts (The "Reader")
 
-The generated Zsh/Bash scripts will employ a **Fast Path / Slow Path** strategy:
+The generated Zsh/Bash scripts will employ a **cache-only** strategy:
 
-1.  **Fast Path (Optimization)**:
-    *   Attempt to locate `.index/completion_cache.jsonl` in `.mm` or parent directories (optimistic CWD check).
-    *   If found, use a **robust regex** (`grep`) to extract `value` fields where `type` matches.
+1.  **Cache Lookup**:
+    *   Locate `.index/completion_aliases.txt` or `.index/completion_context_tags.txt` by traversing upward from CWD.
+    *   Read file content directly (no parsing needed - plain text)
     *   *Goal*: Low latency (< 20ms) for common case (inside workspace).
-2.  **Slow Path (Primary/Fallback)**:
-    *   If file missing, empty, or CWD check fails, call `mm completions --emit-source --filter <type>`.
-    *   This leverages the CLI's internal workspace resolution (finding `MM_HOME` etc.) to guarantee correctness if run from outside the workspace structure.
-    *   Preferred for correctness; if the helper remains fast enough, consider skipping cache parsing entirely and always using it.
-
-### 3.3 Internal Helper: `mm completions --emit-source`
-
-An internal (hidden) flag for the `completions` command, used by the shell script as a reliable fallback.
-
-*   **Usage**: `mm completions --emit-source [--filter <id|alias|tag>]`
-*   **Behavior**:
-    1.  Resolves workspace via standard CLI mechanisms (`MM_HOME`, state, etc.).
-    2.  Fetches **ALL** available candidates (Open + Closed items from DB, all Tags).
-    3.  Outputs **Plain Text** (one value per line) to standard output.
-        *   This avoids JSON parsing in the shell for the fallback path.
-*   **Goal**: Correctness & Reliability. Used when cache is unavailable or invalid.
+2.  **No Cache Behavior**:
+    *   If cache files are missing or empty, no completion candidates are provided.
+    *   Users must run commands (`mm ls`, `mm note`, etc.) to populate the cache.
+    *   This keeps the implementation simple and avoids scalability risks of full enumeration.
 
 ---
 
@@ -118,41 +113,54 @@ An internal (hidden) flag for the `completions` command, used by the shell scrip
 ### 4.1 New Command
 
 ```bash
-mm completions [shell]
+mm completions [bash|zsh]
 ```
+
+Outputs shell completion script to stdout for installation.
 
 ### 4.2 Behavior Changes
 
-*   **Stateful Completion**: Completion candidates evolve based on usage.
-*   **No Short IDs**: Completion will suggest full UUIDs or Aliases. Users typically type Aliases or copy-paste UUIDs; completion helps with Aliases and previously seen UUIDs.
+*   **Stateful Completion**: Completion candidates evolve based on usage. Natural command usage (`mm ls`, `mm note`, etc.) populates the cache.
+*   **Cache-Only**: If cache is empty (e.g., fresh install), no completion candidates are provided until commands are run.
+*   **Aliases and Tags Only**: Completion suggests aliases and context tags. IDs are not suggested since they are long UUIDs not meant for manual typing.
 
 ---
 
 ## 5. Implementation Notes
 
-### 5.1 Command Interceptors
+### 5.1 Cache Update Integration
 
-Implement a `CommandRunner` or `Middleware` that wraps the `cliffy` ActionHandler.
-It inspects `options` and arguments for known patterns (UUID regex, Alias format) or consumes a Structured Result object if available.
+**CacheUpdateService** provides high-level API for commands:
+*   `updateFromItem(item)` - Cache single item's alias and tag
+*   `updateFromItems(items)` - Cache multiple items (for `mm ls`)
+*   Silent error handling - cache failures don't break commands (warning message shown)
 
-### 5.2 Helper Commands
+Commands call cache update after successful execution only.
 
-*   `mm workspace info --path`: Fast command to print workspace root (for shell script).
-*   `mm items --json --ids-only`: Fast dump of valid IDs/Aliases.
+### 5.2 Cache Population Strategy
+
+Commands update the cache by extracting:
+*   **From results only**: Items created, displayed, or modified by the command (extract their aliases and tags).
+*   **Not from arguments**: Prevents caching values from failed commands.
+
+This ensures natural usage builds the cache organically and accurately.
 
 ### 5.3 Alternatives Considered
 
+*   **JSONL Format**: Rejected in favor of plain text for simplicity and easier shell script integration.
+*   **Timestamps**: Rejected - file order is sufficient for recency tracking.
+*   **Full deduplication**: Rejected - tail-only dedup is more efficient, some duplicates acceptable.
+*   **Separate compaction phase**: Rejected - truncation on append is simpler.
 *   **Reuse `.index` directly**: Rejected due to latency (>50ms parsing thousands of files) and lack of recency history.
-*   **Short IDs**: Rejected as the domain uses strictly UUIDv7. "Shortening" is a display-only concern, not unique addressing in the domain currently.
-*   **Simple Text Cache**: Rejected in favor of JSONL to allow distinguishing `alias` vs `tag` and managing staleness/renames better.
+*   **Fallback to full enumeration**: Rejected due to scalability concerns. Cache-only approach is simpler and safer; natural usage builds the cache.
 
 ---
 
 ## 6. Error Handling
 
-*   **Cache Corruption**: If the JSONL cache contains invalid lines (partial writes), the reader (shell script) must skip them. The writer will use atomic `rename` to prevent torn reads.
-*   **Workspace Resolution Failure**: If `mm workspace info` fails (not in a workspace), completion halts silently or falls back to basic file completion.
-*   **Permissions**: Silently ignore cache write failures (e.g., read-only filesystem).
+*   **Cache Write Failures**: Commands show warning message but continue execution (e.g., "Warning: Failed to update completion cache: PermissionDenied...").
+*   **Workspace Resolution Failure**: If not in a workspace, completion halts silently or falls back to basic file completion.
+*   **Missing Cache Files**: Shell completion returns no candidates if cache files don't exist yet.
 
 ---
 
@@ -160,26 +168,23 @@ It inspects `options` and arguments for known patterns (UUID regex, Alias format
 
 ### 7.1 Unit Tests
 
-*   **Concurrency**: Simulate multiple writers appending/compacting. Verify no data loss using the atomic write pattern.
-*   **Format Compliance**: Ensure valid JSONL output with `type`, `value`, `canonical_key`, and `last_seen`.
-*   **Compaction**: Trigger compaction (e.g. limit 10 items), insert 15 items, verify only 10 most recent remain.
-*   **Alias Renaming**:
-    1.  Cache: `alias: old -> uuid1`
-    2.  Rename `old` to `new`.
-    3.  Cache Update: `alias: new -> uuid1` (new entry), `alias: old` (entry remains until eviction or handled by smart compaction). *Note*: ideally, compaction should detect `old` is no longer valid if we had a precise invalidation mechanism, but simple LRU is acceptable for v1.
+*   **Deduplication**: Verify tail-only dedup works (check last N lines, skip duplicates).
+*   **Truncation**: Insert 1015 entries with max 1000, verify oldest 15 are removed.
+*   **Extraction**: Test `CacheExtractor` extracts correct aliases and tags from items.
+*   **Update Service**: Test `CacheUpdateService` handles errors gracefully (silent with warning).
+*   **Format Compliance**: Ensure plain text output, one value per line, newest at end.
 
 ---
 
 ## 8. Shell Snippet (Conceptual)
 
-*Note*: Shell extraction ignores `canonical_key`/`target` (handled by compaction). For maximum robustness, you may always use `mm completions --emit-source` instead of parsing the cache.
-
 ```zsh
 _mm_find_cache_file() {
+    local filename="$1" # 'completion_aliases.txt' or 'completion_context_tags.txt'
     local dir="$PWD"
     while [[ "$dir" != "/" ]]; do
-        if [[ -f "$dir/.index/completion_cache.jsonl" ]]; then
-            echo "$dir/.index/completion_cache.jsonl"
+        if [[ -f "$dir/.index/$filename" ]]; then
+            echo "$dir/.index/$filename"
             return 0
         fi
         if [[ -f "$dir/workspace.json" || -d "$dir/.mm" ]]; then
@@ -191,43 +196,44 @@ _mm_find_cache_file() {
     return 1
 }
 
-_mm_get_candidates() {
-    local type="$1" # 'id' or 'tag'
-    local cache_file="$(_mm_find_cache_file)"
-    
+_mm_get_alias_candidates() {
+    local cache_file="$(_mm_find_cache_file completion_aliases.txt)"
     if [[ -n "$cache_file" ]]; then
-        # Fast path: Robust Regex extraction from JSONL
-        # Matches: "type":"<type>"..."value":"<value>"
-        grep "\"type\":\"$type\"" "$cache_file" | \
-        sed -E 's/.*"value":"([^"]+)".*/\1/'
-    else
-        # Slow path / Fallback: CLI Helper (Plain Text output)
-        mm completions --emit-source --filter "$type"
+        cat "$cache_file"
     fi
+    # No fallback: if cache is missing/empty, no candidates are provided
+}
+
+_mm_get_tag_candidates() {
+    local cache_file="$(_mm_find_cache_file completion_context_tags.txt)"
+    if [[ -n "$cache_file" ]]; then
+        cat "$cache_file"
+    fi
+    # No fallback: if cache is missing/empty, no candidates are provided
 }
 ```
 ## 9. Manual Verification
 
-1.  **Fresh Install**:
+1.  **Fresh Install (No Cache)**:
     *   Run `mm completions zsh > ~/.zshrc_mm`.
     *   Start new shell.
-    *   Verify `mm edit <TAB>` falls back to `mm completions --emit-source` and shows *Open + Closed* items (or all available candidates).
+    *   Verify `mm edit <TAB>` provides no completion candidates (cache is empty).
 2.  **Cache Population**:
-    *   Run `mm note "Hello"`.
-    *   Run `mm list`.
-    *   Check `.index/completion_cache.jsonl` exists and contains the new note UUID.
-3.  **Completion usage**:
-    *   Type `mm edit <TAB>` -> UUID should be suggested.
-4.  **Fallback**:
-    *   Delete `.index/completion_cache.jsonl`.
-    *   Type `mm edit <TAB>` -> Should run `mm completions --emit-source` (verified by latency or process list) and suggest open/closed items.
+    *   Run `mm note "Hello" --context work` to create an item.
+    *   Check `.index/completion_aliases.txt` and `.index/completion_context_tags.txt` exist.
+    *   Verify the alias file contains the new note's alias and tags file contains "work".
+3.  **Completion After Cache Population**:
+    *   Type `mm edit <TAB>` -> The newly created item's alias should be suggested.
+4.  **Cache Growth Through Usage**:
+    *   Run `mm ls` to display items.
+    *   Check cache files now include aliases and context tags of displayed items.
+    *   Verify `mm edit <TAB>` suggests these aliases and `mm note --context <TAB>` suggests the tags.
 
 ---
 
 ## 10. Technical Constraints & Details
 
-*   **Shell JSON Parsing**: To avoid dependencies like `jq`, shell scripts will use `awk` or `sed` to filter the JSONL.
-    *   *Example*: `awk -F'"' '/"type":"tag"/ {print $8}' .index/completion_cache.jsonl` (assuming consistent field ordering/formatting by the writer).
-*   **Compaction Cadence**: Run compaction on every 10th write or when file size > 50KB.
-*   **Time Format**: usage `last_seen` must be UTC ISO 8601 string.
-*   **Locking**: Use advisory file locking (or simple retry on rename) for compaction to avoid writer conflicts.
+*   **Shell Reading**: Simple `cat` command - no parsing needed for plain text format.
+*   **Max Entries**: 1000 lines per cache file (auto-truncated on append).
+*   **Deduplication Window**: Last N lines where N = number of new entries being appended.
+*   **Error Handling**: Cache write failures show warning but don't break commands.

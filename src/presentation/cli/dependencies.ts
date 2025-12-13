@@ -32,6 +32,8 @@ import { createCryptoRandomSource } from "../../infrastructure/random/crypto_ran
 import type { SectionQueryService } from "../../domain/services/section_query_service.ts";
 import { VersionControlService } from "../../domain/services/version_control_service.ts";
 import { createGitVersionControlService } from "../../infrastructure/git/git_client.ts";
+import { CacheUpdateService } from "../../infrastructure/completion_cache/cache_update_service.ts";
+import { CacheManager } from "../../infrastructure/completion_cache/cache_manager.ts";
 
 export type CliDependencies = Readonly<{
   readonly root: string;
@@ -46,6 +48,7 @@ export type CliDependencies = Readonly<{
   readonly rankService: RankService;
   readonly idGenerationService: IdGenerationService;
   readonly versionControlService: VersionControlService;
+  readonly cacheUpdateService: CacheUpdateService;
 }>;
 
 export type CliDependencyError =
@@ -236,6 +239,10 @@ export const loadCliDependencies = async (
   const rankService = createRankService(createLexoRankGenerator());
   const idGenerationService = createIdGenerationService(createUuidV7Generator());
   const versionControlService = createGitVersionControlService();
+  const cacheManager = new CacheManager(root, {
+    maxEntries: 1000,
+  });
+  const cacheUpdateService = new CacheUpdateService(cacheManager);
 
   return Result.ok({
     root,
@@ -250,5 +257,6 @@ export const loadCliDependencies = async (
     rankService,
     idGenerationService,
     versionControlService,
+    cacheUpdateService,
   });
 };

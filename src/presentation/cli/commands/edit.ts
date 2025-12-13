@@ -70,6 +70,7 @@ export function createEditCommand() {
       }
 
       const deps = depsResult.value;
+
       const now = new Date();
       const occurredAtResult = dateTimeFromDate(now);
       if (occurredAtResult.type === "error") {
@@ -129,6 +130,7 @@ export function createEditCommand() {
           }
 
           const updatedItem = reloadResult.value;
+
           const newAlias = updatedItem.data.alias;
 
           // Update alias index if alias changed
@@ -179,6 +181,9 @@ export function createEditCommand() {
               }
             }
           }
+
+          // Update cache after all validations and persists succeed
+          await deps.cacheUpdateService.updateFromItem(updatedItem);
 
           console.log(`✅ Updated ${formatItem(updatedItem)}`);
         } catch (error) {
@@ -235,6 +240,9 @@ export function createEditCommand() {
         }
         Deno.exit(1);
       }
+
+      // Update cache with edited item
+      await deps.cacheUpdateService.updateFromItem(result.value);
 
       console.log(`✅ Updated ${formatItem(result.value)}`);
     });
