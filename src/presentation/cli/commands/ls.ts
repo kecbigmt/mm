@@ -194,6 +194,9 @@ export function createLsCommand() {
 
       const { items } = workflowResult.value;
 
+      // Update cache with displayed items
+      await deps.cacheUpdateService.updateFromItems(items);
+
       // Query sections for numeric ranges
       let sections: ReadonlyArray<SectionSummary> = [];
       if (placementRange.kind === "numericRange" || placementRange.kind === "single") {

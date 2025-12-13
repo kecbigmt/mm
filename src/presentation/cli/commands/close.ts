@@ -57,6 +57,11 @@ export function createCloseCommand() {
 
       const { succeeded, failed } = workflowResult.value;
 
+      // Update cache with successfully closed items
+      if (succeeded.length > 0) {
+        await deps.cacheUpdateService.updateFromItems(succeeded);
+      }
+
       // Display successful closes
       if (succeeded.length > 0) {
         if (succeeded.length === 1) {
