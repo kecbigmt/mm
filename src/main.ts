@@ -16,6 +16,7 @@ import { createDoctorCommand } from "./presentation/cli/commands/doctor/mod.ts";
 import { createEditCommand } from "./presentation/cli/commands/edit.ts";
 import { createSnoozeCommand } from "./presentation/cli/commands/snooze.ts";
 import { createSyncCommand } from "./presentation/cli/commands/sync.ts";
+import { createCompletionsCommand } from "./presentation/cli/commands/completions.ts";
 
 async function main() {
   const cli = new Command()
@@ -40,7 +41,11 @@ async function main() {
     .command("snooze", createSnoozeCommand().description("Snooze item until a future datetime"))
     .alias("sn")
     .command("doctor", createDoctorCommand().description("Workspace validation and maintenance"))
-    .command("sync", createSyncCommand());
+    .command("sync", createSyncCommand())
+    .command(
+      "completions",
+      createCompletionsCommand().description("Generate shell completion script"),
+    );
 
   await cli.parse(Deno.args);
 }
