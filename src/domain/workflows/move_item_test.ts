@@ -28,8 +28,8 @@ const createTestRankService = () => {
       }
       return "m";
     },
-    next: (rank) => `${rank}n`,
-    prev: (rank) => `p${rank}`,
+    next: (rank) => (rank === "z" ? "z" : `${rank}n`), // max stays at max
+    prev: (rank) => (rank === "a" ? "a" : `p${rank}`), // min stays at min
     compare: (first, second) => first.localeCompare(second),
   };
 
@@ -313,6 +313,236 @@ describe("MoveItemWorkflow", () => {
         itemD.data.id.toString(),
         "Fourth item should be D",
       );
+    }
+  });
+
+  it("fails to move to head: when item at minimum rank already exists", async () => {
+    const itemRepository = new InMemoryItemRepository();
+    const aliasRepository = new InMemoryAliasRepository();
+    const aliasAutoGenerator = createTestAliasAutoGenerator();
+    const rankService = createTestRankService();
+    const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
+    const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
+
+    // Create first item
+    const itemAResult = await CreateItemWorkflow.execute({
+      title: "Item A",
+      itemType: "note",
+      parentPlacement,
+      createdAt,
+      timezone: TEST_TIMEZONE,
+    }, {
+      itemRepository,
+      aliasRepository,
+      aliasAutoGenerator,
+      rankService,
+      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd009"),
+    });
+    assertEquals(itemAResult.type, "ok");
+    const itemA = itemAResult.type === "ok" ? itemAResult.value.item : undefined;
+    assertExists(itemA);
+
+    // Manually move item A to min rank
+    const minRank = Result.unwrap(rankService.minRank());
+    const relocatedA = itemA.relocate(parentPlacement, minRank, createdAt);
+    await itemRepository.save(relocatedA);
+
+    // Create second item
+    const itemBResult = await CreateItemWorkflow.execute({
+      title: "Item B",
+      itemType: "note",
+      parentPlacement,
+      createdAt,
+      timezone: TEST_TIMEZONE,
+    }, {
+      itemRepository,
+      aliasRepository,
+      aliasAutoGenerator,
+      rankService,
+      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd010"),
+    });
+    assertEquals(itemBResult.type, "ok");
+    const itemB = itemBResult.type === "ok" ? itemBResult.value.item : undefined;
+    assertExists(itemB);
+
+    // Try to move item B to head (should fail because A is already at min rank)
+    const moveResult = await MoveItemWorkflow.execute({
+      itemExpression: itemB.data.id.toString(),
+      targetExpression: "head:2024-09-20",
+      cwd: parentPlacement,
+      occurredAt: createdAt,
+    }, {
+      itemRepository,
+      aliasRepository,
+      rankService,
+    });
+
+    assertEquals(moveResult.type, "error");
+    if (moveResult.type === "error") {
+      assertEquals(moveResult.error.kind, "ValidationError");
+      if ("objectKind" in moveResult.error) {
+        assertEquals(moveResult.error.objectKind, "MoveItem");
+        assertEquals(moveResult.error.issues[0].code, "no_headroom");
+      }
+    }
+  });
+
+  it("fails to move before: item at minimum rank", async () => {
+    const itemRepository = new InMemoryItemRepository();
+    const aliasRepository = new InMemoryAliasRepository();
+    const aliasAutoGenerator = createTestAliasAutoGenerator();
+    const rankService = createTestRankService();
+    const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
+    const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
+
+    // Create first item
+    const itemAResult = await CreateItemWorkflow.execute({
+      title: "Item A",
+      itemType: "note",
+      parentPlacement,
+      createdAt,
+      timezone: TEST_TIMEZONE,
+    }, {
+      itemRepository,
+      aliasRepository,
+      aliasAutoGenerator,
+      rankService,
+      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd011"),
+    });
+    assertEquals(itemAResult.type, "ok");
+    const itemA = itemAResult.type === "ok" ? itemAResult.value.item : undefined;
+    assertExists(itemA);
+
+    // Manually move item A to min rank
+    const minRank = Result.unwrap(rankService.minRank());
+    const relocatedA = itemA.relocate(parentPlacement, minRank, createdAt);
+    await itemRepository.save(relocatedA);
+
+    // Create second item
+    const itemBResult = await CreateItemWorkflow.execute({
+      title: "Item B",
+      itemType: "note",
+      parentPlacement,
+      createdAt,
+      timezone: TEST_TIMEZONE,
+    }, {
+      itemRepository,
+      aliasRepository,
+      aliasAutoGenerator,
+      rankService,
+      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd012"),
+    });
+    assertEquals(itemBResult.type, "ok");
+    const itemB = itemBResult.type === "ok" ? itemBResult.value.item : undefined;
+    assertExists(itemB);
+
+    // Try to move item B before A (should fail because A is at min rank and prevRank would return same rank)
+    const moveResult = await MoveItemWorkflow.execute({
+      itemExpression: itemB.data.id.toString(),
+      targetExpression: `before:${itemA.data.id.toString()}`,
+      cwd: parentPlacement,
+      occurredAt: createdAt,
+    }, {
+      itemRepository,
+      aliasRepository,
+      rankService,
+    });
+
+    assertEquals(moveResult.type, "error");
+    if (moveResult.type === "error") {
+      assertEquals(moveResult.error.kind, "ValidationError");
+      if ("objectKind" in moveResult.error) {
+        assertEquals(moveResult.error.objectKind, "MoveItem");
+        assertEquals(moveResult.error.issues[0].code, "no_headroom");
+      }
+    }
+  });
+
+  it("fails to move to tail: when item at maximum rank already exists", async () => {
+    const itemRepository = new InMemoryItemRepository();
+    const aliasRepository = new InMemoryAliasRepository();
+    const aliasAutoGenerator = createTestAliasAutoGenerator();
+
+    // Create a test rank service where max rank is reachable
+    const generator: RankGenerator = {
+      min: () => "a",
+      max: () => "z",
+      middle: () => "m",
+      between: (first, second) => {
+        if (first < second) {
+          return first + "m";
+        }
+        return "m";
+      },
+      next: (rank) => (rank === "z" ? "z" : `${rank}n`), // max stays at max
+      prev: (rank) => `p${rank}`,
+      compare: (first, second) => first.localeCompare(second),
+    };
+    const rankService = createRankService(generator);
+
+    const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
+    const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
+
+    // Create first item
+    const itemAResult = await CreateItemWorkflow.execute({
+      title: "Item A",
+      itemType: "note",
+      parentPlacement,
+      createdAt,
+      timezone: TEST_TIMEZONE,
+    }, {
+      itemRepository,
+      aliasRepository,
+      aliasAutoGenerator,
+      rankService,
+      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd013"),
+    });
+    assertEquals(itemAResult.type, "ok");
+    const itemA = itemAResult.type === "ok" ? itemAResult.value.item : undefined;
+    assertExists(itemA);
+
+    // Manually move item A to max rank by relocating it
+    const maxRank = Result.unwrap(rankService.maxRank());
+    const relocatedA = itemA.relocate(parentPlacement, maxRank, createdAt);
+    await itemRepository.save(relocatedA);
+
+    // Create second item
+    const itemBResult = await CreateItemWorkflow.execute({
+      title: "Item B",
+      itemType: "note",
+      parentPlacement,
+      createdAt,
+      timezone: TEST_TIMEZONE,
+    }, {
+      itemRepository,
+      aliasRepository,
+      aliasAutoGenerator,
+      rankService,
+      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd014"),
+    });
+    assertEquals(itemBResult.type, "ok");
+    const itemB = itemBResult.type === "ok" ? itemBResult.value.item : undefined;
+    assertExists(itemB);
+
+    // Try to move item B to tail (should fail because A is already at max rank)
+    const moveResult = await MoveItemWorkflow.execute({
+      itemExpression: itemB.data.id.toString(),
+      targetExpression: "tail:2024-09-20",
+      cwd: parentPlacement,
+      occurredAt: createdAt,
+    }, {
+      itemRepository,
+      aliasRepository,
+      rankService,
+    });
+
+    assertEquals(moveResult.type, "error");
+    if (moveResult.type === "error") {
+      assertEquals(moveResult.error.kind, "ValidationError");
+      if ("objectKind" in moveResult.error) {
+        assertEquals(moveResult.error.objectKind, "MoveItem");
+        assertEquals(moveResult.error.issues[0].code, "no_headroom");
+      }
     }
   });
 });
