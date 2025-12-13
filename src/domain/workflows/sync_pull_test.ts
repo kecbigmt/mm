@@ -149,7 +149,10 @@ Deno.test("SyncPullWorkflow success flow", async () => {
   );
 
   assertEquals(result.type, "ok");
-  assertEquals(git.getCalls(), ["hasUncommittedChanges", "pull:origin:main"]);
+  assertEquals(git.getCalls(), [
+    "hasUncommittedChanges",
+    "pull:https://github.com/user/repo.git:main",
+  ]);
 });
 
 Deno.test("SyncPullWorkflow already up to date", async () => {
@@ -239,9 +242,9 @@ Deno.test("SyncPullWorkflow resolves remote default branch when no branch config
 
   assertEquals(result.type, "ok");
   assertEquals(git.getCalls(), [
-    "getRemoteDefaultBranch:origin",
+    "getRemoteDefaultBranch:https://github.com/user/repo.git",
     "hasUncommittedChanges",
-    "pull:origin:develop",
+    "pull:https://github.com/user/repo.git:develop",
   ]);
 
   // Verify branch was persisted to workspace.json
@@ -305,7 +308,10 @@ Deno.test("SyncPullWorkflow fails on non-fast-forward update", async () => {
     assertEquals(result.error.kind, "VersionControlError");
     assertEquals(result.error.message.includes("Not possible to fast-forward"), true);
   }
-  assertEquals(git.getCalls(), ["hasUncommittedChanges", "pull:origin:main"]);
+  assertEquals(git.getCalls(), [
+    "hasUncommittedChanges",
+    "pull:https://github.com/user/repo.git:main",
+  ]);
 });
 
 Deno.test("SyncPullWorkflow fails when pull command fails", async () => {
@@ -328,5 +334,8 @@ Deno.test("SyncPullWorkflow fails when pull command fails", async () => {
     assertEquals(result.error.kind, "VersionControlError");
     assertEquals(result.error.message.includes("Could not resolve host"), true);
   }
-  assertEquals(git.getCalls(), ["hasUncommittedChanges", "pull:origin:main"]);
+  assertEquals(git.getCalls(), [
+    "hasUncommittedChanges",
+    "pull:https://github.com/user/repo.git:main",
+  ]);
 });
