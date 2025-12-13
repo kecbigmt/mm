@@ -58,7 +58,7 @@ export const SyncPullWorkflow = {
       // Resolve remote default branch
       const remoteBranchResult = await deps.gitService.getRemoteDefaultBranch(
         input.workspaceRoot,
-        "origin",
+        remote,
       );
       if (remoteBranchResult.type === "error") {
         return Result.error(remoteBranchResult.error);
@@ -102,7 +102,7 @@ export const SyncPullWorkflow = {
     // 6. Execute pull
     const pullResult = await deps.gitService.pull(
       input.workspaceRoot,
-      "origin",
+      remote,
       branch,
     );
     if (pullResult.type === "error") {
