@@ -18,14 +18,14 @@ export type GitSyncMode = "auto-commit" | "auto-sync";
 export type GitSettings = Readonly<{
   enabled: boolean;
   remote: string | null;
-  branch: string;
+  branch?: string;
   syncMode: GitSyncMode;
 }>;
 
 export type GitSettingsSnapshot = Readonly<{
   enabled: boolean;
   remote: string | null;
-  branch: string;
+  branch?: string;
   sync_mode: string;
 }>;
 
@@ -50,7 +50,6 @@ export type WorkspaceSettingsValidationError = ValidationError<typeof WORKSPACE_
 export const DEFAULT_GIT_SETTINGS: GitSettings = {
   enabled: false,
   remote: null,
-  branch: "main",
   syncMode: "auto-commit",
 };
 
@@ -63,14 +62,21 @@ const instantiate = (data: WorkspaceSettingsData): WorkspaceSettings => {
     kind: WORKSPACE_SETTINGS_KIND,
     data: frozen,
     toJSON() {
-      return Object.freeze({
-        timezone: frozen.timezone.toString(),
-        git: Object.freeze({
+      const gitSnapshot: GitSettingsSnapshot = frozen.git.branch !== undefined
+        ? {
           enabled: frozen.git.enabled,
           remote: frozen.git.remote,
           branch: frozen.git.branch,
           sync_mode: frozen.git.syncMode,
-        }),
+        }
+        : {
+          enabled: frozen.git.enabled,
+          remote: frozen.git.remote,
+          sync_mode: frozen.git.syncMode,
+        };
+      return Object.freeze({
+        timezone: frozen.timezone.toString(),
+        git: Object.freeze(gitSnapshot),
       });
     },
   });
@@ -106,7 +112,9 @@ export const parseWorkspaceSettings = (
     gitSettings = {
       enabled: typeof snapshot.git.enabled === "boolean" ? snapshot.git.enabled : false,
       remote: typeof snapshot.git.remote === "string" ? snapshot.git.remote : null,
-      branch: typeof snapshot.git.branch === "string" ? snapshot.git.branch : "main",
+      branch: typeof snapshot.git.branch === "string" && snapshot.git.branch !== ""
+        ? snapshot.git.branch
+        : undefined,
       syncMode: mode,
     };
   }

@@ -5,7 +5,7 @@ import { createWorkspaceSettings, WorkspaceSettings } from "../models/workspace.
 import { timezoneIdentifierFromString } from "../primitives/timezone_identifier.ts";
 import { WorkspaceRepository } from "../repositories/workspace_repository.ts";
 import {
-  createVersionControlError,
+  createVersionControlCommandFailedError,
   VersionControlError,
 } from "../services/version_control_service.ts";
 
@@ -35,7 +35,7 @@ const mockVersionControlService = () => {
       calls.push(`validateBranch:${branch}`);
       if (branch === "invalid-branch") {
         return Promise.resolve(
-          Result.error(createVersionControlError("Invalid branch name")),
+          Result.error(createVersionControlCommandFailedError("Invalid branch name")),
         );
       }
       return Promise.resolve(Result.ok(undefined));
@@ -60,6 +60,25 @@ const mockVersionControlService = () => {
     ): Promise<Result<void, VersionControlError>> => {
       calls.push(`checkoutBranch:${branch}`);
       return Promise.resolve(Result.ok(undefined));
+    },
+    pull: (
+      _cwd: string,
+      _remote: string,
+      _branch: string,
+    ): Promise<Result<string, VersionControlError>> => {
+      calls.push("pull");
+      return Promise.resolve(Result.ok("Already up to date.\n"));
+    },
+    hasUncommittedChanges: (_cwd: string): Promise<Result<boolean, VersionControlError>> => {
+      calls.push("hasUncommittedChanges");
+      return Promise.resolve(Result.ok(false));
+    },
+    getRemoteDefaultBranch: (
+      _cwd: string,
+      _remote: string,
+    ): Promise<Result<string, VersionControlError>> => {
+      calls.push("getRemoteDefaultBranch");
+      return Promise.resolve(Result.ok("main"));
     },
     getCalls: () => calls,
   };
@@ -264,7 +283,7 @@ Deno.test("SyncInitWorkflow returns git error when validation fails with generic
   const git = mockVersionControlService();
   git.validateBranchName = ((_cwd: string, _branch: string) =>
     Promise.resolve(
-      Result.error(createVersionControlError("fatal: ambiguous argument")),
+      Result.error(createVersionControlCommandFailedError("fatal: ambiguous argument")),
     )) as unknown as typeof git.validateBranchName;
 
   const repo = mockWorkspaceRepo();
@@ -283,7 +302,7 @@ Deno.test("SyncInitWorkflow returns git error when validation fails with generic
   assertEquals(result.type, "error", "Should error");
   if (result.type === "error") {
     // Should be VersionControlError
-    assertEquals(result.error.kind, "VersionControlError");
+    assertEquals(result.error.kind, "VersionControlCommandFailedError");
   }
 });
 
@@ -324,7 +343,7 @@ Deno.test("SyncInitWorkflow handles nothing to commit gracefully", async () => {
   // Explicitly cast the function to match the interface, effectively overriding the mock type
   git.commit = (() =>
     Promise.resolve(
-      Result.error(createVersionControlError("nothing to commit, working tree clean")),
+      Result.error(createVersionControlCommandFailedError("nothing to commit, working tree clean")),
     )) as unknown as typeof git.commit;
 
   const repo = mockWorkspaceRepo();
@@ -351,7 +370,9 @@ Deno.test("SyncInitWorkflow returns git error when Git is not installed during v
   // Override validateBranchName to return specific "Git is not installed" error
   git.validateBranchName = ((_cwd: string, _branch: string) =>
     Promise.resolve(
-      Result.error(createVersionControlError("Git is not installed or not in the PATH")),
+      Result.error(
+        createVersionControlCommandFailedError("Git is not installed or not in the PATH"),
+      ),
     )) as unknown as typeof git.validateBranchName;
 
   const repo = mockWorkspaceRepo();
@@ -371,7 +392,7 @@ Deno.test("SyncInitWorkflow returns git error when Git is not installed during v
   assertEquals(result.type, "error");
   if (result.type === "error") {
     // Should be VersionControlError
-    assertEquals(result.error.kind, "VersionControlError");
+    assertEquals(result.error.kind, "VersionControlCommandFailedError");
     assertEquals(result.error.message.includes("Git is not installed"), true);
   }
 });
