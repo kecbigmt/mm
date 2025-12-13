@@ -61,6 +61,25 @@ const mockVersionControlService = () => {
       calls.push(`checkoutBranch:${branch}`);
       return Promise.resolve(Result.ok(undefined));
     },
+    pull: (
+      _cwd: string,
+      _remote: string,
+      _branch: string,
+    ): Promise<Result<string, VersionControlError>> => {
+      calls.push("pull");
+      return Promise.resolve(Result.ok("Already up to date.\n"));
+    },
+    hasUncommittedChanges: (_cwd: string): Promise<Result<boolean, VersionControlError>> => {
+      calls.push("hasUncommittedChanges");
+      return Promise.resolve(Result.ok(false));
+    },
+    getRemoteDefaultBranch: (
+      _cwd: string,
+      _remote: string,
+    ): Promise<Result<string, VersionControlError>> => {
+      calls.push("getRemoteDefaultBranch");
+      return Promise.resolve(Result.ok("main"));
+    },
     getCalls: () => calls,
   };
 };
