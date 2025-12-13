@@ -9,6 +9,7 @@ import {
   timezoneIdentifierFromString,
 } from "../primitives/mod.ts";
 import { createRankService, type RankGenerator } from "../services/rank_service.ts";
+import { itemRankFromString } from "../primitives/item_rank.ts";
 import { createIdGenerationService } from "../services/id_generation_service.ts";
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
 import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.ts";
@@ -343,9 +344,12 @@ describe("MoveItemWorkflow", () => {
     assertExists(itemA);
 
     // Manually move item A to min rank
-    const minRank = Result.unwrap(rankService.minRank());
-    const relocatedA = itemA.relocate(parentPlacement, minRank, createdAt);
-    await itemRepository.save(relocatedA);
+    const minRankResult = itemRankFromString("a");
+    assertEquals(minRankResult.type, "ok");
+    if (minRankResult.type === "ok") {
+      const relocatedA = itemA.relocate(parentPlacement, minRankResult.value, createdAt);
+      await itemRepository.save(relocatedA);
+    }
 
     // Create second item
     const itemBResult = await CreateItemWorkflow.execute({
@@ -414,9 +418,12 @@ describe("MoveItemWorkflow", () => {
     assertExists(itemA);
 
     // Manually move item A to min rank
-    const minRank = Result.unwrap(rankService.minRank());
-    const relocatedA = itemA.relocate(parentPlacement, minRank, createdAt);
-    await itemRepository.save(relocatedA);
+    const minRankResult = itemRankFromString("a");
+    assertEquals(minRankResult.type, "ok");
+    if (minRankResult.type === "ok") {
+      const relocatedA = itemA.relocate(parentPlacement, minRankResult.value, createdAt);
+      await itemRepository.save(relocatedA);
+    }
 
     // Create second item
     const itemBResult = await CreateItemWorkflow.execute({
@@ -520,9 +527,12 @@ describe("MoveItemWorkflow", () => {
     assertExists(itemB);
 
     // Now manually move item B to max rank by relocating it
-    const maxRank = Result.unwrap(rankService.maxRank());
-    const relocatedB = itemB.relocate(parentPlacement, maxRank, createdAt);
-    await itemRepository.save(relocatedB);
+    const maxRankResult = itemRankFromString("z");
+    assertEquals(maxRankResult.type, "ok");
+    if (maxRankResult.type === "ok") {
+      const relocatedB = itemB.relocate(parentPlacement, maxRankResult.value, createdAt);
+      await itemRepository.save(relocatedB);
+    }
 
     // Try to move item A to tail (should fail because B is already at max rank)
     const moveResult = await MoveItemWorkflow.execute({

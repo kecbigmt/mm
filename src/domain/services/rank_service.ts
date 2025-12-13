@@ -28,9 +28,8 @@ export type RankServiceError = ItemRankValidationError | RankBoundaryError;
  * All operations that could reach rank boundaries return errors instead of duplicates.
  */
 export interface RankService {
-  minRank(): Result<ItemRank, ItemRankValidationError>;
-  maxRank(): Result<ItemRank, ItemRankValidationError>;
-  middleRank(): Result<ItemRank, ItemRankValidationError>;
+  headRank(existingRanks: ReadonlyArray<ItemRank>): Result<ItemRank, RankServiceError>;
+  tailRank(existingRanks: ReadonlyArray<ItemRank>): Result<ItemRank, RankServiceError>;
   betweenRanks(first: ItemRank, second: ItemRank): Result<ItemRank, RankServiceError>;
   nextRank(rank: ItemRank): Result<ItemRank, RankServiceError>;
   prevRank(rank: ItemRank): Result<ItemRank, RankServiceError>;
@@ -43,14 +42,7 @@ export interface RankService {
  * @param generator - External rank generation implementation
  */
 export function createRankService(generator: RankGenerator): RankService {
-  const minRank = (): Result<ItemRank, ItemRankValidationError> => {
-    return itemRankFromString(generator.min());
-  };
-
-  const maxRank = (): Result<ItemRank, ItemRankValidationError> => {
-    return itemRankFromString(generator.max());
-  };
-
+  // Internal helper function (not exposed in interface)
   const middleRank = (): Result<ItemRank, ItemRankValidationError> => {
     return itemRankFromString(generator.middle());
   };
@@ -120,6 +112,30 @@ export function createRankService(generator: RankGenerator): RankService {
     return itemRankFromString(prevValue);
   };
 
+  const headRank = (
+    existingRanks: ReadonlyArray<ItemRank>,
+  ): Result<ItemRank, RankServiceError> => {
+    if (existingRanks.length === 0) {
+      return middleRank();
+    }
+    const sorted = existingRanks.slice().sort((a, b) =>
+      generator.compare(a.toString(), b.toString())
+    );
+    return prevRank(sorted[0]);
+  };
+
+  const tailRank = (
+    existingRanks: ReadonlyArray<ItemRank>,
+  ): Result<ItemRank, RankServiceError> => {
+    if (existingRanks.length === 0) {
+      return middleRank();
+    }
+    const sorted = existingRanks.slice().sort((a, b) =>
+      generator.compare(a.toString(), b.toString())
+    );
+    return nextRank(sorted[sorted.length - 1]);
+  };
+
   const compareRanks = (first: ItemRank, second: ItemRank): number => {
     return generator.compare(first.toString(), second.toString());
   };
@@ -158,9 +174,8 @@ export function createRankService(generator: RankGenerator): RankService {
   };
 
   return {
-    minRank,
-    maxRank,
-    middleRank,
+    headRank,
+    tailRank,
     betweenRanks,
     nextRank,
     prevRank,

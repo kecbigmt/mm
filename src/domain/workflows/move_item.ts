@@ -132,13 +132,6 @@ async function loadSiblings(
   });
 }
 
-function sortSiblingsByRank(
-  siblings: ReadonlyArray<Item>,
-  rankService: RankService,
-): ReadonlyArray<Item> {
-  return siblings.slice().sort((a, b) => rankService.compareRanks(a.data.rank, b.data.rank));
-}
-
 /**
  * Calculate rank for head: positioning.
  * Places item before all existing items.
@@ -166,10 +159,8 @@ async function calculateRankForHead(
     return Result.error(siblingsResult.error);
   }
 
-  const sortedSiblings = sortSiblingsByRank(siblingsResult.value, deps.rankService);
-  const rankResult = sortedSiblings.length === 0
-    ? deps.rankService.middleRank()
-    : deps.rankService.prevRank(sortedSiblings[0].data.rank);
+  const existingRanks = siblingsResult.value.map((item) => item.data.rank);
+  const rankResult = deps.rankService.headRank(existingRanks);
 
   if (rankResult.type === "error") {
     return Result.error(createValidationError("MoveItem", rankResult.error.issues));
@@ -208,10 +199,8 @@ async function calculateRankForTail(
     return Result.error(siblingsResult.error);
   }
 
-  const sortedSiblings = sortSiblingsByRank(siblingsResult.value, deps.rankService);
-  const rankResult = sortedSiblings.length === 0
-    ? deps.rankService.middleRank()
-    : deps.rankService.nextRank(sortedSiblings[sortedSiblings.length - 1].data.rank);
+  const existingRanks = siblingsResult.value.map((item) => item.data.rank);
+  const rankResult = deps.rankService.tailRank(existingRanks);
 
   if (rankResult.type === "error") {
     return Result.error(createValidationError("MoveItem", rankResult.error.issues));
@@ -259,7 +248,9 @@ async function calculateRankForAfter(
     return Result.error(siblingsResult.error);
   }
 
-  const sortedSiblings = sortSiblingsByRank(siblingsResult.value, deps.rankService);
+  const sortedSiblings = siblingsResult.value.slice().sort((a, b) =>
+    deps.rankService.compareRanks(a.data.rank, b.data.rank)
+  );
   const refIndex = sortedSiblings.findIndex((s) =>
     s.data.id.toString() === refItem.data.id.toString()
   );
@@ -315,7 +306,9 @@ async function calculateRankForBefore(
     return Result.error(siblingsResult.error);
   }
 
-  const sortedSiblings = sortSiblingsByRank(siblingsResult.value, deps.rankService);
+  const sortedSiblings = siblingsResult.value.slice().sort((a, b) =>
+    deps.rankService.compareRanks(a.data.rank, b.data.rank)
+  );
   const refIndex = sortedSiblings.findIndex((s) =>
     s.data.id.toString() === refItem.data.id.toString()
   );
@@ -385,10 +378,8 @@ async function calculateRankForRegularPlacement(
     return Result.error(siblingsResult.error);
   }
 
-  const sortedSiblings = sortSiblingsByRank(siblingsResult.value, deps.rankService);
-  const rankResult = sortedSiblings.length === 0
-    ? deps.rankService.middleRank()
-    : deps.rankService.nextRank(sortedSiblings[sortedSiblings.length - 1].data.rank);
+  const existingRanks = siblingsResult.value.map((item) => item.data.rank);
+  const rankResult = deps.rankService.tailRank(existingRanks);
 
   if (rankResult.type === "error") {
     return Result.error(createValidationError("MoveItem", rankResult.error.issues));

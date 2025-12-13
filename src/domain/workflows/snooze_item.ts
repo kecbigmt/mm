@@ -128,10 +128,8 @@ const execute = async (
     }
 
     // Calculate rank: if no items, use middle; otherwise, use next after last item
-    const targetItems = targetItemsResult.value;
-    const rankResult = targetItems.length === 0
-      ? dependencies.rankService.middleRank()
-      : dependencies.rankService.nextRank(targetItems[targetItems.length - 1].data.rank);
+    const existingRanks = targetItemsResult.value.map((item) => item.data.rank);
+    const rankResult = dependencies.rankService.tailRank(existingRanks);
 
     if (rankResult.type === "error") {
       return Result.error(createValidationError("SnoozeItem", rankResult.error.issues));

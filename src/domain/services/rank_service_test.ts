@@ -59,32 +59,46 @@ describe("RankService", () => {
   const generator = createMockRankGenerator();
   const service = createRankService(generator);
 
-  describe("minRank", () => {
-    it("should return minimum rank", () => {
-      const result = service.minRank();
-      assertEquals(result.type, "ok");
-      if (result.type === "ok") {
-        assertEquals(result.value.toString(), "0");
-      }
-    });
-  });
-
-  describe("maxRank", () => {
-    it("should return maximum rank", () => {
-      const result = service.maxRank();
-      assertEquals(result.type, "ok");
-      if (result.type === "ok") {
-        assertEquals(result.value.toString(), "z");
-      }
-    });
-  });
-
-  describe("middleRank", () => {
-    it("should return middle rank", () => {
-      const result = service.middleRank();
+  describe("headRank", () => {
+    it("should return middle rank when no existing ranks", () => {
+      const result = service.headRank([]);
       assertEquals(result.type, "ok");
       if (result.type === "ok") {
         assertEquals(result.value.toString(), "m");
+      }
+    });
+
+    it("should return rank before first item when ranks exist", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("b");
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = service.headRank([rank1.value, rank2.value]);
+        assertEquals(result.type, "ok");
+        if (result.type === "ok") {
+          assertEquals(result.value.toString(), "0a");
+        }
+      }
+    });
+  });
+
+  describe("tailRank", () => {
+    it("should return middle rank when no existing ranks", () => {
+      const result = service.tailRank([]);
+      assertEquals(result.type, "ok");
+      if (result.type === "ok") {
+        assertEquals(result.value.toString(), "m");
+      }
+    });
+
+    it("should return rank after last item when ranks exist", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("b");
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = service.tailRank([rank1.value, rank2.value]);
+        assertEquals(result.type, "ok");
+        if (result.type === "ok") {
+          assertEquals(result.value.toString(), "c");
+        }
       }
     });
   });
