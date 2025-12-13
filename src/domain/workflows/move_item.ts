@@ -248,17 +248,8 @@ async function calculateRankForAfter(
     return Result.error(siblingsResult.error);
   }
 
-  const sortedSiblings = siblingsResult.value.slice().sort((a, b) =>
-    deps.rankService.compareRanks(a.data.rank, b.data.rank)
-  );
-  const refIndex = sortedSiblings.findIndex((s) =>
-    s.data.id.toString() === refItem.data.id.toString()
-  );
-
-  const nextItem = sortedSiblings[refIndex + 1];
-  const rankResult = nextItem
-    ? deps.rankService.betweenRanks(refItem.data.rank, nextItem.data.rank)
-    : deps.rankService.nextRank(refItem.data.rank);
+  const existingRanks = siblingsResult.value.map((item) => item.data.rank);
+  const rankResult = deps.rankService.afterRank(refItem.data.rank, existingRanks);
 
   if (rankResult.type === "error") {
     return Result.error(createValidationError("MoveItem", rankResult.error.issues));
@@ -306,17 +297,8 @@ async function calculateRankForBefore(
     return Result.error(siblingsResult.error);
   }
 
-  const sortedSiblings = siblingsResult.value.slice().sort((a, b) =>
-    deps.rankService.compareRanks(a.data.rank, b.data.rank)
-  );
-  const refIndex = sortedSiblings.findIndex((s) =>
-    s.data.id.toString() === refItem.data.id.toString()
-  );
-
-  const prevItem = sortedSiblings[refIndex - 1];
-  const rankResult = prevItem
-    ? deps.rankService.betweenRanks(prevItem.data.rank, refItem.data.rank)
-    : deps.rankService.prevRank(refItem.data.rank);
+  const existingRanks = siblingsResult.value.map((item) => item.data.rank);
+  const rankResult = deps.rankService.beforeRank(refItem.data.rank, existingRanks);
 
   if (rankResult.type === "error") {
     return Result.error(createValidationError("MoveItem", rankResult.error.issues));

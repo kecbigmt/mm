@@ -103,53 +103,76 @@ describe("RankService", () => {
     });
   });
 
-  describe("betweenRanks", () => {
-    it("should return rank between two ranks", () => {
-      const firstResult = itemRankFromString("a");
-      const secondResult = itemRankFromString("c");
-
-      assertExists(firstResult.type === "ok");
-      assertExists(secondResult.type === "ok");
-
-      if (firstResult.type === "ok" && secondResult.type === "ok") {
-        const result = service.betweenRanks(
-          firstResult.value,
-          secondResult.value,
-        );
+  describe("beforeRank", () => {
+    it("should return rank before target when previous item exists", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("c");
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = service.beforeRank(rank2.value, [rank1.value, rank2.value]);
         assertEquals(result.type, "ok");
         if (result.type === "ok") {
+          // Should return rank between 'a' and 'c', which is 'b'
           assertEquals(result.value.toString(), "b");
         }
       }
     });
-  });
 
-  describe("nextRank", () => {
-    it("should return next rank", () => {
-      const rankResult = itemRankFromString("a");
-      assertExists(rankResult.type === "ok");
-
-      if (rankResult.type === "ok") {
-        const result = service.nextRank(rankResult.value);
+    it("should return prevRank when target is first item", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("b");
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = service.beforeRank(rank1.value, [rank1.value, rank2.value]);
         assertEquals(result.type, "ok");
         if (result.type === "ok") {
-          assertEquals(result.value.toString(), "b");
+          assertEquals(result.value.toString(), "0a");
         }
+      }
+    });
+
+    it("should return error when target not found", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("b");
+      const rank3 = itemRankFromString("c");
+      if (rank1.type === "ok" && rank2.type === "ok" && rank3.type === "ok") {
+        const result = service.beforeRank(rank3.value, [rank1.value, rank2.value]);
+        assertEquals(result.type, "error");
       }
     });
   });
 
-  describe("prevRank", () => {
-    it("should return previous rank", () => {
-      const rankResult = itemRankFromString("b");
-      assertExists(rankResult.type === "ok");
-
-      if (rankResult.type === "ok") {
-        const result = service.prevRank(rankResult.value);
+  describe("afterRank", () => {
+    it("should return rank after target when next item exists", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("c");
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = service.afterRank(rank1.value, [rank1.value, rank2.value]);
         assertEquals(result.type, "ok");
         if (result.type === "ok") {
-          assertEquals(result.value.toString(), "a");
+          // Should return rank between 'a' and 'c', which is 'b'
+          assertEquals(result.value.toString(), "b");
         }
+      }
+    });
+
+    it("should return nextRank when target is last item", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("b");
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = service.afterRank(rank2.value, [rank1.value, rank2.value]);
+        assertEquals(result.type, "ok");
+        if (result.type === "ok") {
+          assertEquals(result.value.toString(), "c");
+        }
+      }
+    });
+
+    it("should return error when target not found", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("b");
+      const rank3 = itemRankFromString("c");
+      if (rank1.type === "ok" && rank2.type === "ok" && rank3.type === "ok") {
+        const result = service.afterRank(rank3.value, [rank1.value, rank2.value]);
+        assertEquals(result.type, "error");
       }
     });
   });
