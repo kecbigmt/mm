@@ -45,6 +45,7 @@ export function createNoteCommand() {
       }
 
       const deps = depsResult.value;
+
       const resolvedTitle = typeof title === "string" && title.trim().length > 0
         ? title
         : "Untitled";
@@ -138,6 +139,10 @@ export function createNoteCommand() {
       }
 
       const item = workflowResult.value.item;
+
+      // Update cache with created item
+      await deps.cacheUpdateService.updateFromItem(item);
+
       const label = formatItemLabel(item);
       console.log(
         `✅ Created note [${label}] ${item.data.title.toString()} at ${parentPlacement.toString()}`,
