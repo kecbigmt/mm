@@ -1,4 +1,9 @@
 import { Result } from "../../shared/result.ts";
+import {
+  createValidationError,
+  createValidationIssue,
+  ValidationError,
+} from "../../shared/errors.ts";
 import { ItemRank, itemRankFromString, ItemRankValidationError } from "../primitives/item_rank.ts";
 
 /**
@@ -15,16 +20,20 @@ export interface RankGenerator {
   compare(first: string, second: string): number;
 }
 
+export type RankBoundaryError = ValidationError<"RankBoundary">;
+export type RankServiceError = ItemRankValidationError | RankBoundaryError;
+
 /**
- * Rank service interface for managing item ranks
+ * Rank service interface for managing item ranks.
+ * All operations that could reach rank boundaries return errors instead of duplicates.
  */
 export interface RankService {
   minRank(): Result<ItemRank, ItemRankValidationError>;
   maxRank(): Result<ItemRank, ItemRankValidationError>;
   middleRank(): Result<ItemRank, ItemRankValidationError>;
-  betweenRanks(first: ItemRank, second: ItemRank): Result<ItemRank, ItemRankValidationError>;
-  nextRank(rank: ItemRank): Result<ItemRank, ItemRankValidationError>;
-  prevRank(rank: ItemRank): Result<ItemRank, ItemRankValidationError>;
+  betweenRanks(first: ItemRank, second: ItemRank): Result<ItemRank, RankServiceError>;
+  nextRank(rank: ItemRank): Result<ItemRank, RankServiceError>;
+  prevRank(rank: ItemRank): Result<ItemRank, RankServiceError>;
   compareRanks(first: ItemRank, second: ItemRank): number;
   generateEquallySpacedRanks(count: number): Result<ItemRank[], ItemRankValidationError>;
 }
@@ -49,17 +58,64 @@ export function createRankService(generator: RankGenerator): RankService {
   const betweenRanks = (
     first: ItemRank,
     second: ItemRank,
-  ): Result<ItemRank, ItemRankValidationError> => {
+  ): Result<ItemRank, RankServiceError> => {
+    // Check for duplicate ranks
+    if (generator.compare(first.toString(), second.toString()) === 0) {
+      return Result.error(
+        createValidationError("RankBoundary", [
+          createValidationIssue(
+            "Cannot generate rank between identical ranks.",
+            {
+              code: "duplicate_ranks",
+              path: ["rank"],
+            },
+          ),
+        ]),
+      );
+    }
+
     const betweenValue = generator.between(first.toString(), second.toString());
     return itemRankFromString(betweenValue);
   };
 
-  const nextRank = (rank: ItemRank): Result<ItemRank, ItemRankValidationError> => {
+  const nextRank = (rank: ItemRank): Result<ItemRank, RankServiceError> => {
+    // Check if already at maximum
+    const maxValue = generator.max();
+    if (generator.compare(rank.toString(), maxValue) === 0) {
+      return Result.error(
+        createValidationError("RankBoundary", [
+          createValidationIssue(
+            "Cannot generate next rank: already at maximum boundary.",
+            {
+              code: "no_headroom",
+              path: ["rank"],
+            },
+          ),
+        ]),
+      );
+    }
+
     const nextValue = generator.next(rank.toString());
     return itemRankFromString(nextValue);
   };
 
-  const prevRank = (rank: ItemRank): Result<ItemRank, ItemRankValidationError> => {
+  const prevRank = (rank: ItemRank): Result<ItemRank, RankServiceError> => {
+    // Check if already at minimum
+    const minValue = generator.min();
+    if (generator.compare(rank.toString(), minValue) === 0) {
+      return Result.error(
+        createValidationError("RankBoundary", [
+          createValidationIssue(
+            "Cannot generate previous rank: already at minimum boundary.",
+            {
+              code: "no_headroom",
+              path: ["rank"],
+            },
+          ),
+        ]),
+      );
+    }
+
     const prevValue = generator.prev(rank.toString());
     return itemRankFromString(prevValue);
   };

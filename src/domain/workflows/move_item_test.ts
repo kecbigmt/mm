@@ -501,12 +501,7 @@ describe("MoveItemWorkflow", () => {
     const itemA = itemAResult.type === "ok" ? itemAResult.value.item : undefined;
     assertExists(itemA);
 
-    // Manually move item A to max rank by relocating it
-    const maxRank = Result.unwrap(rankService.maxRank());
-    const relocatedA = itemA.relocate(parentPlacement, maxRank, createdAt);
-    await itemRepository.save(relocatedA);
-
-    // Create second item
+    // Create second item (before relocating A to max rank)
     const itemBResult = await CreateItemWorkflow.execute({
       title: "Item B",
       itemType: "note",
@@ -524,9 +519,14 @@ describe("MoveItemWorkflow", () => {
     const itemB = itemBResult.type === "ok" ? itemBResult.value.item : undefined;
     assertExists(itemB);
 
-    // Try to move item B to tail (should fail because A is already at max rank)
+    // Now manually move item B to max rank by relocating it
+    const maxRank = Result.unwrap(rankService.maxRank());
+    const relocatedB = itemB.relocate(parentPlacement, maxRank, createdAt);
+    await itemRepository.save(relocatedB);
+
+    // Try to move item A to tail (should fail because B is already at max rank)
     const moveResult = await MoveItemWorkflow.execute({
-      itemExpression: itemB.data.id.toString(),
+      itemExpression: itemA.data.id.toString(),
       targetExpression: "tail:2024-09-20",
       cwd: parentPlacement,
       occurredAt: createdAt,

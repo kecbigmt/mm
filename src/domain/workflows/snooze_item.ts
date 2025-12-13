@@ -131,14 +131,10 @@ const execute = async (
     const targetItems = targetItemsResult.value;
     const rankResult = targetItems.length === 0
       ? dependencies.rankService.middleRank()
-      : dependencies.rankService.nextRank(
-        targetItems[targetItems.length - 1].data.rank,
-      );
+      : dependencies.rankService.nextRank(targetItems[targetItems.length - 1].data.rank);
 
     if (rankResult.type === "error") {
-      return Result.error(
-        createValidationError("SnoozeItem", rankResult.error.issues),
-      );
+      return Result.error(createValidationError("SnoozeItem", rankResult.error.issues));
     }
 
     snoozedItem = snoozedItem.relocate(

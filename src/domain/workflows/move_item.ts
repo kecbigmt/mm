@@ -132,14 +132,6 @@ async function loadSiblings(
   });
 }
 
-function hasItemAtRank(
-  siblings: ReadonlyArray<Item>,
-  rank: ItemRank,
-  rankService: RankService,
-): boolean {
-  return siblings.some((sibling) => rankService.compareRanks(sibling.data.rank, rank) === 0);
-}
-
 function sortSiblingsByRank(
   siblings: ReadonlyArray<Item>,
   rankService: RankService,
@@ -149,7 +141,7 @@ function sortSiblingsByRank(
 
 /**
  * Calculate rank for head: positioning.
- * Ensures no duplicate at minimum rank to prevent lexorank generation failures.
+ * Places item before all existing items.
  */
 async function calculateRankForHead(
   placementExpr: string,
@@ -174,23 +166,13 @@ async function calculateRankForHead(
     return Result.error(siblingsResult.error);
   }
 
-  const rankResult = deps.rankService.minRank();
+  const sortedSiblings = sortSiblingsByRank(siblingsResult.value, deps.rankService);
+  const rankResult = sortedSiblings.length === 0
+    ? deps.rankService.minRank()
+    : deps.rankService.prevRank(sortedSiblings[0].data.rank);
+
   if (rankResult.type === "error") {
     return Result.error(createValidationError("MoveItem", rankResult.error.issues));
-  }
-
-  if (hasItemAtRank(siblingsResult.value, rankResult.value, deps.rankService)) {
-    return Result.error(
-      createValidationError("MoveItem", [
-        createValidationIssue(
-          "Cannot move to head: insufficient rank headroom at minimum boundary.",
-          {
-            code: "no_headroom",
-            path: ["targetExpression"],
-          },
-        ),
-      ]),
-    );
   }
 
   return Result.ok({
@@ -201,7 +183,7 @@ async function calculateRankForHead(
 
 /**
  * Calculate rank for tail: positioning.
- * Ensures no duplicate at maximum rank to prevent lexorank generation failures.
+ * Places item after all existing items.
  */
 async function calculateRankForTail(
   placementExpr: string,
@@ -226,23 +208,13 @@ async function calculateRankForTail(
     return Result.error(siblingsResult.error);
   }
 
-  const rankResult = deps.rankService.maxRank();
+  const sortedSiblings = sortSiblingsByRank(siblingsResult.value, deps.rankService);
+  const rankResult = sortedSiblings.length === 0
+    ? deps.rankService.maxRank()
+    : deps.rankService.nextRank(sortedSiblings[sortedSiblings.length - 1].data.rank);
+
   if (rankResult.type === "error") {
     return Result.error(createValidationError("MoveItem", rankResult.error.issues));
-  }
-
-  if (hasItemAtRank(siblingsResult.value, rankResult.value, deps.rankService)) {
-    return Result.error(
-      createValidationError("MoveItem", [
-        createValidationIssue(
-          "Cannot move to tail: insufficient rank headroom at maximum boundary.",
-          {
-            code: "no_headroom",
-            path: ["targetExpression"],
-          },
-        ),
-      ]),
-    );
   }
 
   return Result.ok({
@@ -253,7 +225,6 @@ async function calculateRankForTail(
 
 /**
  * Calculate rank for after: positioning.
- * Handles edge cases: duplicate ranks and items at maximum rank boundary.
  */
 async function calculateRankForAfter(
   itemExpr: string,
@@ -294,46 +265,9 @@ async function calculateRankForAfter(
   );
 
   const nextItem = sortedSiblings[refIndex + 1];
-  let rankResult;
-
-  if (nextItem) {
-    // Check for duplicate ranks
-    if (deps.rankService.compareRanks(refItem.data.rank, nextItem.data.rank) === 0) {
-      return Result.error(
-        createValidationError("MoveItem", [
-          createValidationIssue(
-            "Cannot move item: duplicate ranks detected between adjacent items.",
-            {
-              code: "duplicate_ranks",
-              path: ["targetExpression"],
-            },
-          ),
-        ]),
-      );
-    }
-    rankResult = deps.rankService.betweenRanks(refItem.data.rank, nextItem.data.rank);
-  } else {
-    // No next item, append after reference item
-    const maxRankResult = deps.rankService.maxRank();
-    if (maxRankResult.type === "error") {
-      return Result.error(createValidationError("MoveItem", maxRankResult.error.issues));
-    }
-
-    if (deps.rankService.compareRanks(refItem.data.rank, maxRankResult.value) === 0) {
-      return Result.error(
-        createValidationError("MoveItem", [
-          createValidationIssue(
-            "Cannot move item after last item: insufficient rank headroom at maximum boundary.",
-            {
-              code: "no_headroom",
-              path: ["targetExpression"],
-            },
-          ),
-        ]),
-      );
-    }
-    rankResult = deps.rankService.nextRank(refItem.data.rank);
-  }
+  const rankResult = nextItem
+    ? deps.rankService.betweenRanks(refItem.data.rank, nextItem.data.rank)
+    : deps.rankService.nextRank(refItem.data.rank);
 
   if (rankResult.type === "error") {
     return Result.error(createValidationError("MoveItem", rankResult.error.issues));
@@ -347,7 +281,6 @@ async function calculateRankForAfter(
 
 /**
  * Calculate rank for before: positioning.
- * Handles edge cases: duplicate ranks and items at minimum rank boundary.
  */
 async function calculateRankForBefore(
   itemExpr: string,
@@ -388,46 +321,9 @@ async function calculateRankForBefore(
   );
 
   const prevItem = sortedSiblings[refIndex - 1];
-  let rankResult;
-
-  if (prevItem) {
-    // Check for duplicate ranks
-    if (deps.rankService.compareRanks(prevItem.data.rank, refItem.data.rank) === 0) {
-      return Result.error(
-        createValidationError("MoveItem", [
-          createValidationIssue(
-            "Cannot move item: duplicate ranks detected between adjacent items.",
-            {
-              code: "duplicate_ranks",
-              path: ["targetExpression"],
-            },
-          ),
-        ]),
-      );
-    }
-    rankResult = deps.rankService.betweenRanks(prevItem.data.rank, refItem.data.rank);
-  } else {
-    // No previous item, prepend before reference item
-    const minRankResult = deps.rankService.minRank();
-    if (minRankResult.type === "error") {
-      return Result.error(createValidationError("MoveItem", minRankResult.error.issues));
-    }
-
-    if (deps.rankService.compareRanks(refItem.data.rank, minRankResult.value) === 0) {
-      return Result.error(
-        createValidationError("MoveItem", [
-          createValidationIssue(
-            "Cannot move item before first item: insufficient rank headroom at minimum boundary.",
-            {
-              code: "no_headroom",
-              path: ["targetExpression"],
-            },
-          ),
-        ]),
-      );
-    }
-    rankResult = deps.rankService.prevRank(refItem.data.rank);
-  }
+  const rankResult = prevItem
+    ? deps.rankService.betweenRanks(prevItem.data.rank, refItem.data.rank)
+    : deps.rankService.prevRank(refItem.data.rank);
 
   if (rankResult.type === "error") {
     return Result.error(createValidationError("MoveItem", rankResult.error.issues));
