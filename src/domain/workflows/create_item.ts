@@ -267,12 +267,8 @@ export const CreateItemWorkflow = {
       return Result.error(repositoryFailure(siblingsResult.error));
     }
 
-    const siblings = siblingsResult.value;
-    const rankResult = siblings.length === 0
-      ? deps.rankService.middleRank()
-      : deps.rankService.nextRank(
-        siblings[siblings.length - 1].data.rank,
-      );
+    const existingRanks = siblingsResult.value.map((item) => item.data.rank);
+    const rankResult = deps.rankService.tailRank(existingRanks);
 
     if (rankResult.type === "error") {
       return Result.error(invalidInput(
