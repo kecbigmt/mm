@@ -1,43 +1,70 @@
 import { dirname, join } from "@std/path";
-import type { CompletionCacheEntry } from "../../domain/models/completion_cache_entry.ts";
 
 /**
- * Repository for managing completion cache file I/O
+ * Repository for managing completion cache files
  *
- * Reads and writes completion_cache.jsonl in JSONL format.
- * Handles malformed lines gracefully by skipping them.
+ * Manages two text files:
+ * - completion_aliases.txt: Item aliases (one per line)
+ * - completion_context_tags.txt: Context tags (one per line)
+ *
+ * File format: Plain text, one value per line, newest entries at the end.
  */
 export class CacheRepository {
-  private readonly cacheFilePath: string;
+  private readonly aliasesFilePath: string;
+  private readonly contextTagsFilePath: string;
 
   constructor(workspaceRoot: string) {
-    this.cacheFilePath = join(workspaceRoot, ".index", "completion_cache.jsonl");
+    const indexDir = join(workspaceRoot, ".index");
+    this.aliasesFilePath = join(indexDir, "completion_aliases.txt");
+    this.contextTagsFilePath = join(indexDir, "completion_context_tags.txt");
   }
 
   /**
-   * Read all cache entries from the file
+   * Read all alias entries
    * Returns empty array if file doesn't exist
-   * Skips malformed lines
    */
-  async read(): Promise<CompletionCacheEntry[]> {
+  async readAliases(): Promise<string[]> {
+    return await this.readFile(this.aliasesFilePath);
+  }
+
+  /**
+   * Read all context tag entries
+   * Returns empty array if file doesn't exist
+   */
+  async readContextTags(): Promise<string[]> {
+    return await this.readFile(this.contextTagsFilePath);
+  }
+
+  /**
+   * Append aliases with deduplication and truncation
+   *
+   * Algorithm:
+   * 1. Read last N lines (N = number of new entries)
+   * 2. Skip entries that already exist in last N lines
+   * 3. Append new entries
+   * 4. If total > maxEntries, remove from beginning
+   */
+  async appendAliases(entries: string[], maxEntries: number): Promise<void> {
+    await this.appendWithDedup(this.aliasesFilePath, entries, maxEntries);
+  }
+
+  /**
+   * Append context tags with deduplication and truncation
+   */
+  async appendContextTags(entries: string[], maxEntries: number): Promise<void> {
+    await this.appendWithDedup(this.contextTagsFilePath, entries, maxEntries);
+  }
+
+  /**
+   * Generic file reader
+   */
+  private async readFile(filePath: string): Promise<string[]> {
     try {
-      const content = await Deno.readTextFile(this.cacheFilePath);
-      const lines = content.trim().split("\n");
-
-      const entries: CompletionCacheEntry[] = [];
-      for (const line of lines) {
-        if (!line.trim()) continue;
-
-        try {
-          const entry = JSON.parse(line) as CompletionCacheEntry;
-          entries.push(entry);
-        } catch {
-          // Skip malformed lines
-          continue;
-        }
-      }
-
-      return entries;
+      const content = await Deno.readTextFile(filePath);
+      return content
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
     } catch (error) {
       if (error instanceof Deno.errors.NotFound) {
         return [];
@@ -47,60 +74,57 @@ export class CacheRepository {
   }
 
   /**
-   * Write entries to cache file (overwrites existing file)
+   * Append entries with deduplication against tail and truncation
    */
-  async write(entries: CompletionCacheEntry[]): Promise<void> {
-    const lines = entries.map((entry) => JSON.stringify(entry));
-    const content = lines.join("\n") + (lines.length > 0 ? "\n" : "");
-
-    // Ensure .index directory exists
-    const indexDir = dirname(this.cacheFilePath);
-    await Deno.mkdir(indexDir, { recursive: true });
-
-    await Deno.writeTextFile(this.cacheFilePath, content);
-  }
-
-  /**
-   * Append entries to cache file
-   */
-  async append(entries: CompletionCacheEntry[]): Promise<void> {
-    const lines = entries.map((entry) => JSON.stringify(entry));
-    const content = lines.join("\n") + "\n";
-
-    // Ensure .index directory exists
-    const indexDir = dirname(this.cacheFilePath);
-    await Deno.mkdir(indexDir, { recursive: true });
-
-    try {
-      await Deno.writeTextFile(this.cacheFilePath, content, { append: true });
-    } catch (error) {
-      if (error instanceof Deno.errors.NotFound) {
-        // File doesn't exist, create it
-        await Deno.writeTextFile(this.cacheFilePath, content);
-      } else {
-        throw error;
-      }
+  private async appendWithDedup(
+    filePath: string,
+    newEntries: string[],
+    maxEntries: number,
+  ): Promise<void> {
+    if (newEntries.length === 0) {
+      return;
     }
+
+    // Ensure .index directory exists
+    const indexDir = dirname(filePath);
+    await Deno.mkdir(indexDir, { recursive: true });
+
+    // Read current entries
+    const existing = await this.readFile(filePath);
+
+    // Get last N lines for deduplication check
+    const checkCount = newEntries.length;
+    const tailEntries = existing.slice(-checkCount);
+    const tailSet = new Set(tailEntries);
+
+    // Filter out duplicates from new entries
+    const toAppend = newEntries.filter((entry) => !tailSet.has(entry));
+
+    if (toAppend.length === 0) {
+      // All entries were duplicates, nothing to append
+      return;
+    }
+
+    // Combine existing + new entries
+    const combined = [...existing, ...toAppend];
+
+    // Truncate from beginning if exceeds maxEntries
+    const final = combined.length > maxEntries
+      ? combined.slice(combined.length - maxEntries)
+      : combined;
+
+    // Write back
+    const content = final.join("\n") + (final.length > 0 ? "\n" : "");
+    await Deno.writeTextFile(filePath, content);
   }
 
   /**
-   * Atomic write using tmp file and rename
-   * Prevents corruption from concurrent writes or interrupts
+   * Get file paths (for testing/debugging)
    */
-  async atomicWrite(entries: CompletionCacheEntry[]): Promise<void> {
-    const lines = entries.map((entry) => JSON.stringify(entry));
-    const content = lines.join("\n") + (lines.length > 0 ? "\n" : "");
-
-    // Ensure .index directory exists
-    const indexDir = dirname(this.cacheFilePath);
-    await Deno.mkdir(indexDir, { recursive: true });
-
-    const tmpFile = this.cacheFilePath + ".tmp";
-
-    // Write to tmp file
-    await Deno.writeTextFile(tmpFile, content);
-
-    // Atomic rename
-    await Deno.rename(tmpFile, this.cacheFilePath);
+  getFilePaths(): { aliases: string; contextTags: string } {
+    return {
+      aliases: this.aliasesFilePath,
+      contextTags: this.contextTagsFilePath,
+    };
   }
 }

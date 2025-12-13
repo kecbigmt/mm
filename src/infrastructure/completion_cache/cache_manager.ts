@@ -1,85 +1,56 @@
-import type { CompletionCacheEntry } from "../../domain/models/completion_cache_entry.ts";
 import { CacheRepository } from "./cache_repository.ts";
-import { CompactionService } from "./compaction_service.ts";
 
 /**
  * Configuration for cache manager
  */
 export interface CacheManagerConfig {
   maxEntries: number;
-  compactionThreshold?: {
-    writes: number; // Compact after N writes
-    sizeBytes: number; // Compact if file exceeds N bytes
-  };
 }
 
 /**
- * Cache manager coordinates repository and compaction
+ * Cache manager coordinates repository for alias and context tag caches
  *
- * Tracks write count and file size to trigger compaction automatically.
- * Default thresholds: 10 writes or 50KB file size.
+ * Simplified design:
+ * - No compaction triggers (handled per-append in repository)
+ * - No write counting
+ * - Just delegates to repository with maxEntries config
  */
 export class CacheManager {
   private readonly repository: CacheRepository;
-  private readonly compactionService: CompactionService;
-  private readonly config: Required<CacheManagerConfig>;
-  private writeCount: number = 0;
+  private readonly config: CacheManagerConfig;
 
   constructor(workspaceRoot: string, config: CacheManagerConfig) {
     this.repository = new CacheRepository(workspaceRoot);
-    this.compactionService = new CompactionService({
-      maxEntries: config.maxEntries,
-    });
-    this.config = {
-      maxEntries: config.maxEntries,
-      compactionThreshold: config.compactionThreshold ?? {
-        writes: 10,
-        sizeBytes: 50000, // 50KB
-      },
-    };
+    this.config = config;
   }
 
   /**
-   * Add entries to cache
-   * Triggers compaction if thresholds are met
+   * Add alias entries to cache
    */
-  async add(entries: CompletionCacheEntry[]): Promise<void> {
-    await this.repository.append(entries);
-    this.writeCount++;
-
-    if (this.shouldCompact()) {
-      await this.compact();
-      this.writeCount = 0;
-    }
+  async addAliases(aliases: string[]): Promise<void> {
+    if (aliases.length === 0) return;
+    await this.repository.appendAliases(aliases, this.config.maxEntries);
   }
 
   /**
-   * Get all cached entries
+   * Add context tag entries to cache
    */
-  async getAll(): Promise<CompletionCacheEntry[]> {
-    return await this.repository.read();
+  async addContextTags(tags: string[]): Promise<void> {
+    if (tags.length === 0) return;
+    await this.repository.appendContextTags(tags, this.config.maxEntries);
   }
 
   /**
-   * Manually trigger compaction
+   * Get all cached aliases
    */
-  async compact(): Promise<void> {
-    const entries = await this.repository.read();
-    const compacted = this.compactionService.compact(entries);
-    await this.repository.atomicWrite(compacted);
+  async getAliases(): Promise<string[]> {
+    return await this.repository.readAliases();
   }
 
   /**
-   * Check if compaction should be triggered
+   * Get all cached context tags
    */
-  private shouldCompact(): boolean {
-    // Check write count
-    if (this.writeCount >= this.config.compactionThreshold.writes) {
-      return true;
-    }
-
-    // Check file size (simple heuristic: count >= threshold implies size check)
-    // For more accurate size check, we could stat the file, but this adds overhead
-    return false;
+  async getContextTags(): Promise<string[]> {
+    return await this.repository.readContextTags();
   }
 }

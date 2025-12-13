@@ -1,6 +1,5 @@
 import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
-import { createAliasEntry, createTagEntry } from "../../domain/models/completion_cache_entry.ts";
 import { CacheRepository } from "./cache_repository.ts";
 
 async function setupTestWorkspace(): Promise<string> {
@@ -24,153 +23,139 @@ Deno.test("CacheRepository - read empty cache returns empty array", async () => 
   const workspaceDir = await setupTestWorkspace();
   const repo = new CacheRepository(workspaceDir);
 
-  const entries = await repo.read();
+  const aliases = await repo.readAliases();
+  const tags = await repo.readContextTags();
 
-  assertEquals(entries, []);
+  assertEquals(aliases, []);
+  assertEquals(tags, []);
 
   await cleanupWorkspace(workspaceDir);
 });
 
-Deno.test("CacheRepository - write and read entries", async () => {
+Deno.test("CacheRepository - append aliases", async () => {
   const workspaceDir = await setupTestWorkspace();
   const repo = new CacheRepository(workspaceDir);
 
-  const entries = [
-    createAliasEntry({
-      alias: "todo",
-      targetId: "0193bb00-0000-7000-8000-000000000000",
-      lastSeen: "2025-12-08T06:00:00Z",
-    }),
-    createTagEntry({
-      tag: "work",
-      lastSeen: "2025-12-08T06:00:00Z",
-    }),
-  ];
+  await repo.appendAliases(["todo", "meeting"], 1000);
 
-  await repo.write(entries);
-  const readEntries = await repo.read();
-
-  assertEquals(readEntries.length, 2);
-  assertEquals(readEntries[0].type, "alias");
-  assertEquals(readEntries[0].value, "todo");
-  assertEquals(readEntries[1].type, "tag");
-  assertEquals(readEntries[1].value, "work");
+  const aliases = await repo.readAliases();
+  assertEquals(aliases, ["todo", "meeting"]);
 
   await cleanupWorkspace(workspaceDir);
 });
 
-Deno.test("CacheRepository - append entries", async () => {
+Deno.test("CacheRepository - append context tags", async () => {
   const workspaceDir = await setupTestWorkspace();
   const repo = new CacheRepository(workspaceDir);
 
-  const entry1 = createAliasEntry({
-    alias: "todo",
-    targetId: "0193bb00-0000-7000-8000-000000000000",
-    lastSeen: "2025-12-08T06:00:00Z",
-  });
+  await repo.appendContextTags(["work", "personal"], 1000);
 
-  const entry2 = createTagEntry({
-    tag: "work",
-    lastSeen: "2025-12-08T06:01:00Z",
-  });
-
-  await repo.append([entry1]);
-  await repo.append([entry2]);
-
-  const entries = await repo.read();
-
-  assertEquals(entries.length, 2);
-  assertEquals(entries[0].value, "todo");
-  assertEquals(entries[1].value, "work");
+  const tags = await repo.readContextTags();
+  assertEquals(tags, ["work", "personal"]);
 
   await cleanupWorkspace(workspaceDir);
 });
 
-Deno.test("CacheRepository - handles malformed lines gracefully", async () => {
-  const workspaceDir = await setupTestWorkspace();
-  const repo = new CacheRepository(workspaceDir);
-  const cacheFile = join(workspaceDir, ".index", "completion_cache.jsonl");
-
-  // Write valid entry followed by malformed line
-  const validEntry = JSON.stringify(
-    createAliasEntry({
-      alias: "todo",
-      targetId: "0193bb00-0000-7000-8000-000000000000",
-      lastSeen: "2025-12-08T06:00:00Z",
-    }),
-  );
-  await Deno.writeTextFile(cacheFile, validEntry + "\n{invalid json\n");
-
-  const entries = await repo.read();
-
-  // Should skip malformed line and return only valid entry
-  assertEquals(entries.length, 1);
-  assertEquals(entries[0].value, "todo");
-
-  await cleanupWorkspace(workspaceDir);
-});
-
-Deno.test("CacheRepository - atomic write uses tmp file", async () => {
+Deno.test("CacheRepository - deduplicates against tail", async () => {
   const workspaceDir = await setupTestWorkspace();
   const repo = new CacheRepository(workspaceDir);
 
-  const entries = [
-    createAliasEntry({
-      alias: "todo",
-      targetId: "0193bb00-0000-7000-8000-000000000000",
-      lastSeen: "2025-12-08T06:00:00Z",
-    }),
-  ];
+  // First append
+  await repo.appendAliases(["todo", "meeting"], 1000);
 
-  await repo.atomicWrite(entries);
+  // Second append with duplicate "meeting"
+  await repo.appendAliases(["meeting", "project"], 1000);
 
-  // Verify the file exists and tmp file is gone
-  const cacheFile = join(workspaceDir, ".index", "completion_cache.jsonl");
-  const tmpFile = cacheFile + ".tmp";
-
-  const stat = await Deno.stat(cacheFile);
-  assertEquals(stat.isFile, true);
-
-  try {
-    await Deno.stat(tmpFile);
-    throw new Error("Tmp file should not exist after atomic write");
-  } catch (error) {
-    assertEquals(error instanceof Deno.errors.NotFound, true);
-  }
-
-  const readEntries = await repo.read();
-  assertEquals(readEntries.length, 1);
-  assertEquals(readEntries[0].value, "todo");
+  const aliases = await repo.readAliases();
+  // "meeting" should not be duplicated because it was in the tail
+  assertEquals(aliases, ["todo", "meeting", "project"]);
 
   await cleanupWorkspace(workspaceDir);
 });
 
-Deno.test("CacheRepository - creates .index directory not file", async () => {
+Deno.test("CacheRepository - truncates to maxEntries", async () => {
   const workspaceDir = await setupTestWorkspace();
-  // Remove .index directory to test creation
+  const repo = new CacheRepository(workspaceDir);
+
+  // Add 5 entries
+  await repo.appendAliases(["a", "b", "c", "d", "e"], 3);
+
+  const aliases = await repo.readAliases();
+  // Should keep only last 3
+  assertEquals(aliases, ["c", "d", "e"]);
+
+  await cleanupWorkspace(workspaceDir);
+});
+
+Deno.test("CacheRepository - truncates after multiple appends", async () => {
+  const workspaceDir = await setupTestWorkspace();
+  const repo = new CacheRepository(workspaceDir);
+
+  await repo.appendAliases(["a", "b"], 5);
+  await repo.appendAliases(["c", "d"], 5);
+  await repo.appendAliases(["e", "f", "g"], 5);
+
+  const aliases = await repo.readAliases();
+  // Total 7 entries, max 5, should keep last 5
+  assertEquals(aliases, ["c", "d", "e", "f", "g"]);
+
+  await cleanupWorkspace(workspaceDir);
+});
+
+Deno.test("CacheRepository - skips all duplicates", async () => {
+  const workspaceDir = await setupTestWorkspace();
+  const repo = new CacheRepository(workspaceDir);
+
+  await repo.appendAliases(["todo", "meeting"], 1000);
+
+  // Try to append same values
+  await repo.appendAliases(["todo", "meeting"], 1000);
+
+  const aliases = await repo.readAliases();
+  // Should still have only 2 entries
+  assertEquals(aliases, ["todo", "meeting"]);
+
+  await cleanupWorkspace(workspaceDir);
+});
+
+Deno.test("CacheRepository - handles empty append", async () => {
+  const workspaceDir = await setupTestWorkspace();
+  const repo = new CacheRepository(workspaceDir);
+
+  await repo.appendAliases(["todo"], 1000);
+  await repo.appendAliases([], 1000);
+
+  const aliases = await repo.readAliases();
+  assertEquals(aliases, ["todo"]);
+
+  await cleanupWorkspace(workspaceDir);
+});
+
+Deno.test("CacheRepository - creates .index directory if missing", async () => {
+  const workspaceDir = await setupTestWorkspace();
   await Deno.remove(join(workspaceDir, ".index"), { recursive: true });
 
   const repo = new CacheRepository(workspaceDir);
+  await repo.appendAliases(["todo"], 1000);
 
-  const entries = [
-    createAliasEntry({
-      alias: "test",
-      targetId: "0193bb00-0000-7000-8000-000000000000",
-      lastSeen: "2025-12-08T06:00:00Z",
-    }),
-  ];
+  const aliases = await repo.readAliases();
+  assertEquals(aliases, ["todo"]);
 
-  await repo.write(entries);
+  await cleanupWorkspace(workspaceDir);
+});
 
-  // Verify .index is a directory, not a file
-  const indexDir = join(workspaceDir, ".index");
-  const indexStat = await Deno.stat(indexDir);
-  assertEquals(indexStat.isDirectory, true);
+Deno.test("CacheRepository - independent alias and tag caches", async () => {
+  const workspaceDir = await setupTestWorkspace();
+  const repo = new CacheRepository(workspaceDir);
 
-  // Verify cache file exists as a file inside .index
-  const cacheFile = join(indexDir, "completion_cache.jsonl");
-  const cacheStat = await Deno.stat(cacheFile);
-  assertEquals(cacheStat.isFile, true);
+  await repo.appendAliases(["todo", "meeting"], 1000);
+  await repo.appendContextTags(["work", "personal"], 1000);
+
+  const aliases = await repo.readAliases();
+  const tags = await repo.readContextTags();
+
+  assertEquals(aliases, ["todo", "meeting"]);
+  assertEquals(tags, ["work", "personal"]);
 
   await cleanupWorkspace(workspaceDir);
 });

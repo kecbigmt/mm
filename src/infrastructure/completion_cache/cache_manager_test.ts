@@ -1,6 +1,5 @@
 import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
-import { createAliasEntry, createTagEntry } from "../../domain/models/completion_cache_entry.ts";
 import { CacheManager } from "./cache_manager.ts";
 
 async function setupTestWorkspace(): Promise<string> {
@@ -20,131 +19,71 @@ async function cleanupWorkspace(workspaceDir: string) {
   }
 }
 
-Deno.test("CacheManager - add entries", async () => {
+Deno.test("CacheManager - add and get aliases", async () => {
   const workspaceDir = await setupTestWorkspace();
   const manager = new CacheManager(workspaceDir, { maxEntries: 1000 });
 
-  const entries = [
-    createAliasEntry({
-      alias: "todo",
-      targetId: "0193bb00-0000-7000-8000-000000000000",
-      lastSeen: "2025-12-08T06:00:00Z",
-    }),
-  ];
+  await manager.addAliases(["todo", "meeting"]);
 
-  await manager.add(entries);
-
-  const cached = await manager.getAll();
-  assertEquals(cached.length, 1);
-  assertEquals(cached[0].value, "todo");
+  const aliases = await manager.getAliases();
+  assertEquals(aliases, ["todo", "meeting"]);
 
   await cleanupWorkspace(workspaceDir);
 });
 
-Deno.test("CacheManager - triggers compaction after 10 writes", async () => {
+Deno.test("CacheManager - add and get context tags", async () => {
   const workspaceDir = await setupTestWorkspace();
-  const manager = new CacheManager(workspaceDir, {
-    maxEntries: 1000,
-    compactionThreshold: { writes: 10, sizeBytes: 50000 },
-  });
+  const manager = new CacheManager(workspaceDir, { maxEntries: 1000 });
 
-  // Add 10 entries one by one (will trigger compaction on 10th write)
-  for (let i = 0; i < 10; i++) {
-    await manager.add([
-      createAliasEntry({
-        alias: `item${i}`,
-        targetId: `0193bb00-0000-7000-8000-00000000000${i}`,
-        lastSeen: `2025-12-08T06:${String(i).padStart(2, "0")}:00Z`,
-      }),
-    ]);
-  }
+  await manager.addContextTags(["work", "personal"]);
 
-  const cached = await manager.getAll();
-  // After 10 writes, compaction should have occurred
-  assertEquals(cached.length, 10);
-  // Should be sorted by recency (newest first) after compaction
-  assertEquals(cached[0].value, "item9");
-  assertEquals(cached[9].value, "item0");
+  const tags = await manager.getContextTags();
+  assertEquals(tags, ["work", "personal"]);
 
   await cleanupWorkspace(workspaceDir);
 });
 
-Deno.test("CacheManager - deduplicates on compaction", async () => {
+Deno.test("CacheManager - respects maxEntries", async () => {
   const workspaceDir = await setupTestWorkspace();
-  const manager = new CacheManager(workspaceDir, {
-    maxEntries: 1000,
-    compactionThreshold: { writes: 3, sizeBytes: 50000 },
-  });
+  const manager = new CacheManager(workspaceDir, { maxEntries: 3 });
 
-  // Add duplicate entries
-  await manager.add([
-    createAliasEntry({
-      alias: "todo",
-      targetId: "0193bb00-0000-7000-8000-000000000000",
-      lastSeen: "2025-12-08T06:00:00Z",
-    }),
-  ]);
+  await manager.addAliases(["a", "b", "c", "d", "e"]);
 
-  await manager.add([
-    createAliasEntry({
-      alias: "todo",
-      targetId: "0193bb00-0000-7000-8000-000000000000",
-      lastSeen: "2025-12-08T07:00:00Z", // Newer
-    }),
-  ]);
-
-  await manager.add([
-    createTagEntry({
-      tag: "work",
-      lastSeen: "2025-12-08T06:00:00Z",
-    }),
-  ]);
-
-  // This should trigger compaction (3rd write)
-  await manager.add([
-    createTagEntry({
-      tag: "urgent",
-      lastSeen: "2025-12-08T08:00:00Z",
-    }),
-  ]);
-
-  const cached = await manager.getAll();
-  // Should have 3 entries (todo deduplicated, work, urgent)
-  assertEquals(cached.length, 3);
-
-  // Find the todo entry
-  const todoEntry = cached.find((e) => e.value === "todo");
-  assertEquals(todoEntry?.last_seen, "2025-12-08T07:00:00Z"); // Kept newer
+  const aliases = await manager.getAliases();
+  // Should keep only last 3
+  assertEquals(aliases, ["c", "d", "e"]);
 
   await cleanupWorkspace(workspaceDir);
 });
 
-Deno.test("CacheManager - truncates to maxEntries", async () => {
+Deno.test("CacheManager - handles empty arrays", async () => {
   const workspaceDir = await setupTestWorkspace();
-  const manager = new CacheManager(workspaceDir, {
-    maxEntries: 5,
-    compactionThreshold: { writes: 10, sizeBytes: 50000 },
-  });
+  const manager = new CacheManager(workspaceDir, { maxEntries: 1000 });
 
-  // Add 10 entries
-  for (let i = 0; i < 10; i++) {
-    await manager.add([
-      createAliasEntry({
-        alias: `item${i}`,
-        targetId: `0193bb00-0000-7000-8000-00000000000${i}`,
-        lastSeen: `2025-12-08T06:${String(i).padStart(2, "0")}:00Z`,
-      }),
-    ]);
-  }
+  await manager.addAliases([]);
+  await manager.addContextTags([]);
 
-  // Force compaction
-  await manager.compact();
+  const aliases = await manager.getAliases();
+  const tags = await manager.getContextTags();
 
-  const cached = await manager.getAll();
-  // Should keep only 5 most recent
-  assertEquals(cached.length, 5);
-  assertEquals(cached[0].value, "item9");
-  assertEquals(cached[4].value, "item5");
+  assertEquals(aliases, []);
+  assertEquals(tags, []);
+
+  await cleanupWorkspace(workspaceDir);
+});
+
+Deno.test("CacheManager - independent alias and tag management", async () => {
+  const workspaceDir = await setupTestWorkspace();
+  const manager = new CacheManager(workspaceDir, { maxEntries: 1000 });
+
+  await manager.addAliases(["todo"]);
+  await manager.addContextTags(["work"]);
+
+  const aliases = await manager.getAliases();
+  const tags = await manager.getContextTags();
+
+  assertEquals(aliases, ["todo"]);
+  assertEquals(tags, ["work"]);
 
   await cleanupWorkspace(workspaceDir);
 });
