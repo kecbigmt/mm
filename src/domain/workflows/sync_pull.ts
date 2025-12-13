@@ -83,7 +83,24 @@ export const SyncPullWorkflow = {
       settings = updatedSettings;
     }
 
-    // 5. Check for uncommitted changes
+    // 5. Validate current branch matches configured branch
+    const currentBranchResult = await deps.gitService.getCurrentBranch(input.workspaceRoot);
+    if (currentBranchResult.type === "error") {
+      return Result.error(currentBranchResult.error);
+    }
+    const currentBranch = currentBranchResult.value;
+    if (currentBranch !== branch) {
+      return Result.error(createValidationError("SyncPullInput", [
+        {
+          message:
+            `Current branch '${currentBranch}' does not match configured branch '${branch}'. ` +
+            `Checkout '${branch}' or update workspace.json to match current branch.`,
+          path: ["git", "branch"],
+        },
+      ]));
+    }
+
+    // 6. Check for uncommitted changes
     const uncommittedResult = await deps.gitService.hasUncommittedChanges(
       input.workspaceRoot,
     );
@@ -99,7 +116,7 @@ export const SyncPullWorkflow = {
       ]));
     }
 
-    // 6. Execute pull
+    // 7. Execute pull
     const pullResult = await deps.gitService.pull(
       input.workspaceRoot,
       remote,

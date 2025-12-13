@@ -15,6 +15,7 @@ const mockVersionControlService = () => {
   let pullErrorMessage = "git pull failed: rejected";
   let hasUncommitted = false;
   let remoteDefaultBranch = "main";
+  let currentBranch = "main";
 
   return {
     init: () => {
@@ -65,7 +66,7 @@ const mockVersionControlService = () => {
     },
     getCurrentBranch: (_cwd: string): Promise<Result<string, VersionControlError>> => {
       calls.push(`getCurrentBranch`);
-      return Promise.resolve(Result.ok("main"));
+      return Promise.resolve(Result.ok(currentBranch));
     },
     checkoutBranch: (
       _cwd: string,
@@ -96,6 +97,9 @@ const mockVersionControlService = () => {
     },
     setRemoteDefaultBranch: (branch: string) => {
       remoteDefaultBranch = branch;
+    },
+    setCurrentBranch: (branch: string) => {
+      currentBranch = branch;
     },
   };
 };
@@ -152,6 +156,7 @@ Deno.test("SyncPullWorkflow success flow", async () => {
 
   assertEquals(result.type, "ok");
   assertEquals(git.getCalls(), [
+    "getCurrentBranch",
     "hasUncommittedChanges",
     "pull:https://github.com/user/repo.git:main",
   ]);
@@ -230,6 +235,7 @@ Deno.test("SyncPullWorkflow fails when no remote configured", async () => {
 Deno.test("SyncPullWorkflow resolves remote default branch when no branch configured", async () => {
   const git = mockVersionControlService();
   git.setRemoteDefaultBranch("develop");
+  git.setCurrentBranch("develop"); // Simulate local repo is on develop
   const repo = mockWorkspaceRepo(true, "https://github.com/user/repo.git", null);
 
   const result = await SyncPullWorkflow.execute(
@@ -245,6 +251,7 @@ Deno.test("SyncPullWorkflow resolves remote default branch when no branch config
   assertEquals(result.type, "ok");
   assertEquals(git.getCalls(), [
     "getRemoteDefaultBranch:https://github.com/user/repo.git",
+    "getCurrentBranch",
     "hasUncommittedChanges",
     "pull:https://github.com/user/repo.git:develop",
   ]);
@@ -284,7 +291,7 @@ Deno.test("SyncPullWorkflow fails when has uncommitted changes", async () => {
       `Expected error message to include "commit or stash", got: ${errorStr}`,
     );
   }
-  assertEquals(git.getCalls(), ["hasUncommittedChanges"]);
+  assertEquals(git.getCalls(), ["getCurrentBranch", "hasUncommittedChanges"]);
 });
 
 Deno.test("SyncPullWorkflow fails on non-fast-forward update", async () => {
@@ -311,6 +318,7 @@ Deno.test("SyncPullWorkflow fails on non-fast-forward update", async () => {
     assertEquals(result.error.message.includes("Not possible to fast-forward"), true);
   }
   assertEquals(git.getCalls(), [
+    "getCurrentBranch",
     "hasUncommittedChanges",
     "pull:https://github.com/user/repo.git:main",
   ]);
@@ -337,7 +345,41 @@ Deno.test("SyncPullWorkflow fails when pull command fails", async () => {
     assertEquals(result.error.message.includes("Could not resolve host"), true);
   }
   assertEquals(git.getCalls(), [
+    "getCurrentBranch",
     "hasUncommittedChanges",
     "pull:https://github.com/user/repo.git:main",
   ]);
+});
+
+Deno.test("SyncPullWorkflow fails when current branch does not match configured branch", async () => {
+  const git = mockVersionControlService();
+  git.setCurrentBranch("develop"); // Current branch is develop
+  const repo = mockWorkspaceRepo(true, "https://github.com/user/repo.git", "main"); // Configured branch is main
+
+  const result = await SyncPullWorkflow.execute(
+    {
+      workspaceRoot: "/ws",
+    },
+    {
+      gitService: git,
+      workspaceRepository: repo as unknown as WorkspaceRepository,
+    },
+  );
+
+  assertEquals(result.type, "error");
+  if (result.type === "error") {
+    assertEquals(result.error.kind, "ValidationError");
+    const errorStr = result.error.toString();
+    assertEquals(
+      errorStr.includes("Current branch 'develop' does not match configured branch 'main'"),
+      true,
+      `Expected error message about branch mismatch, got: ${errorStr}`,
+    );
+    assertEquals(
+      errorStr.includes("Checkout 'main' or update workspace.json"),
+      true,
+      `Expected error message to suggest checkout or update, got: ${errorStr}`,
+    );
+  }
+  assertEquals(git.getCalls(), ["getCurrentBranch"]);
 });
