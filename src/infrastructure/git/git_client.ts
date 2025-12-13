@@ -359,26 +359,27 @@ export const createGitVersionControlService = (): VersionControlService => {
     remote: string,
   ): Promise<Result<string, VersionControlError>> => {
     try {
-      // If remote is a URL, resolve to remote name
+      // Resolve remote URL/path to remote name
+      // The remote can be a URL (https://..., git@...), a path (/tmp/repo, ../repo.git), or a remote name (origin)
       let remoteName = remote;
-      if (remote.includes("://") || remote.includes("@")) {
-        // List all remotes and find the one matching this URL
-        const remoteListCommand = new Deno.Command("git", {
-          args: ["remote", "-v"],
-          cwd,
-          stdout: "piped",
-          stderr: "piped",
-        });
-        const listOutput = await remoteListCommand.output();
-        if (listOutput.code === 0) {
-          const remotes = new TextDecoder().decode(listOutput.stdout);
-          // Parse lines like: "origin  https://github.com/user/repo.git (fetch)"
-          for (const line of remotes.split("\n")) {
-            const match = line.match(/^(\S+)\s+(\S+)\s+\(fetch\)$/);
-            if (match && match[2] === remote) {
-              remoteName = match[1];
-              break;
-            }
+
+      // List all remotes and try to find a match
+      const remoteListCommand = new Deno.Command("git", {
+        args: ["remote", "-v"],
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const listOutput = await remoteListCommand.output();
+      if (listOutput.code === 0) {
+        const remotes = new TextDecoder().decode(listOutput.stdout);
+        // Parse lines like: "origin  https://github.com/user/repo.git (fetch)"
+        // or: "local  /tmp/repo (fetch)"
+        for (const line of remotes.split("\n")) {
+          const match = line.match(/^(\S+)\s+(\S+)\s+\(fetch\)$/);
+          if (match && match[2] === remote) {
+            remoteName = match[1];
+            break;
           }
         }
       }
