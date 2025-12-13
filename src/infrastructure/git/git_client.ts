@@ -359,9 +359,33 @@ export const createGitVersionControlService = (): VersionControlService => {
     remote: string,
   ): Promise<Result<string, VersionControlError>> => {
     try {
+      // If remote is a URL, resolve to remote name
+      let remoteName = remote;
+      if (remote.includes("://") || remote.includes("@")) {
+        // List all remotes and find the one matching this URL
+        const remoteListCommand = new Deno.Command("git", {
+          args: ["remote", "-v"],
+          cwd,
+          stdout: "piped",
+          stderr: "piped",
+        });
+        const listOutput = await remoteListCommand.output();
+        if (listOutput.code === 0) {
+          const remotes = new TextDecoder().decode(listOutput.stdout);
+          // Parse lines like: "origin  https://github.com/user/repo.git (fetch)"
+          for (const line of remotes.split("\n")) {
+            const match = line.match(/^(\S+)\s+(\S+)\s+\(fetch\)$/);
+            if (match && match[2] === remote) {
+              remoteName = match[1];
+              break;
+            }
+          }
+        }
+      }
+
       // First, fetch to update remote refs
       const fetchCommand = new Deno.Command("git", {
-        args: ["fetch", remote],
+        args: ["fetch", remoteName],
         cwd,
         stdout: "piped",
         stderr: "piped",
@@ -374,7 +398,7 @@ export const createGitVersionControlService = (): VersionControlService => {
 
       // Get remote HEAD using symbolic-ref
       const command = new Deno.Command("git", {
-        args: ["symbolic-ref", `refs/remotes/${remote}/HEAD`],
+        args: ["symbolic-ref", `refs/remotes/${remoteName}/HEAD`],
         cwd,
         stdout: "piped",
         stderr: "piped",
