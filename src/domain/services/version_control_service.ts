@@ -31,10 +31,17 @@ export interface VersionControlService {
     branch: string,
     options?: { force?: boolean },
   ): Promise<Result<string, VersionControlError>>;
+  pull(
+    cwd: string,
+    remote: string,
+    branch: string,
+  ): Promise<Result<string, VersionControlError>>;
   getCurrentBranch(cwd: string): Promise<Result<string, VersionControlError>>;
   checkoutBranch(
     cwd: string,
     branch: string,
     create: boolean,
   ): Promise<Result<void, VersionControlError>>;
+  hasUncommittedChanges(cwd: string): Promise<Result<boolean, VersionControlError>>;
+  getRemoteDefaultBranch(cwd: string, remote: string): Promise<Result<string, VersionControlError>>;
 }

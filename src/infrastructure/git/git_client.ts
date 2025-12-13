@@ -260,6 +260,129 @@ export const createGitVersionControlService = (): VersionControlService => {
     }
   };
 
+  const pull = async (
+    cwd: string,
+    remote: string,
+    branch: string,
+  ): Promise<Result<string, VersionControlError>> => {
+    try {
+      const command = new Deno.Command("git", {
+        args: ["pull", "--ff-only", remote, branch],
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { code, stdout, stderr } = await command.output();
+      const outStr = new TextDecoder().decode(stdout);
+      const errStr = new TextDecoder().decode(stderr);
+
+      if (code !== 0) {
+        return Result.error(createVersionControlError(`git pull failed: ${outStr} ${errStr}`));
+      }
+      // Git pull outputs progress to stderr and result to stdout
+      // Combine both to show complete output
+      const output = errStr.trim() && outStr.trim()
+        ? `${errStr.trim()}\n${outStr.trim()}`
+        : (errStr || outStr);
+      return Result.ok(output);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+      }
+      return Result.error(createVersionControlError(`git pull failed: ${error}`, { cause: error }));
+    }
+  };
+
+  const hasUncommittedChanges = async (
+    cwd: string,
+  ): Promise<Result<boolean, VersionControlError>> => {
+    try {
+      const command = new Deno.Command("git", {
+        args: ["status", "--porcelain"],
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { code, stdout, stderr } = await command.output();
+      if (code !== 0) {
+        const errStr = new TextDecoder().decode(stderr);
+        return Result.error(createVersionControlError(`git status failed: ${errStr}`));
+      }
+      const output = new TextDecoder().decode(stdout);
+      // Filter out untracked files (lines starting with "??")
+      // Only tracked modified/staged files count as uncommitted changes
+      const trackedChanges = output
+        .split("\n")
+        .filter((line) => line.trim() !== "")
+        .filter((line) => !line.startsWith("??"));
+      return Result.ok(trackedChanges.length > 0);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+      }
+      return Result.error(
+        createVersionControlError(`git status failed: ${error}`, { cause: error }),
+      );
+    }
+  };
+
+  const getRemoteDefaultBranch = async (
+    cwd: string,
+    remote: string,
+  ): Promise<Result<string, VersionControlError>> => {
+    try {
+      // First, fetch to update remote refs
+      const fetchCommand = new Deno.Command("git", {
+        args: ["fetch", remote],
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const fetchOutput = await fetchCommand.output();
+      if (fetchOutput.code !== 0) {
+        const errStr = new TextDecoder().decode(fetchOutput.stderr);
+        return Result.error(createVersionControlError(`git fetch failed: ${errStr}`));
+      }
+
+      // Get remote HEAD using symbolic-ref
+      const command = new Deno.Command("git", {
+        args: ["symbolic-ref", `refs/remotes/${remote}/HEAD`],
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { code, stdout, stderr } = await command.output();
+      if (code !== 0) {
+        const errStr = new TextDecoder().decode(stderr);
+        return Result.error(
+          createVersionControlError(
+            `Failed to resolve remote default branch: ${errStr}`,
+          ),
+        );
+      }
+      const symbolicRef = new TextDecoder().decode(stdout).trim();
+      // symbolicRef format: "refs/remotes/origin/main" -> extract "main"
+      const branchMatch = symbolicRef.match(/^refs\/remotes\/[^/]+\/(.+)$/);
+      if (!branchMatch) {
+        return Result.error(
+          createVersionControlError(
+            `Invalid symbolic-ref format: ${symbolicRef}`,
+          ),
+        );
+      }
+      return Result.ok(branchMatch[1]);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.error(createVersionControlError("Git is not installed or not in the PATH"));
+      }
+      return Result.error(
+        createVersionControlError(`Failed to get remote default branch: ${error}`, {
+          cause: error,
+        }),
+      );
+    }
+  };
+
   return {
     init,
     setRemote,
@@ -267,7 +390,10 @@ export const createGitVersionControlService = (): VersionControlService => {
     commit,
     validateBranchName,
     push,
+    pull,
     getCurrentBranch,
     checkoutBranch,
+    hasUncommittedChanges,
+    getRemoteDefaultBranch,
   };
 };
