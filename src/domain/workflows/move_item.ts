@@ -168,7 +168,7 @@ async function calculateRankForHead(
 
   const sortedSiblings = sortSiblingsByRank(siblingsResult.value, deps.rankService);
   const rankResult = sortedSiblings.length === 0
-    ? deps.rankService.minRank()
+    ? deps.rankService.middleRank()
     : deps.rankService.prevRank(sortedSiblings[0].data.rank);
 
   if (rankResult.type === "error") {
@@ -210,7 +210,7 @@ async function calculateRankForTail(
 
   const sortedSiblings = sortSiblingsByRank(siblingsResult.value, deps.rankService);
   const rankResult = sortedSiblings.length === 0
-    ? deps.rankService.maxRank()
+    ? deps.rankService.middleRank()
     : deps.rankService.nextRank(sortedSiblings[sortedSiblings.length - 1].data.rank);
 
   if (rankResult.type === "error") {
@@ -336,7 +336,7 @@ async function calculateRankForBefore(
 }
 
 /**
- * Default behavior when no positioning prefix is specified: moves item to head of target placement.
+ * Default behavior when no positioning prefix is specified: moves item to tail of target placement.
  */
 async function calculateRankForRegularPlacement(
   targetExpression: string,
@@ -378,14 +378,25 @@ async function calculateRankForRegularPlacement(
     );
   }
 
-  const newRankResult = deps.rankService.minRank();
-  if (newRankResult.type === "error") {
-    return Result.error(createValidationError("MoveItem", newRankResult.error.issues));
+  const targetPlacement = targetPlacementResult.value;
+
+  const siblingsResult = await loadSiblings(targetPlacement, deps.itemRepository);
+  if (siblingsResult.type === "error") {
+    return Result.error(siblingsResult.error);
+  }
+
+  const sortedSiblings = sortSiblingsByRank(siblingsResult.value, deps.rankService);
+  const rankResult = sortedSiblings.length === 0
+    ? deps.rankService.middleRank()
+    : deps.rankService.nextRank(sortedSiblings[sortedSiblings.length - 1].data.rank);
+
+  if (rankResult.type === "error") {
+    return Result.error(createValidationError("MoveItem", rankResult.error.issues));
   }
 
   return Result.ok({
-    placement: targetPlacementResult.value,
-    rank: newRankResult.value,
+    placement: targetPlacement,
+    rank: rankResult.value,
   });
 }
 
