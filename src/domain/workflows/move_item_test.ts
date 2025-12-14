@@ -29,8 +29,10 @@ const createTestRankService = () => {
       }
       return "m";
     },
-    next: (rank) => (rank === "z" ? "z" : `${rank}n`), // max stays at max
-    prev: (rank) => (rank === "a" ? "a" : `p${rank}`), // min stays at min
+    // Note: The following simplified boundary behavior (returning the same rank at min/max)
+    // is intentional for testing boundary conditions and differs from typical lexorank implementations.
+    next: (rank) => (rank === "z" ? "z" : `${rank}n`), // max stays at max (test simplification)
+    prev: (rank) => (rank === "a" ? "a" : `p${rank}`), // min stays at min (test simplification)
     compare: (first, second) => first.localeCompare(second),
   };
 
@@ -469,23 +471,7 @@ describe("MoveItemWorkflow", () => {
     const itemRepository = new InMemoryItemRepository();
     const aliasRepository = new InMemoryAliasRepository();
     const aliasAutoGenerator = createTestAliasAutoGenerator();
-
-    // Create a test rank service where max rank is reachable
-    const generator: RankGenerator = {
-      min: () => "a",
-      max: () => "z",
-      middle: () => "m",
-      between: (first, second) => {
-        if (first < second) {
-          return first + "m";
-        }
-        return "m";
-      },
-      next: (rank) => (rank === "z" ? "z" : `${rank}n`), // max stays at max
-      prev: (rank) => `p${rank}`,
-      compare: (first, second) => first.localeCompare(second),
-    };
-    const rankService = createRankService(generator);
+    const rankService = createTestRankService();
 
     const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
     const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
