@@ -1,7 +1,6 @@
 import { assertEquals, assertExists } from "@std/assert";
 import { groupByPlacement, rebalanceGroup } from "./rank_rebalancer.ts";
-import { createRankService } from "../../domain/services/rank_service.ts";
-import { createLexoRankGenerator } from "../lexorank/generator.ts";
+import { createLexoRankService } from "../lexorank/rank_service.ts";
 import { createItem, Item } from "../../domain/models/item.ts";
 import {
   parseDateTime,
@@ -43,7 +42,7 @@ const createTestItem = (
 };
 
 Deno.test("rebalanceGroup - returns empty array for empty input", () => {
-  const rankService = createRankService(createLexoRankGenerator());
+  const rankService = createLexoRankService();
   const result = rebalanceGroup([], rankService);
 
   assertEquals(result.type, "ok");
@@ -53,7 +52,7 @@ Deno.test("rebalanceGroup - returns empty array for empty input", () => {
 });
 
 Deno.test("rebalanceGroup - single item gets middle rank", () => {
-  const rankService = createRankService(createLexoRankGenerator());
+  const rankService = createLexoRankService();
   const item = createTestItem("9f9e", "2025-01-15", "0|a0:z");
 
   const result = rebalanceGroup([item], rankService);
@@ -67,7 +66,7 @@ Deno.test("rebalanceGroup - single item gets middle rank", () => {
 });
 
 Deno.test("rebalanceGroup - preserves order when rebalancing", () => {
-  const rankService = createRankService(createLexoRankGenerator());
+  const rankService = createLexoRankService();
 
   // Create items with consecutive ranks
   const items = [
@@ -104,7 +103,7 @@ Deno.test("rebalanceGroup - preserves order when rebalancing", () => {
 });
 
 Deno.test("rebalanceGroup - uses createdAt as tiebreak for same ranks", () => {
-  const rankService = createRankService(createLexoRankGenerator());
+  const rankService = createLexoRankService();
 
   // Create items with same rank but different createdAt
   const items = [
@@ -177,7 +176,7 @@ Deno.test("groupByPlacement - groups items under parent item", () => {
 });
 
 Deno.test("rebalanceGroup - only returns updates for changed ranks", () => {
-  const rankService = createRankService(createLexoRankGenerator());
+  const rankService = createLexoRankService();
 
   // Create a single item that's already at the middle rank
   const middleRank = rankService.headRank([]);
@@ -197,7 +196,7 @@ Deno.test("rebalanceGroup - only returns updates for changed ranks", () => {
 });
 
 Deno.test("rebalanceGroup - redistributes dense ranks to spread distribution", () => {
-  const rankService = createRankService(createLexoRankGenerator());
+  const rankService = createLexoRankService();
 
   // Create items with dense ranks in middle of space (simulating consecutive creation)
   // These ranks are all in h bucket - densely packed around middle
