@@ -95,7 +95,7 @@ async function loadItemFromPlacement(
   if (placement.head.kind !== "item") {
     return Result.error(
       createValidationError("MoveItem", [
-        createValidationIssue("expression must resolve to an item, not a date", {
+        createValidationIssue("item expression must resolve to an item, not a date", {
           code: errorCode,
           path: ["targetExpression"],
         }),
