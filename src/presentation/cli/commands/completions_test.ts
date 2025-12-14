@@ -120,67 +120,8 @@ Deno.test({
   },
 });
 
-Deno.test({
-  name: "zsh script passes syntax validation",
-  async fn() {
-    const captured = captureConsole();
-    try {
-      await buildCli().parse(["completions", "zsh"]);
-    } finally {
-      captured.restore();
-    }
-
-    const output = captured.logs.join("\n");
-    const tempFile = await Deno.makeTempFile({ suffix: ".zsh" });
-    try {
-      await Deno.writeTextFile(tempFile, output);
-      const proc = new Deno.Command("zsh", {
-        args: ["-n", tempFile],
-        stdout: "piped",
-        stderr: "piped",
-      });
-      const result = await proc.output();
-      assertEquals(
-        result.code,
-        0,
-        `zsh syntax validation failed: ${new TextDecoder().decode(result.stderr)}`,
-      );
-    } finally {
-      await Deno.remove(tempFile);
-    }
-  },
-});
-
-Deno.test({
-  name: "bash script passes syntax validation",
-  async fn() {
-    const captured = captureConsole();
-    try {
-      await buildCli().parse(["completions", "bash"]);
-    } finally {
-      captured.restore();
-    }
-
-    const output = captured.logs.join("\n");
-    const tempFile = await Deno.makeTempFile({ suffix: ".bash" });
-    try {
-      await Deno.writeTextFile(tempFile, output);
-      const proc = new Deno.Command("bash", {
-        args: ["-n", tempFile],
-        stdout: "piped",
-        stderr: "piped",
-      });
-      const result = await proc.output();
-      assertEquals(
-        result.code,
-        0,
-        `bash syntax validation failed: ${new TextDecoder().decode(result.stderr)}`,
-      );
-    } finally {
-      await Deno.remove(tempFile);
-    }
-  },
-});
+// Note: Syntax validation tests have been moved to tests/e2e/scenarios/completions_test.ts
+// because they depend on external shell binaries (zsh, bash) being installed.
 
 Deno.test({
   name: "zsh script includes all commands from main CLI",
