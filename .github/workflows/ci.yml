@@ -16,6 +16,10 @@ jobs:
       - uses: denoland/setup-deno@v1
         with:
           deno-version: v2.x
+      - name: Install zsh and bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh bash
       - run: deno fmt --check
       - run: deno lint
       - run: deno task test
