@@ -30,8 +30,8 @@ async function main() {
     .command("reopen", createReopenCommand().description("Reopen closed items")).alias("op")
     .command("edit", createEditCommand().description("Edit an item")).alias("e")
     .command("workspace", createWorkspaceCommand().description("Workspace management")).alias("ws")
-    .command("cd", createCdCommand().description("Change current working directory"))
-    .command("pwd", createPwdCommand().description("Print current working directory"))
+    .command("cd", createCdCommand().description("Navigate to location in knowledge graph"))
+    .command("pwd", createPwdCommand().description("Show current location in knowledge graph"))
     .command("list", createListCommand().description("List items")).alias("ls")
     .command(
       "where",
