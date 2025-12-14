@@ -5,7 +5,7 @@ const ZSHELL_SCRIPT = `#compdef mm
 #
 # Installation:
 #   Add the following to your ~/.zshrc:
-#     eval "$(mm completions zsh)"
+#     source <(mm completions zsh)
 #   Then restart your shell or run: source ~/.zshrc
 
 _mm_resolve_workspace_root() {
@@ -255,7 +255,7 @@ const BASH_SCRIPT = `# mm shell completion for Bash
 #
 # Installation:
 #   Add the following to your ~/.bashrc or ~/.bash_profile:
-#     eval "$(mm completions bash)"
+#     source <(mm completions bash)
 #   Then restart your shell or run: source ~/.bashrc
 
 _mm_resolve_workspace_root() {

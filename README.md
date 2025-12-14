@@ -19,6 +19,10 @@ Use `deno task test` to run the full unit test suite.
 Build a standalone binary with `deno task compile`, or install the CLI globally via
 `deno task install`.
 
+**Shell Completion (optional):** Enable tab completion for Zsh/Bash by adding
+`source <(mm completions zsh)` or `source <(mm completions bash)` to your shell config. See
+[Shell Completion](#shell-completion) for details.
+
 ## Commands
 
 ### Creating Items
@@ -192,3 +196,47 @@ Rebalance LexoRank values for items in specified paths to restore insertion head
 mm doctor rebalance-rank today
 mm doctor rebalance-rank 2025-01-15 book-alias
 ```
+
+## Shell Completion
+
+mm provides tab completion for commands, flags, and recently used aliases/tags in Zsh and Bash.
+
+### Installation
+
+#### Zsh
+
+Add the following to your `~/.zshrc`:
+
+```sh
+source <(mm completions zsh)
+```
+
+Then restart your shell or run `source ~/.zshrc`.
+
+#### Bash
+
+Add the following to your `~/.bashrc` or `~/.bash_profile`:
+
+```sh
+source <(mm completions bash)
+```
+
+Then restart your shell or run `source ~/.bashrc`.
+
+### What Gets Completed
+
+- **Commands**: All mm commands (`note`, `task`, `edit`, `list`, `move`, `close`, etc.)
+- **Flags**: Context-aware flag completion for each command (e.g., `--context`, `--parent`,
+  `--alias`)
+- **Aliases**: Recently used item aliases when editing or moving items (cached from recent
+  operations)
+- **Context tags**: Recently used tags when specifying `--context` (cached from recent operations)
+
+### How It Works
+
+Completion suggestions for aliases and tags are powered by cache files stored in your workspace's
+`.index/` directory. These cache files are automatically updated when you use commands like `list`,
+`edit`, `note`, and `close`.
+
+The completion system resolves your current workspace from `MM_HOME/config.json` (defaulting to
+`~/.mm`), so completions work from any directory.
