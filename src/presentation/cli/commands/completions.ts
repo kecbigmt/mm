@@ -112,8 +112,8 @@ _mm() {
                     case "$state" in
                         context_tags)
                             local -a tags
-                            tags=($(_mm_get_tag_candidates))
-                            _describe -t context_tags 'context tag' tags
+                            tags=(\${(f)"\$(_mm_get_tag_candidates)"})
+                            compadd -a tags
                             ;;
                     esac
                     ;;
@@ -122,8 +122,8 @@ _mm() {
                     case "$state" in
                         context_tags)
                             local -a tags
-                            tags=($(_mm_get_tag_candidates))
-                            _describe -t context_tags 'context tag' tags
+                            tags=(\${(f)"\$(_mm_get_tag_candidates)"})
+                            compadd -a tags
                             ;;
                     esac
                     ;;
@@ -132,8 +132,8 @@ _mm() {
                     case "$state" in
                         context_tags)
                             local -a tags
-                            tags=($(_mm_get_tag_candidates))
-                            _describe -t context_tags 'context tag' tags
+                            tags=(\${(f)"\$(_mm_get_tag_candidates)"})
+                            compadd -a tags
                             ;;
                     esac
                     ;;
@@ -144,8 +144,8 @@ _mm() {
                     case "$state" in
                         item_id)
                             local -a aliases
-                            aliases=($(_mm_get_alias_candidates))
-                            _describe -t item_aliases 'item alias' aliases
+                            aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
+                            compadd -a aliases
                             ;;
                     esac
                     ;;
@@ -162,8 +162,8 @@ _mm() {
                     case "$state" in
                         item_ids)
                             local -a aliases
-                            aliases=($(_mm_get_alias_candidates))
-                            _describe -t item_aliases 'item alias' aliases
+                            aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
+                            compadd -a aliases
                             ;;
                     esac
                     ;;
@@ -174,8 +174,8 @@ _mm() {
                     case "$state" in
                         item_ids)
                             local -a aliases
-                            aliases=($(_mm_get_alias_candidates))
-                            _describe -t item_aliases 'item alias' aliases
+                            aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
+                            compadd -a aliases
                             ;;
                     esac
                     ;;
@@ -186,8 +186,8 @@ _mm() {
                     case "$state" in
                         item_ids)
                             local -a aliases
-                            aliases=($(_mm_get_alias_candidates))
-                            _describe -t item_aliases 'item alias' aliases
+                            aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
+                            compadd -a aliases
                             ;;
                     esac
                     ;;
