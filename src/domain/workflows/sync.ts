@@ -33,8 +33,10 @@ export const SyncWorkflow = {
       return Result.error(pushResult.error);
     }
 
-    // 3. Combine outputs
-    const output = `${pullResult.value}${pushResult.value}`;
+    // 3. Combine outputs with labels
+    const pullOutput = pullResult.value.trim();
+    const pushOutput = pushResult.value.trim();
+    const output = `Pull:\n${pullOutput}\n\nPush:\n${pushOutput}`;
     return Result.ok(output);
   },
 };

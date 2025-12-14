@@ -51,7 +51,9 @@ const mockVersionControlService = () => {
       const forceFlag = options?.force ? ":force" : "";
       calls.push(`push:${remote}:${branch}${forceFlag}`);
       if (shouldFailPush) {
-        return Promise.resolve(Result.error(createVersionControlCommandFailedError(pushErrorMessage)));
+        return Promise.resolve(
+          Result.error(createVersionControlCommandFailedError(pushErrorMessage)),
+        );
       }
       return Promise.resolve(Result.ok("Everything up-to-date\n"));
     },
@@ -62,7 +64,9 @@ const mockVersionControlService = () => {
     ): Promise<Result<string, VersionControlError>> => {
       calls.push(`pull:${remote}:${branch}`);
       if (shouldFailPull) {
-        return Promise.resolve(Result.error(createVersionControlCommandFailedError(pullErrorMessage)));
+        return Promise.resolve(
+          Result.error(createVersionControlCommandFailedError(pullErrorMessage)),
+        );
       }
       return Promise.resolve(Result.ok("Already up to date.\n"));
     },
