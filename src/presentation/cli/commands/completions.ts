@@ -366,7 +366,16 @@ _mm() {
 
     # Complete item IDs/aliases for commands that take them
     case "$cmd" in
-        edit|e|move|mv|close|cl|reopen|op|snooze|sn|where)
+        edit|e|where)
+            # Single item commands - only complete first argument
+            if [[ $cword -eq 2 ]]; then
+                local aliases="$(_mm_get_alias_candidates)"
+                COMPREPLY=($(compgen -W "$aliases" -- "$cur"))
+            fi
+            return 0
+            ;;
+        move|mv|close|cl|reopen|op|snooze|sn)
+            # Multiple item commands - complete all arguments
             local aliases="$(_mm_get_alias_candidates)"
             COMPREPLY=($(compgen -W "$aliases" -- "$cur"))
             return 0
