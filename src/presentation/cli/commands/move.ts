@@ -5,6 +5,7 @@ import { CwdResolutionService } from "../../../domain/services/cwd_resolution_se
 import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
+import { executeAutoCommit } from "../auto_commit_helper.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -95,5 +96,16 @@ export function createMoveCommand() {
           `✅ Moved [${label}] ${item.data.title.toString()} to ${item.data.placement.toString()}`,
         );
       }
+
+      // Auto-commit if enabled
+      const autoCommitDeps = {
+        workspaceRoot: deps.root,
+        versionControlService: deps.versionControlService,
+        workspaceRepository: deps.workspaceRepository,
+      };
+      const commitMessage = itemRefs.length === 1
+        ? `move item to ${placement}`
+        : `move ${itemRefs.length} items to ${placement}`;
+      await executeAutoCommit(autoCommitDeps, commitMessage);
     });
 }
