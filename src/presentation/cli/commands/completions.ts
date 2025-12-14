@@ -8,20 +8,42 @@ const ZSHELL_SCRIPT = `#compdef mm
 #     eval "$(mm completions zsh)"
 #   Then restart your shell or run: source ~/.zshrc
 
+_mm_resolve_workspace_root() {
+    # Resolve MM_HOME
+    local mm_home="\${MM_HOME:-\${HOME}/.mm}"
+
+    # Read current workspace from config
+    local config_file="\${mm_home}/config.json"
+    if [[ ! -f "$config_file" ]]; then
+        return 1
+    fi
+
+    # Extract currentWorkspace from JSON (simple grep approach)
+    local current_workspace
+    current_workspace=\$(grep -o '"currentWorkspace"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" 2>/dev/null | sed 's/.*"\\([^"]*\\)".*/\\1/')
+
+    # Default to "home" if not found
+    if [[ -z "$current_workspace" ]]; then
+        current_workspace="home"
+    fi
+
+    echo "\${mm_home}/workspaces/\${current_workspace}"
+}
+
 _mm_find_cache_file() {
     local filename="$1" # 'completion_aliases.txt' or 'completion_context_tags.txt'
-    local dir="$PWD"
-    while [[ "$dir" != "/" ]]; do
-        if [[ -f "$dir/.index/$filename" ]]; then
-            echo "$dir/.index/$filename"
-            return 0
-        fi
-        if [[ -f "$dir/workspace.json" ]]; then
-             # Workspace found but no cache yet
-             return 1
-        fi
-        dir="$(dirname "$dir")"
-    done
+    local workspace_root=\$(_mm_resolve_workspace_root)
+
+    if [[ -z "$workspace_root" ]]; then
+        return 1
+    fi
+
+    local cache_file="\${workspace_root}/.index/\${filename}"
+    if [[ -f "$cache_file" ]]; then
+        echo "$cache_file"
+        return 0
+    fi
+
     return 1
 }
 
@@ -212,20 +234,42 @@ const BASH_SCRIPT = `# mm shell completion for Bash
 #     eval "$(mm completions bash)"
 #   Then restart your shell or run: source ~/.bashrc
 
+_mm_resolve_workspace_root() {
+    # Resolve MM_HOME
+    local mm_home="\${MM_HOME:-\${HOME}/.mm}"
+
+    # Read current workspace from config
+    local config_file="\${mm_home}/config.json"
+    if [[ ! -f "$config_file" ]]; then
+        return 1
+    fi
+
+    # Extract currentWorkspace from JSON (simple grep approach)
+    local current_workspace
+    current_workspace=\$(grep -o '"currentWorkspace"[[:space:]]*:[[:space:]]*"[^"]*"' "$config_file" 2>/dev/null | sed 's/.*"\\([^"]*\\)".*/\\1/')
+
+    # Default to "home" if not found
+    if [[ -z "$current_workspace" ]]; then
+        current_workspace="home"
+    fi
+
+    echo "\${mm_home}/workspaces/\${current_workspace}"
+}
+
 _mm_find_cache_file() {
     local filename="$1" # 'completion_aliases.txt' or 'completion_context_tags.txt'
-    local dir="$PWD"
-    while [[ "$dir" != "/" ]]; do
-        if [[ -f "$dir/.index/$filename" ]]; then
-            echo "$dir/.index/$filename"
-            return 0
-        fi
-        if [[ -f "$dir/workspace.json" ]]; then
-             # Workspace found but no cache yet
-             return 1
-        fi
-        dir="$(dirname "$dir")"
-    done
+    local workspace_root=\$(_mm_resolve_workspace_root)
+
+    if [[ -z "$workspace_root" ]]; then
+        return 1
+    fi
+
+    local cache_file="\${workspace_root}/.index/\${filename}"
+    if [[ -f "$cache_file" ]]; then
+        echo "$cache_file"
+        return 0
+    fi
+
     return 1
 }
 
