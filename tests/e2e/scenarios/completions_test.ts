@@ -1,14 +1,17 @@
 /**
- * E2E Test: Shell Completion Script Validation
+ * E2E Test: Shell Completion Script Registration
  *
  * Purpose:
- *   Verify that shell completion scripts are syntactically valid and can be
- *   executed by zsh and bash interpreters.
+ *   Verify that shell completion scripts can be sourced and properly register
+ *   completion functions with zsh and bash.
  *
  * Overview:
  *   These tests validate that:
- *   - Zsh completion script passes `zsh -n` syntax validation
- *   - Bash completion script passes `bash -n` syntax validation
+ *   - Zsh completion is properly registered after sourcing the script
+ *   - Bash completion is properly registered after sourcing the script
+ *
+ * These tests detect both syntax errors (which would prevent sourcing) and
+ * registration issues (like missing compdef/complete calls).
  *
  * Design Reference:
  *   See docs/stories/20251206_command-completion/20251213T141938_shell-completion-script.story.md
@@ -23,7 +26,7 @@ import {
   type TestContext,
 } from "../helpers.ts";
 
-describe("Shell Completion Script Validation", () => {
+describe("Shell Completion Script Registration", () => {
   let ctx: TestContext;
 
   beforeEach(async () => {
@@ -34,49 +37,106 @@ describe("Shell Completion Script Validation", () => {
     await cleanupTestEnvironment(ctx);
   });
 
-  it("generates zsh script that passes syntax validation", async () => {
+  it("zsh completion is registered after sourcing script", async () => {
     const result = await runCommand(ctx.testHome, ["completions", "zsh"]);
     assertEquals(result.success, true, `Command failed: ${result.stderr}`);
 
-    const tempFile = await Deno.makeTempFile({ suffix: ".zsh" });
-    try {
-      await Deno.writeTextFile(tempFile, result.stdout);
-      const proc = new Deno.Command("zsh", {
-        args: ["-n", tempFile],
-        stdout: "piped",
-        stderr: "piped",
-      });
-      const validationResult = await proc.output();
-      assertEquals(
-        validationResult.code,
-        0,
-        `zsh syntax validation failed: ${new TextDecoder().decode(validationResult.stderr)}`,
-      );
-    } finally {
-      await Deno.remove(tempFile);
-    }
+    // Test that completion system can load and register the completion
+    const testScript = `
+      autoload -U compinit && compinit
+      source /dev/stdin
+
+      # Check that _mm function is defined
+      if ! type _mm > /dev/null 2>&1; then
+        echo "ERROR: _mm function not defined"
+        exit 1
+      fi
+
+      # Check that mm command has completion registered
+      # In zsh, completions are stored in the _comps associative array
+      if [[ "\${_comps[mm]}" != "_mm" ]]; then
+        echo "ERROR: mm completion not registered (expected _mm, got \${_comps[mm]})"
+        exit 2
+      fi
+
+      echo "SUCCESS"
+    `;
+
+    const proc = new Deno.Command("zsh", {
+      args: ["-c", testScript],
+      stdin: "piped",
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const child = proc.spawn();
+    const writer = child.stdin.getWriter();
+    await writer.write(new TextEncoder().encode(result.stdout));
+    await writer.close();
+
+    const output = await child.output();
+    const stdout = new TextDecoder().decode(output.stdout);
+    const stderr = new TextDecoder().decode(output.stderr);
+
+    assertEquals(
+      output.code,
+      0,
+      `Zsh completion registration failed (exit ${output.code}):\nstdout: ${stdout}\nstderr: ${stderr}`,
+    );
+    assertEquals(stdout.trim(), "SUCCESS", "Expected SUCCESS message");
   });
 
-  it("generates bash script that passes syntax validation", async () => {
+  it("bash completion is registered after sourcing script", async () => {
     const result = await runCommand(ctx.testHome, ["completions", "bash"]);
     assertEquals(result.success, true, `Command failed: ${result.stderr}`);
 
-    const tempFile = await Deno.makeTempFile({ suffix: ".bash" });
-    try {
-      await Deno.writeTextFile(tempFile, result.stdout);
-      const proc = new Deno.Command("bash", {
-        args: ["-n", tempFile],
-        stdout: "piped",
-        stderr: "piped",
-      });
-      const validationResult = await proc.output();
-      assertEquals(
-        validationResult.code,
-        0,
-        `bash syntax validation failed: ${new TextDecoder().decode(validationResult.stderr)}`,
-      );
-    } finally {
-      await Deno.remove(tempFile);
-    }
+    // Test that bash completion system can load and register the completion
+    const testScript = `
+      source /dev/stdin
+
+      # Check that _mm function is defined
+      if ! type _mm > /dev/null 2>&1; then
+        echo "ERROR: _mm function not defined"
+        exit 1
+      fi
+
+      # Check that mm command has completion registered
+      # complete -p mm returns the completion spec for mm
+      if ! complete -p mm > /dev/null 2>&1; then
+        echo "ERROR: mm completion not registered"
+        exit 2
+      fi
+
+      # Verify it's using our _mm function
+      if ! complete -p mm | grep -q "_mm"; then
+        echo "ERROR: mm completion not using _mm function"
+        exit 3
+      fi
+
+      echo "SUCCESS"
+    `;
+
+    const proc = new Deno.Command("bash", {
+      args: ["-c", testScript],
+      stdin: "piped",
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const child = proc.spawn();
+    const writer = child.stdin.getWriter();
+    await writer.write(new TextEncoder().encode(result.stdout));
+    await writer.close();
+
+    const output = await child.output();
+    const stdout = new TextDecoder().decode(output.stdout);
+    const stderr = new TextDecoder().decode(output.stderr);
+
+    assertEquals(
+      output.code,
+      0,
+      `Bash completion registration failed (exit ${output.code}):\nstdout: ${stdout}\nstderr: ${stderr}`,
+    );
+    assertEquals(stdout.trim(), "SUCCESS", "Expected SUCCESS message");
   });
 });
