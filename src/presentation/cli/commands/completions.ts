@@ -74,6 +74,7 @@ _mm() {
         'move:Move items to a new placement'
         'close:Close items'
         'reopen:Reopen closed items'
+        'remove:Remove items'
         'workspace:Workspace management'
         'cd:Navigate to location in knowledge graph'
         'pwd:Show current location in knowledge graph'
@@ -213,6 +214,18 @@ _mm() {
                             ;;
                     esac
                     ;;
+                remove|rm)
+                    _arguments \\
+                        '*: :->item_ids' \\
+                        $common_flags
+                    case "$state" in
+                        item_ids)
+                            local -a aliases
+                            aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
+                            compadd -a aliases
+                            ;;
+                    esac
+                    ;;
                 snooze|sn)
                     _arguments \\
                         '*: :->item_ids' \\
@@ -331,7 +344,7 @@ _mm() {
         cword=$COMP_CWORD
     fi
 
-    local commands="note task event list edit move close reopen workspace cd pwd where snooze doctor sync completions"
+    local commands="note task event list edit move close reopen remove workspace cd pwd where snooze doctor sync completions"
     local common_flags="--workspace --help --version"
 
     # First word: complete command
@@ -377,7 +390,7 @@ _mm() {
             fi
             return 0
             ;;
-        move|mv|close|cl|reopen|op|snooze|sn)
+        move|mv|close|cl|reopen|op|remove|rm|snooze|sn)
             # Multiple item commands - complete all arguments
             local aliases="$(_mm_get_alias_candidates)"
             COMPREPLY=($(compgen -W "$aliases" -- "$cur"))
