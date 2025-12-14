@@ -3,6 +3,7 @@ import { loadCliDependencies } from "../dependencies.ts";
 import { SyncInitWorkflow } from "../../../domain/workflows/sync_init.ts";
 import { SyncPushWorkflow } from "../../../domain/workflows/sync_push.ts";
 import { SyncPullWorkflow } from "../../../domain/workflows/sync_pull.ts";
+import { SyncWorkflow } from "../../../domain/workflows/sync.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 
@@ -132,6 +133,34 @@ export const createSyncCommand = () => {
 
   return new Command()
     .description("Sync workspace with remote repository")
+    .option("-w, --workspace <workspace:string>", "Workspace to override")
+    .action(async (options: Record<string, unknown>) => {
+      // Default action when no subcommand is specified: pull + push
+      const workspace = typeof options.workspace === "string" ? options.workspace : undefined;
+      const depsResult = await loadCliDependencies(workspace);
+      if (depsResult.type === "error") {
+        console.error(depsResult.error);
+        Deno.exit(1);
+      }
+      const deps = depsResult.value;
+
+      const result = await SyncWorkflow.execute(
+        { workspaceRoot: deps.root },
+        {
+          gitService: deps.versionControlService,
+          workspaceRepository: deps.workspaceRepository,
+        },
+      );
+
+      if (result.type === "error") {
+        const error = result.error;
+        const debug = isDebugMode();
+        console.error(formatError(error, debug));
+        Deno.exit(1);
+      }
+
+      console.log(result.value.trim());
+    })
     .command("init", initCommand)
     .command("push", pushCommand)
     .command("pull", pullCommand);
