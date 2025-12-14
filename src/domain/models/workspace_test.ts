@@ -51,7 +51,7 @@ Deno.test("parseWorkspaceSettings defaults git settings when missing", () => {
 
   assertEquals(settings.data.git.enabled, false);
   assertEquals(settings.data.git.remote, null);
-  assertEquals(settings.data.git.branch, "main");
+  assertEquals(settings.data.git.branch, undefined);
   assertEquals(settings.data.git.syncMode, "auto-commit");
 });
 
