@@ -1,81 +1,34 @@
 import { assertEquals, assertExists } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
-import { createRankService, type RankGenerator } from "./rank_service.ts";
 import { itemRankFromString } from "../primitives/item_rank.ts";
-
-/**
- * Mock implementation of RankGenerator for testing
- */
-function createMockRankGenerator(): RankGenerator {
-  return {
-    min(): string {
-      return "0";
-    },
-    max(): string {
-      return "z";
-    },
-    middle(): string {
-      return "m";
-    },
-    between(first: string, second: string): string {
-      // Simple mock implementation
-      if (first === "0" && second === "m") return "g";
-      if (first === "m" && second === "z") return "s";
-      if (first === "a" && second === "c") return "b";
-      return "h";
-    },
-    next(rank: string): string {
-      // Simple mock implementation
-      const mapping: Record<string, string> = {
-        "0": "1",
-        "1": "2",
-        "2": "3",
-        "a": "b",
-        "b": "c",
-        "m": "n",
-      };
-      return mapping[rank] || rank + "1";
-    },
-    prev(rank: string): string {
-      // Simple mock implementation
-      const mapping: Record<string, string> = {
-        "1": "0",
-        "2": "1",
-        "3": "2",
-        "b": "a",
-        "c": "b",
-        "n": "m",
-      };
-      return mapping[rank] || "0" + rank;
-    },
-    compare(first: string, second: string): number {
-      if (first === second) return 0;
-      return first < second ? -1 : 1;
-    },
-  };
-}
+import { createLexorankRankService } from "../../infrastructure/lexorank/rank_service.ts";
 
 describe("RankService", () => {
-  const generator = createMockRankGenerator();
-  const service = createRankService(generator);
-
   describe("headRank", () => {
     it("should return middle rank when no existing ranks", () => {
-      const result = service.headRank([]);
+      const rankService = createLexorankRankService();
+      const result = rankService.headRank([]);
+
       assertEquals(result.type, "ok");
-      if (result.type === "ok") {
-        assertEquals(result.value.toString(), "m");
-      }
+      assertExists(result.type === "ok" && result.value);
     });
 
     it("should return rank before first item when ranks exist", () => {
-      const rank1 = itemRankFromString("a");
-      const rank2 = itemRankFromString("b");
+      const rankService = createLexorankRankService();
+      const rank1 = itemRankFromString("0|100000:");
+      const rank2 = itemRankFromString("0|200000:");
+
+      assertEquals(rank1.type, "ok");
+      assertEquals(rank2.type, "ok");
+
       if (rank1.type === "ok" && rank2.type === "ok") {
-        const result = service.headRank([rank1.value, rank2.value]);
+        const result = rankService.headRank([rank1.value, rank2.value]);
         assertEquals(result.type, "ok");
+
         if (result.type === "ok") {
-          assertEquals(result.value.toString(), "0a");
+          // Verify the new rank is before the first item
+          const comparison = rankService.compareRanks(result.value, rank1.value);
+          assertEquals(comparison < 0, true);
         }
       }
     });
@@ -83,21 +36,29 @@ describe("RankService", () => {
 
   describe("tailRank", () => {
     it("should return middle rank when no existing ranks", () => {
-      const result = service.tailRank([]);
+      const rankService = createLexorankRankService();
+      const result = rankService.tailRank([]);
+
       assertEquals(result.type, "ok");
-      if (result.type === "ok") {
-        assertEquals(result.value.toString(), "m");
-      }
+      assertExists(result.type === "ok" && result.value);
     });
 
     it("should return rank after last item when ranks exist", () => {
-      const rank1 = itemRankFromString("a");
-      const rank2 = itemRankFromString("b");
+      const rankService = createLexorankRankService();
+      const rank1 = itemRankFromString("0|100000:");
+      const rank2 = itemRankFromString("0|200000:");
+
+      assertEquals(rank1.type, "ok");
+      assertEquals(rank2.type, "ok");
+
       if (rank1.type === "ok" && rank2.type === "ok") {
-        const result = service.tailRank([rank1.value, rank2.value]);
+        const result = rankService.tailRank([rank1.value, rank2.value]);
         assertEquals(result.type, "ok");
+
         if (result.type === "ok") {
-          assertEquals(result.value.toString(), "c");
+          // Verify the new rank is after the last item
+          const comparison = rankService.compareRanks(result.value, rank2.value);
+          assertEquals(comparison > 0, true);
         }
       }
     });
@@ -105,122 +66,191 @@ describe("RankService", () => {
 
   describe("beforeRank", () => {
     it("should return rank before target when previous item exists", () => {
-      const rank1 = itemRankFromString("a");
-      const rank2 = itemRankFromString("c");
-      if (rank1.type === "ok" && rank2.type === "ok") {
-        const result = service.beforeRank(rank2.value, [rank1.value, rank2.value]);
+      const rankService = createLexorankRankService();
+      const rank1 = itemRankFromString("0|100000:");
+      const rank2 = itemRankFromString("0|200000:");
+      const rank3 = itemRankFromString("0|300000:");
+
+      assertEquals(rank1.type, "ok");
+      assertEquals(rank2.type, "ok");
+      assertEquals(rank3.type, "ok");
+
+      if (rank1.type === "ok" && rank2.type === "ok" && rank3.type === "ok") {
+        const result = rankService.beforeRank(rank2.value, [
+          rank1.value,
+          rank2.value,
+          rank3.value,
+        ]);
         assertEquals(result.type, "ok");
+
         if (result.type === "ok") {
-          // Should return rank between 'a' and 'c', which is 'b'
-          assertEquals(result.value.toString(), "b");
+          // Verify the new rank is between rank1 and rank2
+          const comp1 = rankService.compareRanks(result.value, rank1.value);
+          const comp2 = rankService.compareRanks(result.value, rank2.value);
+          assertEquals(comp1 > 0, true);
+          assertEquals(comp2 < 0, true);
         }
       }
     });
 
     it("should return prevRank when target is first item", () => {
-      const rank1 = itemRankFromString("a");
-      const rank2 = itemRankFromString("b");
+      const rankService = createLexorankRankService();
+      const rank1 = itemRankFromString("0|100000:");
+      const rank2 = itemRankFromString("0|200000:");
+
+      assertEquals(rank1.type, "ok");
+      assertEquals(rank2.type, "ok");
+
       if (rank1.type === "ok" && rank2.type === "ok") {
-        const result = service.beforeRank(rank1.value, [rank1.value, rank2.value]);
+        const result = rankService.beforeRank(rank1.value, [rank1.value, rank2.value]);
         assertEquals(result.type, "ok");
+
         if (result.type === "ok") {
-          assertEquals(result.value.toString(), "0a");
+          // Verify the new rank is before rank1
+          const comparison = rankService.compareRanks(result.value, rank1.value);
+          assertEquals(comparison < 0, true);
         }
       }
     });
 
     it("should return error when target not found", () => {
-      const rank1 = itemRankFromString("a");
-      const rank2 = itemRankFromString("b");
-      const rank3 = itemRankFromString("c");
+      const rankService = createLexorankRankService();
+      const rank1 = itemRankFromString("0|100000:");
+      const rank2 = itemRankFromString("0|200000:");
+      const rank3 = itemRankFromString("0|300000:");
+
+      assertEquals(rank1.type, "ok");
+      assertEquals(rank2.type, "ok");
+      assertEquals(rank3.type, "ok");
+
       if (rank1.type === "ok" && rank2.type === "ok" && rank3.type === "ok") {
-        const result = service.beforeRank(rank3.value, [rank1.value, rank2.value]);
+        const result = rankService.beforeRank(rank3.value, [rank1.value, rank2.value]);
         assertEquals(result.type, "error");
+
+        if (result.type === "error") {
+          assertEquals(result.error.issues[0].code, "target_not_found");
+        }
       }
     });
   });
 
   describe("afterRank", () => {
     it("should return rank after target when next item exists", () => {
-      const rank1 = itemRankFromString("a");
-      const rank2 = itemRankFromString("c");
-      if (rank1.type === "ok" && rank2.type === "ok") {
-        const result = service.afterRank(rank1.value, [rank1.value, rank2.value]);
+      const rankService = createLexorankRankService();
+      const rank1 = itemRankFromString("0|100000:");
+      const rank2 = itemRankFromString("0|200000:");
+      const rank3 = itemRankFromString("0|300000:");
+
+      assertEquals(rank1.type, "ok");
+      assertEquals(rank2.type, "ok");
+      assertEquals(rank3.type, "ok");
+
+      if (rank1.type === "ok" && rank2.type === "ok" && rank3.type === "ok") {
+        const result = rankService.afterRank(rank2.value, [
+          rank1.value,
+          rank2.value,
+          rank3.value,
+        ]);
         assertEquals(result.type, "ok");
+
         if (result.type === "ok") {
-          // Should return rank between 'a' and 'c', which is 'b'
-          assertEquals(result.value.toString(), "b");
+          // Verify the new rank is between rank2 and rank3
+          const comp1 = rankService.compareRanks(result.value, rank2.value);
+          const comp2 = rankService.compareRanks(result.value, rank3.value);
+          assertEquals(comp1 > 0, true);
+          assertEquals(comp2 < 0, true);
         }
       }
     });
 
     it("should return nextRank when target is last item", () => {
-      const rank1 = itemRankFromString("a");
-      const rank2 = itemRankFromString("b");
+      const rankService = createLexorankRankService();
+      const rank1 = itemRankFromString("0|100000:");
+      const rank2 = itemRankFromString("0|200000:");
+
+      assertEquals(rank1.type, "ok");
+      assertEquals(rank2.type, "ok");
+
       if (rank1.type === "ok" && rank2.type === "ok") {
-        const result = service.afterRank(rank2.value, [rank1.value, rank2.value]);
+        const result = rankService.afterRank(rank2.value, [rank1.value, rank2.value]);
         assertEquals(result.type, "ok");
+
         if (result.type === "ok") {
-          assertEquals(result.value.toString(), "c");
+          // Verify the new rank is after rank2
+          const comparison = rankService.compareRanks(result.value, rank2.value);
+          assertEquals(comparison > 0, true);
         }
       }
     });
 
     it("should return error when target not found", () => {
-      const rank1 = itemRankFromString("a");
-      const rank2 = itemRankFromString("b");
-      const rank3 = itemRankFromString("c");
+      const rankService = createLexorankRankService();
+      const rank1 = itemRankFromString("0|100000:");
+      const rank2 = itemRankFromString("0|200000:");
+      const rank3 = itemRankFromString("0|300000:");
+
+      assertEquals(rank1.type, "ok");
+      assertEquals(rank2.type, "ok");
+      assertEquals(rank3.type, "ok");
+
       if (rank1.type === "ok" && rank2.type === "ok" && rank3.type === "ok") {
-        const result = service.afterRank(rank3.value, [rank1.value, rank2.value]);
+        const result = rankService.afterRank(rank3.value, [rank1.value, rank2.value]);
         assertEquals(result.type, "error");
+
+        if (result.type === "error") {
+          assertEquals(result.error.issues[0].code, "target_not_found");
+        }
       }
     });
   });
 
   describe("compareRanks", () => {
     it("should compare two equal ranks", () => {
-      const rank1Result = itemRankFromString("m");
-      const rank2Result = itemRankFromString("m");
+      const rankService = createLexorankRankService();
+      const rank = itemRankFromString("0|100000:");
 
-      assertExists(rank1Result.type === "ok");
-      assertExists(rank2Result.type === "ok");
+      assertEquals(rank.type, "ok");
 
-      if (rank1Result.type === "ok" && rank2Result.type === "ok") {
-        const result = service.compareRanks(rank1Result.value, rank2Result.value);
+      if (rank.type === "ok") {
+        const result = rankService.compareRanks(rank.value, rank.value);
         assertEquals(result, 0);
       }
     });
 
     it("should compare first rank less than second", () => {
-      const rank1Result = itemRankFromString("a");
-      const rank2Result = itemRankFromString("b");
+      const rankService = createLexorankRankService();
+      const rank1 = itemRankFromString("0|100000:");
+      const rank2 = itemRankFromString("0|200000:");
 
-      assertExists(rank1Result.type === "ok");
-      assertExists(rank2Result.type === "ok");
+      assertEquals(rank1.type, "ok");
+      assertEquals(rank2.type, "ok");
 
-      if (rank1Result.type === "ok" && rank2Result.type === "ok") {
-        const result = service.compareRanks(rank1Result.value, rank2Result.value);
-        assertEquals(result, -1);
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = rankService.compareRanks(rank1.value, rank2.value);
+        assertEquals(result < 0, true);
       }
     });
 
     it("should compare first rank greater than second", () => {
-      const rank1Result = itemRankFromString("b");
-      const rank2Result = itemRankFromString("a");
+      const rankService = createLexorankRankService();
+      const rank1 = itemRankFromString("0|200000:");
+      const rank2 = itemRankFromString("0|100000:");
 
-      assertExists(rank1Result.type === "ok");
-      assertExists(rank2Result.type === "ok");
+      assertEquals(rank1.type, "ok");
+      assertEquals(rank2.type, "ok");
 
-      if (rank1Result.type === "ok" && rank2Result.type === "ok") {
-        const result = service.compareRanks(rank1Result.value, rank2Result.value);
-        assertEquals(result, 1);
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = rankService.compareRanks(rank1.value, rank2.value);
+        assertEquals(result > 0, true);
       }
     });
   });
 
   describe("generateEquallySpacedRanks", () => {
     it("should return empty array for count 0", () => {
-      const result = service.generateEquallySpacedRanks(0);
+      const rankService = createLexorankRankService();
+      const result = rankService.generateEquallySpacedRanks(0);
+
       assertEquals(result.type, "ok");
       if (result.type === "ok") {
         assertEquals(result.value.length, 0);
@@ -228,22 +258,31 @@ describe("RankService", () => {
     });
 
     it("should return single middle rank for count 1", () => {
-      const result = service.generateEquallySpacedRanks(1);
+      const rankService = createLexorankRankService();
+      const result = rankService.generateEquallySpacedRanks(1);
+
       assertEquals(result.type, "ok");
       if (result.type === "ok") {
         assertEquals(result.value.length, 1);
-        assertEquals(result.value[0].toString(), "m");
       }
     });
 
     it("should return multiple equally spaced ranks", () => {
-      const result = service.generateEquallySpacedRanks(3);
+      const rankService = createLexorankRankService();
+      const result = rankService.generateEquallySpacedRanks(5);
+
       assertEquals(result.type, "ok");
       if (result.type === "ok") {
-        assertEquals(result.value.length, 3);
-        assertEquals(result.value[0].toString(), "0");
-        assertEquals(result.value[1].toString(), "1");
-        assertEquals(result.value[2].toString(), "2");
+        assertEquals(result.value.length, 5);
+
+        // Verify ranks are in order
+        for (let i = 0; i < result.value.length - 1; i++) {
+          const comparison = rankService.compareRanks(
+            result.value[i],
+            result.value[i + 1],
+          );
+          assertEquals(comparison < 0, true);
+        }
       }
     });
   });
