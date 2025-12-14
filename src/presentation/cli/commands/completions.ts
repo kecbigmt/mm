@@ -203,8 +203,6 @@ _mm() {
             ;;
     esac
 }
-
-_mm "$@"
 `;
 
 const BASH_SCRIPT = `# mm shell completion for Bash
