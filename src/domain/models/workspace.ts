@@ -13,13 +13,13 @@ import {
 
 const WORKSPACE_SETTINGS_KIND = "WorkspaceSettings" as const;
 
-export type GitSyncMode = "auto-commit" | "auto-sync";
+export type VersionControlSyncMode = "auto-commit" | "auto-sync";
 
 export type GitSettings = Readonly<{
   enabled: boolean;
   remote: string | null;
   branch?: string;
-  syncMode: GitSyncMode;
+  syncMode: VersionControlSyncMode;
 }>;
 
 export type GitSettingsSnapshot = Readonly<{
@@ -108,7 +108,9 @@ export const parseWorkspaceSettings = (
 
   let gitSettings = DEFAULT_GIT_SETTINGS;
   if (snapshot.git) {
-    const mode = snapshot.git.sync_mode === "auto-sync" ? "auto-sync" : "auto-commit";
+    const mode: VersionControlSyncMode = snapshot.git.sync_mode === "auto-sync"
+      ? "auto-sync"
+      : "auto-commit";
     gitSettings = {
       enabled: typeof snapshot.git.enabled === "boolean" ? snapshot.git.enabled : false,
       remote: typeof snapshot.git.remote === "string" ? snapshot.git.remote : null,
