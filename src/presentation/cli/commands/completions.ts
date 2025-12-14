@@ -213,6 +213,30 @@ _mm() {
                             ;;
                     esac
                     ;;
+                snooze|sn)
+                    _arguments \\
+                        '*: :->item_ids' \\
+                        $common_flags
+                    case "$state" in
+                        item_ids)
+                            local -a aliases
+                            aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
+                            compadd -a aliases
+                            ;;
+                    esac
+                    ;;
+                where)
+                    _arguments \\
+                        '1: :->item_id' \\
+                        $common_flags
+                    case "$state" in
+                        item_id)
+                            local -a aliases
+                            aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
+                            compadd -a aliases
+                            ;;
+                    esac
+                    ;;
                 completions)
                     _arguments \\
                         '1: :(bash zsh)' \\
@@ -342,7 +366,7 @@ _mm() {
 
     # Complete item IDs/aliases for commands that take them
     case "$cmd" in
-        edit|e|move|mv|close|cl|reopen|op)
+        edit|e|move|mv|close|cl|reopen|op|snooze|sn|where)
             local aliases="$(_mm_get_alias_candidates)"
             COMPREPLY=($(compgen -W "$aliases" -- "$cur"))
             return 0
