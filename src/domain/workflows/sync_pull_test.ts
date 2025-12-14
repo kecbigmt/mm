@@ -198,10 +198,9 @@ Deno.test("SyncPullWorkflow fails when git not enabled", async () => {
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "ValidationError");
     assertEquals(
-      result.error.toString().includes("Git sync is not enabled"),
-      true,
+      result.error,
+      { type: "git_not_enabled" },
     );
   }
   assertEquals(git.getCalls(), []); // No git operations should be called
@@ -223,10 +222,9 @@ Deno.test("SyncPullWorkflow fails when no remote configured", async () => {
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "ValidationError");
     assertEquals(
-      result.error.toString().includes("No remote configured"),
-      true,
+      result.error,
+      { type: "no_remote_configured" },
     );
   }
   assertEquals(git.getCalls(), []);
@@ -278,17 +276,9 @@ Deno.test("SyncPullWorkflow fails when has uncommitted changes", async () => {
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "ValidationError");
-    const errorStr = result.error.toString();
     assertEquals(
-      errorStr.toLowerCase().includes("uncommitted changes"),
-      true,
-      `Expected error message to include "uncommitted changes", got: ${errorStr}`,
-    );
-    assertEquals(
-      errorStr.toLowerCase().includes("commit or stash"),
-      true,
-      `Expected error message to include "commit or stash", got: ${errorStr}`,
+      result.error,
+      { type: "uncommitted_changes" },
     );
   }
   assertEquals(git.getCalls(), ["hasUncommittedChanges"]);
@@ -314,8 +304,10 @@ Deno.test("SyncPullWorkflow fails on non-fast-forward update", async () => {
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "VersionControlCommandFailedError");
-    assertEquals(result.error.message.includes("Not possible to fast-forward"), true);
+    if ("kind" in result.error) {
+      assertEquals(result.error.kind, "VersionControlCommandFailedError");
+      assertEquals(result.error.message.includes("Not possible to fast-forward"), true);
+    }
   }
   assertEquals(git.getCalls(), [
     "hasUncommittedChanges",
@@ -341,8 +333,10 @@ Deno.test("SyncPullWorkflow fails when pull command fails", async () => {
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "VersionControlCommandFailedError");
-    assertEquals(result.error.message.includes("Could not resolve host"), true);
+    if ("kind" in result.error) {
+      assertEquals(result.error.kind, "VersionControlCommandFailedError");
+      assertEquals(result.error.message.includes("Could not resolve host"), true);
+    }
   }
   assertEquals(git.getCalls(), [
     "hasUncommittedChanges",
@@ -368,17 +362,13 @@ Deno.test("SyncPullWorkflow fails when current branch does not match configured 
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "ValidationError");
-    const errorStr = result.error.toString();
     assertEquals(
-      errorStr.includes("Current branch 'develop' does not match configured branch 'main'"),
-      true,
-      `Expected error message about branch mismatch, got: ${errorStr}`,
-    );
-    assertEquals(
-      errorStr.includes("Checkout 'main' or update workspace.json"),
-      true,
-      `Expected error message to suggest checkout or update, got: ${errorStr}`,
+      result.error,
+      {
+        type: "branch_mismatch",
+        currentBranch: "develop",
+        configuredBranch: "main",
+      },
     );
   }
   assertEquals(git.getCalls(), ["hasUncommittedChanges", "getCurrentBranch"]);

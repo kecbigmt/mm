@@ -195,10 +195,9 @@ Deno.test("SyncPushWorkflow fails when git not enabled", async () => {
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "ValidationError");
     assertEquals(
-      result.error.toString().includes("Git sync is not enabled"),
-      true,
+      result.error,
+      { type: "git_not_enabled" },
     );
   }
   assertEquals(git.getCalls(), []); // No git operations should be called
@@ -221,10 +220,9 @@ Deno.test("SyncPushWorkflow fails when no remote configured", async () => {
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "ValidationError");
     assertEquals(
-      result.error.toString().includes("No remote configured"),
-      true,
+      result.error,
+      { type: "no_remote_configured" },
     );
   }
   assertEquals(git.getCalls(), []);
@@ -248,8 +246,10 @@ Deno.test("SyncPushWorkflow fails when push is rejected", async () => {
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "VersionControlCommandFailedError");
-    assertEquals(result.error.message, "git push failed: rejected");
+    if ("kind" in result.error) {
+      assertEquals(result.error.kind, "VersionControlCommandFailedError");
+      assertEquals(result.error.message, "git push failed: rejected");
+    }
   }
   assertEquals(git.getCalls(), ["getCurrentBranch", "push:origin:main"]);
 });
@@ -272,14 +272,13 @@ Deno.test("SyncPushWorkflow fails when current branch does not match configured 
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(result.error.kind, "ValidationError");
     assertEquals(
-      result.error.toString().includes('Current branch "feature-test" does not match'),
-      true,
-    );
-    assertEquals(
-      result.error.toString().includes('configured branch "main"'),
-      true,
+      result.error,
+      {
+        type: "branch_mismatch",
+        currentBranch: "feature-test",
+        configuredBranch: "main",
+      },
     );
   }
   assertEquals(git.getCalls(), ["getCurrentBranch"]);

@@ -185,10 +185,10 @@ Deno.test("SyncWorkflow - git not enabled", async () => {
   );
 
   assertEquals(result.type, "error");
-  if (result.type === "error" && "issues" in result.error) {
+  if (result.type === "error") {
     assertEquals(
-      result.error.issues[0].message.includes("Git sync is not enabled"),
-      true,
+      result.error,
+      { type: "git_not_enabled" },
     );
   }
 });
@@ -206,10 +206,10 @@ Deno.test("SyncWorkflow - no remote configured", async () => {
   );
 
   assertEquals(result.type, "error");
-  if (result.type === "error" && "issues" in result.error) {
+  if (result.type === "error") {
     assertEquals(
-      result.error.issues[0].message.includes("No remote configured"),
-      true,
+      result.error,
+      { type: "no_remote_configured" },
     );
   }
 });
@@ -275,10 +275,10 @@ Deno.test("SyncWorkflow - uncommitted changes", async () => {
   );
 
   assertEquals(result.type, "error");
-  if (result.type === "error" && "issues" in result.error) {
+  if (result.type === "error") {
     assertEquals(
-      result.error.issues[0].message.includes("uncommitted changes"),
-      true,
+      result.error,
+      { type: "uncommitted_changes" },
     );
   }
 });

@@ -1,11 +1,56 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { SyncInitWorkflow } from "../../../domain/workflows/sync_init.ts";
-import { SyncPushWorkflow } from "../../../domain/workflows/sync_push.ts";
-import { SyncPullWorkflow } from "../../../domain/workflows/sync_pull.ts";
+import { SyncPushValidationError, SyncPushWorkflow } from "../../../domain/workflows/sync_push.ts";
+import { SyncPullValidationError, SyncPullWorkflow } from "../../../domain/workflows/sync_pull.ts";
 import { SyncWorkflow } from "../../../domain/workflows/sync.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
+
+function formatSyncPushError(error: SyncPushValidationError): string {
+  switch (error.type) {
+    case "git_not_enabled":
+      return "Git sync is not enabled. Run 'mm sync init <remote-url>' first.";
+    case "no_remote_configured":
+      return "No remote configured. Run 'mm sync init <remote-url>' first.";
+    case "branch_mismatch":
+      return `Current branch "${error.currentBranch}" does not match configured branch "${error.configuredBranch}". Check out "${error.configuredBranch}" or update workspace.json.`;
+  }
+}
+
+function formatSyncPullError(error: SyncPullValidationError): string {
+  switch (error.type) {
+    case "git_not_enabled":
+      return "Git sync is not enabled. Run 'mm sync init <remote-url>' first.";
+    case "no_remote_configured":
+      return "No remote configured. Run 'mm sync init <remote-url>' first.";
+    case "uncommitted_changes":
+      return "Working tree has uncommitted changes. Commit or stash changes before pulling.";
+    case "branch_mismatch":
+      return `Current branch '${error.currentBranch}' does not match configured branch '${error.configuredBranch}'. Checkout '${error.configuredBranch}' or update workspace.json to match current branch.`;
+  }
+}
+
+function isSyncPushValidationError(error: unknown): error is SyncPushValidationError {
+  return (
+    typeof error === "object" && error !== null &&
+    "type" in error &&
+    (error.type === "git_not_enabled" ||
+      error.type === "no_remote_configured" ||
+      error.type === "branch_mismatch")
+  );
+}
+
+function isSyncPullValidationError(error: unknown): error is SyncPullValidationError {
+  return (
+    typeof error === "object" && error !== null &&
+    "type" in error &&
+    (error.type === "git_not_enabled" ||
+      error.type === "no_remote_configured" ||
+      error.type === "uncommitted_changes" ||
+      error.type === "branch_mismatch")
+  );
+}
 
 export const createSyncCommand = () => {
   const initCommand = new Command()
@@ -85,8 +130,12 @@ export const createSyncCommand = () => {
 
       if (result.type === "error") {
         const error = result.error;
-        const debug = isDebugMode();
-        console.error(formatError(error, debug));
+        if (isSyncPushValidationError(error)) {
+          console.error(`error: ${formatSyncPushError(error)}`);
+        } else {
+          const debug = isDebugMode();
+          console.error(formatError(error, debug));
+        }
         Deno.exit(1);
       }
 
@@ -117,12 +166,19 @@ export const createSyncCommand = () => {
 
       if (result.type === "error") {
         const error = result.error;
-        const debug = isDebugMode();
-        console.error(formatError(error, debug));
+        if (isSyncPullValidationError(error)) {
+          console.error(`error: ${formatSyncPullError(error)}`);
+        } else {
+          const debug = isDebugMode();
+          console.error(formatError(error, debug));
 
-        // Provide actionable guidance for specific error types
-        if (error.kind === "VersionControlNotInitializedError") {
-          console.error("\nRun 'mm sync init <remote-url>' or 'git init' to initialize.");
+          // Provide actionable guidance for specific error types
+          if (
+            typeof error === "object" && error !== null &&
+            "kind" in error && error.kind === "VersionControlNotInitializedError"
+          ) {
+            console.error("\nRun 'mm sync init <remote-url>' or 'git init' to initialize.");
+          }
         }
 
         Deno.exit(1);
@@ -154,8 +210,14 @@ export const createSyncCommand = () => {
 
       if (result.type === "error") {
         const error = result.error;
-        const debug = isDebugMode();
-        console.error(formatError(error, debug));
+        if (isSyncPullValidationError(error)) {
+          console.error(`error: ${formatSyncPullError(error)}`);
+        } else if (isSyncPushValidationError(error)) {
+          console.error(`error: ${formatSyncPushError(error)}`);
+        } else {
+          const debug = isDebugMode();
+          console.error(formatError(error, debug));
+        }
         Deno.exit(1);
       }
 
