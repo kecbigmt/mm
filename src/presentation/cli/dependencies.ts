@@ -13,8 +13,8 @@ import { WorkspaceRepository } from "../../domain/repositories/workspace_reposit
 import { WorkspaceSettings } from "../../domain/models/workspace.ts";
 import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
-import { createRankService, RankService } from "../../domain/services/rank_service.ts";
-import { createLexoRankGenerator } from "../../infrastructure/lexorank/generator.ts";
+import { RankService } from "../../domain/services/rank_service.ts";
+import { createLexoRankService } from "../../infrastructure/lexorank/rank_service.ts";
 import {
   createIdGenerationService,
   IdGenerationService,
@@ -236,7 +236,7 @@ export const loadCliDependencies = async (
   const aliasAutoGenerator = createAliasAutoGenerator(createCryptoRandomSource());
   const stateRepository = createFileSystemStateRepository({ workspaceRoot: root });
   const sectionQueryService = createFileSystemSectionQueryService({ root });
-  const rankService = createRankService(createLexoRankGenerator());
+  const rankService = createLexoRankService();
   const idGenerationService = createIdGenerationService(createUuidV7Generator());
   const versionControlService = createGitVersionControlService();
   const cacheManager = new CacheManager(root, {

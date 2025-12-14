@@ -43,7 +43,8 @@ describe("Shell Completion Script Registration", () => {
 
     // Test that completion system can load and register the completion
     const testScript = `
-      autoload -U compinit && compinit
+      # Initialize completion system (-i: ignore insecure directories)
+      autoload -U compinit && compinit -i
       source /dev/stdin
 
       # Check that _mm function is defined
@@ -67,6 +68,10 @@ describe("Shell Completion Script Registration", () => {
       stdin: "piped",
       stdout: "piped",
       stderr: "piped",
+      env: {
+        ...Deno.env.toObject(),
+        TERM: "dumb", // Provide a terminal type for non-interactive mode
+      },
     });
 
     const child = proc.spawn();
@@ -121,6 +126,10 @@ describe("Shell Completion Script Registration", () => {
       stdin: "piped",
       stdout: "piped",
       stderr: "piped",
+      env: {
+        ...Deno.env.toObject(),
+        TERM: "dumb", // Provide a terminal type for non-interactive mode
+      },
     });
 
     const child = proc.spawn();
