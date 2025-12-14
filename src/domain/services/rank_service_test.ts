@@ -59,83 +59,120 @@ describe("RankService", () => {
   const generator = createMockRankGenerator();
   const service = createRankService(generator);
 
-  describe("minRank", () => {
-    it("should return minimum rank", () => {
-      const result = service.minRank();
-      assertEquals(result.type, "ok");
-      if (result.type === "ok") {
-        assertEquals(result.value.toString(), "0");
-      }
-    });
-  });
-
-  describe("maxRank", () => {
-    it("should return maximum rank", () => {
-      const result = service.maxRank();
-      assertEquals(result.type, "ok");
-      if (result.type === "ok") {
-        assertEquals(result.value.toString(), "z");
-      }
-    });
-  });
-
-  describe("middleRank", () => {
-    it("should return middle rank", () => {
-      const result = service.middleRank();
+  describe("headRank", () => {
+    it("should return middle rank when no existing ranks", () => {
+      const result = service.headRank([]);
       assertEquals(result.type, "ok");
       if (result.type === "ok") {
         assertEquals(result.value.toString(), "m");
       }
     });
-  });
 
-  describe("betweenRanks", () => {
-    it("should return rank between two ranks", () => {
-      const firstResult = itemRankFromString("a");
-      const secondResult = itemRankFromString("c");
-
-      assertExists(firstResult.type === "ok");
-      assertExists(secondResult.type === "ok");
-
-      if (firstResult.type === "ok" && secondResult.type === "ok") {
-        const result = service.betweenRanks(
-          firstResult.value,
-          secondResult.value,
-        );
+    it("should return rank before first item when ranks exist", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("b");
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = service.headRank([rank1.value, rank2.value]);
         assertEquals(result.type, "ok");
         if (result.type === "ok") {
-          assertEquals(result.value.toString(), "b");
+          assertEquals(result.value.toString(), "0a");
         }
       }
     });
   });
 
-  describe("nextRank", () => {
-    it("should return next rank", () => {
-      const rankResult = itemRankFromString("a");
-      assertExists(rankResult.type === "ok");
+  describe("tailRank", () => {
+    it("should return middle rank when no existing ranks", () => {
+      const result = service.tailRank([]);
+      assertEquals(result.type, "ok");
+      if (result.type === "ok") {
+        assertEquals(result.value.toString(), "m");
+      }
+    });
 
-      if (rankResult.type === "ok") {
-        const result = service.nextRank(rankResult.value);
+    it("should return rank after last item when ranks exist", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("b");
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = service.tailRank([rank1.value, rank2.value]);
         assertEquals(result.type, "ok");
         if (result.type === "ok") {
-          assertEquals(result.value.toString(), "b");
+          assertEquals(result.value.toString(), "c");
         }
       }
     });
   });
 
-  describe("prevRank", () => {
-    it("should return previous rank", () => {
-      const rankResult = itemRankFromString("b");
-      assertExists(rankResult.type === "ok");
-
-      if (rankResult.type === "ok") {
-        const result = service.prevRank(rankResult.value);
+  describe("beforeRank", () => {
+    it("should return rank before target when previous item exists", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("c");
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = service.beforeRank(rank2.value, [rank1.value, rank2.value]);
         assertEquals(result.type, "ok");
         if (result.type === "ok") {
-          assertEquals(result.value.toString(), "a");
+          // Should return rank between 'a' and 'c', which is 'b'
+          assertEquals(result.value.toString(), "b");
         }
+      }
+    });
+
+    it("should return prevRank when target is first item", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("b");
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = service.beforeRank(rank1.value, [rank1.value, rank2.value]);
+        assertEquals(result.type, "ok");
+        if (result.type === "ok") {
+          assertEquals(result.value.toString(), "0a");
+        }
+      }
+    });
+
+    it("should return error when target not found", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("b");
+      const rank3 = itemRankFromString("c");
+      if (rank1.type === "ok" && rank2.type === "ok" && rank3.type === "ok") {
+        const result = service.beforeRank(rank3.value, [rank1.value, rank2.value]);
+        assertEquals(result.type, "error");
+      }
+    });
+  });
+
+  describe("afterRank", () => {
+    it("should return rank after target when next item exists", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("c");
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = service.afterRank(rank1.value, [rank1.value, rank2.value]);
+        assertEquals(result.type, "ok");
+        if (result.type === "ok") {
+          // Should return rank between 'a' and 'c', which is 'b'
+          assertEquals(result.value.toString(), "b");
+        }
+      }
+    });
+
+    it("should return nextRank when target is last item", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("b");
+      if (rank1.type === "ok" && rank2.type === "ok") {
+        const result = service.afterRank(rank2.value, [rank1.value, rank2.value]);
+        assertEquals(result.type, "ok");
+        if (result.type === "ok") {
+          assertEquals(result.value.toString(), "c");
+        }
+      }
+    });
+
+    it("should return error when target not found", () => {
+      const rank1 = itemRankFromString("a");
+      const rank2 = itemRankFromString("b");
+      const rank3 = itemRankFromString("c");
+      if (rank1.type === "ok" && rank2.type === "ok" && rank3.type === "ok") {
+        const result = service.afterRank(rank3.value, [rank1.value, rank2.value]);
+        assertEquals(result.type, "error");
       }
     });
   });

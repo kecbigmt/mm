@@ -180,7 +180,7 @@ Deno.test("rebalanceGroup - only returns updates for changed ranks", () => {
   const rankService = createRankService(createLexoRankGenerator());
 
   // Create a single item that's already at the middle rank
-  const middleRank = rankService.middleRank();
+  const middleRank = rankService.headRank([]);
   assertEquals(middleRank.type, "ok");
 
   if (middleRank.type === "ok") {
