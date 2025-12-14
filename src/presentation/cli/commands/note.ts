@@ -7,6 +7,7 @@ import { parsePathExpression } from "../path_parser.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
+import { executeAutoCommit } from "../auto_commit_helper.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -147,6 +148,14 @@ export function createNoteCommand() {
       console.log(
         `✅ Created note [${label}] ${item.data.title.toString()} at ${parentPlacement.toString()}`,
       );
+
+      // Auto-commit if enabled
+      const autoCommitDeps = {
+        workspaceRoot: deps.root,
+        versionControlService: deps.versionControlService,
+        workspaceRepository: deps.workspaceRepository,
+      };
+      await executeAutoCommit(autoCommitDeps, `create new note "${resolvedTitle}"`);
 
       if (options.edit === true) {
         console.warn("Editor integration not implemented yet");
