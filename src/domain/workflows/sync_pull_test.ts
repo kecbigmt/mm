@@ -156,8 +156,8 @@ Deno.test("SyncPullWorkflow success flow", async () => {
 
   assertEquals(result.type, "ok");
   assertEquals(git.getCalls(), [
-    "getCurrentBranch",
     "hasUncommittedChanges",
+    "getCurrentBranch",
     "pull:https://github.com/user/repo.git:main",
   ]);
 });
@@ -251,8 +251,8 @@ Deno.test("SyncPullWorkflow resolves remote default branch when no branch config
   assertEquals(result.type, "ok");
   assertEquals(git.getCalls(), [
     "getRemoteDefaultBranch:https://github.com/user/repo.git",
-    "getCurrentBranch",
     "hasUncommittedChanges",
+    "getCurrentBranch",
     "pull:https://github.com/user/repo.git:develop",
   ]);
 
@@ -291,7 +291,7 @@ Deno.test("SyncPullWorkflow fails when has uncommitted changes", async () => {
       `Expected error message to include "commit or stash", got: ${errorStr}`,
     );
   }
-  assertEquals(git.getCalls(), ["getCurrentBranch", "hasUncommittedChanges"]);
+  assertEquals(git.getCalls(), ["hasUncommittedChanges"]);
 });
 
 Deno.test("SyncPullWorkflow fails on non-fast-forward update", async () => {
@@ -318,8 +318,8 @@ Deno.test("SyncPullWorkflow fails on non-fast-forward update", async () => {
     assertEquals(result.error.message.includes("Not possible to fast-forward"), true);
   }
   assertEquals(git.getCalls(), [
-    "getCurrentBranch",
     "hasUncommittedChanges",
+    "getCurrentBranch",
     "pull:https://github.com/user/repo.git:main",
   ]);
 });
@@ -345,8 +345,8 @@ Deno.test("SyncPullWorkflow fails when pull command fails", async () => {
     assertEquals(result.error.message.includes("Could not resolve host"), true);
   }
   assertEquals(git.getCalls(), [
-    "getCurrentBranch",
     "hasUncommittedChanges",
+    "getCurrentBranch",
     "pull:https://github.com/user/repo.git:main",
   ]);
 });
@@ -381,5 +381,5 @@ Deno.test("SyncPullWorkflow fails when current branch does not match configured 
       `Expected error message to suggest checkout or update, got: ${errorStr}`,
     );
   }
-  assertEquals(git.getCalls(), ["getCurrentBranch"]);
+  assertEquals(git.getCalls(), ["hasUncommittedChanges", "getCurrentBranch"]);
 });

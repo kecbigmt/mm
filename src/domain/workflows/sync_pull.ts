@@ -83,7 +83,23 @@ export const SyncPullWorkflow = {
       settings = updatedSettings;
     }
 
-    // 5. Validate current branch matches configured branch
+    // 5. Check for uncommitted changes (also validates git repository exists)
+    const uncommittedResult = await deps.gitService.hasUncommittedChanges(
+      input.workspaceRoot,
+    );
+    if (uncommittedResult.type === "error") {
+      return Result.error(uncommittedResult.error);
+    }
+    if (uncommittedResult.value) {
+      return Result.error(createValidationError("SyncPullInput", [
+        {
+          message: "Working tree has uncommitted changes. Commit or stash changes before pulling.",
+          path: ["workingTree"],
+        },
+      ]));
+    }
+
+    // 6. Validate current branch matches configured branch
     const currentBranchResult = await deps.gitService.getCurrentBranch(input.workspaceRoot);
     if (currentBranchResult.type === "error") {
       return Result.error(currentBranchResult.error);
@@ -96,22 +112,6 @@ export const SyncPullWorkflow = {
             `Current branch '${currentBranch}' does not match configured branch '${branch}'. ` +
             `Checkout '${branch}' or update workspace.json to match current branch.`,
           path: ["git", "branch"],
-        },
-      ]));
-    }
-
-    // 6. Check for uncommitted changes
-    const uncommittedResult = await deps.gitService.hasUncommittedChanges(
-      input.workspaceRoot,
-    );
-    if (uncommittedResult.type === "error") {
-      return Result.error(uncommittedResult.error);
-    }
-    if (uncommittedResult.value) {
-      return Result.error(createValidationError("SyncPullInput", [
-        {
-          message: "Working tree has uncommitted changes. Commit or stash changes before pulling.",
-          path: ["workingTree"],
         },
       ]));
     }
