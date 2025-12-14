@@ -1,9 +1,9 @@
 import { assertEquals, assertExists } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
-import { itemRankFromString } from "../primitives/item_rank.ts";
-import { createLexorankRankService } from "../../infrastructure/lexorank/rank_service.ts";
+import { itemRankFromString } from "../../domain/primitives/item_rank.ts";
+import { createLexorankRankService } from "./rank_service.ts";
 
-describe("RankService", () => {
+describe("LexorankRankService", () => {
   describe("headRank", () => {
     it("should return middle rank when no existing ranks", () => {
       const rankService = createLexorankRankService();
