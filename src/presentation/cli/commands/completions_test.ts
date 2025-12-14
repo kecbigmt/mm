@@ -119,3 +119,178 @@ Deno.test({
     );
   },
 });
+
+Deno.test({
+  name: "zsh script passes syntax validation",
+  async fn() {
+    const captured = captureConsole();
+    try {
+      await buildCli().parse(["completions", "zsh"]);
+    } finally {
+      captured.restore();
+    }
+
+    const output = captured.logs.join("\n");
+    const tempFile = await Deno.makeTempFile({ suffix: ".zsh" });
+    try {
+      await Deno.writeTextFile(tempFile, output);
+      const proc = new Deno.Command("zsh", {
+        args: ["-n", tempFile],
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const result = await proc.output();
+      assertEquals(
+        result.code,
+        0,
+        `zsh syntax validation failed: ${new TextDecoder().decode(result.stderr)}`,
+      );
+    } finally {
+      await Deno.remove(tempFile);
+    }
+  },
+});
+
+Deno.test({
+  name: "bash script passes syntax validation",
+  async fn() {
+    const captured = captureConsole();
+    try {
+      await buildCli().parse(["completions", "bash"]);
+    } finally {
+      captured.restore();
+    }
+
+    const output = captured.logs.join("\n");
+    const tempFile = await Deno.makeTempFile({ suffix: ".bash" });
+    try {
+      await Deno.writeTextFile(tempFile, output);
+      const proc = new Deno.Command("bash", {
+        args: ["-n", tempFile],
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const result = await proc.output();
+      assertEquals(
+        result.code,
+        0,
+        `bash syntax validation failed: ${new TextDecoder().decode(result.stderr)}`,
+      );
+    } finally {
+      await Deno.remove(tempFile);
+    }
+  },
+});
+
+Deno.test({
+  name: "zsh script includes all commands from main CLI",
+  async fn() {
+    const captured = captureConsole();
+    try {
+      await buildCli().parse(["completions", "zsh"]);
+    } finally {
+      captured.restore();
+    }
+
+    const output = captured.logs.join("\n");
+
+    // Commands that should be in completion script
+    const expectedCommands = [
+      "note",
+      "task",
+      "event",
+      "list",
+      "edit",
+      "move",
+      "close",
+      "reopen",
+      "workspace",
+      "cd",
+      "pwd",
+      "where",
+      "snooze",
+      "doctor",
+      "sync",
+      "completions",
+    ];
+
+    for (const cmd of expectedCommands) {
+      assertStringIncludes(
+        output,
+        `'${cmd}:`,
+        `zsh script should include command: ${cmd}`,
+      );
+    }
+  },
+});
+
+Deno.test({
+  name: "bash script includes all commands from main CLI",
+  async fn() {
+    const captured = captureConsole();
+    try {
+      await buildCli().parse(["completions", "bash"]);
+    } finally {
+      captured.restore();
+    }
+
+    const output = captured.logs.join("\n");
+
+    // Commands that should be in completion script
+    const expectedCommands = [
+      "note",
+      "task",
+      "event",
+      "list",
+      "edit",
+      "move",
+      "close",
+      "reopen",
+      "workspace",
+      "cd",
+      "pwd",
+      "where",
+      "snooze",
+      "doctor",
+      "sync",
+      "completions",
+    ];
+
+    for (const cmd of expectedCommands) {
+      assertStringIncludes(
+        output,
+        cmd,
+        `bash script should include command: ${cmd}`,
+      );
+    }
+  },
+});
+
+Deno.test({
+  name: "zsh script handles hyphen-containing aliases correctly",
+  async fn() {
+    const captured = captureConsole();
+    try {
+      await buildCli().parse(["completions", "zsh"]);
+    } finally {
+      captured.restore();
+    }
+
+    const output = captured.logs.join("\n");
+
+    // Verify the script uses compadd -a instead of _describe for aliases
+    // This is the critical fix that prevents hyphen splitting
+    assertStringIncludes(
+      output,
+      "compadd -a aliases",
+      "zsh script should use 'compadd -a aliases' to handle hyphenated aliases correctly",
+    );
+
+    // Verify the proper array expansion is used
+    assertStringIncludes(
+      output,
+      '${(f)"$(_mm_get_alias_candidates)"}',
+      "zsh script should use proper array expansion to preserve hyphens",
+    );
+  },
+});
