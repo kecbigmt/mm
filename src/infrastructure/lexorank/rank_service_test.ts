@@ -286,4 +286,70 @@ describe("LexorankRankService", () => {
       }
     });
   });
+
+  describe("Boundary conditions", () => {
+    it("should return error when trying to insert before minimum rank", () => {
+      const rankService = createLexoRankService();
+      const minRank = itemRankFromString("0|000000:");
+      const rank2 = itemRankFromString("0|100000:");
+
+      assertEquals(minRank.type, "ok");
+      assertEquals(rank2.type, "ok");
+
+      if (minRank.type === "ok" && rank2.type === "ok") {
+        const result = rankService.beforeRank(minRank.value, [minRank.value, rank2.value]);
+
+        // Should return error when reaching boundary
+        assertEquals(result.type, "error");
+      }
+    });
+
+    it("should return error when trying to insert after maximum rank", () => {
+      const rankService = createLexoRankService();
+      const rank1 = itemRankFromString("0|100000:");
+      const maxRank = itemRankFromString("0|zzzzzz:");
+
+      assertEquals(rank1.type, "ok");
+      assertEquals(maxRank.type, "ok");
+
+      if (rank1.type === "ok" && maxRank.type === "ok") {
+        const result = rankService.tailRank([rank1.value, maxRank.value]);
+
+        // Should return error when reaching boundary
+        assertEquals(result.type, "error");
+      }
+    });
+
+    it("should return error when using afterRank on maximum rank", () => {
+      const rankService = createLexoRankService();
+      const rank1 = itemRankFromString("0|100000:");
+      const maxRank = itemRankFromString("0|zzzzzz:");
+
+      assertEquals(rank1.type, "ok");
+      assertEquals(maxRank.type, "ok");
+
+      if (rank1.type === "ok" && maxRank.type === "ok") {
+        const result = rankService.afterRank(maxRank.value, [rank1.value, maxRank.value]);
+
+        // Should return error when reaching boundary
+        assertEquals(result.type, "error");
+      }
+    });
+
+    it("should return error when using headRank with minimum rank", () => {
+      const rankService = createLexoRankService();
+      const minRank = itemRankFromString("0|000000:");
+      const rank2 = itemRankFromString("0|100000:");
+
+      assertEquals(minRank.type, "ok");
+      assertEquals(rank2.type, "ok");
+
+      if (minRank.type === "ok" && rank2.type === "ok") {
+        const result = rankService.headRank([minRank.value, rank2.value]);
+
+        // Should return error when reaching boundary
+        assertEquals(result.type, "error");
+      }
+    });
+  });
 });
