@@ -6,6 +6,7 @@ import { createTaskCommand } from "./presentation/cli/commands/task.ts";
 import { createEventCommand } from "./presentation/cli/commands/event.ts";
 import { createCloseCommand } from "./presentation/cli/commands/close.ts";
 import { createReopenCommand } from "./presentation/cli/commands/reopen.ts";
+import { createRemoveCommand } from "./presentation/cli/commands/remove.ts";
 import { createWorkspaceCommand } from "./presentation/cli/commands/workspace.ts";
 import { createCdCommand } from "./presentation/cli/commands/cd.ts";
 import { createPwdCommand } from "./presentation/cli/commands/pwd.ts";
@@ -28,6 +29,7 @@ async function main() {
     .command("event", createEventCommand().description("Create a new event")).alias("ev")
     .command("close", createCloseCommand().description("Close items")).alias("cl")
     .command("reopen", createReopenCommand().description("Reopen closed items")).alias("op")
+    .command("remove", createRemoveCommand().description("Remove items")).alias("rm")
     .command("edit", createEditCommand().description("Edit an item")).alias("e")
     .command("workspace", createWorkspaceCommand().description("Workspace management")).alias("ws")
     .command("cd", createCdCommand().description("Navigate to location in knowledge graph"))
