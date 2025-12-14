@@ -57,6 +57,7 @@ export function createRankService(generator: RankGenerator): RankService {
     second: ItemRank,
   ): Result<ItemRank, RankServiceError> => {
     // Check for duplicate ranks
+    // Note: ItemRank.toString() returns canonical representations (guaranteed by smart constructor)
     if (generator.compare(first.toString(), second.toString()) === 0) {
       return Result.error(
         createValidationError("RankBoundary", [
