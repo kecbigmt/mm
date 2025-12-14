@@ -13,12 +13,12 @@ import { createIdGenerationService } from "../services/id_generation_service.ts"
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
 import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.ts";
 import { createAliasAutoGenerator, type RandomSource } from "../services/alias_auto_generator.ts";
-import { createLexorankRankService } from "../../infrastructure/lexorank/rank_service.ts";
+import { createLexoRankService } from "../../infrastructure/lexorank/rank_service.ts";
 
 const TEST_TIMEZONE = Result.unwrap(timezoneIdentifierFromString("UTC"));
 
 const createTestRankService = () => {
-  return createLexorankRankService();
+  return createLexoRankService();
 };
 
 const createFixedIdService = (id: string) =>

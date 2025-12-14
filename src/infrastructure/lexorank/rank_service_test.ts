@@ -1,12 +1,12 @@
 import { assertEquals, assertExists } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 import { itemRankFromString } from "../../domain/primitives/item_rank.ts";
-import { createLexorankRankService } from "./rank_service.ts";
+import { createLexoRankService } from "./rank_service.ts";
 
 describe("LexorankRankService", () => {
   describe("headRank", () => {
     it("should return middle rank when no existing ranks", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const result = rankService.headRank([]);
 
       assertEquals(result.type, "ok");
@@ -14,7 +14,7 @@ describe("LexorankRankService", () => {
     });
 
     it("should return rank before first item when ranks exist", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const rank1 = itemRankFromString("0|100000:");
       const rank2 = itemRankFromString("0|200000:");
 
@@ -36,7 +36,7 @@ describe("LexorankRankService", () => {
 
   describe("tailRank", () => {
     it("should return middle rank when no existing ranks", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const result = rankService.tailRank([]);
 
       assertEquals(result.type, "ok");
@@ -44,7 +44,7 @@ describe("LexorankRankService", () => {
     });
 
     it("should return rank after last item when ranks exist", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const rank1 = itemRankFromString("0|100000:");
       const rank2 = itemRankFromString("0|200000:");
 
@@ -66,7 +66,7 @@ describe("LexorankRankService", () => {
 
   describe("beforeRank", () => {
     it("should return rank before target when previous item exists", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const rank1 = itemRankFromString("0|100000:");
       const rank2 = itemRankFromString("0|200000:");
       const rank3 = itemRankFromString("0|300000:");
@@ -94,7 +94,7 @@ describe("LexorankRankService", () => {
     });
 
     it("should return prevRank when target is first item", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const rank1 = itemRankFromString("0|100000:");
       const rank2 = itemRankFromString("0|200000:");
 
@@ -114,7 +114,7 @@ describe("LexorankRankService", () => {
     });
 
     it("should return error when target not found", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const rank1 = itemRankFromString("0|100000:");
       const rank2 = itemRankFromString("0|200000:");
       const rank3 = itemRankFromString("0|300000:");
@@ -136,7 +136,7 @@ describe("LexorankRankService", () => {
 
   describe("afterRank", () => {
     it("should return rank after target when next item exists", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const rank1 = itemRankFromString("0|100000:");
       const rank2 = itemRankFromString("0|200000:");
       const rank3 = itemRankFromString("0|300000:");
@@ -164,7 +164,7 @@ describe("LexorankRankService", () => {
     });
 
     it("should return nextRank when target is last item", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const rank1 = itemRankFromString("0|100000:");
       const rank2 = itemRankFromString("0|200000:");
 
@@ -184,7 +184,7 @@ describe("LexorankRankService", () => {
     });
 
     it("should return error when target not found", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const rank1 = itemRankFromString("0|100000:");
       const rank2 = itemRankFromString("0|200000:");
       const rank3 = itemRankFromString("0|300000:");
@@ -206,7 +206,7 @@ describe("LexorankRankService", () => {
 
   describe("compareRanks", () => {
     it("should compare two equal ranks", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const rank = itemRankFromString("0|100000:");
 
       assertEquals(rank.type, "ok");
@@ -218,7 +218,7 @@ describe("LexorankRankService", () => {
     });
 
     it("should compare first rank less than second", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const rank1 = itemRankFromString("0|100000:");
       const rank2 = itemRankFromString("0|200000:");
 
@@ -232,7 +232,7 @@ describe("LexorankRankService", () => {
     });
 
     it("should compare first rank greater than second", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const rank1 = itemRankFromString("0|200000:");
       const rank2 = itemRankFromString("0|100000:");
 
@@ -248,7 +248,7 @@ describe("LexorankRankService", () => {
 
   describe("generateEquallySpacedRanks", () => {
     it("should return empty array for count 0", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const result = rankService.generateEquallySpacedRanks(0);
 
       assertEquals(result.type, "ok");
@@ -258,7 +258,7 @@ describe("LexorankRankService", () => {
     });
 
     it("should return single middle rank for count 1", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const result = rankService.generateEquallySpacedRanks(1);
 
       assertEquals(result.type, "ok");
@@ -268,7 +268,7 @@ describe("LexorankRankService", () => {
     });
 
     it("should return multiple equally spaced ranks", () => {
-      const rankService = createLexorankRankService();
+      const rankService = createLexoRankService();
       const result = rankService.generateEquallySpacedRanks(5);
 
       assertEquals(result.type, "ok");

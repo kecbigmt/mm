@@ -9,12 +9,12 @@ import {
   timezoneIdentifierFromString,
 } from "../primitives/mod.ts";
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
-import { createLexorankRankService } from "../../infrastructure/lexorank/rank_service.ts";
+import { createLexoRankService } from "../../infrastructure/lexorank/rank_service.ts";
 
 const TEST_TIMEZONE = Result.unwrap(timezoneIdentifierFromString("UTC"));
 
 const createTestRankService = () => {
-  return createLexorankRankService();
+  return createLexoRankService();
 };
 
 const createTestItem = async (

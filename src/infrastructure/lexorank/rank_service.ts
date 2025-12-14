@@ -21,7 +21,7 @@ export type RankServiceError = ItemRankValidationError | RankBoundaryError;
  * Lexorank-based implementation of RankService.
  * All rank calculation logic and boundary validation is encapsulated here.
  */
-export function createLexorankRankService(): RankService {
+export function createLexoRankService(): RankService {
   // Internal helper: parse ItemRank to LexoRank
   const toLexoRank = (rank: ItemRank) => LexoRank.parse(rank.toString());
 

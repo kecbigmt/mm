@@ -24,12 +24,12 @@ import {
   createAliasAutoGenerator,
   RandomSource,
 } from "../services/alias_auto_generator.ts";
-import { createLexorankRankService } from "../../infrastructure/lexorank/rank_service.ts";
+import { createLexoRankService } from "../../infrastructure/lexorank/rank_service.ts";
 
 const TEST_TIMEZONE = Result.unwrap(timezoneIdentifierFromString("UTC"));
 
 const createTestRankService = (): RankService => {
-  return createLexorankRankService();
+  return createLexoRankService();
 };
 
 const createFixedIdService = (id: string) =>
