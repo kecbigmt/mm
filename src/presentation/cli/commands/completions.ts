@@ -249,6 +249,9 @@ _mm() {
             ;;
     esac
 }
+
+# Register the completion function
+compdef _mm mm
 `;
 
 const BASH_SCRIPT = `# mm shell completion for Bash
