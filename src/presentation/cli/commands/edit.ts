@@ -5,6 +5,7 @@ import { dateTimeFromDate } from "../../../domain/primitives/date_time.ts";
 import { deriveFilePathFromId } from "../../../infrastructure/fileSystem/item_repository.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
+import { executeAutoCommit } from "../auto_commit_helper.ts";
 
 const hasMetadataOptions = (options: Record<string, unknown>): boolean => {
   return (
@@ -186,6 +187,14 @@ export function createEditCommand() {
           await deps.cacheUpdateService.updateFromItem(updatedItem);
 
           console.log(`✅ Updated ${formatItem(updatedItem)}`);
+
+          // Auto-commit if enabled
+          const autoCommitDeps = {
+            workspaceRoot: deps.root,
+            versionControlService: deps.versionControlService,
+            workspaceRepository: deps.workspaceRepository,
+          };
+          await executeAutoCommit(autoCommitDeps, `edit item via editor`);
         } catch (error) {
           console.error(
             `Failed to edit item: ${error instanceof Error ? error.message : String(error)}`,
@@ -245,5 +254,13 @@ export function createEditCommand() {
       await deps.cacheUpdateService.updateFromItem(result.value);
 
       console.log(`✅ Updated ${formatItem(result.value)}`);
+
+      // Auto-commit if enabled
+      const autoCommitDeps = {
+        workspaceRoot: deps.root,
+        versionControlService: deps.versionControlService,
+        workspaceRepository: deps.workspaceRepository,
+      };
+      await executeAutoCommit(autoCommitDeps, `edit item metadata`);
     });
 }

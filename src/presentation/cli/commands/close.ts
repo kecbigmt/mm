@@ -5,6 +5,7 @@ import { dateTimeFromDate } from "../../../domain/primitives/date_time.ts";
 import { Item } from "../../../domain/models/item.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
+import { executeAutoCommit } from "../auto_commit_helper.ts";
 
 const formatItemLabel = (item: Item): string =>
   item.data.alias ? item.data.alias.toString() : item.data.id.toString();
@@ -75,6 +76,14 @@ export function createCloseCommand() {
             console.log(`  [${label}] ${item.data.title.toString()}`);
           }
         }
+
+        // Auto-commit if there were successful closes
+        const autoCommitDeps = {
+          workspaceRoot: deps.root,
+          versionControlService: deps.versionControlService,
+          workspaceRepository: deps.workspaceRepository,
+        };
+        await executeAutoCommit(autoCommitDeps, `close ${succeeded.length} item(s)`);
       }
 
       // Display failures
