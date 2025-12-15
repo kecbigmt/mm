@@ -57,6 +57,7 @@ export const runCommand = async (
       "--allow-read",
       "--allow-write",
       "--allow-env",
+      "--allow-run",
       "src/main.ts",
       ...args,
     ],
