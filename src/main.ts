@@ -17,6 +17,7 @@ import { createDoctorCommand } from "./presentation/cli/commands/doctor/mod.ts";
 import { createEditCommand } from "./presentation/cli/commands/edit.ts";
 import { createSnoozeCommand } from "./presentation/cli/commands/snooze.ts";
 import { createSyncCommand } from "./presentation/cli/commands/sync.ts";
+import { createCompletionsCommand } from "./presentation/cli/commands/completions.ts";
 
 async function main() {
   const cli = new Command()
@@ -31,8 +32,8 @@ async function main() {
     .command("remove", createRemoveCommand().description("Remove items")).alias("rm")
     .command("edit", createEditCommand().description("Edit an item")).alias("e")
     .command("workspace", createWorkspaceCommand().description("Workspace management")).alias("ws")
-    .command("cd", createCdCommand().description("Change current working directory"))
-    .command("pwd", createPwdCommand().description("Print current working directory"))
+    .command("cd", createCdCommand().description("Navigate to location in knowledge graph"))
+    .command("pwd", createPwdCommand().description("Show current location in knowledge graph"))
     .command("list", createListCommand().description("List items")).alias("ls")
     .command(
       "where",
@@ -42,7 +43,11 @@ async function main() {
     .command("snooze", createSnoozeCommand().description("Snooze item until a future datetime"))
     .alias("sn")
     .command("doctor", createDoctorCommand().description("Workspace validation and maintenance"))
-    .command("sync", createSyncCommand());
+    .command("sync", createSyncCommand())
+    .command(
+      "completions",
+      createCompletionsCommand().description("Generate shell completion script"),
+    );
 
   await cli.parse(Deno.args);
 }

@@ -29,11 +29,6 @@ export function createRemoveCommand() {
 
       const deps = depsResult.value;
 
-      if (ids.length === 0) {
-        console.error("At least one item ID is required");
-        return;
-      }
-
       const workflowResult = await RemoveItemWorkflow.execute({
         itemIds: ids,
       }, {

@@ -1,6 +1,8 @@
 # Project Design
 
-**Role**: This document defines the **product design, domain model, and architecture**—the foundational knowledge about what mm is, how it works, and core design decisions. This is a stock-type document maintained throughout the project lifecycle.
+**Role**: This document defines the **product design, domain model, and architecture**—the
+foundational knowledge about what mm is, how it works, and core design decisions. This is a
+stock-type document maintained throughout the project lifecycle.
 
 ---
 
@@ -8,62 +10,64 @@
 
 mm is a personal knowledgement CLI tool with built-in MCP server.
 
-It has a local-files PKM system unifying GTD / Bullet Journal / Zettelkasten around concise
-vocabulary: people interact with **Items** that live inside **Containers**, while the code models
-their union as a single Node algebraic data type. Items are created under a date container
+It has a local-files PKM system unifying GTD / Bullet Journal / Zettelkasten around two primitives:
+**Item** (an addressable entity) and **Section** (a numbered or dated shelf). Items can have
+children. Each Item has exactly one active placement. Items are created under a date section
 (Calendar), never moved physically; "moves" update frontmatter (placement, rank) and edge files.
 
 ## 2) Goals / Non-Goals
 
 **Goals**
 
-- Simple diffs, conflict-resistant Git workflow.
-- One mental model: Item inside a Container, single active placement per Item.
+- **Simple diffs, conflict-resistant Git workflow**: UUID v7-based file names (timestamp-embedded)
+  and date-partitioned directories minimize merge conflicts across devices. Frontmatter as single
+  source of truth (placement, rank) allows conflict-free moves. Git-ignored rebuildable `.index/`
+  eliminates index conflicts. Optional Git sync supports offline-first workflow (commit locally,
+  sync when online) with rebase-based synchronization.
+- One mental model: Items placed under Items, split by Sections; single active placement per Item.
 - Fast navigation by date, numbering paths, or aliases.
 - Deterministic ordering via ranks (LexoRank).
 
 **Non-Goals**
 
-- Multi-placement (no simultaneous presence in multiple containers).
+- Multi-placement (no simultaneous presence in multiple parents).
 - Cross-platform symlinks.
 - Timezone migrations (workspace TZ is fixed).
 
 ## 3) Core Concepts
 
-### Node (domain core)
-
-- Has 0 or 1 parent Node.
-- Two concrete kinds in code: `Container` and `Item`.
-
-### Container (user vocabulary)
-
-- No content “body”; acts as a fixed **place** to hold Nodes.
-- Not movable; addressed by a **path**.
-- Can contain 0+ Nodes.
-- Has a **sequential number** within its level (sibling order).
-- **Top level of the graph is Calendar (year/month/day)**; Items are initially stored under their
-  creation date.
-
 ### Item
 
-- Must have exactly **one current parent container**.
-- Has content: single `.md` file with **YAML Frontmatter + Markdown body**.
-- Identified by **UUID v7** (creation timestamp embedded).
-- Created under the **date Container** matching its creation date.
-- Can be **moved** to another container; the physical file location remains under its original date;
+- **Identity**: UUID v7 (timestamp-embedded).
+- **Content**: Single `.md` file with **YAML Frontmatter + Markdown body**.
+- **Frontmatter fields**: `id`, `kind`, `status`, `placement`, `rank`, `created_at`, `updated_at`,
+  optional `alias`, `tags`, `schema`, `extra`.
+- **Body**: Markdown content; title is the first H1.
+- Exactly **one active placement** in the logical graph.
+- Created under the **date section** matching its creation date.
+- Can be **moved** to another placement; the physical file location remains under its original date;
   frontmatter (`placement`, `rank`) and edge files are updated. After move, it is **excluded** from
   the original date's listing.
-- Has per-container **rank (LexoRank)** for ordering.
-- May also act as a container (can have children).
-- Frontmatter fields: `id`, `kind`, `status`, `placement`, `rank`, `created_at`, `updated_at`,
-  optional `alias`, `tags`, `schema`, `extra`.
+- Has **rank (LexoRank)** for ordering within its placement.
+- May also act as a parent (can have children).
 - State transitions: `close`, `reopen`.
+
+### Section
+
+- A **hierarchical numeric path** under a parent Item: `.../1`, `.../1/2`, `.../3/2/1`, etc.
+- A **date section** exists **only at the head of a path**: `YYYY-MM-DD`, `today`, `tomorrow`, etc.
+- Relative date forms are **always evaluated from "today"** in the workspace timezone.
+- **Top level of the graph is Calendar (year/month/day)**; Items are initially placed under their
+  creation date section.
 
 ### Workspace
 
 - Holds one graph of Nodes plus alias/context metadata.
 - Fixed timezone for date partitioning (e.g., `"Asia/Tokyo"`). Changing TZ would require full
   re-partition; **not supported**.
+- Optional Git sync configuration (`git.enabled`, `git.sync_mode`, `git.remote`, `git.branch`):
+  - `sync_mode="auto-commit"`: auto-commit after state changes (local only).
+  - `sync_mode="auto-sync"`: auto-commit + pull(rebase) + push after state changes.
 
 ## 4) On-Disk Layout
 
@@ -91,6 +95,8 @@ their union as a single Node algebraic data type. Items are created under a date
     aliases/
       <hh>/
         <hash>.alias.json                 # { schema, raw, canonical_key, created_at }
+    completion_aliases.txt                # Shell completion cache: recently used aliases
+    completion_context_tags.txt           # Shell completion cache: recently used tags
   tags/
     <hash>.tag.json                       # { schema, raw, canonical_key, created_at, description? }
 ```
@@ -115,11 +121,11 @@ their union as a single Node algebraic data type. Items are created under a date
 
 ## 6) Movement & Placement
 
-- Items have **one active container** at a time.
+- Items have **one active placement** at a time.
 - Move updates **Frontmatter `placement` and `rank`** fields so that:
 
   - the item **disappears** from its original day listing,
-  - appears in the new container in the specified position.
+  - appears in the new placement.
 - Physical path stays under original `YYYY/MM/DD/<uuidv7>.md`.
 - Edge files in `.index/graph` are rebuilt to reflect the new placement.
 
@@ -137,32 +143,35 @@ their union as a single Node algebraic data type. Items are created under a date
 
 ## 9) Identifiers & Resolution
 
-- Item IDs: full UUID v7 or **short suffix** (min 7 chars; auto-expand to uniqueness).
-- Container notation:
+- Item IDs: full UUID v7 (no short IDs in current implementation).
+- Path notation:
 
   - Dates: `2025-09-20`, `today`, `tm`, etc.
-  - By node/alias: `theme-focus-control`, and optional numbering paths:
+  - By item/alias: `theme-focus-control`, with optional numeric sections:
 
     - Slash: `theme-focus-control/1/2`
-    - Colon/Dashes: `theme-focus-control:1-2`
-- Priority when parsing container tokens: **date/relative > id/short-id > alias**.
+- Priority when parsing path segments: **date/relative > id > alias**.
 
 ## 10) Listing & Sorting
 
 - `list` default sort: **rank asc**, tie-break by `created_at` asc.
-- Calendar listings exclude items that have been moved to another container.
+- Calendar listings exclude items that have been moved to another placement.
 
 ## 11) CLI (current surface)
 
 ```
 # create items
-mm new|note|n [title] [-p <project>] [-c <context>] [-i <container>]
-mm task [title] [-p ...] [-c ...] [-i ...]
-mm event|ev [title] [-p ...] [-c ...] [-i ...]
+mm new|note|n [title] [--parent <path>] [--context <tag>] [--alias <alias>]
+mm task [title] [--parent <path>] [--context <tag>] [--alias <alias>]
+mm event|ev [title] [--parent <path>] [--context <tag>] [--alias <alias>]
+
+# navigation
+mm cd [path]           # Navigate to location in knowledge graph
+mm pwd                 # Show current location in knowledge graph
 
 # edit / view
 mm edit|e <id>
-mm list|ls <container|container_range> [--all|-a]
+mm list|ls [<path>] [--all|-a]
 
 # move (relocate single active placement)
 mm move|mv <ids...> <placement>
@@ -174,11 +183,14 @@ mm reopen|op <ids...>
 # delete
 mm remove|rm <ids...>
 
+# shell completion
+mm completions [bash|zsh]
+
 # placement syntax
-2025-09-20              # tail of that day
+2025-09-20              # tail of that date section
 tail:2025-09-20         # explicit tail
 head:2025-09-20         # head
-head | tail             # head/tail of current container
+head | tail             # head/tail of current path
 before:<id> | after:<id>
 ```
 
@@ -215,10 +227,9 @@ before:<id> | after:<id>
 
 ## 13) Error Handling (CLI)
 
-- Ambiguous short id → show candidates, abort.
-- Unknown container token → show parse help with examples.
-- Move to invalid position (e.g., before id in another container) → explain required context (use
-  container-qualified placement).
+- Unknown path token → show parse help with examples.
+- Move to invalid position (e.g., before id in another parent/section) → explain required context
+  (use path-qualified placement).
 
 ## 14) Future Work (optional)
 

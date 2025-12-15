@@ -40,9 +40,16 @@ describe("Scenario 22: Auto-commit Mode", () => {
     });
     await initCmd.output();
 
+    // Set default branch to main
+    const setHeadCmd = new Deno.Command("git", {
+      args: ["symbolic-ref", "HEAD", "refs/heads/main"],
+      cwd: bareRepoDir,
+    });
+    await setHeadCmd.output();
+
     // Initialize workspace with Git
     await runCommand(ctx.testHome, ["workspace", "init", "test-autocommit"]);
-    await runCommand(ctx.testHome, ["sync", "init", bareRepoDir]);
+    await runCommand(ctx.testHome, ["sync", "init", bareRepoDir, "--branch", "main"]);
 
     workspaceDir = getWorkspacePath(ctx.testHome, "test-autocommit");
 

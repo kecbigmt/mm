@@ -9,27 +9,12 @@ import {
   timezoneIdentifierFromString,
 } from "../primitives/mod.ts";
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
-import { createRankService, type RankGenerator } from "../services/rank_service.ts";
+import { createLexoRankService } from "../../infrastructure/lexorank/rank_service.ts";
 
 const TEST_TIMEZONE = Result.unwrap(timezoneIdentifierFromString("UTC"));
 
 const createTestRankService = () => {
-  const generator: RankGenerator = {
-    min: () => "a",
-    max: () => "z",
-    middle: () => "m",
-    between: (first: string, second: string) => {
-      const mid = String.fromCharCode(
-        Math.floor((first.charCodeAt(0) + second.charCodeAt(0)) / 2),
-      );
-      return mid;
-    },
-    next: (rank: string) => String.fromCharCode(rank.charCodeAt(0) + 1),
-    prev: (rank: string) => String.fromCharCode(rank.charCodeAt(0) - 1),
-    compare: (first: string, second: string) => first.localeCompare(second),
-  };
-
-  return createRankService(generator);
+  return createLexoRankService();
 };
 
 const createTestItem = async (
