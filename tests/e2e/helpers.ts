@@ -16,6 +16,8 @@ export type CommandResult = Readonly<{
 export type TestContext = Readonly<{
   testHome: string;
   originalHome: string | undefined;
+  gitConfigPath?: string;
+  originalGitConfig?: string;
 }>;
 
 /**
@@ -25,7 +27,20 @@ export const setupTestEnvironment = async (): Promise<TestContext> => {
   const testHome = await Deno.makeTempDir({ prefix: "mm_e2e_test_" });
   const originalHome = Deno.env.get("MM_HOME");
   Deno.env.set("MM_HOME", testHome);
-  return { testHome, originalHome };
+
+  // Set up Git config for CI environments
+  const gitConfigPath = join(testHome, ".gitconfig");
+  await Deno.writeTextFile(
+    gitConfigPath,
+    `[user]
+	name = MM Test
+	email = test@mm.local
+`,
+  );
+  const originalGitConfig = Deno.env.get("GIT_CONFIG_GLOBAL");
+  Deno.env.set("GIT_CONFIG_GLOBAL", gitConfigPath);
+
+  return { testHome, originalHome, gitConfigPath, originalGitConfig };
 };
 
 /**
@@ -37,6 +52,14 @@ export const cleanupTestEnvironment = async (ctx: TestContext): Promise<void> =>
   } else {
     Deno.env.delete("MM_HOME");
   }
+
+  // Restore Git config
+  if (ctx.originalGitConfig !== undefined) {
+    Deno.env.set("GIT_CONFIG_GLOBAL", ctx.originalGitConfig);
+  } else {
+    Deno.env.delete("GIT_CONFIG_GLOBAL");
+  }
+
   if (Deno.env.get("MM_E2E_KEEP") === "1") {
     console.warn(`MM_E2E_KEEP=1 set; preserving test home at ${ctx.testHome}`);
     return;
@@ -51,6 +74,12 @@ export const runCommand = async (
   testHome: string,
   args: string[],
 ): Promise<CommandResult> => {
+  // Inherit GIT_CONFIG_GLOBAL if set (for CI environments)
+  const env: Record<string, string> = {
+    ...Deno.env.toObject(),
+    MM_HOME: testHome,
+  };
+
   const command = new Deno.Command(Deno.execPath(), {
     args: [
       "run",
@@ -62,10 +91,7 @@ export const runCommand = async (
       ...args,
     ],
     cwd: Deno.cwd(),
-    env: {
-      ...Deno.env.toObject(),
-      MM_HOME: testHome,
-    },
+    env,
     stdout: "piped",
     stderr: "piped",
   });

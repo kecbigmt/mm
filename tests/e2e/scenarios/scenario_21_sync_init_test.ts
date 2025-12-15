@@ -38,6 +38,13 @@ describe("Scenario 21: Git Sync Initialization", () => {
       cwd: bareRepoDir,
     });
     await initCmd.output();
+
+    // Set default branch to main
+    const setHeadCmd = new Deno.Command("git", {
+      args: ["symbolic-ref", "HEAD", "refs/heads/main"],
+      cwd: bareRepoDir,
+    });
+    await setHeadCmd.output();
   });
 
   afterEach(async () => {

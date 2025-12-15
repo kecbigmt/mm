@@ -39,11 +39,21 @@ describe("Scenario 24: Sync Commands", () => {
     });
     await initCmd.output();
 
+    // Set default branch to main
+    const setHeadCmd = new Deno.Command("git", {
+      args: ["symbolic-ref", "HEAD", "refs/heads/main"],
+      cwd: bareRepoDir,
+    });
+    await setHeadCmd.output();
+
     // Initialize workspace with Git (manual sync mode)
     await runCommand(ctx.testHome, ["workspace", "init", "test-sync-cmd"]);
-    await runCommand(ctx.testHome, ["sync", "init", bareRepoDir]);
+    await runCommand(ctx.testHome, ["sync", "init", bareRepoDir, "--branch", "main"]);
 
     workspaceDir = getWorkspacePath(ctx.testHome, "test-sync-cmd");
+
+    // Push initial commit to bare repo to establish main branch
+    await runCommand(ctx.testHome, ["sync", "push"]);
   });
 
   afterEach(async () => {
@@ -71,10 +81,8 @@ describe("Scenario 24: Sync Commands", () => {
   });
 
   it("pulls remote changes with sync pull", async () => {
-    // Create a commit directly in workspace
+    // Create note and push
     await runCommand(ctx.testHome, ["note", "local note"]);
-
-    // Push it
     await runCommand(ctx.testHome, ["sync", "push"]);
 
     // Make another commit directly via git (simulating remote change)
@@ -84,18 +92,21 @@ describe("Scenario 24: Sync Commands", () => {
     const addCmd = new Deno.Command("git", {
       args: ["add", "test.txt"],
       cwd: workspaceDir,
+      env: Deno.env.toObject(),
     });
     await addCmd.output();
 
     const commitCmd = new Deno.Command("git", {
       args: ["commit", "-m", "remote change"],
       cwd: workspaceDir,
+      env: Deno.env.toObject(),
     });
     await commitCmd.output();
 
     const pushCmd = new Deno.Command("git", {
       args: ["push", "origin", "main"],
       cwd: workspaceDir,
+      env: Deno.env.toObject(),
     });
     await pushCmd.output();
 
@@ -103,6 +114,7 @@ describe("Scenario 24: Sync Commands", () => {
     const resetCmd = new Deno.Command("git", {
       args: ["reset", "--hard", "HEAD~1"],
       cwd: workspaceDir,
+      env: Deno.env.toObject(),
     });
     await resetCmd.output();
 
@@ -123,9 +135,6 @@ describe("Scenario 24: Sync Commands", () => {
   });
 
   it("syncs with sync command (pull + push)", async () => {
-    // Push initial commit to remote (sync init creates it but doesn't push)
-    await runCommand(ctx.testHome, ["sync", "push"]);
-
     // Simulate remote change: create commit directly via git
     const testFilePath = join(workspaceDir, "remote-change.txt");
     await Deno.writeTextFile(testFilePath, "remote change");
@@ -133,18 +142,21 @@ describe("Scenario 24: Sync Commands", () => {
     const addCmd = new Deno.Command("git", {
       args: ["add", "remote-change.txt"],
       cwd: workspaceDir,
+      env: Deno.env.toObject(),
     });
     await addCmd.output();
 
     const commitCmd = new Deno.Command("git", {
       args: ["commit", "-m", "remote change"],
       cwd: workspaceDir,
+      env: Deno.env.toObject(),
     });
     await commitCmd.output();
 
     const pushCmd = new Deno.Command("git", {
       args: ["push", "origin", "main"],
       cwd: workspaceDir,
+      env: Deno.env.toObject(),
     });
     await pushCmd.output();
 
@@ -152,6 +164,7 @@ describe("Scenario 24: Sync Commands", () => {
     const resetCmd = new Deno.Command("git", {
       args: ["reset", "--hard", "HEAD~1"],
       cwd: workspaceDir,
+      env: Deno.env.toObject(),
     });
     await resetCmd.output();
 
