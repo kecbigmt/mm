@@ -15,23 +15,35 @@ const WORKSPACE_SETTINGS_KIND = "WorkspaceSettings" as const;
 
 export type VersionControlSyncMode = "auto-commit" | "auto-sync";
 
-export type GitSettings = Readonly<{
-  enabled: boolean;
+export type VcsType = "git";
+
+export type GitSyncSettings = Readonly<{
   remote: string | null;
   branch?: string;
-  syncMode: VersionControlSyncMode;
 }>;
 
-export type GitSettingsSnapshot = Readonly<{
-  enabled: boolean;
+export type GitSyncSettingsSnapshot = Readonly<{
   remote: string | null;
   branch?: string;
+}>;
+
+export type SyncSettings = Readonly<{
+  vcs: VcsType;
+  enabled: boolean;
+  syncMode: VersionControlSyncMode;
+  git: GitSyncSettings | null;
+}>;
+
+export type SyncSettingsSnapshot = Readonly<{
+  vcs: string;
+  enabled: boolean;
   sync_mode: string;
+  git?: GitSyncSettingsSnapshot | null;
 }>;
 
 export type WorkspaceSettingsData = Readonly<{
   readonly timezone: TimezoneIdentifier;
-  readonly git: GitSettings;
+  readonly sync: SyncSettings;
 }>;
 
 export type WorkspaceSettings = Readonly<{
@@ -42,41 +54,53 @@ export type WorkspaceSettings = Readonly<{
 
 export type WorkspaceSettingsSnapshot = Readonly<{
   readonly timezone: string;
-  readonly git?: GitSettingsSnapshot;
+  readonly sync?: SyncSettingsSnapshot;
 }>;
 
 export type WorkspaceSettingsValidationError = ValidationError<typeof WORKSPACE_SETTINGS_KIND>;
 
-export const DEFAULT_GIT_SETTINGS: GitSettings = {
+export const DEFAULT_SYNC_SETTINGS: SyncSettings = {
+  vcs: "git",
   enabled: false,
-  remote: null,
   syncMode: "auto-commit",
+  git: null,
 };
 
 const instantiate = (data: WorkspaceSettingsData): WorkspaceSettings => {
   const frozen = Object.freeze({
     timezone: data.timezone,
-    git: Object.freeze({ ...data.git }),
+    sync: Object.freeze({
+      vcs: data.sync.vcs,
+      enabled: data.sync.enabled,
+      syncMode: data.sync.syncMode,
+      git: data.sync.git ? Object.freeze({ ...data.sync.git }) : null,
+    }),
   });
   return Object.freeze({
     kind: WORKSPACE_SETTINGS_KIND,
     data: frozen,
     toJSON() {
-      const gitSnapshot: GitSettingsSnapshot = frozen.git.branch !== undefined
-        ? {
-          enabled: frozen.git.enabled,
-          remote: frozen.git.remote,
-          branch: frozen.git.branch,
-          sync_mode: frozen.git.syncMode,
-        }
-        : {
-          enabled: frozen.git.enabled,
-          remote: frozen.git.remote,
-          sync_mode: frozen.git.syncMode,
-        };
+      const gitSnapshot: GitSyncSettingsSnapshot | null = frozen.sync.git
+        ? (frozen.sync.git.branch !== undefined
+          ? {
+            remote: frozen.sync.git.remote,
+            branch: frozen.sync.git.branch,
+          }
+          : {
+            remote: frozen.sync.git.remote,
+          })
+        : null;
+
+      const syncSnapshot: SyncSettingsSnapshot = {
+        vcs: frozen.sync.vcs,
+        enabled: frozen.sync.enabled,
+        sync_mode: frozen.sync.syncMode,
+        git: gitSnapshot,
+      };
+
       return Object.freeze({
         timezone: frozen.timezone.toString(),
-        git: Object.freeze(gitSnapshot),
+        sync: Object.freeze(syncSnapshot),
       });
     },
   });
@@ -106,20 +130,29 @@ export const parseWorkspaceSettings = (
     return Result.error(createValidationError(WORKSPACE_SETTINGS_KIND, issues));
   }
 
-  let gitSettings = DEFAULT_GIT_SETTINGS;
-  if (snapshot.git) {
-    const mode: VersionControlSyncMode = snapshot.git.sync_mode === "auto-sync"
+  let syncSettings = DEFAULT_SYNC_SETTINGS;
+  if (snapshot.sync) {
+    const mode: VersionControlSyncMode = snapshot.sync.sync_mode === "auto-sync"
       ? "auto-sync"
       : "auto-commit";
-    gitSettings = {
-      enabled: typeof snapshot.git.enabled === "boolean" ? snapshot.git.enabled : false,
-      remote: typeof snapshot.git.remote === "string" ? snapshot.git.remote : null,
-      branch: typeof snapshot.git.branch === "string" && snapshot.git.branch !== ""
-        ? snapshot.git.branch
-        : undefined,
+
+    let gitSyncSettings: GitSyncSettings | null = null;
+    if (snapshot.sync.git) {
+      gitSyncSettings = {
+        remote: typeof snapshot.sync.git.remote === "string" ? snapshot.sync.git.remote : null,
+        branch: typeof snapshot.sync.git.branch === "string" && snapshot.sync.git.branch !== ""
+          ? snapshot.sync.git.branch
+          : undefined,
+      };
+    }
+
+    syncSettings = {
+      vcs: "git", // Currently only git is supported
+      enabled: typeof snapshot.sync.enabled === "boolean" ? snapshot.sync.enabled : false,
       syncMode: mode,
+      git: gitSyncSettings,
     };
   }
 
-  return Result.ok(instantiate({ timezone: timezoneResult.value, git: gitSettings }));
+  return Result.ok(instantiate({ timezone: timezoneResult.value, sync: syncSettings }));
 };

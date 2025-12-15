@@ -35,13 +35,13 @@ export const SyncPushWorkflow = {
     }
     const settings = settingsResult.value;
 
-    // 2. Validate Git is enabled
-    if (!settings.data.git?.enabled) {
+    // 2. Validate sync is enabled
+    if (!settings.data.sync.enabled) {
       return Result.error({ type: "git_not_enabled" });
     }
 
     // 3. Validate remote is configured
-    const remote = settings.data.git.remote;
+    const remote = settings.data.sync.git?.remote;
     if (!remote) {
       return Result.error({ type: "no_remote_configured" });
     }
@@ -54,7 +54,7 @@ export const SyncPushWorkflow = {
     const currentBranch = currentBranchResult.value;
 
     // 5. Get configured branch (default to "main")
-    const configuredBranch = settings.data.git.branch ?? "main";
+    const configuredBranch = settings.data.sync.git?.branch ?? "main";
 
     // 6. Validate current branch matches configured branch
     if (currentBranch !== configuredBranch) {

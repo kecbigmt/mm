@@ -64,17 +64,17 @@ Deno.test("AutoCommitWorkflow - skips when workspace settings cannot be loaded",
   }
 });
 
-Deno.test("AutoCommitWorkflow - skips when git.enabled is false", async () => {
+Deno.test("AutoCommitWorkflow - skips when sync.enabled is false", async () => {
   const timezoneResult = parseTimezoneIdentifier("UTC");
   if (timezoneResult.type === "error") throw new Error("Invalid timezone");
 
   const settings = createWorkspaceSettings({
     timezone: timezoneResult.value,
-    git: {
+    sync: {
+      vcs: "git",
       enabled: false,
-      remote: null,
-      branch: undefined,
       syncMode: "auto-commit",
+      git: null,
     },
   });
 
@@ -102,11 +102,14 @@ Deno.test("AutoCommitWorkflow - commits successfully in auto-commit mode (no pus
 
   const settings = createWorkspaceSettings({
     timezone: timezoneResult.value,
-    git: {
+    sync: {
+      vcs: "git",
       enabled: true,
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
       syncMode: "auto-commit",
+      git: {
+        remote: "https://github.com/user/repo.git",
+        branch: "main",
+      },
     },
   });
 
@@ -135,11 +138,14 @@ Deno.test("AutoCommitWorkflow - auto-sync: commits and pushes successfully", asy
 
   const settings = createWorkspaceSettings({
     timezone: timezoneResult.value,
-    git: {
+    sync: {
+      vcs: "git",
       enabled: true,
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
       syncMode: "auto-sync",
+      git: {
+        remote: "https://github.com/user/repo.git",
+        branch: "main",
+      },
     },
   });
 
@@ -168,11 +174,14 @@ Deno.test("AutoCommitWorkflow - auto-sync: pull succeeds, push succeeds", async 
 
   const settings = createWorkspaceSettings({
     timezone: timezoneResult.value,
-    git: {
+    sync: {
+      vcs: "git",
       enabled: true,
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
       syncMode: "auto-sync",
+      git: {
+        remote: "https://github.com/user/repo.git",
+        branch: "main",
+      },
     },
   });
 
@@ -201,11 +210,14 @@ Deno.test("AutoCommitWorkflow - auto-sync: pull fails (rebase conflict)", async 
 
   const settings = createWorkspaceSettings({
     timezone: timezoneResult.value,
-    git: {
+    sync: {
+      vcs: "git",
       enabled: true,
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
       syncMode: "auto-sync",
+      git: {
+        remote: "https://github.com/user/repo.git",
+        branch: "main",
+      },
     },
   });
 
@@ -242,11 +254,14 @@ Deno.test("AutoCommitWorkflow - auto-sync: pull succeeds, push fails", async () 
 
   const settings = createWorkspaceSettings({
     timezone: timezoneResult.value,
-    git: {
+    sync: {
+      vcs: "git",
       enabled: true,
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
       syncMode: "auto-sync",
+      git: {
+        remote: "https://github.com/user/repo.git",
+        branch: "main",
+      },
     },
   });
 
@@ -281,11 +296,14 @@ Deno.test("AutoCommitWorkflow - auto-sync: skips when no remote configured", asy
 
   const settings = createWorkspaceSettings({
     timezone: timezoneResult.value,
-    git: {
+    sync: {
+      vcs: "git",
       enabled: true,
-      remote: null,
-      branch: "main",
       syncMode: "auto-sync",
+      git: {
+        remote: null,
+        branch: "main",
+      },
     },
   });
 
@@ -316,11 +334,14 @@ Deno.test("AutoCommitWorkflow - auto-sync: skips when no branch configured", asy
 
   const settings = createWorkspaceSettings({
     timezone: timezoneResult.value,
-    git: {
+    sync: {
+      vcs: "git",
       enabled: true,
-      remote: "https://github.com/user/repo.git",
-      branch: undefined,
       syncMode: "auto-sync",
+      git: {
+        remote: "https://github.com/user/repo.git",
+        branch: undefined,
+      },
     },
   });
 
@@ -351,11 +372,14 @@ Deno.test("AutoCommitWorkflow - handles stage failure gracefully", async () => {
 
   const settings = createWorkspaceSettings({
     timezone: timezoneResult.value,
-    git: {
+    sync: {
+      vcs: "git",
       enabled: true,
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
       syncMode: "auto-commit",
+      git: {
+        remote: "https://github.com/user/repo.git",
+        branch: "main",
+      },
     },
   });
 
@@ -389,11 +413,14 @@ Deno.test("AutoCommitWorkflow - handles commit failure gracefully", async () => 
 
   const settings = createWorkspaceSettings({
     timezone: timezoneResult.value,
-    git: {
+    sync: {
+      vcs: "git",
       enabled: true,
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
       syncMode: "auto-commit",
+      git: {
+        remote: "https://github.com/user/repo.git",
+        branch: "main",
+      },
     },
   });
 
@@ -427,11 +454,14 @@ Deno.test("AutoCommitWorkflow - handles 'nothing to commit' gracefully", async (
 
   const settings = createWorkspaceSettings({
     timezone: timezoneResult.value,
-    git: {
+    sync: {
+      vcs: "git",
       enabled: true,
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
       syncMode: "auto-commit",
+      git: {
+        remote: "https://github.com/user/repo.git",
+        branch: "main",
+      },
     },
   });
 

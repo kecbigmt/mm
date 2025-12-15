@@ -112,16 +112,17 @@ const mockWorkspaceRepo = (
   const tzResult = timezoneIdentifierFromString("UTC");
   if (tzResult.type === "error") throw new Error("Invalid tz");
 
-  const gitConfig = {
-    enabled: gitEnabled,
-    remote,
-    branch: branch === null ? undefined : (branch ?? "main"),
-    syncMode: "auto-commit" as const,
-  };
-
   const settings = createWorkspaceSettings({
     timezone: tzResult.value,
-    git: gitConfig,
+    sync: {
+      vcs: "git",
+      enabled: gitEnabled,
+      syncMode: "auto-commit" as const,
+      git: {
+        remote,
+        branch: branch === null ? undefined : (branch ?? "main"),
+      },
+    },
   });
 
   let savedSettings = settings;
@@ -256,7 +257,7 @@ Deno.test("SyncPullWorkflow resolves remote default branch when no branch config
 
   // Verify branch was persisted to workspace.json
   const savedSettings = (repo as ReturnType<typeof mockWorkspaceRepo>).getSavedSettings();
-  assertEquals(savedSettings.data.git?.branch, "develop");
+  assertEquals(savedSettings.data.sync.git?.branch, "develop");
 });
 
 Deno.test("SyncPullWorkflow fails when has uncommitted changes", async () => {

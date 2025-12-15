@@ -36,19 +36,19 @@ export const SyncPullWorkflow = {
     }
     let settings = settingsResult.value;
 
-    // 2. Validate Git is enabled
-    if (!settings.data.git?.enabled) {
+    // 2. Validate sync is enabled
+    if (!settings.data.sync.enabled) {
       return Result.error({ type: "git_not_enabled" });
     }
 
     // 3. Validate remote is configured
-    const remote = settings.data.git.remote;
+    const remote = settings.data.sync.git?.remote;
     if (!remote) {
       return Result.error({ type: "no_remote_configured" });
     }
 
     // 4. Get or resolve branch
-    let branch = settings.data.git.branch;
+    let branch = settings.data.sync.git?.branch;
     if (!branch) {
       // Resolve remote default branch
       const remoteBranchResult = await deps.gitService.getRemoteDefaultBranch(
@@ -63,9 +63,12 @@ export const SyncPullWorkflow = {
       // Persist resolved branch to workspace.json
       const updatedSettings = createWorkspaceSettings({
         ...settings.data,
-        git: {
-          ...settings.data.git,
-          branch,
+        sync: {
+          ...settings.data.sync,
+          git: {
+            ...settings.data.sync.git!,
+            branch,
+          },
         },
       });
       const saveResult = await deps.workspaceRepository.save(

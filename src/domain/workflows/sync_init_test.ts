@@ -90,7 +90,12 @@ const mockWorkspaceRepo = () => {
 
   let settings = createWorkspaceSettings({
     timezone: tzResult.value,
-    git: { enabled: false, remote: null, branch: "main", syncMode: "auto-commit" },
+    sync: {
+      vcs: "git",
+      enabled: false,
+      syncMode: "auto-commit",
+      git: { remote: null, branch: "main" },
+    },
   });
 
   return {
@@ -139,9 +144,9 @@ Deno.test("SyncInitWorkflow success flow", async () => {
 
   // Verify Config
   const settings = repo.getSettings();
-  assertEquals(settings.data.git.enabled, true);
-  assertEquals(settings.data.git.remote, "https://git.com/repo.git");
-  assertEquals(settings.data.git.branch, "dev");
+  assertEquals(settings.data.sync.enabled, true);
+  assertEquals(settings.data.sync.git?.remote, "https://git.com/repo.git");
+  assertEquals(settings.data.sync.git?.branch, "dev");
 
   // Verify Files
   const gitignore = files["/ws/.gitignore"];

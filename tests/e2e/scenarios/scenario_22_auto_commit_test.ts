@@ -57,7 +57,7 @@ describe("Scenario 22: Auto-commit Mode", () => {
     const workspaceJsonPath = join(workspaceDir, "workspace.json");
     const content = await Deno.readTextFile(workspaceJsonPath);
     const config = JSON.parse(content);
-    config.git.sync_mode = "auto-commit";
+    config.sync.sync_mode = "auto-commit";
     await Deno.writeTextFile(workspaceJsonPath, JSON.stringify(config, null, 2));
   });
 

@@ -111,11 +111,14 @@ export const SyncInitWorkflow = {
     const currentSettings = settingsResult.value;
     const newSettings = createWorkspaceSettings({
       timezone: currentSettings.data.timezone,
-      git: {
+      sync: {
+        vcs: "git",
         enabled: true,
-        remote: input.remoteUrl,
-        branch: actualBranch,
         syncMode: "auto-commit",
+        git: {
+          remote: input.remoteUrl,
+          branch: actualBranch,
+        },
       },
     });
     const saveResult = await deps.workspaceRepository.save(input.workspaceRoot, newSettings);
