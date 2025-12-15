@@ -2,7 +2,6 @@ import { Result } from "../../shared/result.ts";
 import { VersionControlError, VersionControlService } from "../services/version_control_service.ts";
 import { WorkspaceRepository } from "../repositories/workspace_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
-import { createValidationError, ValidationError } from "../../shared/errors.ts";
 
 export type SyncPushInput = {
   workspaceRoot: string;
@@ -14,10 +13,15 @@ export type SyncPushDependencies = {
   workspaceRepository: WorkspaceRepository;
 };
 
+export type SyncPushValidationError =
+  | { type: "git_not_enabled" }
+  | { type: "no_remote_configured" }
+  | { type: "branch_mismatch"; currentBranch: string; configuredBranch: string };
+
 export type SyncPushError =
   | VersionControlError
   | RepositoryError
-  | ValidationError<string>;
+  | SyncPushValidationError;
 
 export const SyncPushWorkflow = {
   execute: async (
@@ -33,23 +37,13 @@ export const SyncPushWorkflow = {
 
     // 2. Validate Git is enabled
     if (!settings.data.git?.enabled) {
-      return Result.error(createValidationError("SyncPushInput", [
-        {
-          message: "Git sync is not enabled. Run 'mm sync init <remote-url>' first.",
-          path: ["git", "enabled"],
-        },
-      ]));
+      return Result.error({ type: "git_not_enabled" });
     }
 
     // 3. Validate remote is configured
     const remote = settings.data.git.remote;
     if (!remote) {
-      return Result.error(createValidationError("SyncPushInput", [
-        {
-          message: "No remote configured. Run 'mm sync init <remote-url>' first.",
-          path: ["git", "remote"],
-        },
-      ]));
+      return Result.error({ type: "no_remote_configured" });
     }
 
     // 4. Get current branch
@@ -64,13 +58,11 @@ export const SyncPushWorkflow = {
 
     // 6. Validate current branch matches configured branch
     if (currentBranch !== configuredBranch) {
-      return Result.error(createValidationError("SyncPushInput", [
-        {
-          message:
-            `Current branch "${currentBranch}" does not match configured branch "${configuredBranch}". Check out "${configuredBranch}" or update workspace.json.`,
-          path: ["git", "branch"],
-        },
-      ]));
+      return Result.error({
+        type: "branch_mismatch",
+        currentBranch,
+        configuredBranch,
+      });
     }
 
     // 7. Execute push to origin/<current-branch>

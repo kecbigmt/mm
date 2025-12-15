@@ -2,7 +2,6 @@ import { Result } from "../../shared/result.ts";
 import { VersionControlError, VersionControlService } from "../services/version_control_service.ts";
 import { WorkspaceRepository } from "../repositories/workspace_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
-import { createValidationError, ValidationError } from "../../shared/errors.ts";
 import { createWorkspaceSettings } from "../models/workspace.ts";
 
 export type SyncPullInput = {
@@ -14,10 +13,16 @@ export type SyncPullDependencies = {
   workspaceRepository: WorkspaceRepository;
 };
 
+export type SyncPullValidationError =
+  | { type: "git_not_enabled" }
+  | { type: "no_remote_configured" }
+  | { type: "uncommitted_changes" }
+  | { type: "branch_mismatch"; currentBranch: string; configuredBranch: string };
+
 export type SyncPullError =
   | VersionControlError
   | RepositoryError
-  | ValidationError<string>;
+  | SyncPullValidationError;
 
 export const SyncPullWorkflow = {
   execute: async (
@@ -33,23 +38,13 @@ export const SyncPullWorkflow = {
 
     // 2. Validate Git is enabled
     if (!settings.data.git?.enabled) {
-      return Result.error(createValidationError("SyncPullInput", [
-        {
-          message: "Git sync is not enabled. Run 'mm sync init <remote-url>' first.",
-          path: ["git", "enabled"],
-        },
-      ]));
+      return Result.error({ type: "git_not_enabled" });
     }
 
     // 3. Validate remote is configured
     const remote = settings.data.git.remote;
     if (!remote) {
-      return Result.error(createValidationError("SyncPullInput", [
-        {
-          message: "No remote configured. Run 'mm sync init <remote-url>' first.",
-          path: ["git", "remote"],
-        },
-      ]));
+      return Result.error({ type: "no_remote_configured" });
     }
 
     // 4. Get or resolve branch
@@ -91,12 +86,7 @@ export const SyncPullWorkflow = {
       return Result.error(uncommittedResult.error);
     }
     if (uncommittedResult.value) {
-      return Result.error(createValidationError("SyncPullInput", [
-        {
-          message: "Working tree has uncommitted changes. Commit or stash changes before pulling.",
-          path: ["workingTree"],
-        },
-      ]));
+      return Result.error({ type: "uncommitted_changes" });
     }
 
     // 6. Validate current branch matches configured branch
@@ -106,14 +96,11 @@ export const SyncPullWorkflow = {
     }
     const currentBranch = currentBranchResult.value;
     if (currentBranch !== branch) {
-      return Result.error(createValidationError("SyncPullInput", [
-        {
-          message:
-            `Current branch '${currentBranch}' does not match configured branch '${branch}'. ` +
-            `Checkout '${branch}' or update workspace.json to match current branch.`,
-          path: ["git", "branch"],
-        },
-      ]));
+      return Result.error({
+        type: "branch_mismatch",
+        currentBranch,
+        configuredBranch: branch,
+      });
     }
 
     // 7. Execute pull

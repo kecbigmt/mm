@@ -51,7 +51,7 @@ export interface VersionControlService {
     cwd: string,
     remote: string,
     branch: string,
-    options?: { force?: boolean },
+    options?: { force?: boolean; setUpstream?: boolean },
   ): Promise<Result<string, VersionControlError>>;
   pull(
     cwd: string,
