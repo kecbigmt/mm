@@ -6,6 +6,7 @@ import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
 import { parsePathExpression } from "../path_parser.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import { parseFutureDateTime } from "../utils/future_date_time.ts";
+import { executeAutoCommit } from "../auto_commit_helper.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -97,6 +98,7 @@ export function createSnoozeCommand() {
       }
 
       // Process each item
+      let successCount = 0;
       for (const itemRef of itemRefs) {
         // Resolve item expression to ItemId
         const itemExprResult = parsePathExpression(itemRef);
@@ -144,6 +146,7 @@ export function createSnoozeCommand() {
 
         const { item } = workflowResult.value;
         const label = formatItemLabel(item);
+        successCount++;
 
         if (item.data.snoozeUntil) {
           // Format snoozeUntil in workspace timezone (YYYY-MM-DD HH:MM)
@@ -172,6 +175,17 @@ export function createSnoozeCommand() {
             `[${label}] "${item.data.title.toString()}" is no longer snoozing`,
           );
         }
+      }
+
+      // Auto-commit if there were successful snoozes
+      if (successCount > 0) {
+        const action = clearFlag ? "unsnooze" : "snooze";
+        const autoCommitDeps = {
+          workspaceRoot: deps.root,
+          versionControlService: deps.versionControlService,
+          workspaceRepository: deps.workspaceRepository,
+        };
+        await executeAutoCommit(autoCommitDeps, `${action} ${successCount} item(s)`);
       }
     });
 }
