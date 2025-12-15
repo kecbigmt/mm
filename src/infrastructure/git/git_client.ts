@@ -174,9 +174,13 @@ export const createGitVersionControlService = (): VersionControlService => {
     cwd: string,
     remote: string,
     branch: string,
-    options?: { force?: boolean },
+    options?: { force?: boolean; setUpstream?: boolean },
   ): Promise<Result<string, VersionControlError>> => {
-    const args = ["push", remote, branch];
+    const args = ["push"];
+    if (options?.setUpstream) {
+      args.push("--set-upstream");
+    }
+    args.push(remote, branch);
     if (options?.force) {
       args.push("--force");
     }
@@ -287,18 +291,19 @@ export const createGitVersionControlService = (): VersionControlService => {
   ): Promise<Result<string, VersionControlError>> => {
     try {
       const command = new Deno.Command("git", {
-        args: ["pull", "--ff-only", remote, branch],
+        args: ["pull", "--rebase", remote, branch],
         cwd,
         stdout: "piped",
         stderr: "piped",
       });
       const { code, stdout, stderr } = await command.output();
-      const outStr = new TextDecoder().decode(stdout);
-      const errStr = new TextDecoder().decode(stderr);
+      const outStr = new TextDecoder().decode(stdout).trim();
+      const errStr = new TextDecoder().decode(stderr).trim();
 
       if (code !== 0) {
+        const errorMessage = [outStr, errStr].filter(Boolean).join("\n");
         return Result.error(
-          createVersionControlCommandFailedError(`git pull failed: ${outStr} ${errStr}`),
+          createVersionControlCommandFailedError(errorMessage),
         );
       }
       // Git pull outputs progress to stderr and result to stdout
@@ -312,7 +317,7 @@ export const createGitVersionControlService = (): VersionControlService => {
         return Result.error(createVersionControlNotAvailableError());
       }
       return Result.error(
-        createVersionControlCommandFailedError(`git pull failed: ${error}`, { cause: error }),
+        createVersionControlCommandFailedError(String(error), { cause: error }),
       );
     }
   };

@@ -60,7 +60,7 @@ Deno.test("AutoCommitWorkflow - skips when workspace settings cannot be loaded",
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertEquals(result.value.committed, false);
-    assertEquals(result.value.message, undefined);
+    assertEquals(result.value.error, undefined);
   }
 });
 
@@ -92,11 +92,11 @@ Deno.test("AutoCommitWorkflow - skips when git.enabled is false", async () => {
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertEquals(result.value.committed, false);
-    assertEquals(result.value.message, undefined);
+    assertEquals(result.value.error, undefined);
   }
 });
 
-Deno.test("AutoCommitWorkflow - commits successfully in auto-commit mode", async () => {
+Deno.test("AutoCommitWorkflow - commits successfully in auto-commit mode (no push)", async () => {
   const timezoneResult = parseTimezoneIdentifier("UTC");
   if (timezoneResult.type === "error") throw new Error("Invalid timezone");
 
@@ -124,11 +124,12 @@ Deno.test("AutoCommitWorkflow - commits successfully in auto-commit mode", async
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertEquals(result.value.committed, true);
-    assertEquals(result.value.message, "Auto-committed: mm: create new note");
+    assertEquals(result.value.pushed, false);
+    assertEquals(result.value.error, undefined); // Silent on success
   }
 });
 
-Deno.test("AutoCommitWorkflow - commits successfully in auto-sync mode", async () => {
+Deno.test("AutoCommitWorkflow - auto-sync: commits and pushes successfully", async () => {
   const timezoneResult = parseTimezoneIdentifier("UTC");
   if (timezoneResult.type === "error") throw new Error("Invalid timezone");
 
@@ -156,7 +157,191 @@ Deno.test("AutoCommitWorkflow - commits successfully in auto-sync mode", async (
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertEquals(result.value.committed, true);
-    assertEquals(result.value.message, "Auto-committed: mm: create new task");
+    assertEquals(result.value.pushed, true);
+    assertEquals(result.value.error, undefined); // Silent on success
+  }
+});
+
+Deno.test("AutoCommitWorkflow - auto-sync: pull succeeds, push succeeds", async () => {
+  const timezoneResult = parseTimezoneIdentifier("UTC");
+  if (timezoneResult.type === "error") throw new Error("Invalid timezone");
+
+  const settings = createWorkspaceSettings({
+    timezone: timezoneResult.value,
+    git: {
+      enabled: true,
+      remote: "https://github.com/user/repo.git",
+      branch: "main",
+      syncMode: "auto-sync",
+    },
+  });
+
+  const versionControlService = createMockGitService();
+  const workspaceRepository = createMockWorkspaceRepository(settings);
+
+  const result = await AutoCommitWorkflow.execute(
+    {
+      workspaceRoot: "/test/workspace",
+      summary: "create new task",
+    },
+    { versionControlService, workspaceRepository },
+  );
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.committed, true);
+    assertEquals(result.value.pushed, true);
+    assertEquals(result.value.error, undefined); // Silent on success
+  }
+});
+
+Deno.test("AutoCommitWorkflow - auto-sync: pull fails (rebase conflict)", async () => {
+  const timezoneResult = parseTimezoneIdentifier("UTC");
+  if (timezoneResult.type === "error") throw new Error("Invalid timezone");
+
+  const settings = createWorkspaceSettings({
+    timezone: timezoneResult.value,
+    git: {
+      enabled: true,
+      remote: "https://github.com/user/repo.git",
+      branch: "main",
+      syncMode: "auto-sync",
+    },
+  });
+
+  const versionControlService = createMockGitService({
+    pull: () =>
+      Promise.resolve(
+        Result.error(createVersionControlCommandFailedError("CONFLICT (content): Merge conflict")),
+      ),
+  });
+  const workspaceRepository = createMockWorkspaceRepository(settings);
+
+  const result = await AutoCommitWorkflow.execute(
+    {
+      workspaceRoot: "/test/workspace",
+      summary: "create new task",
+    },
+    { versionControlService, workspaceRepository },
+  );
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.committed, true);
+    assertEquals(result.value.pushed, false);
+    assertEquals(result.value.error, {
+      type: "pull_failed",
+      details: "CONFLICT (content): Merge conflict",
+    });
+  }
+});
+
+Deno.test("AutoCommitWorkflow - auto-sync: pull succeeds, push fails", async () => {
+  const timezoneResult = parseTimezoneIdentifier("UTC");
+  if (timezoneResult.type === "error") throw new Error("Invalid timezone");
+
+  const settings = createWorkspaceSettings({
+    timezone: timezoneResult.value,
+    git: {
+      enabled: true,
+      remote: "https://github.com/user/repo.git",
+      branch: "main",
+      syncMode: "auto-sync",
+    },
+  });
+
+  const versionControlService = createMockGitService({
+    push: () =>
+      Promise.resolve(Result.error(createVersionControlCommandFailedError("push rejected"))),
+  });
+  const workspaceRepository = createMockWorkspaceRepository(settings);
+
+  const result = await AutoCommitWorkflow.execute(
+    {
+      workspaceRoot: "/test/workspace",
+      summary: "create new task",
+    },
+    { versionControlService, workspaceRepository },
+  );
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.committed, true);
+    assertEquals(result.value.pushed, false);
+    assertEquals(result.value.error, {
+      type: "push_failed",
+      details: "push rejected",
+    });
+  }
+});
+
+Deno.test("AutoCommitWorkflow - auto-sync: skips when no remote configured", async () => {
+  const timezoneResult = parseTimezoneIdentifier("UTC");
+  if (timezoneResult.type === "error") throw new Error("Invalid timezone");
+
+  const settings = createWorkspaceSettings({
+    timezone: timezoneResult.value,
+    git: {
+      enabled: true,
+      remote: null,
+      branch: "main",
+      syncMode: "auto-sync",
+    },
+  });
+
+  const versionControlService = createMockGitService();
+  const workspaceRepository = createMockWorkspaceRepository(settings);
+
+  const result = await AutoCommitWorkflow.execute(
+    {
+      workspaceRoot: "/test/workspace",
+      summary: "create new task",
+    },
+    { versionControlService, workspaceRepository },
+  );
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.committed, true);
+    assertEquals(result.value.pushed, false);
+    assertEquals(result.value.error, {
+      type: "no_remote_configured",
+    });
+  }
+});
+
+Deno.test("AutoCommitWorkflow - auto-sync: skips when no branch configured", async () => {
+  const timezoneResult = parseTimezoneIdentifier("UTC");
+  if (timezoneResult.type === "error") throw new Error("Invalid timezone");
+
+  const settings = createWorkspaceSettings({
+    timezone: timezoneResult.value,
+    git: {
+      enabled: true,
+      remote: "https://github.com/user/repo.git",
+      branch: undefined,
+      syncMode: "auto-sync",
+    },
+  });
+
+  const versionControlService = createMockGitService();
+  const workspaceRepository = createMockWorkspaceRepository(settings);
+
+  const result = await AutoCommitWorkflow.execute(
+    {
+      workspaceRoot: "/test/workspace",
+      summary: "create new task",
+    },
+    { versionControlService, workspaceRepository },
+  );
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.committed, true);
+    assertEquals(result.value.pushed, false);
+    assertEquals(result.value.error, {
+      type: "no_branch_configured",
+    });
   }
 });
 
@@ -191,7 +376,10 @@ Deno.test("AutoCommitWorkflow - handles stage failure gracefully", async () => {
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertEquals(result.value.committed, false);
-    assertEquals(result.value.message, "Warning: Auto-commit stage failed: Permission denied");
+    assertEquals(result.value.error, {
+      type: "stage_failed",
+      details: "Permission denied",
+    });
   }
 });
 
@@ -226,7 +414,10 @@ Deno.test("AutoCommitWorkflow - handles commit failure gracefully", async () => 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertEquals(result.value.committed, false);
-    assertEquals(result.value.message, "Warning: Auto-commit failed: Git not found");
+    assertEquals(result.value.error, {
+      type: "commit_failed",
+      details: "Git not found",
+    });
   }
 });
 
@@ -265,6 +456,6 @@ Deno.test("AutoCommitWorkflow - handles 'nothing to commit' gracefully", async (
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertEquals(result.value.committed, false);
-    assertEquals(result.value.message, undefined);
+    assertEquals(result.value.error, undefined);
   }
 });
