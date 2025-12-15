@@ -47,6 +47,8 @@ Long-lived documents that are maintained throughout the project lifecycle:
 
 **Maintenance**: Keep these documents up-to-date as they represent the current state of the project.
 
+**Reference policy**: Stock-type documents **must not** reference Epic or Story documents, as those are development-time snapshots and may become outdated. All necessary design information must be self-contained within stock-type documents.
+
 ### Flow-type (docs/stories/)
 
 Time-stamped documents that capture development work:

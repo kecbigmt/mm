@@ -19,7 +19,11 @@ children. Each Item has exactly one active placement. Items are created under a 
 
 **Goals**
 
-- Simple diffs, conflict-resistant Git workflow.
+- **Simple diffs, conflict-resistant Git workflow**: UUID v7-based file names (timestamp-embedded)
+  and date-partitioned directories minimize merge conflicts across devices. Frontmatter as single
+  source of truth (placement, rank) allows conflict-free moves. Git-ignored rebuildable `.index/`
+  eliminates index conflicts. Optional Git sync supports offline-first workflow (commit locally,
+  sync when online) with rebase-based synchronization.
 - One mental model: Items placed under Items, split by Sections; single active placement per Item.
 - Fast navigation by date, numbering paths, or aliases.
 - Deterministic ordering via ranks (LexoRank).
@@ -61,6 +65,9 @@ children. Each Item has exactly one active placement. Items are created under a 
 - Holds one graph of Nodes plus alias/context metadata.
 - Fixed timezone for date partitioning (e.g., `"Asia/Tokyo"`). Changing TZ would require full
   re-partition; **not supported**.
+- Optional Git sync configuration (`git.enabled`, `git.sync_mode`, `git.remote`, `git.branch`):
+  - `sync_mode="auto-commit"`: auto-commit after state changes (local only).
+  - `sync_mode="auto-sync"`: auto-commit + pull(rebase) + push after state changes.
 
 ## 4) On-Disk Layout
 
