@@ -81,10 +81,11 @@ describe("Scenario 21: Git Sync Initialization", () => {
     const content = await Deno.readTextFile(workspaceJsonPath);
     const config = JSON.parse(content);
 
-    assertEquals(config.git.enabled, true);
-    assertEquals(config.git.remote, bareRepoDir);
-    assertEquals(config.git.branch, "main");
-    assertEquals(config.git.sync_mode, "auto-commit");
+    assertEquals(config.sync.enabled, true);
+    assertEquals(config.sync.vcs, "git");
+    assertEquals(config.sync.git.remote, bareRepoDir);
+    assertEquals(config.sync.git.branch, "main");
+    assertEquals(config.sync.sync_mode, "auto-commit");
   });
 
   it("initializes git repository", async () => {
@@ -138,6 +139,6 @@ describe("Scenario 21: Git Sync Initialization", () => {
     const content = await Deno.readTextFile(workspaceJsonPath);
     const config = JSON.parse(content);
 
-    assertEquals(config.git.branch, "develop");
+    assertEquals(config.sync.git.branch, "develop");
   });
 });

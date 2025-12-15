@@ -39,36 +39,45 @@ Deno.test("createWorkspaceSettings preserves timezone identifier", () => {
   const timezone = expectOk(timezoneIdentifierFromString("Europe/London"));
   const settings = createWorkspaceSettings({
     timezone,
-    git: { enabled: false, remote: null, branch: "main", syncMode: "auto-commit" },
+    sync: {
+      vcs: "git",
+      enabled: false,
+      syncMode: "auto-commit",
+      git: { remote: null, branch: "main" },
+    },
   });
   assertEquals(settings.data.timezone, timezone);
   assertEquals(settings.toJSON().timezone, "Europe/London");
 });
 
-Deno.test("parseWorkspaceSettings defaults git settings when missing", () => {
+Deno.test("parseWorkspaceSettings defaults sync settings when missing", () => {
   const okResult = parseWorkspaceSettings({ timezone: "Asia/Tokyo" });
   const settings = expectOk(okResult);
 
-  assertEquals(settings.data.git.enabled, false);
-  assertEquals(settings.data.git.remote, null);
-  assertEquals(settings.data.git.branch, undefined);
-  assertEquals(settings.data.git.syncMode, "auto-commit");
+  assertEquals(settings.data.sync.vcs, "git");
+  assertEquals(settings.data.sync.enabled, false);
+  assertEquals(settings.data.sync.syncMode, "auto-commit");
+  assertEquals(settings.data.sync.git, null);
 });
 
-Deno.test("parseWorkspaceSettings parses git settings", () => {
+Deno.test("parseWorkspaceSettings parses sync settings", () => {
   const okResult = parseWorkspaceSettings({
     timezone: "Asia/Tokyo",
-    git: {
+    sync: {
+      vcs: "git",
       enabled: true,
-      remote: "https://github.com/user/repo.git",
-      branch: "develop",
       sync_mode: "auto-sync",
+      git: {
+        remote: "https://github.com/user/repo.git",
+        branch: "develop",
+      },
     },
   });
   const settings = expectOk(okResult);
 
-  assertEquals(settings.data.git.enabled, true);
-  assertEquals(settings.data.git.remote, "https://github.com/user/repo.git");
-  assertEquals(settings.data.git.branch, "develop");
-  assertEquals(settings.data.git.syncMode, "auto-sync");
+  assertEquals(settings.data.sync.vcs, "git");
+  assertEquals(settings.data.sync.enabled, true);
+  assertEquals(settings.data.sync.syncMode, "auto-sync");
+  assertEquals(settings.data.sync.git?.remote, "https://github.com/user/repo.git");
+  assertEquals(settings.data.sync.git?.branch, "develop");
 });

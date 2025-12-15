@@ -100,11 +100,14 @@ const mockWorkspaceRepo = (gitEnabled: boolean, remote: string | null, branch?: 
 
   const settings = createWorkspaceSettings({
     timezone: tzResult.value,
-    git: {
+    sync: {
+      vcs: "git",
       enabled: gitEnabled,
-      remote,
-      branch: branch ?? "main",
       syncMode: "auto-commit",
+      git: {
+        remote,
+        branch: branch ?? "main",
+      },
     },
   });
 

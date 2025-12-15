@@ -65,7 +65,7 @@ children. Each Item has exactly one active placement. Items are created under a 
 - Holds one graph of Nodes plus alias/context metadata.
 - Fixed timezone for date partitioning (e.g., `"Asia/Tokyo"`). Changing TZ would require full
   re-partition; **not supported**.
-- Optional Git sync configuration (`git.enabled`, `git.sync_mode`, `git.remote`, `git.branch`):
+- Optional Git sync configuration (`sync.vcs`, `sync.enabled`, `sync.sync_mode`, `sync.git.remote`, `sync.git.branch`):
   - `sync_mode="auto-commit"`: auto-commit after state changes (local only).
   - `sync_mode="auto-sync"`: auto-commit + pull(rebase) + push after state changes.
 

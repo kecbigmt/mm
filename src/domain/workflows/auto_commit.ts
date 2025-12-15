@@ -74,14 +74,14 @@ export const AutoCommitWorkflow = {
 
     const settings = settingsResult.value;
 
-    // 2. Check if Git sync is enabled
-    if (!settings.data.git?.enabled) {
-      // Git sync not enabled - skip
+    // 2. Check if sync is enabled
+    if (!settings.data.sync.enabled) {
+      // Sync not enabled - skip
       return Result.ok({ committed: false });
     }
 
     // 3. Check sync mode (auto-commit or auto-sync)
-    const syncMode = settings.data.git.syncMode;
+    const syncMode = settings.data.sync.syncMode;
     if (syncMode !== "auto-commit" && syncMode !== "auto-sync") {
       // Not in auto-commit or auto-sync mode - skip
       return Result.ok({ committed: false });
@@ -120,8 +120,8 @@ export const AutoCommitWorkflow = {
     // 6. Auto-sync: pull and push after commit if sync_mode is "auto-sync"
     if (syncMode === "auto-sync") {
       // Get remote and branch configuration
-      const remote = settings.data.git.remote;
-      const branch = settings.data.git.branch;
+      const remote = settings.data.sync.git?.remote;
+      const branch = settings.data.sync.git?.branch;
 
       if (!remote) {
         return Result.ok({
