@@ -19,6 +19,7 @@ English | [日本語](README.ja.md)
 - [Commands](#commands)
   - [Creating Items](#creating-items)
   - [Managing Item Status](#managing-item-status)
+  - [Navigation](#navigation)
   - [Workspace Management](#workspace-management)
   - [Git Synchronization](#git-synchronization)
   - [Maintenance](#maintenance)
@@ -288,6 +289,79 @@ mm rm task-a
 
 # Remove multiple items
 mm remove task-a task-b task-c
+```
+
+### Navigation
+
+mm provides Unix-like path navigation over your knowledge graph.
+
+#### `cd [path]`
+
+Change the current working location in the knowledge graph.
+
+```sh
+# Navigate to today
+mm cd today
+
+# Navigate to a specific date
+mm cd 2025-01-20
+
+# Navigate to an item by alias
+mm cd meeting-notes
+
+# Navigate to a section under an item
+mm cd project-alpha/1
+
+# Go to parent location
+mm cd ..
+
+# Navigate with no arguments shows current location
+mm cd
+```
+
+#### `pwd`
+
+Print the current working path.
+
+```sh
+mm pwd
+```
+
+#### `ls [path]`
+
+List items at the current location or a specified path.
+
+```sh
+# List items at current location
+mm ls
+
+# List items at a specific path
+mm ls today
+mm ls 2025-01-20
+mm ls project-alpha/1
+
+# List all items including snoozed and closed ones
+mm ls --all
+mm ls -a
+
+# List items in a date range
+mm ls 2025-01-01..2025-01-07
+```
+
+Options:
+
+- `-a, --all` - Show all items including snoozed and closed ones
+
+#### `where <id>`
+
+Show both logical and physical paths for an item.
+
+```sh
+# By UUID
+mm where 01932e4a-1234-5678-9abc-def012345678
+
+# By alias
+mm where meeting-notes
 ```
 
 ### Workspace Management
