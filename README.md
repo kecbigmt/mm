@@ -1,8 +1,10 @@
 # mm CLI
 
-mm is a Personal Knowledge Operating System (PKOS) that unifies GTD, Bullet Journal, and Zettelkasten methodologies.
+mm is a Personal Knowledge Operating System (PKOS) that unifies GTD, Bullet Journal, and
+Zettelkasten methodologies.
 
 **Key Features:**
+
 - Unix-like path navigation (`cd`, `ls`, `pwd`) over a knowledge graph
 - Manages notes, tasks, and events as plain text Markdown files with YAML frontmatter
 - Git-friendly and human-editable content
