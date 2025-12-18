@@ -8,22 +8,23 @@ stock-type document maintained throughout the project lifecycle.
 
 ## 1) Overview
 
-mm is a personal knowledgement CLI tool with built-in MCP server.
+mm is a personal knowledge operating system with a built-in MCP server.
 
-It has a local-files PKM system unifying GTD / Bullet Journal / Zettelkasten around two primitives:
-**Item** (an addressable entity) and **Section** (a numbered or dated shelf). Items can have
-children. Each Item has exactly one active placement. Items are created under a date section
-(Calendar), never moved physically; "moves" update frontmatter (placement, rank) and edge files.
+It provides a Unix-like path interface (cd, ls, pwd) over a knowledge graph while keeping
+human-editable content in plain text with Git-friendly diffs. The system is built from two
+primitives: **Item** (an addressable entity like note, task, or event) and **Section** (a numbered
+or dated shelf under a parent). Items can have children. Each Item has exactly one active
+placement. Items are created under date sections, never moved physically; moves update frontmatter
+(placement, rank) which serves as the single source of truth.
 
 ## 2) Goals / Non-Goals
 
 **Goals**
 
 - **Simple diffs, conflict-resistant Git workflow**: UUID v7-based file names (timestamp-embedded)
-  and date-partitioned directories minimize merge conflicts across devices. Frontmatter as single
-  source of truth (placement, rank) allows conflict-free moves. Git-ignored rebuildable `.index/`
-  eliminates index conflicts. Optional Git sync supports offline-first workflow (commit locally,
-  sync when online) with rebase-based synchronization.
+  and date-partitioned directories minimize merge conflicts. Frontmatter as single source of truth
+  (placement, rank) allows conflict-free moves. Git-ignored rebuildable `.index/` eliminates index
+  conflicts. Optional Git sync supports offline-first workflow with rebase-based synchronization.
 - One mental model: Items placed under Items, split by Sections; single active placement per Item.
 - Fast navigation by date, numbering paths, or aliases.
 - Deterministic ordering via ranks (LexoRank).
@@ -46,11 +47,12 @@ children. Each Item has exactly one active placement. Items are created under a 
 - Exactly **one active placement** in the logical graph.
 - Created under the **date section** matching its creation date.
 - Can be **moved** to another placement; the physical file location remains under its original date;
-  frontmatter (`placement`, `rank`) and edge files are updated. After move, it is **excluded** from
-  the original date's listing.
+  frontmatter (`placement`, `rank`) is updated. After move, it is excluded from the original date's
+  listing.
 - Has **rank (LexoRank)** for ordering within its placement.
 - May also act as a parent (can have children).
 - State transitions: `close`, `reopen`.
+- Kinds: `note`, `task`, `event`.
 
 ### Section
 
@@ -60,12 +62,23 @@ children. Each Item has exactly one active placement. Items are created under a 
 - **Top level of the graph is Calendar (year/month/day)**; Items are initially placed under their
   creation date section.
 
+### Path vs Placement
+
+- **Path**: User-facing expression that may contain syntactic sugar (relative dates like `today`,
+  aliases, navigation tokens like `.` or `..`). Used for CLI input.
+- **Placement**: Normalized, absolute logical position stored in Item's frontmatter. Contains only
+  absolute dates (`YYYY-MM-DD`) and UUIDs (no aliases, no relative tokens). This is the canonical
+  representation in the domain model.
+
+All user-provided paths are resolved to placement before being stored in frontmatter.
+
 ### Workspace
 
-- Holds one graph of Nodes plus alias/context metadata.
+- Holds one graph of Items plus alias/context metadata.
 - Fixed timezone for date partitioning (e.g., `"Asia/Tokyo"`). Changing TZ would require full
   re-partition; **not supported**.
-- Optional Git sync configuration (`sync.vcs`, `sync.enabled`, `sync.sync_mode`, `sync.git.remote`, `sync.git.branch`):
+- Optional Git sync configuration (`sync.vcs`, `sync.enabled`, `sync.sync_mode`,
+  `sync.git.remote`, `sync.git.branch`):
   - `sync_mode="auto-commit"`: auto-commit after state changes (local only).
   - `sync_mode="auto-sync"`: auto-commit + pull(rebase) + push after state changes.
 
@@ -73,7 +86,7 @@ children. Each Item has exactly one active placement. Items are created under a 
 
 ```
 /<workspace-root>/
-  workspace.json                          # { timezone: "Asia/Tokyo" }
+  workspace.json                          # { timezone: "Asia/Tokyo", sync: {...} }
   items/
     YYYY/MM/DD/
       <uuidv7>.md                         # Single file: YAML Frontmatter + Markdown body
@@ -105,8 +118,8 @@ children. Each Item has exactly one active placement. Items are created under a 
 
 - **Single file per Item**: `<uuid>.md` contains both metadata (Frontmatter) and content (Markdown
   body).
-- **Frontmatter is authoritative**: The Item's `placement` and `rank` in Frontmatter are the source
-  of truth.
+- **Frontmatter is authoritative**: The Item's `placement` and `rank` in Frontmatter are the single
+  source of truth.
 - **`.index/graph` is rebuildable cache**: Edge files mirror Frontmatter placement for efficient
   traversal; regenerated via `mm doctor rebuild-index`.
 - **Git-ignored index**: `.index/` directory is not committed; each machine rebuilds it locally.
@@ -123,7 +136,6 @@ children. Each Item has exactly one active placement. Items are created under a 
 
 - Items have **one active placement** at a time.
 - Move updates **Frontmatter `placement` and `rank`** fields so that:
-
   - the item **disappears** from its original day listing,
   - appears in the new placement.
 - Physical path stays under original `YYYY/MM/DD/<uuidv7>.md`.
@@ -133,6 +145,7 @@ children. Each Item has exactly one active placement. Items are created under a 
 
 - **Alias**: human-friendly slug → `item_id` mapping (ASCII slug recommended).
 - **Context**: metadata for filtering (e.g., `github.context.json`).
+- Aliases use canonical key (NFKC + casefold) for uniqueness and lookups.
 
 ## 8) Time & Ranges
 
@@ -145,10 +158,8 @@ children. Each Item has exactly one active placement. Items are created under a 
 
 - Item IDs: full UUID v7 (no short IDs in current implementation).
 - Path notation:
-
   - Dates: `2025-09-20`, `today`, `tm`, etc.
   - By item/alias: `theme-focus-control`, with optional numeric sections:
-
     - Slash: `theme-focus-control/1/2`
 - Priority when parsing path segments: **date/relative > id > alias**.
 
@@ -157,44 +168,7 @@ children. Each Item has exactly one active placement. Items are created under a 
 - `list` default sort: **rank asc**, tie-break by `created_at` asc.
 - Calendar listings exclude items that have been moved to another placement.
 
-## 11) CLI (current surface)
-
-```
-# create items
-mm new|note|n [title] [--parent <path>] [--context <tag>] [--alias <alias>]
-mm task [title] [--parent <path>] [--context <tag>] [--alias <alias>]
-mm event|ev [title] [--parent <path>] [--context <tag>] [--alias <alias>]
-
-# navigation
-mm cd [path]           # Navigate to location in knowledge graph
-mm pwd                 # Show current location in knowledge graph
-
-# edit / view
-mm edit|e <id>
-mm list|ls [<path>] [--all|-a]
-
-# move (relocate single active placement)
-mm move|mv <ids...> <placement>
-
-# state
-mm close|cl <ids...>
-mm reopen|op <ids...>
-
-# delete
-mm remove|rm <ids...>
-
-# shell completion
-mm completions [bash|zsh]
-
-# placement syntax
-2025-09-20              # tail of that date section
-tail:2025-09-20         # explicit tail
-head:2025-09-20         # head
-head | tail             # head/tail of current path
-before:<id> | after:<id>
-```
-
-## 12) Validation (pre-save / doctor)
+## 11) Validation (pre-save / doctor)
 
 **Frontmatter validation:**
 
@@ -224,6 +198,22 @@ before:<id> | after:<id>
 - `mm doctor rebuild-index`: Rebuild `.index/graph` and `.index/aliases` from all Frontmatter data.
 - `mm doctor rebalance-rank <paths...>`: Rebalance LexoRank values for items in specified paths to
   restore insertion headroom.
+
+## 12) Git Workflow & Conflict Strategy
+
+- **Git-managed files**:
+  - `items/**/*.md` — Item files (Frontmatter + Markdown body; includes authoritative `placement`,
+    `rank`, and all metadata)
+  - `workspace.json`, `tags/*.tag.json`
+- **Git-ignored files** (`.gitignore` includes `.index/`):
+  - `.index/graph/**` — Graph index (edge files)
+  - `.state.json` — Local session state
+  - Edge files are **rebuildable** from Frontmatter via `mm doctor rebuild-index`
+- **Conflict resolution**:
+  - Changes to Frontmatter are typically line-local (placement, rank, status fields).
+  - Frontmatter conflicts surface as YAML diffs and are resolved by reindexing.
+  - After `git pull`, if `.index/graph` is out-of-sync, run `mm doctor rebuild-index` to regenerate
+    the index from merged Frontmatter.
 
 ## 13) Error Handling (CLI)
 
