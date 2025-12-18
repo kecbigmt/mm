@@ -1,8 +1,9 @@
 # mm CLI
 
-mm is a personal knowledge management CLI that stores notes and tasks as Markdown and JSON files.
-The tool organises content as a graph of container and item nodes, keeping immutable on-disk
-locations while managing logical placements through edges and ranks.
+mm is a personal knowledge operating system that unifies GTD, Bullet Journal, and Zettelkasten
+methodologies. It provides Unix-like path navigation (`cd`, `ls`, `pwd`) over a knowledge graph,
+managing notes, tasks, and events as plain text Markdown files with YAML frontmatter. All content
+is Git-friendly and human-editable.
 
 ## Table of Contents
 
