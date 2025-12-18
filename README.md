@@ -33,6 +33,13 @@ Domain and product design notes live in [docs/steering/design.md](docs/steering/
 
 ## Getting Started
 
+First, clone the repository:
+
+```sh
+git clone https://github.com/kecbigmt/mm.git
+cd mm
+```
+
 ### Quick Try
 
 Try mm without installation:

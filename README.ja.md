@@ -33,6 +33,13 @@ mmは、GTD・Bullet Journal・Zettelkastenといったタスク管理やナレ�
 
 ## はじめに
 
+まず、リポジトリをクローンします：
+
+```sh
+git clone https://github.com/kecbigmt/mm.git
+cd mm
+```
+
 ### インストールせず試したいとき
 
 ```sh
