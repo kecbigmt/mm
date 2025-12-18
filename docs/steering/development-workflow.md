@@ -119,12 +119,9 @@ deno task test
 To try the CLI manually while developing:
 
 ```bash
-# Run once
-deno task start --help
-deno task start sync init git@github.com:user/repo.git
-
-# Hot-reload during development
-deno task dev
+# Execute CLI commands
+deno task exec --help
+deno task exec sync init git@github.com:user/repo.git
 ```
 
 ---

@@ -21,8 +21,7 @@ is under `docs/`, with detailed product steerage in `docs/steering/design.md`.
 
 ## Build, Test, and Development Commands
 
-- `deno task start` – run the CLI entry point once (`src/main.ts`).
-- `deno task dev` – hot-reload the CLI for local iteration.
+- `deno task exec` – run the CLI entry point (`src/main.ts`).
 - `deno task test` – execute all unit and integration tests. Use `deno run` sparingly; prefer the
   tasks so flags match repository defaults.
 

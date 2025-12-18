@@ -23,14 +23,33 @@ Domain and product design notes live in `docs/steering/design.md`.
 
 ## Getting Started
 
+### Quick Try
+
+Try mm without installation:
+
 ```sh
-deno task dev
+deno task exec workspace init my-workspace
+deno task exec note "My first note"
+deno task exec list
 ```
 
-Use `deno task test` to run the full unit test suite.
+### Installation
 
-Build a standalone binary with `deno task compile`, or install the CLI globally via
-`deno task install`.
+For regular use, install mm globally:
+
+```sh
+deno task install
+```
+
+After installation, the `mm` command is available from anywhere:
+
+```sh
+mm workspace init my-workspace
+mm note "My first note"
+mm list
+```
+
+Alternatively, build a standalone binary with `deno task compile`.
 
 **Shell Completion (optional):** Enable tab completion for Zsh/Bash by adding
 `source <(mm completions zsh)` or `source <(mm completions bash)` to your shell config. See
