@@ -28,6 +28,7 @@ Domain and product design notes live in [docs/steering/design.md](docs/steering/
 
 ## Prerequisites
 
+- macOS or Linux
 - [Deno](https://deno.com/) v2.x or later
 - Git (optional, required for sync features)
 

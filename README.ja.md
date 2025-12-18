@@ -28,10 +28,11 @@ mmは、GTD・Bullet Journal・Zettelkastenといったタスク管理やナレ�
 
 ## 前提条件
 
+- macOS または Linux
 - [Deno](https://deno.com/) v2.x以降
 - Git（オプション、同期機能を使う場合に必要）
 
-## はじめに
+## 利用方法
 
 まず、リポジトリをクローンします：
 
