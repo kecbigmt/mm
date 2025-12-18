@@ -276,6 +276,77 @@ mm workspace use research
 mm ws use client-a --timezone Asia/Tokyo
 ```
 
+### Git Synchronization
+
+mm supports Git-based synchronization to backup and sync workspaces across devices. Two sync modes
+are available:
+
+- **auto-commit**: Automatically commits changes after each operation (manual push required)
+- **auto-sync**: Automatically commits and pushes changes after each operation
+
+#### `sync init <remote-url>`
+
+Initialize Git sync for the workspace. This creates a Git repository, configures the remote, and
+enables auto-commit mode (automatic commits after each operation, manual push required).
+
+```sh
+# Initialize with default branch (main)
+mm sync init https://github.com/username/my-workspace.git
+
+# Specify a custom branch
+mm sync init git@github.com:username/my-workspace.git --branch develop
+
+# Force overwrite existing remote configuration
+mm sync init https://github.com/username/my-workspace.git --force
+```
+
+Options:
+
+- `-b, --branch <branch>` - Branch to sync with (default: main)
+- `-f, --force` - Force overwrite existing remote config
+
+The command automatically creates a `.gitignore` file to exclude local state and cache files
+(`.state.json`, `.index/`, `.tmp/`).
+
+#### `sync push`
+
+Push local commits to the remote repository.
+
+```sh
+# Push commits to remote
+mm sync push
+
+# Force push (use with caution)
+mm sync push --force
+```
+
+Options:
+
+- `-f, --force` - Force push to remote
+
+#### `sync pull`
+
+Pull changes from the remote repository. Requires a clean working tree (no uncommitted changes).
+
+```sh
+mm sync pull
+```
+
+#### `sync`
+
+Execute both pull and push operations in sequence.
+
+```sh
+mm sync
+```
+
+**Note**: In auto-commit mode, changes are committed locally but not pushed automatically. Use
+`mm sync push` or `mm sync` to push commits to the remote. In auto-sync mode, changes are
+automatically committed and pushed after each operation.
+
+**Sync Mode Configuration**: The sync mode defaults to `auto-commit`. To change it to `auto-sync`,
+edit the workspace's `workspace.json` file and set `sync.sync_mode` to `"auto-sync"`.
+
 ### Maintenance
 
 #### `doctor check`
