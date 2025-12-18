@@ -105,13 +105,32 @@ placements.
 
 ### Managing Item Status
 
+#### Item ID References
+
+Commands that operate on items accept the following identifier formats:
+
+- **Full item IDs**: Complete UUID v7 identifiers (e.g., `01932e4a-1234-5678-9abc-def012345678`)
+- **Aliases**: Human-readable aliases assigned to items (e.g., `meeting-notes`, `design-system`)
+
+If an alias matches multiple items, the command will show an error listing the ambiguous matches.
+
+#### Common Options
+
+- `-w, --workspace <workspace>` - Override the active workspace for a single command
+
 #### `close <ids...>`
 
 Close one or more items (tasks/notes/events).
 
 ```sh
-mm close abc1234
-mm close abc1234 def5678 ghi9012
+# Close by UUID
+mm close 01932e4a-1234-5678-9abc-def012345678
+
+# Close by alias
+mm close task-a
+
+# Close multiple items
+mm close task-a task-b task-c
 ```
 
 #### `reopen <ids...>`
@@ -119,16 +138,105 @@ mm close abc1234 def5678 ghi9012
 Reopen one or more closed items.
 
 ```sh
-mm reopen abc1234
-mm reopen abc1234 def5678
+# Reopen by UUID
+mm reopen 01932e4a-1234-5678-9abc-def012345678
+
+# Reopen by alias
+mm reopen task-a
+
+# Reopen multiple items
+mm reopen task-a task-b
 ```
 
-Both commands accept:
+#### `move <ids...> <placement>`
 
-- **Full item IDs**: Complete UUID v7 identifiers
-- **Short IDs**: Last 7 characters of the item ID (e.g., `abc1234`)
+Move one or more items to a new placement. Items maintain their physical location; only logical
+placement changes. Alias: `mv`
 
-If a short ID matches multiple items, the command will show an error listing the ambiguous matches.
+```sh
+# Move item to head of today
+mm move task-a head:today
+mm mv task-a head:today
+
+# Move item to tail of today
+mm mv task-b tail:today
+
+# Move item after another item (by UUID)
+mm mv 01932e4a-1234-5678-9abc-def012345678 after:01932e4a-5678-1234-abcd-ef0123456789
+
+# Move item before another item (by alias)
+mm mv task-a before:task-b
+
+# Move to a different parent/section
+mm mv task-c project-alpha/1
+
+# Move to a specific date
+mm mv task-a 2025-01-20
+
+# Move multiple items (maintains order)
+mm mv task-a task-b task-c head:today
+```
+
+Placement formats:
+
+- `head:<path>` - Move to head (first position) of the target container
+- `tail:<path>` - Move to tail (last position) of the target container
+- `after:<item-id>` - Move after the specified item
+- `before:<item-id>` - Move before the specified item
+- `<path>` - Move to the target container (date or item alias)
+
+When moving multiple items, they are placed in the order specified. The first item goes to the
+target placement, and subsequent items are placed after the previous one.
+
+#### `snooze <ids...> [until]`
+
+Snooze items until a future datetime. Snoozed items are hidden from normal listing. Alias: `sn`
+
+```sh
+# Snooze with default duration (8 hours)
+mm snooze task-a
+
+# Snooze with explicit duration (by UUID)
+mm snooze 01932e4a-1234-5678-9abc-def012345678 2h
+mm sn task-b 30m
+
+# Snooze until specific time (uses parent date)
+mm snooze task-c 17:00
+
+# Snooze until specific date and time
+mm snooze task-a "2025-01-20T17:00"
+
+# Clear snooze (unsnooze)
+mm snooze task-a --clear
+mm sn task-b -c
+```
+
+Options:
+
+- `-c, --clear` - Clear snooze (unsnooze items)
+
+Duration formats: `30m`, `2h`, `1h30m`
+
+Datetime formats:
+
+- ISO 8601 with timezone: `2025-01-20T17:00:00Z` or `2025-01-20T17:00:00+09:00`
+- ISO 8601 local time: `2025-01-20T17:00` (interpreted as local time)
+- Time only: `17:00` or `17:00:00` (uses parent placement date or today)
+
+#### `remove <ids...>`
+
+Permanently remove items from the workspace. Alias: `rm`
+
+```sh
+# Remove a single item by UUID
+mm remove 01932e4a-1234-5678-9abc-def012345678
+
+# Remove by alias
+mm rm task-a
+
+# Remove multiple items
+mm remove task-a task-b task-c
+```
 
 ### Workspace Management
 
