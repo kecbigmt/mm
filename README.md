@@ -19,7 +19,7 @@ is Git-friendly and human-editable.
 
 ## Documentation
 
-Domain and product design notes live in `docs/steering/design.md`.
+Domain and product design notes live in [docs/steering/design.md](docs/steering/design.md).
 
 ## Getting Started
 
