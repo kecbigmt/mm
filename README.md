@@ -4,6 +4,18 @@ mm is a personal knowledge management CLI that stores notes and tasks as Markdow
 The tool organises content as a graph of container and item nodes, keeping immutable on-disk
 locations while managing logical placements through edges and ranks.
 
+## Table of Contents
+
+- [Documentation](#documentation)
+- [Getting Started](#getting-started)
+- [Commands](#commands)
+  - [Creating Items](#creating-items)
+  - [Managing Item Status](#managing-item-status)
+  - [Workspace Management](#workspace-management)
+  - [Git Synchronization](#git-synchronization)
+  - [Maintenance](#maintenance)
+- [Shell Completion](#shell-completion)
+
 ## Documentation
 
 Domain and product design notes live in `docs/steering/design.md`.
