@@ -12,6 +12,7 @@ English | [日本語](README.ja.md)
 ## Table of Contents
 
 - [Documentation](#documentation)
+- [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
 - [Commands](#commands)
   - [Creating Items](#creating-items)
@@ -24,6 +25,11 @@ English | [日本語](README.ja.md)
 ## Documentation
 
 Domain and product design notes live in [docs/steering/design.md](docs/steering/design.md).
+
+## Prerequisites
+
+- [Deno](https://deno.com/) v2.x or later
+- Git (optional, required for sync features)
 
 ## Getting Started
 

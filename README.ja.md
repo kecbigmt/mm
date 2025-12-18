@@ -12,6 +12,7 @@ mmは、GTD・Bullet Journal・Zettelkastenといったタスク管理やナレ�
 ## 目次
 
 - [ドキュメント](#ドキュメント)
+- [前提条件](#前提条件)
 - [はじめに](#はじめに)
 - [コマンド](#コマンド)
   - [アイテムの作成](#アイテムの作成)
@@ -24,6 +25,11 @@ mmは、GTD・Bullet Journal・Zettelkastenといったタスク管理やナレ�
 ## ドキュメント
 
 プロダクト設計の詳細は [docs/steering/design.md](docs/steering/design.md) にあります。
+
+## 前提条件
+
+- [Deno](https://deno.com/) v2.x以降
+- Git（オプション、同期機能を使う場合に必要）
 
 ## はじめに
 
