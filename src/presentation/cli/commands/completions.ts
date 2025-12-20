@@ -184,9 +184,34 @@ _mm() {
                         $common_flags
                     case "$state" in
                         item_ids)
+                            # Check if current word has a positioning prefix
+                            local prefix=""
+                            local suffix="$words[$CURRENT]"
+
+                            if [[ "$suffix" == before:* ]]; then
+                                prefix="before:"
+                                suffix="\${suffix#before:}"
+                            elif [[ "$suffix" == after:* ]]; then
+                                prefix="after:"
+                                suffix="\${suffix#after:}"
+                            elif [[ "$suffix" == head:* ]]; then
+                                prefix="head:"
+                                suffix="\${suffix#head:}"
+                            elif [[ "$suffix" == tail:* ]]; then
+                                prefix="tail:"
+                                suffix="\${suffix#tail:}"
+                            fi
+
                             local -a aliases
                             aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
-                            compadd -a aliases
+
+                            if [[ -n "$prefix" ]]; then
+                                # Complete with prefix
+                                compadd -P "$prefix" -a aliases
+                            else
+                                # Normal completion
+                                compadd -a aliases
+                            fi
                             ;;
                     esac
                     ;;
@@ -393,6 +418,37 @@ _mm() {
         move|mv|close|cl|reopen|op|remove|rm|snooze|sn)
             # Multiple item commands - complete all arguments
             local aliases="$(_mm_get_alias_candidates)"
+
+            # For move command, check for positioning prefixes
+            if [[ "$cmd" == "move" || "$cmd" == "mv" ]]; then
+                local prefix=""
+                local suffix="$cur"
+
+                if [[ "$cur" == before:* ]]; then
+                    prefix="before:"
+                    suffix="\${cur#before:}"
+                elif [[ "$cur" == after:* ]]; then
+                    prefix="after:"
+                    suffix="\${cur#after:}"
+                elif [[ "$cur" == head:* ]]; then
+                    prefix="head:"
+                    suffix="\${cur#head:}"
+                elif [[ "$cur" == tail:* ]]; then
+                    prefix="tail:"
+                    suffix="\${cur#tail:}"
+                fi
+
+                if [[ -n "$prefix" ]]; then
+                    # Add prefix to each alias candidate
+                    local -a prefixed_candidates
+                    for alias in $aliases; do
+                        prefixed_candidates+=("$prefix$alias")
+                    done
+                    COMPREPLY=($(compgen -W "\${prefixed_candidates[*]}" -- "$cur"))
+                    return 0
+                fi
+            fi
+
             COMPREPLY=($(compgen -W "$aliases" -- "$cur"))
             return 0
             ;;
