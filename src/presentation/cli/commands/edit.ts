@@ -6,6 +6,7 @@ import { deriveFilePathFromId } from "../../../infrastructure/fileSystem/item_re
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import { executeAutoCommit } from "../auto_commit_helper.ts";
+import { handlePostEditUpdates, launchEditor } from "../utils/edit_item_helper.ts";
 
 const hasMetadataOptions = (options: Record<string, unknown>): boolean => {
   return (
@@ -14,21 +15,6 @@ const hasMetadataOptions = (options: Record<string, unknown>): boolean => {
     options.dueAt !== undefined ||
     options.alias !== undefined || options.context !== undefined
   );
-};
-
-const launchEditor = async (filePath: string): Promise<void> => {
-  const editor = Deno.env.get("EDITOR") || "vi";
-  const command = new Deno.Command(editor, {
-    args: [filePath],
-    stdin: "inherit",
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const child = command.spawn();
-  const status = await child.status;
-  if (!status.success) {
-    throw new Error(`Editor '${editor}' exited with non-zero status`);
-  }
 };
 
 const formatItem = (
@@ -118,73 +104,18 @@ export function createEditCommand() {
 
         try {
           await launchEditor(filePath);
-          const reloadResult = await deps.itemRepository.load(item.data.id);
-
-          if (reloadResult.type === "error") {
-            console.error(`Failed to reload item after edit: ${reloadResult.error.message}`);
-            Deno.exit(1);
-          }
-
-          if (!reloadResult.value) {
-            console.error("Failed to reload item after edit: item not found");
-            Deno.exit(1);
-          }
-
-          const updatedItem = reloadResult.value;
-
-          const newAlias = updatedItem.data.alias;
-
-          // Update alias index if alias changed
-          const oldAliasStr = oldAlias?.toString();
-          const newAliasStr = newAlias?.toString();
-          if (oldAliasStr !== newAliasStr) {
-            // Check for alias collision before updating
-            if (newAlias) {
-              const existingAliasResult = await deps.aliasRepository.load(newAlias);
-              if (existingAliasResult.type === "error") {
-                console.error(
-                  `Failed to check alias collision: ${existingAliasResult.error.message}`,
-                );
-                Deno.exit(1);
-              }
-              if (existingAliasResult.value) {
-                // Alias exists and points to a different item
-                if (!existingAliasResult.value.data.itemId.equals(updatedItem.data.id)) {
-                  console.error(
-                    `Alias '${newAlias.toString()}' is already in use by another item`,
-                  );
-                  Deno.exit(1);
-                }
-              }
-            }
-
-            // Delete old alias if it exists
-            if (oldAlias) {
-              const deleteResult = await deps.aliasRepository.delete(oldAlias);
-              if (deleteResult.type === "error") {
-                console.error(`Failed to delete old alias: ${deleteResult.error.message}`);
-                Deno.exit(1);
-              }
-            }
-
-            // Save new alias if it exists
-            if (newAlias) {
-              const { createAlias } = await import("../../../domain/models/alias.ts");
-              const aliasModel = createAlias({
-                slug: newAlias,
-                itemId: updatedItem.data.id,
-                createdAt: occurredAtResult.value,
-              });
-              const aliasSaveResult = await deps.aliasRepository.save(aliasModel);
-              if (aliasSaveResult.type === "error") {
-                console.error(`Failed to save new alias: ${aliasSaveResult.error.message}`);
-                Deno.exit(1);
-              }
-            }
-          }
-
-          // Update cache after all validations and persists succeed
-          await deps.cacheUpdateService.updateFromItem(updatedItem);
+          const updatedItem = await handlePostEditUpdates(
+            {
+              itemRepository: deps.itemRepository,
+              aliasRepository: deps.aliasRepository,
+              cacheUpdateService: deps.cacheUpdateService,
+            },
+            {
+              itemId: item.data.id,
+              oldAlias: oldAlias,
+              occurredAt: occurredAtResult.value,
+            },
+          );
 
           console.log(`✅ Updated ${formatItem(updatedItem)}`);
 
