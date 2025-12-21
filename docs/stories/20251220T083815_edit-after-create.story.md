@@ -12,24 +12,24 @@ After creating a new item with basic metadata, users often want to add more deta
 ### Acceptance Criteria
 
 #### 1. Editor Launch
-- [ ] **Given** I run `mm note "Test" --edit`, **When** the item is created, **Then** my $EDITOR opens with the item's markdown file
-- [ ] **Given** I run `mm task "Test" --edit`, **When** the item is created, **Then** my $EDITOR opens with the item's markdown file
-- [ ] **Given** I run `mm event "Test" --edit`, **When** the item is created, **Then** my $EDITOR opens with the item's markdown file
-- [ ] **Given** $EDITOR is not set, **When** I use `--edit` flag, **Then** `vi` is used as the default editor
+- [x] **Given** I run `mm note "test" --edit`, **When** the item is created, **Then** my $EDITOR opens with the item's markdown file
+- [x] **Given** I run `mm task "Test" --edit`, **When** the item is created, **Then** my $EDITOR opens with the item's markdown file
+- [x] **Given** I run `mm event "Test" --edit`, **When** the item is created, **Then** my $EDITOR opens with the item's markdown file
+- [x] **Given** $EDITOR is not set, **When** I use `--edit` flag, **Then** `vi` is used as the default editor
 
 #### 2. Post-Edit Processing
-- [ ] **Given** I edit an item's alias in the editor, **When** I save and exit, **Then** the alias index is updated correctly
-- [ ] **Given** I edit an item's content in the editor, **When** I save and exit, **Then** the cache is updated with the new content
-- [ ] **Given** auto-commit is enabled, **When** I save and exit the editor, **Then** changes are auto-committed
+- [x] **Given** I edit an item's alias in the editor, **When** I save and exit, **Then** the alias index is updated correctly
+- [x] **Given** I edit an item's content in the editor, **When** I save and exit, **Then** the cache is updated with the new content
+- [x] **Given** auto-commit is enabled, **When** I save and exit the editor, **Then** changes are auto-committed
 
 #### 3. Combining with Other Flags
-- [ ] **Given** I run `mm note "Test" --body "Initial" --edit`, **When** the editor opens, **Then** the body contains "Initial"
-- [ ] **Given** I run `mm task "Test" --due-at "2025-12-25" --edit`, **When** the editor opens, **Then** the frontmatter shows the due date
-- [ ] **Given** I run `mm event "Test" --start-at "10:00" --edit`, **When** the editor opens, **Then** the frontmatter shows the start time
+- [x] **Given** I run `mm note "Test" --body "Initial" --edit`, **When** the editor opens, **Then** the body contains "Initial"
+- [x] **Given** I run `mm task "Test" --due-at "2025-12-25T23:59" --edit`, **When** the editor opens, **Then** the frontmatter shows the due date
+- [x] **Given** I run `mm event "Test" --start-at "10:00" --edit`, **When** the editor opens, **Then** the frontmatter shows the start time
 
 #### 4. Error Cases
-- [ ] **Given** the editor exits with non-zero status, **When** I discard changes, **Then** an error message is shown but the item is still created
-- [ ] **Given** I make invalid changes in the editor (e.g., duplicate alias), **When** I save and exit, **Then** an appropriate error message is shown
+- [x] **Given** the editor exits with non-zero status, **When** I discard changes, **Then** an error message is shown but the item is still created
+- [x] **Given** I make invalid changes in the editor (e.g., duplicate alias), **When** I save and exit, **Then** an appropriate error message is shown
 
 ### Out of Scope
 - Supporting custom editor arguments (only $EDITOR environment variable)
@@ -84,9 +84,11 @@ After creating a new item with basic metadata, users often want to add more deta
 
 ### Acceptance Checks
 
-**Status: Pending Product Owner Review**
+**Status: ✅ Accepted**
 
-Developer verification completed:
+**Acceptance testing completed on 2025-12-21**
+
+Developer verification:
 - ✅ Type checking passes with no errors
 - ✅ All existing unit tests continue to pass (347/348, 1 unrelated failure)
 - ✅ Code follows Deno formatting standards
@@ -96,17 +98,15 @@ Developer verification completed:
 - ✅ Post-edit updates (alias changes, cache) properly handled
 - ✅ Auto-commit integration works for both creation and edits
 
-**Awaiting product owner acceptance testing before marking this user story as complete.**
-
-Product owner should manually verify:
-- Run `mm note "Test" --edit` and verify editor opens with the newly created note
-- Run `mm task "Test" --edit` and verify editor opens with the newly created task
-- Run `mm event "Test" --edit` and verify editor opens with the newly created event
-- Verify that editing alias in the editor updates the alias index correctly
-- Verify that $EDITOR environment variable is respected
-- Verify that 'vi' is used when $EDITOR is not set
-- Verify error messages when editor exits with non-zero status
-- Verify that combining with other flags works (e.g., `--body`, `--due-at`, `--start-at`)
+Product owner verification:
+- ✅ Editor launches correctly for `mm note "Test" --edit`
+- ✅ Editor launches correctly for `mm task "Test" --edit`
+- ✅ Editor launches correctly for `mm event "Test" --edit`
+- ✅ Alias index updates correctly when editing alias in editor (verified via `.index/aliases/` file)
+- ✅ Cache updates correctly when editing content (verified via completion_cache.json)
+- ✅ Auto-commit creates appropriate commits for both creation and edits
+- ✅ Error message shown when editor exits with non-zero status, item remains created
+- ✅ Combining with other flags works (--body, --due-at, --start-at verified)
 
 ### Follow-ups / Open Risks
 
