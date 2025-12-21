@@ -93,6 +93,15 @@ const mockVersionControlService = () => {
       calls.push(`getRemoteDefaultBranch`);
       return Promise.resolve(Result.ok(remoteDefaultBranch));
     },
+    hasChangesInPath: (
+      _cwd: string,
+      _fromRef: string,
+      _toRef: string,
+      _path: string,
+    ): Promise<Result<boolean, VersionControlError>> => {
+      calls.push(`hasChangesInPath`);
+      return Promise.resolve(Result.ok(false));
+    },
     getCalls: () => calls,
     setFailPull: (should: boolean, message?: string) => {
       shouldFailPull = should;

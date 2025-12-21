@@ -441,6 +441,45 @@ export const createGitVersionControlService = (): VersionControlService => {
     }
   };
 
+  const hasChangesInPath = async (
+    cwd: string,
+    fromRef: string,
+    toRef: string,
+    path: string,
+  ): Promise<Result<boolean, VersionControlError>> => {
+    try {
+      const command = new Deno.Command("git", {
+        args: ["diff", "--quiet", fromRef, toRef, "--", path],
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { code, stderr } = await command.output();
+
+      // Exit code 0: No changes
+      // Exit code 1: Changes detected
+      // Other exit codes: Error
+      if (code === 0) {
+        return Result.ok(false);
+      }
+      if (code === 1) {
+        return Result.ok(true);
+      }
+
+      const errStr = new TextDecoder().decode(stderr);
+      return Result.error(
+        createVersionControlCommandFailedError(`git diff failed: ${errStr}`),
+      );
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.error(createVersionControlNotAvailableError());
+      }
+      return Result.error(
+        createVersionControlCommandFailedError(`git diff failed: ${error}`, { cause: error }),
+      );
+    }
+  };
+
   return {
     init,
     setRemote,
@@ -453,5 +492,6 @@ export const createGitVersionControlService = (): VersionControlService => {
     checkoutBranch,
     hasUncommittedChanges,
     getRemoteDefaultBranch,
+    hasChangesInPath,
   };
 };

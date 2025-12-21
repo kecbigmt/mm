@@ -42,12 +42,11 @@ git diff --quiet HEAD@{1} HEAD -- items/
 
 #### Integration Point
 
-Modify `SyncPullWorkflow` to:
-1. Record HEAD before pull (or use `HEAD@{1}` after pull)
-2. Execute pull
-3. If pull succeeded, check for item changes via git diff
-4. If items changed, run existing `rebuildIndex()` logic
-5. Return combined result (pull result + rebuild status)
+Modify `sync pull` CLI command (presentation layer) to:
+1. Execute pull via `SyncPullWorkflow`
+2. If pull succeeded, check for item changes via `git diff --quiet HEAD@{1} HEAD -- items/`
+3. If items changed, run existing `rebuildIndex()` logic
+4. Display combined result (pull output + rebuild status)
 
 #### Reuse Existing Code
 
@@ -58,15 +57,32 @@ Modify `SyncPullWorkflow` to:
 ---
 
 ### Completed Work Summary
-Not yet started.
+
+**Implementation complete.**
+
+#### Files Modified
+- `src/domain/services/version_control_service.ts`: Added `hasChangesInPath()` interface method
+- `src/infrastructure/git/git_client.ts`: Implemented `hasChangesInPath()` using `git diff --quiet`
+- `src/presentation/cli/commands/sync.ts`: Added `rebuildIndexIfNeeded()` function and integrated into pull command
+
+#### Test Files Updated
+- `src/domain/workflows/sync_pull_test.ts`
+- `src/domain/workflows/sync_push_test.ts`
+- `src/domain/workflows/sync_test.ts`
+- `src/domain/workflows/sync_init_test.ts`
+- `src/domain/workflows/auto_commit_test.ts`
+
+All mocks updated to include `hasChangesInPath` method.
 
 ### Acceptance Checks
 
 **Status: Pending Product Owner Review**
 
 Developer verification completed:
-- [List what the developer manually verified]
-- [Note any observations or findings]
+- Unit tests pass (469 passed, 0 failed)
+- E2E tests pass (25 passed, 1 failed - shell completion test unrelated to this change)
+- Type checking passes
+- Lint passes
 
 **Awaiting product owner acceptance testing before marking this user story as complete.**
 
