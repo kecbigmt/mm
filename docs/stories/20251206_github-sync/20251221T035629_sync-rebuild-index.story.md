@@ -15,10 +15,7 @@ Currently, after `mm sync pull`, users must manually run `mm doctor --rebuild-in
 - [ ] **Given** sync is enabled and `mm sync pull` succeeds, **When** items were added/modified/deleted by the pull, **Then** full index rebuild is executed automatically
 - [ ] **Given** sync is enabled and `mm sync pull` succeeds, **When** no items changed, **Then** no index rebuild is performed (skip for efficiency)
 
-#### 2. Change Detection
-- [ ] **Given** `mm sync pull` just completed, **When** detecting changes, **Then** use git diff to check if any files under `items/` were modified
-
-#### 3. Error Cases
+#### 2. Error Cases
 - [ ] **Given** index rebuild fails, **When** error is detected, **Then** display warning but do not fail the pull command (pull itself succeeded)
 - [ ] **Given** git diff command fails, **When** detecting changes, **Then** skip index rebuild with a warning message
 
