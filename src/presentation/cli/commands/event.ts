@@ -243,6 +243,7 @@ export function createEventCommand() {
           console.error(
             `Failed to edit item: ${error instanceof Error ? error.message : String(error)}`,
           );
+          Deno.exit(1);
         }
       }
     });
