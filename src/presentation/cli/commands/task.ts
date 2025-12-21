@@ -8,6 +8,8 @@ import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import { executeAutoCommit } from "../auto_commit_helper.ts";
+import { deriveFilePathFromId } from "../../../infrastructure/fileSystem/item_repository.ts";
+import { handlePostEditUpdates, launchEditor } from "../utils/edit_item_helper.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -166,6 +168,10 @@ export function createTaskCommand() {
       }
 
       const item = workflowResult.value.item;
+
+      // Update cache with created item
+      await deps.cacheUpdateService.updateFromItem(item);
+
       const label = formatItemLabel(item);
       console.log(
         `✅ Created task [${label}] ${item.data.title.toString()} at ${parentPlacement.toString()}`,
@@ -180,7 +186,41 @@ export function createTaskCommand() {
       await executeAutoCommit(autoCommitDeps, `create new task "${resolvedTitle}"`);
 
       if (options.edit === true) {
-        console.warn("Editor integration not implemented yet");
+        const filePath = deriveFilePathFromId(
+          { root: deps.root, timezone: deps.timezone },
+          item.data.id.toString(),
+        );
+
+        if (!filePath) {
+          console.error(`Could not determine file path for item: ${label}`);
+          return;
+        }
+
+        try {
+          await launchEditor(filePath);
+          const updatedItem = await handlePostEditUpdates(
+            {
+              itemRepository: deps.itemRepository,
+              aliasRepository: deps.aliasRepository,
+              cacheUpdateService: deps.cacheUpdateService,
+            },
+            {
+              itemId: item.data.id,
+              oldAlias: item.data.alias,
+              occurredAt: createdAtResult.value,
+            },
+          );
+
+          console.log(`✅ Updated ${formatItemLabel(updatedItem)}`);
+
+          // Auto-commit edits if enabled
+          await executeAutoCommit(autoCommitDeps, `edit task via editor after creation`);
+        } catch (error) {
+          console.error(
+            `Failed to edit item: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          Deno.exit(1);
+        }
       }
     });
 }
