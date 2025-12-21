@@ -1,11 +1,12 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import { handlePostEditUpdates } from "./edit_item_helper.ts";
+import { handlePostEditUpdates, PostEditDependencies } from "./edit_item_helper.ts";
 import { Result } from "../../../shared/result.ts";
 import { createItem, Item } from "../../../domain/models/item.ts";
 import { Alias, createAlias } from "../../../domain/models/alias.ts";
 import { createRepositoryError } from "../../../domain/repositories/repository_error.ts";
 import type { ItemRepository } from "../../../domain/repositories/item_repository.ts";
 import type { AliasRepository } from "../../../domain/repositories/alias_repository.ts";
+import type { CacheUpdateService } from "../../../infrastructure/completion_cache/cache_update_service.ts";
 import {
   aliasSlugFromString,
   createItemIcon,
@@ -63,19 +64,19 @@ Deno.test("handlePostEditUpdates - updates cache with reloaded item", async () =
     list: () => Promise.resolve(Result.ok([])),
   };
 
-  const mockCacheUpdateService = {
+  const mockCacheUpdateService: Pick<CacheUpdateService, "updateFromItem"> = {
     updateFromItem: () => {
       cacheUpdated = true;
       return Promise.resolve();
     },
-  } as { updateFromItem: (item: Item) => Promise<void> };
+  };
 
   const result = await handlePostEditUpdates(
     {
       itemRepository: mockItemRepository,
       aliasRepository: mockAliasRepository,
       cacheUpdateService: mockCacheUpdateService,
-    },
+    } as PostEditDependencies,
     {
       itemId,
       oldAlias: undefined,
@@ -112,16 +113,16 @@ Deno.test("handlePostEditUpdates - adds new alias when alias changed from undefi
     list: () => Promise.resolve(Result.ok([])),
   };
 
-  const mockCacheUpdateService = {
+  const mockCacheUpdateService: Pick<CacheUpdateService, "updateFromItem"> = {
     updateFromItem: () => Promise.resolve(),
-  } as { updateFromItem: (item: Item) => Promise<void> };
+  };
 
   await handlePostEditUpdates(
     {
       itemRepository: mockItemRepository,
       aliasRepository: mockAliasRepository,
       cacheUpdateService: mockCacheUpdateService,
-    },
+    } as PostEditDependencies,
     {
       itemId,
       oldAlias: undefined,
@@ -163,16 +164,16 @@ Deno.test("handlePostEditUpdates - deletes old alias and adds new alias when cha
     list: () => Promise.resolve(Result.ok([])),
   };
 
-  const mockCacheUpdateService = {
+  const mockCacheUpdateService: Pick<CacheUpdateService, "updateFromItem"> = {
     updateFromItem: () => Promise.resolve(),
-  } as { updateFromItem: (item: Item) => Promise<void> };
+  };
 
   await handlePostEditUpdates(
     {
       itemRepository: mockItemRepository,
       aliasRepository: mockAliasRepository,
       cacheUpdateService: mockCacheUpdateService,
-    },
+    } as PostEditDependencies,
     {
       itemId,
       oldAlias: oldAliasSlug,
@@ -213,16 +214,16 @@ Deno.test("handlePostEditUpdates - does not modify aliases when unchanged", asyn
     list: () => Promise.resolve(Result.ok([])),
   };
 
-  const mockCacheUpdateService = {
+  const mockCacheUpdateService: Pick<CacheUpdateService, "updateFromItem"> = {
     updateFromItem: () => Promise.resolve(),
-  } as { updateFromItem: (item: Item) => Promise<void> };
+  };
 
   await handlePostEditUpdates(
     {
       itemRepository: mockItemRepository,
       aliasRepository: mockAliasRepository,
       cacheUpdateService: mockCacheUpdateService,
-    },
+    } as PostEditDependencies,
     {
       itemId,
       oldAlias: aliasSlug,
@@ -261,9 +262,9 @@ Deno.test("handlePostEditUpdates - throws error when alias collision detected", 
     list: () => Promise.resolve(Result.ok([])),
   };
 
-  const mockCacheUpdateService = {
+  const mockCacheUpdateService: Pick<CacheUpdateService, "updateFromItem"> = {
     updateFromItem: () => Promise.resolve(),
-  } as { updateFromItem: (item: Item) => Promise<void> };
+  };
 
   await assertRejects(
     async () => {
@@ -272,7 +273,7 @@ Deno.test("handlePostEditUpdates - throws error when alias collision detected", 
           itemRepository: mockItemRepository,
           aliasRepository: mockAliasRepository,
           cacheUpdateService: mockCacheUpdateService,
-        },
+        } as PostEditDependencies,
         {
           itemId,
           oldAlias: undefined,
@@ -306,9 +307,9 @@ Deno.test("handlePostEditUpdates - throws error when item reload fails", async (
     list: () => Promise.resolve(Result.ok([])),
   };
 
-  const mockCacheUpdateService = {
+  const mockCacheUpdateService: Pick<CacheUpdateService, "updateFromItem"> = {
     updateFromItem: () => Promise.resolve(),
-  } as { updateFromItem: (item: Item) => Promise<void> };
+  };
 
   await assertRejects(
     async () => {
@@ -317,7 +318,7 @@ Deno.test("handlePostEditUpdates - throws error when item reload fails", async (
           itemRepository: mockItemRepository,
           aliasRepository: mockAliasRepository,
           cacheUpdateService: mockCacheUpdateService,
-        },
+        } as PostEditDependencies,
         {
           itemId,
           oldAlias: undefined,
@@ -348,9 +349,9 @@ Deno.test("handlePostEditUpdates - throws error when item not found after reload
     list: () => Promise.resolve(Result.ok([])),
   };
 
-  const mockCacheUpdateService = {
+  const mockCacheUpdateService: Pick<CacheUpdateService, "updateFromItem"> = {
     updateFromItem: () => Promise.resolve(),
-  } as { updateFromItem: (item: Item) => Promise<void> };
+  };
 
   await assertRejects(
     async () => {
@@ -359,7 +360,7 @@ Deno.test("handlePostEditUpdates - throws error when item not found after reload
           itemRepository: mockItemRepository,
           aliasRepository: mockAliasRepository,
           cacheUpdateService: mockCacheUpdateService,
-        },
+        } as PostEditDependencies,
         {
           itemId,
           oldAlias: undefined,
