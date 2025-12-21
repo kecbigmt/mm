@@ -15,6 +15,7 @@ import { createWhereCommand } from "./presentation/cli/commands/where.ts";
 import { createMoveCommand } from "./presentation/cli/commands/move.ts";
 import { createDoctorCommand } from "./presentation/cli/commands/doctor/mod.ts";
 import { createEditCommand } from "./presentation/cli/commands/edit.ts";
+import { createShowCommand } from "./presentation/cli/commands/show.ts";
 import { createSnoozeCommand } from "./presentation/cli/commands/snooze.ts";
 import { createSyncCommand } from "./presentation/cli/commands/sync.ts";
 import { createCompletionsCommand } from "./presentation/cli/commands/completions.ts";
@@ -31,6 +32,7 @@ async function main() {
     .command("reopen", createReopenCommand().description("Reopen closed items")).alias("op")
     .command("remove", createRemoveCommand().description("Remove items")).alias("rm")
     .command("edit", createEditCommand().description("Edit an item")).alias("e")
+    .command("show", createShowCommand().description("Show item details")).alias("s")
     .command("workspace", createWorkspaceCommand().description("Workspace management")).alias("ws")
     .command("cd", createCdCommand().description("Navigate to location in knowledge graph"))
     .command("pwd", createPwdCommand().description("Show current location in knowledge graph"))
