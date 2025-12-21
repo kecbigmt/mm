@@ -71,6 +71,7 @@ _mm() {
         'event:Create a new event'
         'list:List items'
         'edit:Edit an item'
+        'show:Show item details'
         'move:Move items to a new placement'
         'close:Close items'
         'reopen:Reopen closed items'
@@ -163,6 +164,19 @@ _mm() {
                 edit|e)
                     _arguments \\
                         '1: :->item_id' \\
+                        $common_flags
+                    case "$state" in
+                        item_id)
+                            local -a aliases
+                            aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
+                            compadd -a aliases
+                            ;;
+                    esac
+                    ;;
+                show|s)
+                    _arguments \\
+                        '1: :->item_id' \\
+                        '--print[Output directly without using pager]' \\
                         $common_flags
                     case "$state" in
                         item_id)
@@ -344,7 +358,7 @@ _mm() {
         cword=$COMP_CWORD
     fi
 
-    local commands="note task event list edit move close reopen remove workspace cd pwd where snooze doctor sync completions"
+    local commands="note task event list edit show move close reopen remove workspace cd pwd where snooze doctor sync completions"
     local common_flags="--workspace --help --version"
 
     # First word: complete command
@@ -366,6 +380,10 @@ _mm() {
                 local flags="--all $common_flags"
                 COMPREPLY=($(compgen -W "$flags" -- "$cur"))
                 ;;
+            show|s)
+                local flags="--print $common_flags"
+                COMPREPLY=($(compgen -W "$flags" -- "$cur"))
+                ;;
             *)
                 COMPREPLY=($(compgen -W "$common_flags" -- "$cur"))
                 ;;
@@ -382,7 +400,7 @@ _mm() {
 
     # Complete item IDs/aliases for commands that take them
     case "$cmd" in
-        edit|e|where)
+        edit|e|show|s|where)
             # Single item commands - only complete first argument
             if [[ $cword -eq 2 ]]; then
                 local aliases="$(_mm_get_alias_candidates)"
