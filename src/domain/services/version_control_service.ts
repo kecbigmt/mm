@@ -66,4 +66,10 @@ export interface VersionControlService {
   ): Promise<Result<void, VersionControlError>>;
   hasUncommittedChanges(cwd: string): Promise<Result<boolean, VersionControlError>>;
   getRemoteDefaultBranch(cwd: string, remote: string): Promise<Result<string, VersionControlError>>;
+  hasChangesInPath(
+    cwd: string,
+    fromRef: string,
+    toRef: string,
+    path: string,
+  ): Promise<Result<boolean, VersionControlError>>;
 }

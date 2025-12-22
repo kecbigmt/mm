@@ -80,6 +80,15 @@ const mockVersionControlService = () => {
       calls.push("getRemoteDefaultBranch");
       return Promise.resolve(Result.ok("main"));
     },
+    hasChangesInPath: (
+      _cwd: string,
+      _fromRef: string,
+      _toRef: string,
+      _path: string,
+    ): Promise<Result<boolean, VersionControlError>> => {
+      calls.push("hasChangesInPath");
+      return Promise.resolve(Result.ok(false));
+    },
     getCalls: () => calls,
   };
 };

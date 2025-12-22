@@ -1,4 +1,5 @@
 import { Command } from "@cliffy/command";
+import { join } from "@std/path";
 import { loadCliDependencies } from "../dependencies.ts";
 import { SyncInitWorkflow } from "../../../domain/workflows/sync_init.ts";
 import { SyncPushValidationError, SyncPushWorkflow } from "../../../domain/workflows/sync_push.ts";
@@ -6,6 +7,123 @@ import { SyncPullValidationError, SyncPullWorkflow } from "../../../domain/workf
 import { SyncWorkflow } from "../../../domain/workflows/sync.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
+import { VersionControlService } from "../../../domain/services/version_control_service.ts";
+import { createWorkspaceScanner } from "../../../infrastructure/fileSystem/workspace_scanner.ts";
+import { rebuildFromItems } from "../../../infrastructure/fileSystem/index_rebuilder.ts";
+import {
+  replaceIndex,
+  writeAliasIndex,
+  writeGraphIndex,
+} from "../../../infrastructure/fileSystem/index_writer.ts";
+import { Item } from "../../../domain/models/item.ts";
+
+type IndexRebuildResult =
+  | { status: "rebuilt"; itemsProcessed: number; edgesCreated: number; aliasesCreated: number }
+  | { status: "skipped"; reason: "no_changes" }
+  | { status: "skipped"; reason: "diff_failed"; message: string }
+  | { status: "failed"; message: string };
+
+async function cleanupTempDirs(workspaceRoot: string): Promise<void> {
+  try {
+    await Deno.remove(join(workspaceRoot, ".index", ".tmp-graph"), { recursive: true });
+  } catch {
+    // Ignore cleanup errors
+  }
+  try {
+    await Deno.remove(join(workspaceRoot, ".index", ".tmp-aliases"), { recursive: true });
+  } catch {
+    // Ignore cleanup errors
+  }
+}
+
+async function rebuildIndexIfNeeded(
+  workspaceRoot: string,
+  gitService: VersionControlService,
+): Promise<IndexRebuildResult> {
+  // Check if items changed after pull
+  // Use ORIG_HEAD instead of HEAD@{1} because:
+  // - git pull --rebase sets ORIG_HEAD to the pre-rebase HEAD
+  // - HEAD@{1} after rebase points to the last cherry-pick step, not pre-rebase state
+  // - This ensures we detect upstream changes even when local commits are rebased
+  const diffResult = await gitService.hasChangesInPath(
+    workspaceRoot,
+    "ORIG_HEAD",
+    "HEAD",
+    "items/",
+  );
+
+  if (diffResult.type === "error") {
+    return {
+      status: "skipped",
+      reason: "diff_failed",
+      message: diffResult.error.message,
+    };
+  }
+
+  if (!diffResult.value) {
+    return { status: "skipped", reason: "no_changes" };
+  }
+
+  // Items changed, rebuild index
+  const scanner = createWorkspaceScanner(workspaceRoot);
+  const items: Item[] = [];
+
+  for await (const result of scanner.scanAllItems()) {
+    if (result.type === "error") {
+      return {
+        status: "failed",
+        message: `Failed to scan items: ${result.error.message}`,
+      };
+    }
+    items.push(result.value);
+  }
+
+  const rebuildResult = await rebuildFromItems(items);
+  if (rebuildResult.type === "error") {
+    return {
+      status: "failed",
+      message: `Failed to rebuild index: ${rebuildResult.error.message}`,
+    };
+  }
+
+  const { graphEdges, aliases, itemsProcessed, edgesCreated, aliasesCreated } = rebuildResult.value;
+
+  // Write to temp directories
+  const graphWriteResult = await writeGraphIndex(workspaceRoot, graphEdges, { temp: true });
+  if (graphWriteResult.type === "error") {
+    await cleanupTempDirs(workspaceRoot);
+    return {
+      status: "failed",
+      message: `Failed to write graph index: ${graphWriteResult.error.message}`,
+    };
+  }
+
+  const aliasWriteResult = await writeAliasIndex(workspaceRoot, aliases, { temp: true });
+  if (aliasWriteResult.type === "error") {
+    await cleanupTempDirs(workspaceRoot);
+    return {
+      status: "failed",
+      message: `Failed to write alias index: ${aliasWriteResult.error.message}`,
+    };
+  }
+
+  // Replace index atomically
+  const replaceResult = await replaceIndex(workspaceRoot);
+  if (replaceResult.type === "error") {
+    await cleanupTempDirs(workspaceRoot);
+    return {
+      status: "failed",
+      message: `Failed to replace index: ${replaceResult.error.message}`,
+    };
+  }
+
+  return {
+    status: "rebuilt",
+    itemsProcessed,
+    edgesCreated,
+    aliasesCreated,
+  };
+}
 
 function formatSyncPushError(error: SyncPushValidationError): string {
   switch (error.type) {
@@ -185,6 +303,29 @@ export const createSyncCommand = () => {
       }
 
       console.log(result.value.trim());
+
+      // Rebuild index if items changed
+      const rebuildResult = await rebuildIndexIfNeeded(
+        deps.root,
+        deps.versionControlService,
+      );
+
+      switch (rebuildResult.status) {
+        case "rebuilt":
+          console.log(
+            `Index rebuilt: ${rebuildResult.itemsProcessed} items, ${rebuildResult.edgesCreated} edges, ${rebuildResult.aliasesCreated} aliases`,
+          );
+          break;
+        case "skipped":
+          if (rebuildResult.reason === "diff_failed") {
+            console.warn(`Warning: Could not detect item changes: ${rebuildResult.message}`);
+          }
+          // no_changes: silent, no message needed
+          break;
+        case "failed":
+          console.warn(`Warning: Index rebuild failed: ${rebuildResult.message}`);
+          break;
+      }
     });
 
   return new Command()
