@@ -41,9 +41,13 @@ async function rebuildIndexIfNeeded(
   gitService: VersionControlService,
 ): Promise<IndexRebuildResult> {
   // Check if items changed after pull
+  // Use ORIG_HEAD instead of HEAD@{1} because:
+  // - git pull --rebase sets ORIG_HEAD to the pre-rebase HEAD
+  // - HEAD@{1} after rebase points to the last cherry-pick step, not pre-rebase state
+  // - This ensures we detect upstream changes even when local commits are rebased
   const diffResult = await gitService.hasChangesInPath(
     workspaceRoot,
-    "HEAD@{1}",
+    "ORIG_HEAD",
     "HEAD",
     "items/",
   );

@@ -31,20 +31,25 @@ Currently, after `mm sync pull`, users must manually run `mm doctor --rebuild-in
 
 #### Change Detection
 
-After `git pull` completes, check if items changed:
+After `git pull --rebase` completes, check if items changed:
 
 ```bash
-git diff --quiet HEAD@{1} HEAD -- items/
+git diff --quiet ORIG_HEAD HEAD -- items/
 ```
 
 - Exit code 0: No changes in items/
 - Exit code 1: Changes detected in items/
 
+**Note**: We use `ORIG_HEAD` instead of `HEAD@{1}` because:
+- `git pull --rebase` sets `ORIG_HEAD` to the pre-rebase HEAD
+- `HEAD@{1}` after rebase points to the last cherry-pick step, not the pre-rebase state
+- This ensures we detect upstream changes even when local commits exist and are rebased
+
 #### Integration Point
 
 Modify `sync pull` CLI command (presentation layer) to:
 1. Execute pull via `SyncPullWorkflow`
-2. If pull succeeded, check for item changes via `git diff --quiet HEAD@{1} HEAD -- items/`
+2. If pull succeeded, check for item changes via `git diff --quiet ORIG_HEAD HEAD -- items/`
 3. If items changed, run existing `rebuildIndex()` logic
 4. Display combined result (pull output + rebuild status)
 

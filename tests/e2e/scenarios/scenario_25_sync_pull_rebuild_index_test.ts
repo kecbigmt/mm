@@ -223,6 +223,82 @@ describe("Scenario 25: Sync Pull Index Rebuild", () => {
     }
   });
 
+  it("rebuilds index when items changed during rebase pull with local commits", async () => {
+    // This test reproduces the issue where HEAD@{1} fails to detect changes
+    // after a rebase when local commits exist.
+    //
+    // Scenario:
+    // 1. Create initial note and push
+    // 2. Simulate remote: add new item, push
+    // 3. Reset local to before remote change
+    // 4. Create LOCAL commit (unpushed)
+    // 5. Pull with rebase -> local commit rebased on top of remote
+    // 6. HEAD@{1} points to last cherry-pick, NOT pre-rebase state
+    // 7. Index rebuild should still detect the remote item change
+
+    // Step 1: Create initial note and push
+    await runCommand(ctx.testHome, ["note", "initial note"]);
+    await runCommand(ctx.testHome, ["sync", "push"]);
+
+    // Save the commit hash after initial push
+    const getHeadCmd = new Deno.Command("git", {
+      args: ["rev-parse", "HEAD"],
+      cwd: workspaceDir,
+      stdout: "piped",
+    });
+    const headOutput = await getHeadCmd.output();
+    const initialHead = new TextDecoder().decode(headOutput.stdout).trim();
+
+    // Step 2: Simulate remote adding a new item
+    await runCommand(ctx.testHome, ["note", "remote note from other device"]);
+    await runCommand(ctx.testHome, ["sync", "push"]);
+
+    // Step 3: Reset local to before remote change
+    const resetCmd = new Deno.Command("git", {
+      args: ["reset", "--hard", initialHead],
+      cwd: workspaceDir,
+      env: Deno.env.toObject(),
+    });
+    await resetCmd.output();
+
+    // Step 4: Create a LOCAL commit (simulates work done on this device)
+    // Add a non-item file to avoid confusion
+    const localFilePath = join(workspaceDir, "local-work.txt");
+    await Deno.writeTextFile(localFilePath, "local work in progress");
+
+    const addCmd = new Deno.Command("git", {
+      args: ["add", "local-work.txt"],
+      cwd: workspaceDir,
+      env: Deno.env.toObject(),
+    });
+    await addCmd.output();
+
+    const commitCmd = new Deno.Command("git", {
+      args: ["commit", "-m", "local work"],
+      cwd: workspaceDir,
+      env: Deno.env.toObject(),
+    });
+    await commitCmd.output();
+
+    // Now we have:
+    // origin/main: initial -> remote-note
+    // local/main:  initial -> local-work (diverged!)
+
+    // Step 5: Pull with rebase
+    // This will rebase "local-work" on top of "remote-note"
+    const result = await runCommand(ctx.testHome, ["sync", "pull"]);
+
+    // Step 6 & 7: Assert index rebuild detected the remote item change
+    assertEquals(result.success, true, `Pull should succeed: ${result.stderr}`);
+    assertEquals(
+      result.stdout.includes("Index rebuilt:"),
+      true,
+      `Should rebuild index when items changed via rebase pull. ` +
+        `This tests the scenario where local commits exist and rebase is performed. ` +
+        `Stdout: ${result.stdout}`,
+    );
+  });
+
   it("rebuilds index when item DELETED by pull", async () => {
     // Setup: create two notes and push
     await runCommand(ctx.testHome, ["note", "note to keep"]);
