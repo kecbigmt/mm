@@ -388,9 +388,17 @@ mm workspace init research
 mm ws init client-a --timezone Asia/Tokyo
 ```
 
+To clone from an existing remote repository (e.g., from another machine):
+
+```sh
+mm workspace init my-workspace --remote https://github.com/username/my-workspace.git
+```
+
 Options:
 
 - `-t, --timezone <iana-id>` – Timezone identifier for the new workspace (default: host timezone)
+- `-r, --remote <url>` – Clone from a remote Git repository (HTTPS or SSH)
+- `-b, --branch <branch>` – Branch to checkout when cloning (default: repository default)
 
 #### `workspace use <name>`
 

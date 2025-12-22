@@ -12,26 +12,26 @@ Users who already have a workspace synced to a remote repository (e.g., from ano
 ### Acceptance Criteria
 
 #### 1. Command Execution & Repository Cloning
-- [ ] **Given** a valid remote URL and workspace name, **When** I run `mm workspace init <name> --remote <url>`, **Then** the remote repository is cloned into `~/.mm/<name>/`.
-- [ ] **Given** an HTTPS URL (e.g., `https://github.com/<owner>/<repo>.git`), **When** I run the command, **Then** the repository is cloned successfully.
-- [ ] **Given** an SSH URL (e.g., `git@github.com:<owner>/<repo>.git`), **When** I run the command, **Then** the repository is cloned successfully.
-- [ ] **Given** a remote URL, **When** cloning succeeds, **Then** the remote `origin` is already configured (inherited from clone).
-- [ ] **Given** a remote with a non-default branch, **When** I run `mm workspace init <name> --remote <url> --branch <branch>`, **Then** the specified branch is checked out.
-- [ ] **Given** a successful clone, **When** workspace is created, **Then** `workspace.json` from the remote is preserved (not modified).
+- [x] **Given** a valid remote URL and workspace name, **When** I run `mm workspace init <name> --remote <url>`, **Then** the remote repository is cloned into `~/.mm/<name>/`.
+- [x] **Given** an HTTPS URL (e.g., `https://github.com/<owner>/<repo>.git`), **When** I run the command, **Then** the repository is cloned successfully.
+- [x] **Given** an SSH URL (e.g., `git@github.com:<owner>/<repo>.git`), **When** I run the command, **Then** the repository is cloned successfully.
+- [x] **Given** a remote URL, **When** cloning succeeds, **Then** the remote `origin` is already configured (inherited from clone).
+- [x] **Given** a remote with a non-default branch, **When** I run `mm workspace init <name> --remote <url> --branch <branch>`, **Then** the specified branch is checked out.
+- [x] **Given** a successful clone, **When** workspace is created, **Then** `workspace.json` from the remote is preserved (not modified).
 
 #### 2. Workspace Registration
-- [ ] **Given** a successful clone, **When** I run `mm workspace list`, **Then** the new workspace appears in the list.
-- [ ] **Given** a successful clone, **Then** the new workspace is set as the current workspace.
+- [x] **Given** a successful clone, **When** I run `mm workspace list`, **Then** the new workspace appears in the list.
+- [x] **Given** a successful clone, **Then** the new workspace is set as the current workspace.
 
 #### 3. Index Rebuild
-- [ ] **Given** a successful clone with existing items, **When** workspace is created, **Then** the `.index/` is rebuilt from the cloned items.
+- [x] **Given** a successful clone with existing items, **When** workspace is created, **Then** the `.index/` is rebuilt from the cloned items.
 
 #### 4. Error Cases
-- [ ] **Given** a workspace name that already exists, **When** I run the command, **Then** it fails with error "Workspace '<name>' already exists."
-- [ ] **Given** an invalid remote URL, **When** I run the command, **Then** it fails with a clear error message.
-- [ ] **Given** a remote URL that doesn't exist or is inaccessible, **When** I run the command, **Then** Git's error message is displayed.
-- [ ] **Given** an invalid branch name, **When** I run with `--branch`, **Then** it returns a validation error.
-- [ ] **Given** clone fails, **When** error occurs, **Then** no partial workspace directory is left behind (cleanup).
+- [x] **Given** a workspace name that already exists, **When** I run the command, **Then** it fails with error "Workspace '<name>' already exists."
+- [x] **Given** an invalid remote URL, **When** I run the command, **Then** it fails with a clear error message.
+- [x] **Given** a remote URL that doesn't exist or is inaccessible, **When** I run the command, **Then** Git's error message is displayed.
+- [x] **Given** an invalid branch name, **When** I run with `--branch`, **Then** it returns a validation error.
+- [x] **Given** clone fails, **When** error occurs, **Then** no partial workspace directory is left behind (cleanup).
 
 ### Verification Approach
 - Direct CLI command execution for all acceptance criteria
@@ -69,26 +69,26 @@ Users who already have a workspace synced to a remote repository (e.g., from ano
 
 ### Acceptance Checks
 
-**Status: Pending Product Owner Review**
+**Status: Accepted**
 
-Developer verification completed:
-- Clone from local path: ✅ Successfully cloned workspace with `mm workspace init testwork --remote /tmp/test-remote-repo`
-- workspace.json preserved: ✅ Remote's workspace.json copied as-is
-- Workspace registration: ✅ New workspace appears in `mm workspace list` as current
-- --branch option: ✅ Successfully cloned develop branch with `--branch develop`
-- Error: workspace exists: ✅ Returns "Workspace 'testwork' already exists."
-- Error: invalid remote: ✅ Returns Git error message "repository does not exist"
-- Cleanup on failure: ✅ No partial directory left after clone failure
-- Lint: ✅ No issues
-- Type check: ✅ No issues
-- No debug prints: ✅ Only user-facing console.log
-- No uncontextualized TODOs: ✅ None found
+All acceptance criteria verified and passing.
+Tested on: 2025-12-22
 
-Limitations:
-- HTTPS/SSH URL formats not tested with real remote (tested with local path only)
-- Index rebuild verified to run but not tested with actual items
-
-**Awaiting product owner acceptance testing before marking this user story as complete.**
+Product owner acceptance testing (using https://github.com/kecbigmt/mm-workspace):
+- 1.1 Clone with valid remote URL: ✅ Pass
+- 1.2 HTTPS URL clone: ✅ Pass
+- 1.3 SSH URL clone: ✅ Pass
+- 1.4 Remote origin configured: ✅ Pass
+- 1.5 --branch option: ✅ Pass
+- 1.6 workspace.json preserved: ✅ Pass
+- 2.1 Workspace appears in list: ✅ Pass
+- 2.2 Set as current workspace: ✅ Pass
+- 3.1 Index rebuild: ✅ Pass (77 items, 77 edges, 77 aliases)
+- 4.1 Error - workspace exists: ✅ Pass
+- 4.2 Error - invalid remote URL: ✅ Pass
+- 4.3 Error - inaccessible remote: ✅ Pass
+- 4.4 Error - invalid branch name: ✅ Pass
+- 4.5 Cleanup on failure: ✅ Pass
 
 ### Follow-ups / Open Risks
 
