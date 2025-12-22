@@ -37,6 +37,11 @@ export const createVersionControlCommandFailedError = (
 });
 
 export interface VersionControlService {
+  clone(
+    url: string,
+    targetPath: string,
+    options?: { branch?: string },
+  ): Promise<Result<void, VersionControlError>>;
   init(cwd: string): Promise<Result<void, VersionControlError>>;
   setRemote(
     cwd: string,

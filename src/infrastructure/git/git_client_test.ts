@@ -106,3 +106,95 @@ Deno.test("GitClient integration", async (t) => {
     await Deno.remove(tmpDir, { recursive: true });
   }
 });
+
+Deno.test("GitClient.clone", async (t) => {
+  const client = createGitVersionControlService();
+
+  // Create a source repo to clone from
+  const sourceDir = await Deno.makeTempDir();
+  const targetDir = await Deno.makeTempDir();
+
+  try {
+    // Setup source repo
+    await new Deno.Command("git", { args: ["init"], cwd: sourceDir }).output();
+    await new Deno.Command("git", {
+      args: ["config", "user.email", "test@example.com"],
+      cwd: sourceDir,
+    }).output();
+    await new Deno.Command("git", {
+      args: ["config", "user.name", "Test User"],
+      cwd: sourceDir,
+    }).output();
+    await Deno.writeTextFile(join(sourceDir, "test.txt"), "hello");
+    await new Deno.Command("git", { args: ["add", "."], cwd: sourceDir }).output();
+    await new Deno.Command("git", {
+      args: ["commit", "-m", "initial"],
+      cwd: sourceDir,
+    }).output();
+
+    // Remove target dir so clone can create it
+    await Deno.remove(targetDir, { recursive: true });
+
+    await t.step("clone creates repository at target path", async () => {
+      const result = await client.clone(sourceDir, targetDir);
+      assert(
+        result.type === "ok",
+        `Clone failed: ${result.type === "error" ? result.error.message : ""}`,
+      );
+      assert(await exists(join(targetDir, ".git")));
+      assert(await exists(join(targetDir, "test.txt")));
+    });
+
+    await t.step("clone with branch checks out specified branch", async () => {
+      // Create a branch in source
+      await new Deno.Command("git", {
+        args: ["checkout", "-b", "feature"],
+        cwd: sourceDir,
+      }).output();
+      await Deno.writeTextFile(join(sourceDir, "feature.txt"), "feature content");
+      await new Deno.Command("git", { args: ["add", "."], cwd: sourceDir }).output();
+      await new Deno.Command("git", {
+        args: ["commit", "-m", "feature commit"],
+        cwd: sourceDir,
+      }).output();
+
+      // Clone to new target with branch
+      const targetDir2 = await Deno.makeTempDir();
+      await Deno.remove(targetDir2, { recursive: true });
+
+      const result = await client.clone(sourceDir, targetDir2, { branch: "feature" });
+      assert(
+        result.type === "ok",
+        `Clone failed: ${result.type === "error" ? result.error.message : ""}`,
+      );
+
+      // Verify branch
+      const branchResult = await client.getCurrentBranch(targetDir2);
+      assert(branchResult.type === "ok");
+      assert(branchResult.value === "feature", `Expected 'feature', got '${branchResult.value}'`);
+
+      // Verify feature file exists
+      assert(await exists(join(targetDir2, "feature.txt")));
+
+      await Deno.remove(targetDir2, { recursive: true });
+    });
+
+    await t.step("clone fails with invalid URL", async () => {
+      const invalidTarget = await Deno.makeTempDir();
+      await Deno.remove(invalidTarget, { recursive: true });
+
+      const result = await client.clone(
+        "https://invalid.example.com/nonexistent.git",
+        invalidTarget,
+      );
+      assert(result.type === "error");
+    });
+  } finally {
+    await Deno.remove(sourceDir, { recursive: true });
+    try {
+      await Deno.remove(targetDir, { recursive: true });
+    } catch {
+      // May not exist if test failed early
+    }
+  }
+});

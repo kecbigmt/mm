@@ -40,6 +40,42 @@ export const createGitVersionControlService = (): VersionControlService => {
     }
   };
 
+  const clone = async (
+    url: string,
+    targetPath: string,
+    options?: { branch?: string },
+  ): Promise<Result<void, VersionControlError>> => {
+    const args = ["clone"];
+    if (options?.branch) {
+      args.push("--branch", options.branch);
+    }
+    args.push(url, targetPath);
+
+    try {
+      const command = new Deno.Command("git", {
+        args,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { code, stdout, stderr } = await command.output();
+      if (code !== 0) {
+        const outStr = new TextDecoder().decode(stdout);
+        const errStr = new TextDecoder().decode(stderr);
+        return Result.error(
+          createVersionControlCommandFailedError(`git clone failed: ${outStr} ${errStr}`),
+        );
+      }
+      return Result.ok(undefined);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.error(createVersionControlNotAvailableError());
+      }
+      return Result.error(
+        createVersionControlCommandFailedError(`git clone failed: ${error}`, { cause: error }),
+      );
+    }
+  };
+
   const init = (cwd: string) => safeExecute("git", ["init"], cwd, "git init failed");
 
   const setRemote = async (
@@ -481,6 +517,7 @@ export const createGitVersionControlService = (): VersionControlService => {
   };
 
   return {
+    clone,
     init,
     setRemote,
     stage,
