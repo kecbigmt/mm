@@ -14,6 +14,7 @@ import { parseTimezoneIdentifier } from "../primitives/timezone_identifier.ts";
 const createMockGitService = (
   overrides?: Partial<VersionControlService>,
 ): VersionControlService => ({
+  clone: () => Promise.resolve(Result.ok(undefined)),
   init: () => Promise.resolve(Result.ok(undefined)),
   setRemote: () => Promise.resolve(Result.ok(undefined)),
   stage: () => Promise.resolve(Result.ok(undefined)),

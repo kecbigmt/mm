@@ -19,6 +19,10 @@ const mockVersionControlService = () => {
   let remoteDefaultBranch = "main";
 
   return {
+    clone: () => {
+      calls.push("clone");
+      return Promise.resolve(Result.ok(undefined));
+    },
     init: () => {
       calls.push("init");
       return Promise.resolve(Result.ok(undefined));
