@@ -198,3 +198,47 @@ Deno.test("GitClient.clone", async (t) => {
     }
   }
 });
+
+Deno.test("GitClient.stage with non-existent paths", async (t) => {
+  const client = createGitVersionControlService();
+  const tmpDir = await Deno.makeTempDir();
+
+  try {
+    // Initialize git repo
+    await new Deno.Command("git", { args: ["init"], cwd: tmpDir }).output();
+    await new Deno.Command("git", {
+      args: ["config", "user.email", "test@example.com"],
+      cwd: tmpDir,
+    }).output();
+    await new Deno.Command("git", {
+      args: ["config", "user.name", "Test User"],
+      cwd: tmpDir,
+    }).output();
+
+    await t.step("stage succeeds with all non-existent paths", async () => {
+      const result = await client.stage(tmpDir, ["nonexistent", "also-missing"]);
+      assert(result.type === "ok", "Stage should succeed with non-existent paths");
+    });
+
+    await t.step("stage only stages existing paths when mixed", async () => {
+      // Create one file
+      await Deno.writeTextFile(join(tmpDir, "exists.txt"), "content");
+
+      const result = await client.stage(tmpDir, ["exists.txt", "missing.txt"]);
+      assert(result.type === "ok", "Stage should succeed");
+
+      // Verify only exists.txt is staged
+      const statusCmd = new Deno.Command("git", {
+        args: ["status", "--porcelain"],
+        cwd: tmpDir,
+        stdout: "piped",
+      });
+      const { stdout } = await statusCmd.output();
+      const status = new TextDecoder().decode(stdout);
+      assert(status.includes("A  exists.txt"), "exists.txt should be staged");
+      assert(!status.includes("missing.txt"), "missing.txt should not appear");
+    });
+  } finally {
+    await Deno.remove(tmpDir, { recursive: true });
+  }
+});

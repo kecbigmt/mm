@@ -1,4 +1,4 @@
-import { dirname } from "@std/path";
+import { dirname, join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import {
   createVersionControlCommandFailedError,
@@ -165,8 +165,27 @@ export const createGitVersionControlService = (): VersionControlService => {
     }
   };
 
-  const stage = (cwd: string, paths: string[]) =>
-    safeExecute("git", ["add", ...paths], cwd, "git add failed");
+  const stage = async (
+    cwd: string,
+    paths: string[],
+  ): Promise<Result<void, VersionControlError>> => {
+    // Filter to only existing paths to avoid "pathspec did not match" errors
+    const existingPaths: string[] = [];
+    for (const p of paths) {
+      try {
+        await Deno.stat(join(cwd, p));
+        existingPaths.push(p);
+      } catch {
+        // Path doesn't exist, skip it
+      }
+    }
+
+    if (existingPaths.length === 0) {
+      return Result.ok(undefined);
+    }
+
+    return safeExecute("git", ["add", ...existingPaths], cwd, "git add failed");
+  };
 
   const commit = (cwd: string, message: string) =>
     safeExecute("git", ["commit", "-m", message], cwd, "git commit failed");
