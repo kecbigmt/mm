@@ -1,3 +1,4 @@
+import { dirname } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import {
   createVersionControlCommandFailedError,
@@ -52,6 +53,10 @@ export const createGitVersionControlService = (): VersionControlService => {
     args.push(url, targetPath);
 
     try {
+      // Ensure parent directory exists before cloning
+      const parentDir = dirname(targetPath);
+      await Deno.mkdir(parentDir, { recursive: true });
+
       const command = new Deno.Command("git", {
         args,
         stdout: "piped",
