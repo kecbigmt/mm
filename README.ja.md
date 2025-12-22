@@ -376,9 +376,17 @@ mm workspace init research
 mm ws init client-a --timezone Asia/Tokyo
 ```
 
+既存のリモートリポジトリからクローンする場合（例: 別のマシンから）:
+
+```sh
+mm workspace init my-workspace --remote https://github.com/username/my-workspace.git
+```
+
 オプション:
 
 - `-t, --timezone <iana-id>` - 新しいワークスペースのタイムゾーン識別子（デフォルト: ホストのタイムゾーン）
+- `-r, --remote <url>` - リモートGitリポジトリからクローン（HTTPSまたはSSH）
+- `-b, --branch <branch>` - クローン時にチェックアウトするブランチ（デフォルト: リポジトリのデフォルト）
 
 #### `workspace use <name>`
 

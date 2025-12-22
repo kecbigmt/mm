@@ -8,6 +8,16 @@ import { parseTimezoneIdentifier } from "../../../domain/primitives/timezone_ide
 import { CliDependencyError } from "../dependencies.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
+import { createGitVersionControlService } from "../../../infrastructure/git/git_client.ts";
+import { WorkspaceInitRemoteWorkflow } from "../../../domain/workflows/workspace_init_remote.ts";
+import { createWorkspaceScanner } from "../../../infrastructure/fileSystem/workspace_scanner.ts";
+import { rebuildFromItems } from "../../../infrastructure/fileSystem/index_rebuilder.ts";
+import {
+  replaceIndex,
+  writeAliasIndex,
+  writeGraphIndex,
+} from "../../../infrastructure/fileSystem/index_writer.ts";
+import { Item } from "../../../domain/models/item.ts";
 
 const reportError = (error: CliDependencyError, debug: boolean): void => {
   if (error.type === "repository") {
@@ -81,6 +91,51 @@ const listAction = async () => {
   }
 };
 
+const rebuildIndex = async (workspaceRoot: string): Promise<void> => {
+  const scanner = createWorkspaceScanner(workspaceRoot);
+  const items: Item[] = [];
+
+  for await (const result of scanner.scanAllItems()) {
+    if (result.type === "ok") {
+      items.push(result.value);
+    }
+  }
+
+  if (items.length === 0) {
+    return;
+  }
+
+  const rebuildResult = await rebuildFromItems(items);
+  if (rebuildResult.type === "error") {
+    console.warn(`Warning: Index rebuild failed: ${rebuildResult.error.message}`);
+    return;
+  }
+
+  const { graphEdges, aliases, itemsProcessed, edgesCreated, aliasesCreated } = rebuildResult.value;
+
+  const graphWriteResult = await writeGraphIndex(workspaceRoot, graphEdges, { temp: true });
+  if (graphWriteResult.type === "error") {
+    console.warn(`Warning: Failed to write graph index: ${graphWriteResult.error.message}`);
+    return;
+  }
+
+  const aliasWriteResult = await writeAliasIndex(workspaceRoot, aliases, { temp: true });
+  if (aliasWriteResult.type === "error") {
+    console.warn(`Warning: Failed to write alias index: ${aliasWriteResult.error.message}`);
+    return;
+  }
+
+  const replaceResult = await replaceIndex(workspaceRoot);
+  if (replaceResult.type === "error") {
+    console.warn(`Warning: Failed to replace index: ${replaceResult.error.message}`);
+    return;
+  }
+
+  console.log(
+    `Index rebuilt: ${itemsProcessed} items, ${edgesCreated} edges, ${aliasesCreated} aliases`,
+  );
+};
+
 const initAction = async (
   options: Record<string, unknown>,
   name: string,
@@ -99,6 +154,47 @@ const initAction = async (
     return;
   }
 
+  const remoteUrl = typeof options.remote === "string" ? options.remote : undefined;
+  const branch = typeof options.branch === "string" ? options.branch : undefined;
+
+  // Remote mode: clone from remote repository
+  if (remoteUrl) {
+    const gitService = createGitVersionControlService();
+
+    const result = await WorkspaceInitRemoteWorkflow.execute(
+      {
+        workspaceName: parsedName.value,
+        remoteUrl,
+        branch,
+      },
+      {
+        gitService,
+        workspaceRepository: env.repository,
+        configRepository: env.config,
+        removeDirectory: async (path) => {
+          try {
+            await Deno.remove(path, { recursive: true });
+          } catch {
+            // Ignore cleanup errors
+          }
+        },
+      },
+    );
+
+    if (result.type === "error") {
+      console.error(formatError(result.error, debug));
+      Deno.exit(1);
+    }
+
+    console.log(`Cloned workspace: ${parsedName.value.toString()}`);
+    console.log(`Switched to workspace: ${parsedName.value.toString()}`);
+
+    // Rebuild index
+    await rebuildIndex(result.value.workspacePath);
+    return;
+  }
+
+  // Local mode: create empty workspace
   const hostTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const timezoneInput = typeof options.timezone === "string" ? options.timezone : hostTimezone;
   const timezoneResult = timezoneOrReport(timezoneInput);
@@ -197,6 +293,8 @@ export const createWorkspaceCommand = () =>
         .description("Initialize a new workspace")
         .arguments("<name:string>")
         .option("-t, --timezone <timezone:string>", "Timezone identifier")
+        .option("-r, --remote <url:string>", "Clone from remote Git repository")
+        .option("-b, --branch <branch:string>", "Branch to checkout (with --remote)")
         .action(initAction),
     )
     .command(

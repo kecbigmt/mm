@@ -1,3 +1,4 @@
+import { dirname, join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import {
   createVersionControlCommandFailedError,
@@ -36,6 +37,46 @@ export const createGitVersionControlService = (): VersionControlService => {
       }
       return Result.error(
         createVersionControlCommandFailedError(`${errorPrefix}: ${error}`, { cause: error }),
+      );
+    }
+  };
+
+  const clone = async (
+    url: string,
+    targetPath: string,
+    options?: { branch?: string },
+  ): Promise<Result<void, VersionControlError>> => {
+    const args = ["clone"];
+    if (options?.branch) {
+      args.push("--branch", options.branch);
+    }
+    args.push(url, targetPath);
+
+    try {
+      // Ensure parent directory exists before cloning
+      const parentDir = dirname(targetPath);
+      await Deno.mkdir(parentDir, { recursive: true });
+
+      const command = new Deno.Command("git", {
+        args,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { code, stdout, stderr } = await command.output();
+      if (code !== 0) {
+        const outStr = new TextDecoder().decode(stdout);
+        const errStr = new TextDecoder().decode(stderr);
+        return Result.error(
+          createVersionControlCommandFailedError(`git clone failed: ${outStr} ${errStr}`),
+        );
+      }
+      return Result.ok(undefined);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.error(createVersionControlNotAvailableError());
+      }
+      return Result.error(
+        createVersionControlCommandFailedError(`git clone failed: ${error}`, { cause: error }),
       );
     }
   };
@@ -124,8 +165,27 @@ export const createGitVersionControlService = (): VersionControlService => {
     }
   };
 
-  const stage = (cwd: string, paths: string[]) =>
-    safeExecute("git", ["add", ...paths], cwd, "git add failed");
+  const stage = async (
+    cwd: string,
+    paths: string[],
+  ): Promise<Result<void, VersionControlError>> => {
+    // Filter to only existing paths to avoid "pathspec did not match" errors
+    const existingPaths: string[] = [];
+    for (const p of paths) {
+      try {
+        await Deno.stat(join(cwd, p));
+        existingPaths.push(p);
+      } catch {
+        // Path doesn't exist, skip it
+      }
+    }
+
+    if (existingPaths.length === 0) {
+      return Result.ok(undefined);
+    }
+
+    return safeExecute("git", ["add", ...existingPaths], cwd, "git add failed");
+  };
 
   const commit = (cwd: string, message: string) =>
     safeExecute("git", ["commit", "-m", message], cwd, "git commit failed");
@@ -481,6 +541,7 @@ export const createGitVersionControlService = (): VersionControlService => {
   };
 
   return {
+    clone,
     init,
     setRemote,
     stage,
