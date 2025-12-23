@@ -41,7 +41,6 @@ describe("Scenario 26: Config Command", () => {
 
       assertEquals(result.success, true, `config list failed: ${result.stderr}`);
       assertEquals(result.stdout.includes("timezone:"), true);
-      assertEquals(result.stdout.includes("sync.vcs:"), true);
       assertEquals(result.stdout.includes("sync.enabled:"), true);
       assertEquals(result.stdout.includes("sync.mode:"), true);
       assertEquals(result.stdout.includes("sync.git.remote:"), true);
@@ -161,18 +160,6 @@ describe("Scenario 26: Config Command", () => {
 
       assertEquals(result.success, false);
       assertEquals(result.stderr.includes("Unknown config key: unknown.key"), true);
-    });
-
-    it("rejects modifying read-only key sync.vcs", async () => {
-      const result = await runCommand(ctx.testHome, [
-        "config",
-        "set",
-        "sync.vcs",
-        "svn",
-      ]);
-
-      assertEquals(result.success, false);
-      assertEquals(result.stderr.includes("Cannot modify read-only key: sync.vcs"), true);
     });
   });
 

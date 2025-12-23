@@ -9,9 +9,10 @@ import {
 } from "../../../domain/models/workspace.ts";
 import { executeAutoCommit } from "../auto_commit_helper.ts";
 
+// Note: sync.vcs is intentionally excluded because it's always "git" and cannot be changed.
+// Including it would confuse users since it's not configurable.
 type ConfigKey =
   | "timezone"
-  | "sync.vcs"
   | "sync.enabled"
   | "sync.mode"
   | "sync.git.remote"
@@ -19,21 +20,14 @@ type ConfigKey =
 
 const VALID_KEYS: ConfigKey[] = [
   "timezone",
-  "sync.vcs",
   "sync.enabled",
   "sync.mode",
   "sync.git.remote",
   "sync.git.branch",
 ];
 
-const READ_ONLY_KEYS: ConfigKey[] = ["sync.vcs"];
-
 function isValidKey(key: string): key is ConfigKey {
   return VALID_KEYS.includes(key as ConfigKey);
-}
-
-function isReadOnlyKey(key: ConfigKey): boolean {
-  return READ_ONLY_KEYS.includes(key);
 }
 
 function getValueByKey(
@@ -44,8 +38,6 @@ function getValueByKey(
   switch (key) {
     case "timezone":
       return data.timezone.toString();
-    case "sync.vcs":
-      return data.sync.vcs;
     case "sync.enabled":
       return data.sync.enabled;
     case "sync.mode":
@@ -85,8 +77,7 @@ async function listAllSettings(): Promise<void> {
   console.log();
   for (const key of VALID_KEYS) {
     const value = getValueByKey(settings, key);
-    const readOnlyMarker = isReadOnlyKey(key) ? " (read-only)" : "";
-    console.log(`  ${key}: ${formatValue(value)}${readOnlyMarker}`);
+    console.log(`  ${key}: ${formatValue(value)}`);
   }
 }
 
@@ -134,11 +125,6 @@ export const createConfigCommand = () => {
       if (!isValidKey(key)) {
         console.error(`Unknown config key: ${key}`);
         console.error(`\nValid keys: ${VALID_KEYS.join(", ")}`);
-        Deno.exit(1);
-      }
-
-      if (isReadOnlyKey(key)) {
-        console.error(`Cannot modify read-only key: ${key}`);
         Deno.exit(1);
       }
 
