@@ -10,6 +10,7 @@ import {
   itemRankFromString,
   itemStatusOpen,
   itemTitleFromString,
+  parseCalendarDay,
   parseDuration,
   parsePlacement,
   timezoneIdentifierFromString,
@@ -463,4 +464,77 @@ Deno.test("CreateItemWorkflow - allows event with different date for item placem
   if (result.type === "ok") {
     assertEquals(result.value.item.data.startAt, startAt);
   }
+});
+
+Deno.test("CreateItemWorkflow - creates task with CalendarDay dueAt (converts to end of day)", async () => {
+  const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+  const rankService = createTestRankService();
+  const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
+
+  const parentPlacement = Result.unwrap(parsePlacement("2025-01-15"));
+  const createdAt = Result.unwrap(parseDateTime("2025-01-15T10:00:00Z"));
+  const dueAtDay = Result.unwrap(parseCalendarDay("2025-01-20"));
+
+  const result = await CreateItemWorkflow.execute({
+    title: "Review PR",
+    itemType: "task",
+    dueAt: dueAtDay,
+    parentPlacement,
+    createdAt,
+    timezone: TEST_TIMEZONE,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService,
+  });
+
+  if (result.type !== "ok") {
+    throw new Error(`expected ok result, received ${JSON.stringify(result.error)}`);
+  }
+
+  // Verify dueAt is converted to 23:59:59 UTC (end of day in UTC timezone)
+  const dueAt = result.value.item.data.dueAt;
+  assertExists(dueAt);
+  assertEquals(dueAt.data.iso, "2025-01-20T23:59:59.000Z");
+});
+
+Deno.test("CreateItemWorkflow - creates task with CalendarDay dueAt in JST timezone", async () => {
+  const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+  const rankService = createTestRankService();
+  const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
+
+  const jstTimezone = Result.unwrap(timezoneIdentifierFromString("Asia/Tokyo"));
+  const parentPlacement = Result.unwrap(parsePlacement("2025-01-20"));
+  const createdAt = Result.unwrap(parseDateTime("2025-01-20T10:00:00+09:00"));
+  const dueAtDay = Result.unwrap(parseCalendarDay("2025-01-20"));
+
+  const result = await CreateItemWorkflow.execute({
+    title: "Review PR",
+    itemType: "task",
+    dueAt: dueAtDay,
+    parentPlacement,
+    createdAt,
+    timezone: jstTimezone,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService,
+  });
+
+  if (result.type !== "ok") {
+    throw new Error(`expected ok result, received ${JSON.stringify(result.error)}`);
+  }
+
+  // Verify dueAt is converted to 23:59:59 JST = 14:59:59 UTC
+  const dueAt = result.value.item.data.dueAt;
+  assertExists(dueAt);
+  assertEquals(dueAt.data.iso, "2025-01-20T14:59:59.000Z");
 });

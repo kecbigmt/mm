@@ -3,13 +3,16 @@ import { createValidationIssue, ValidationIssue } from "../../shared/errors.ts";
 import { createItem, Item } from "../models/item.ts";
 import {
   AliasSlug,
+  CalendarDay,
   createItemIcon,
   DateTime,
   Duration,
+  isCalendarDay,
   ItemId,
   itemStatusOpen,
   itemTitleFromString,
   parseAliasSlug,
+  parseDateTime,
   Placement,
   PlacementRange,
   TagSlug,
@@ -36,7 +39,7 @@ export type CreateItemInput = Readonly<{
   // Scheduling fields
   startAt?: DateTime;
   duration?: Duration;
-  dueAt?: DateTime;
+  dueAt?: CalendarDay | DateTime;
 }>;
 
 export type CreateItemDependencies = Readonly<{
@@ -147,6 +150,29 @@ const validateEventDateConsistency = (
   }
 
   return Result.ok(undefined);
+};
+
+/**
+ * Converts a CalendarDay to a DateTime at end of day (23:59:59) in the given timezone.
+ * Used for deadline semantics where a date means "by the end of that day".
+ */
+const calendarDayToEndOfDay = (
+  day: CalendarDay,
+  timezone: TimezoneIdentifier,
+): Result<DateTime, ValidationIssue[]> => {
+  const endOfDayStr = `${day.toString()}T23:59:59`;
+  const result = parseDateTime(endOfDayStr, { timezone });
+  if (result.type === "error") {
+    return Result.error(
+      result.error.issues.map((issue) =>
+        createValidationIssue(issue.message, {
+          code: issue.code,
+          path: ["dueAt", ...issue.path],
+        })
+      ),
+    );
+  }
+  return Result.ok(result.value);
 };
 
 export const CreateItemWorkflow = {
@@ -320,14 +346,28 @@ export const CreateItemWorkflow = {
       alias,
     });
 
+    // Convert dueAt from CalendarDay to DateTime if needed
+    let resolvedDueAt: DateTime | undefined;
+    if (input.dueAt) {
+      if (isCalendarDay(input.dueAt)) {
+        const conversionResult = calendarDayToEndOfDay(input.dueAt, input.timezone);
+        if (conversionResult.type === "error") {
+          return Result.error(invalidInput(conversionResult.error));
+        }
+        resolvedDueAt = conversionResult.value;
+      } else {
+        resolvedDueAt = input.dueAt;
+      }
+    }
+
     // Apply schedule if any scheduling fields are provided
     let itemWithSchedule = item;
-    if (input.startAt || input.duration || input.dueAt) {
+    if (input.startAt || input.duration || resolvedDueAt) {
       itemWithSchedule = item.schedule(
         {
           startAt: input.startAt,
           duration: input.duration,
-          dueAt: input.dueAt,
+          dueAt: resolvedDueAt,
         },
         input.createdAt,
       );

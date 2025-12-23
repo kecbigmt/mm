@@ -1,6 +1,10 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { dateTimeFromDate, parseDateTime } from "../../../domain/primitives/mod.ts";
+import {
+  dateTimeFromDate,
+  parseCalendarDay,
+  parseDateTime,
+} from "../../../domain/primitives/mod.ts";
 import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { parsePathExpression } from "../path_parser.ts";
@@ -115,28 +119,36 @@ export function createTaskCommand() {
       const aliasOption = typeof options.alias === "string" ? options.alias : undefined;
 
       // Parse dueAt if provided
-      // For time-only formats (HH:MM), use parent placement date as reference
+      // Supports: date-only (YYYY-MM-DD) or datetime formats
       let dueAt = undefined;
       if (typeof options.dueAt === "string") {
-        // Extract reference date from parent placement for time-only formats
-        // Use noon UTC to avoid day shifts when formatting in workspace timezone
-        let referenceDate = now;
-        if (parentPlacement.head.kind === "date") {
-          const dateStr = parentPlacement.head.date.toString();
-          const [year, month, day] = dateStr.split("-").map(Number);
-          referenceDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-        }
+        // First, try to parse as date-only (CalendarDay)
+        const calendarDayResult = parseCalendarDay(options.dueAt);
+        if (calendarDayResult.type === "ok") {
+          // Date-only format: workflow will convert to end of day (23:59:59)
+          dueAt = calendarDayResult.value;
+        } else {
+          // Not a date-only format, try datetime formats
+          // Extract reference date from parent placement for time-only formats
+          // Use noon UTC to avoid day shifts when formatting in workspace timezone
+          let referenceDate = now;
+          if (parentPlacement.head.kind === "date") {
+            const dateStr = parentPlacement.head.date.toString();
+            const [year, month, day] = dateStr.split("-").map(Number);
+            referenceDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+          }
 
-        const dueAtResult = parseDateTime(options.dueAt, {
-          referenceDate,
-          timezone: deps.timezone,
-        });
-        if (dueAtResult.type === "error") {
-          console.error("Invalid due-at format:");
-          reportValidationIssues(dueAtResult.error.issues);
-          return;
+          const dueAtResult = parseDateTime(options.dueAt, {
+            referenceDate,
+            timezone: deps.timezone,
+          });
+          if (dueAtResult.type === "error") {
+            console.error("Invalid due-at format:");
+            reportValidationIssues(dueAtResult.error.issues);
+            return;
+          }
+          dueAt = dueAtResult.value;
         }
-        dueAt = dueAtResult.value;
       }
 
       const workflowResult = await CreateItemWorkflow.execute({
