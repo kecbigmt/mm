@@ -287,7 +287,8 @@ Deno.test("formatDateHeader - yesterday shows relative label", () => {
   assertEquals(result, "[2025-02-09] yesterday");
 });
 
-Deno.test("formatDateHeader - +2d shows relative label", () => {
+// 2025-02-10 is Monday, so +2d (2025-02-12) is Wednesday
+Deno.test("formatDateHeader - +2d shows next-wednesday (weekday label)", () => {
   const day = makeCalendarDay("2025-02-12");
   const referenceDate = new Date("2025-02-10T12:00:00Z");
   const options: ListFormatterOptions = {
@@ -295,10 +296,47 @@ Deno.test("formatDateHeader - +2d shows relative label", () => {
     timezone: makeTimezone(),
   };
   const result = formatDateHeader(day, referenceDate, options);
-  assertEquals(result, "[2025-02-12] +2d");
+  assertEquals(result, "[2025-02-12] next-wednesday");
 });
 
-Deno.test("formatDateHeader - far future shows no relative label", () => {
+// 2025-02-10 is Monday, so -2d (2025-02-08) is Saturday
+Deno.test("formatDateHeader - -2d shows last-saturday (weekday label)", () => {
+  const day = makeCalendarDay("2025-02-08");
+  const referenceDate = new Date("2025-02-10T12:00:00Z");
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+  };
+  const result = formatDateHeader(day, referenceDate, options);
+  assertEquals(result, "[2025-02-08] last-saturday");
+});
+
+// 2025-02-10 is Monday, so +7d (2025-02-17) is Monday
+Deno.test("formatDateHeader - +7d shows next-monday (weekday label)", () => {
+  const day = makeCalendarDay("2025-02-17");
+  const referenceDate = new Date("2025-02-10T12:00:00Z");
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+  };
+  const result = formatDateHeader(day, referenceDate, options);
+  assertEquals(result, "[2025-02-17] next-monday");
+});
+
+// 2025-02-10 is Monday, so -7d (2025-02-03) is Monday
+Deno.test("formatDateHeader - -7d shows last-monday (weekday label)", () => {
+  const day = makeCalendarDay("2025-02-03");
+  const referenceDate = new Date("2025-02-10T12:00:00Z");
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+  };
+  const result = formatDateHeader(day, referenceDate, options);
+  assertEquals(result, "[2025-02-03] last-monday");
+});
+
+// 2025-03-01 is 19 days after 2025-02-10
+Deno.test("formatDateHeader - far future shows +Xd label", () => {
   const day = makeCalendarDay("2025-03-01");
   const referenceDate = new Date("2025-02-10T12:00:00Z");
   const options: ListFormatterOptions = {
@@ -306,10 +344,11 @@ Deno.test("formatDateHeader - far future shows no relative label", () => {
     timezone: makeTimezone(),
   };
   const result = formatDateHeader(day, referenceDate, options);
-  assertEquals(result, "[2025-03-01]");
+  assertEquals(result, "[2025-03-01] +19d");
 });
 
-Deno.test("formatDateHeader - far past shows no relative label", () => {
+// 2025-01-01 is 40 days before 2025-02-10
+Deno.test("formatDateHeader - far past shows ~Xd label", () => {
   const day = makeCalendarDay("2025-01-01");
   const referenceDate = new Date("2025-02-10T12:00:00Z");
   const options: ListFormatterOptions = {
@@ -317,7 +356,31 @@ Deno.test("formatDateHeader - far past shows no relative label", () => {
     timezone: makeTimezone(),
   };
   const result = formatDateHeader(day, referenceDate, options);
-  assertEquals(result, "[2025-01-01]");
+  assertEquals(result, "[2025-01-01] ~40d");
+});
+
+// 2025-02-18 is 8 days after 2025-02-10 (just beyond weekday range)
+Deno.test("formatDateHeader - +8d shows +8d label (beyond weekday range)", () => {
+  const day = makeCalendarDay("2025-02-18");
+  const referenceDate = new Date("2025-02-10T12:00:00Z");
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+  };
+  const result = formatDateHeader(day, referenceDate, options);
+  assertEquals(result, "[2025-02-18] +8d");
+});
+
+// 2025-02-02 is 8 days before 2025-02-10 (just beyond weekday range)
+Deno.test("formatDateHeader - -8d shows ~8d label (beyond weekday range)", () => {
+  const day = makeCalendarDay("2025-02-02");
+  const referenceDate = new Date("2025-02-10T12:00:00Z");
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+  };
+  const result = formatDateHeader(day, referenceDate, options);
+  assertEquals(result, "[2025-02-02] ~8d");
 });
 
 // =============================================================================

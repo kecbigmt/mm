@@ -192,12 +192,31 @@ export const formatItemLine = (
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * Weekday names indexed by JavaScript's Date.getUTCDay() (0 = Sunday, 6 = Saturday).
+ */
+const WEEKDAY_NAMES = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+] as const;
+
+/**
  * Computes the relative label for a date.
  *
- * Returns: today, tomorrow, yesterday, +Nd (up to +7d), or empty for dates outside range.
+ * Returns:
+ * - today, tomorrow, yesterday for 0, +1, -1 days
+ * - next-{weekday} for +2 to +7 days
+ * - last-{weekday} for -2 to -7 days
+ * - +Nd for dates beyond +7 days
+ * - ~Nd for dates beyond -7 days
  */
 const computeRelativeLabel = (day: CalendarDay, referenceDate: Date): string => {
-  const dayMs = day.toDate().getTime();
+  const targetDate = day.toDate();
+  const dayMs = targetDate.getTime();
 
   // Normalize reference to start of day in UTC
   const refDay = new Date(Date.UTC(
@@ -212,8 +231,20 @@ const computeRelativeLabel = (day: CalendarDay, referenceDate: Date): string => 
   if (diffDays === 0) return "today";
   if (diffDays === 1) return "tomorrow";
   if (diffDays === -1) return "yesterday";
-  if (diffDays > 1 && diffDays <= 7) return `+${diffDays}d`;
-  if (diffDays < -1 && diffDays >= -7) return `${diffDays}d`;
+
+  // Within a week: use weekday labels
+  if (diffDays >= 2 && diffDays <= 7) {
+    const weekday = WEEKDAY_NAMES[targetDate.getUTCDay()];
+    return `next-${weekday}`;
+  }
+  if (diffDays <= -2 && diffDays >= -7) {
+    const weekday = WEEKDAY_NAMES[targetDate.getUTCDay()];
+    return `last-${weekday}`;
+  }
+
+  // Beyond a week: use day count
+  if (diffDays > 7) return `+${diffDays}d`;
+  if (diffDays < -7) return `~${Math.abs(diffDays)}d`;
 
   return "";
 };
@@ -222,7 +253,12 @@ const computeRelativeLabel = (day: CalendarDay, referenceDate: Date): string => 
  * Formats a date header line.
  *
  * Format: [YYYY-MM-DD] <relative>
- * - relative: today, tomorrow, yesterday, +Nd, -Nd (only for -7..+7 days)
+ * - relative labels:
+ *   - today, tomorrow, yesterday (for 0, +1, -1 days)
+ *   - next-{weekday} (for +2 to +7 days)
+ *   - last-{weekday} (for -2 to -7 days)
+ *   - +Nd (for beyond +7 days)
+ *   - ~Nd (for beyond -7 days)
  * - Bold when relative is "today" in colored mode
  */
 export const formatDateHeader = (
