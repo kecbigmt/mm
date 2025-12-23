@@ -102,7 +102,7 @@ const mockWorkspaceRepo = () => {
     sync: {
       vcs: "git",
       enabled: false,
-      syncMode: "auto-commit",
+      mode: "auto-commit",
       git: { remote: null, branch: "main" },
     },
   });

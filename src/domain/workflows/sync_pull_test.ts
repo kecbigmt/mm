@@ -126,7 +126,7 @@ const mockWorkspaceRepo = (
     sync: {
       vcs: "git",
       enabled: gitEnabled,
-      syncMode: "auto-commit" as const,
+      mode: "auto-commit" as const,
       git: {
         remote,
         branch: branch === null ? undefined : (branch ?? "main"),

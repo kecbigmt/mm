@@ -48,7 +48,7 @@ function isNetworkConnectivityError(errorMessage: string): boolean {
 /**
  * Auto-commit workflow
  *
- * Automatically commits changes when git.sync_mode is "auto-commit" or "auto-sync".
+ * Automatically commits changes when sync.mode is "auto-commit" or "auto-sync".
  *
  * For "auto-sync" mode, follows commit→pull(rebase)→push pattern:
  * - Commits are always created first (offline resilience)
@@ -81,8 +81,8 @@ export const AutoCommitWorkflow = {
     }
 
     // 3. Check sync mode (auto-commit or auto-sync)
-    const syncMode = settings.data.sync.syncMode;
-    if (syncMode !== "auto-commit" && syncMode !== "auto-sync") {
+    const mode = settings.data.sync.mode;
+    if (mode !== "auto-commit" && mode !== "auto-sync") {
       // Not in auto-commit or auto-sync mode - skip
       return Result.ok({ committed: false });
     }
@@ -117,8 +117,8 @@ export const AutoCommitWorkflow = {
       });
     }
 
-    // 6. Auto-sync: pull and push after commit if sync_mode is "auto-sync"
-    if (syncMode === "auto-sync") {
+    // 6. Auto-sync: pull and push after commit if mode is "auto-sync"
+    if (mode === "auto-sync") {
       // Get remote and branch configuration
       const remote = settings.data.sync.git?.remote;
       const branch = settings.data.sync.git?.branch;

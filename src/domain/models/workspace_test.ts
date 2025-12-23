@@ -42,7 +42,7 @@ Deno.test("createWorkspaceSettings preserves timezone identifier", () => {
     sync: {
       vcs: "git",
       enabled: false,
-      syncMode: "auto-commit",
+      mode: "auto-commit",
       git: { remote: null, branch: "main" },
     },
   });
@@ -56,7 +56,7 @@ Deno.test("parseWorkspaceSettings defaults sync settings when missing", () => {
 
   assertEquals(settings.data.sync.vcs, "git");
   assertEquals(settings.data.sync.enabled, false);
-  assertEquals(settings.data.sync.syncMode, "auto-commit");
+  assertEquals(settings.data.sync.mode, "auto-commit");
   assertEquals(settings.data.sync.git, null);
 });
 
@@ -66,7 +66,7 @@ Deno.test("parseWorkspaceSettings parses sync settings", () => {
     sync: {
       vcs: "git",
       enabled: true,
-      sync_mode: "auto-sync",
+      mode: "auto-sync",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "develop",
@@ -77,7 +77,7 @@ Deno.test("parseWorkspaceSettings parses sync settings", () => {
 
   assertEquals(settings.data.sync.vcs, "git");
   assertEquals(settings.data.sync.enabled, true);
-  assertEquals(settings.data.sync.syncMode, "auto-sync");
+  assertEquals(settings.data.sync.mode, "auto-sync");
   assertEquals(settings.data.sync.git?.remote, "https://github.com/user/repo.git");
   assertEquals(settings.data.sync.git?.branch, "develop");
 });
