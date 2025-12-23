@@ -21,6 +21,7 @@ English | [日本語](README.ja.md)
   - [Managing Item Status](#managing-item-status)
   - [Navigation](#navigation)
   - [Workspace Management](#workspace-management)
+  - [Configuration](#configuration)
   - [Git Synchronization](#git-synchronization)
   - [Maintenance](#maintenance)
 - [Shell Completion](#shell-completion)
@@ -410,6 +411,20 @@ mm workspace use research
 mm ws use client-a --timezone Asia/Tokyo
 ```
 
+### Configuration
+
+#### `config [list|get|set]`
+
+View and modify workspace settings.
+
+```sh
+mm config                              # List all settings
+mm config get sync.mode                # Get a specific value
+mm config set sync.mode auto-sync      # Set a value
+```
+
+Supported keys: `timezone`, `sync.enabled`, `sync.mode`, `sync.git.remote`, `sync.git.branch`
+
 ### Git Synchronization
 
 mm supports Git-based synchronization to backup and sync workspaces across devices. Two sync modes
@@ -479,7 +494,7 @@ mm sync
 automatically committed and pushed after each operation.
 
 **Sync Mode Configuration**: The sync mode defaults to `auto-commit`. To change it to `auto-sync`,
-edit the workspace's `workspace.json` file and set `sync.sync_mode` to `"auto-sync"`.
+use `mm config set sync.mode auto-sync`.
 
 ### Maintenance
 

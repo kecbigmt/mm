@@ -1,8 +1,11 @@
 # mm CLI
 
-mmは、GTD・Bullet Journal・Zettelkastenといったタスク管理やナレッジ管理の手法を統合した、PKOS（Personal Knowledge Operating System）です。
+mmは、GTD・Bullet
+Journal・Zettelkastenといったタスク管理やナレッジ管理の手法を統合した、PKOS（Personal Knowledge
+Operating System）です。
 
 **主な特徴:**
+
 - 知識グラフ上でUnixライクなパスナビゲーション（`cd`、`ls`、`pwd`）を提供
 - ノート・タスク・イベントをYAMLフロントマター付きのプレーンテキストMarkdownファイルとして管理
 - Gitフレンドリーでユーザーが直接編集可能
@@ -19,6 +22,7 @@ mmは、GTD・Bullet Journal・Zettelkastenといったタスク管理やナレ�
   - [アイテムステータスの管理](#アイテムステータスの管理)
   - [ナビゲーション](#ナビゲーション)
   - [ワークスペース管理](#ワークスペース管理)
+  - [設定](#設定)
   - [Git同期](#git同期)
   - [メンテナンス](#メンテナンス)
 - [シェル補完](#シェル補完)
@@ -146,7 +150,8 @@ mm event "ランチ" --start-at "12:00" --duration 1h
 - `-d, --duration <duration>` - 期間（例: 30m, 2h, 1h30m）
 - `-e, --edit` - 作成後にエディタを開く
 
-**注意:** `--start-at` を指定したイベントの場合、カレンダーベースの配置（例: `/2025-01-15`）では日付部分が親の配置日付と一致する必要があります。この検証はアイテムベースの配置ではスキップされます。
+**注意:** `--start-at` を指定したイベントの場合、カレンダーベースの配置（例:
+`/2025-01-15`）では日付部分が親の配置日付と一致する必要があります。この検証はアイテムベースの配置ではスキップされます。
 
 ### アイテムステータスの管理
 
@@ -155,7 +160,8 @@ mm event "ランチ" --start-at "12:00" --duration 1h
 アイテムを操作するコマンドは、以下の識別子形式を受け付けます：
 
 - **完全なアイテムID**: 完全なUUID v7識別子（例: `01932e4a-1234-5678-9abc-def012345678`）
-- **エイリアス**: アイテムに割り当てられた人間が読めるエイリアス（例: `meeting-notes`, `design-system`）
+- **エイリアス**: アイテムに割り当てられた人間が読めるエイリアス（例: `meeting-notes`,
+  `design-system`）
 
 エイリアスが複数のアイテムにマッチする場合、コマンドは曖昧なマッチをリストするエラーを表示します。
 
@@ -195,7 +201,8 @@ mm reopen task-a task-b
 
 #### `move <ids...> <placement>`
 
-1つ以上のアイテムを新しい配置に移動します。アイテムは物理的な場所を維持し、論理的な配置のみが変更されます。エイリアス: `mv`
+1つ以上のアイテムを新しい配置に移動します。アイテムは物理的な場所を維持し、論理的な配置のみが変更されます。エイリアス:
+`mv`
 
 ```sh
 # アイテムを今日の先頭に移動
@@ -233,7 +240,8 @@ mm mv task-a task-b task-c head:today
 
 #### `snooze <ids...> [until]`
 
-アイテムを将来の日時までスヌーズします。スヌーズされたアイテムは通常のリストから非表示になります。エイリアス: `sn`
+アイテムを将来の日時までスヌーズします。スヌーズされたアイテムは通常のリストから非表示になります。エイリアス:
+`sn`
 
 ```sh
 # デフォルトの期間（8時間）でスヌーズ
@@ -356,7 +364,8 @@ mm where meeting-notes
 
 ### ワークスペース管理
 
-ワークスペースはデフォルトで `~/.mm/workspaces` に保存されます（`MM_HOME` で上書き可能）。`workspace` コマンドは短いエイリアス `ws` も受け付けます。
+ワークスペースはデフォルトで `~/.mm/workspaces` に保存されます（`MM_HOME`
+で上書き可能）。`workspace` コマンドは短いエイリアス `ws` も受け付けます。
 
 #### `workspace list`
 
@@ -384,9 +393,11 @@ mm workspace init my-workspace --remote https://github.com/username/my-workspace
 
 オプション:
 
-- `-t, --timezone <iana-id>` - 新しいワークスペースのタイムゾーン識別子（デフォルト: ホストのタイムゾーン）
+- `-t, --timezone <iana-id>` - 新しいワークスペースのタイムゾーン識別子（デフォルト:
+  ホストのタイムゾーン）
 - `-r, --remote <url>` - リモートGitリポジトリからクローン（HTTPSまたはSSH）
-- `-b, --branch <branch>` - クローン時にチェックアウトするブランチ（デフォルト: リポジトリのデフォルト）
+- `-b, --branch <branch>` - クローン時にチェックアウトするブランチ（デフォルト:
+  リポジトリのデフォルト）
 
 #### `workspace use <name>`
 
@@ -396,6 +407,20 @@ mm workspace init my-workspace --remote https://github.com/username/my-workspace
 mm workspace use research
 mm ws use client-a --timezone Asia/Tokyo
 ```
+
+### 設定
+
+#### `config [list|get|set]`
+
+ワークスペース設定を表示・変更します。
+
+```sh
+mm config                              # すべての設定を表示
+mm config get sync.mode                # 特定の値を取得
+mm config set sync.mode auto-sync      # 値を設定
+```
+
+対応キー: `timezone`, `sync.enabled`, `sync.mode`, `sync.git.remote`, `sync.git.branch`
 
 ### Git同期
 
@@ -424,7 +449,9 @@ mm sync init https://github.com/username/my-workspace.git --force
 - `-b, --branch <branch>` - 同期するブランチ（デフォルト: main）
 - `-f, --force` - 既存のリモート設定を強制上書き
 
-このコマンドは自動的に `.gitignore` ファイルを作成し、ローカルの状態とキャッシュファイル（`.state.json`, `.index/`, `.tmp/`）を除外します。
+このコマンドは自動的に `.gitignore`
+ファイルを作成し、ローカルの状態とキャッシュファイル（`.state.json`, `.index/`,
+`.tmp/`）を除外します。
 
 #### `sync push`
 
@@ -458,9 +485,13 @@ pullとpush操作を順番に実行します。
 mm sync
 ```
 
-**注意**: auto-commitモードでは、変更はローカルにコミットされますが、自動的にはプッシュされません。リモートにコミットをプッシュするには `mm sync push` または `mm sync` を使用してください。auto-syncモードでは、各操作後に変更が自動的にコミットされてプッシュされます。
+**注意**:
+auto-commitモードでは、変更はローカルにコミットされますが、自動的にはプッシュされません。リモートにコミットをプッシュするには
+`mm sync push` または `mm sync`
+を使用してください。auto-syncモードでは、各操作後に変更が自動的にコミットされてプッシュされます。
 
-**同期モード設定**: 同期モードはデフォルトで `auto-commit` です。`auto-sync` に変更するには、ワークスペースの `workspace.json` ファイルを編集し、`sync.sync_mode` を `"auto-sync"` に設定してください。
+**同期モード設定**: 同期モードはデフォルトで `auto-commit` です。`auto-sync` に変更するには
+`mm config set sync.mode auto-sync` を使用してください。
 
 ### メンテナンス
 
@@ -474,7 +505,8 @@ mm doctor check
 
 #### `doctor rebuild-index`
 
-アイテムのフロントマターから `.index/` ディレクトリを再構築します。ワークスペースのクローン後やインデックスが破損した場合に使用します。
+アイテムのフロントマターから `.index/`
+ディレクトリを再構築します。ワークスペースのクローン後やインデックスが破損した場合に使用します。
 
 ```sh
 mm doctor rebuild-index
@@ -524,6 +556,9 @@ source <(mm completions bash)
 
 ### 動作の仕組み
 
-エイリアスとタグの補完候補は、ワークスペースの `.index/` ディレクトリに保存されたキャッシュファイルによって提供されます。これらのキャッシュファイルは、`list`、`edit`、`note`、`close` などのコマンドを使用すると自動的に更新されます。
+エイリアスとタグの補完候補は、ワークスペースの `.index/`
+ディレクトリに保存されたキャッシュファイルによって提供されます。これらのキャッシュファイルは、`list`、`edit`、`note`、`close`
+などのコマンドを使用すると自動的に更新されます。
 
-補完システムは、`MM_HOME/config.json`（デフォルトは `~/.mm`）から現在のワークスペースを解決するため、どのディレクトリからでも補完が機能します。
+補完システムは、`MM_HOME/config.json`（デフォルトは
+`~/.mm`）から現在のワークスペースを解決するため、どのディレクトリからでも補完が機能します。
