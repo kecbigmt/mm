@@ -77,10 +77,10 @@ All user-provided paths are resolved to placement before being stored in frontma
 - Holds one graph of Items plus alias/context metadata.
 - Fixed timezone for date partitioning (e.g., `"Asia/Tokyo"`). Changing TZ would require full
   re-partition; **not supported**.
-- Optional Git sync configuration (`sync.vcs`, `sync.enabled`, `sync.sync_mode`,
+- Optional Git sync configuration (`sync.vcs`, `sync.enabled`, `sync.mode`,
   `sync.git.remote`, `sync.git.branch`):
-  - `sync_mode="auto-commit"`: auto-commit after state changes (local only).
-  - `sync_mode="auto-sync"`: auto-commit + pull(rebase) + push after state changes.
+  - `mode="auto-commit"`: auto-commit after state changes (local only).
+  - `mode="auto-sync"`: auto-commit + pull(rebase) + push after state changes.
 
 ## 4) On-Disk Layout
 
