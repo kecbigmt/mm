@@ -240,7 +240,7 @@ export const createConfigCommand = () => {
               sync: {
                 ...currentData.sync,
                 git: {
-                  ...currentData.sync.git,
+                  ...(currentData.sync.git ?? {}),
                   remote: value,
                 },
               },
@@ -268,7 +268,7 @@ export const createConfigCommand = () => {
               sync: {
                 ...currentData.sync,
                 git: {
-                  ...currentData.sync.git,
+                  ...(currentData.sync.git ?? {}),
                   remote: currentData.sync.git?.remote ?? null,
                   branch: value,
                 },
