@@ -56,7 +56,7 @@ describe("Scenario 23: Auto-sync Mode", () => {
     const workspaceJsonPath = join(workspaceDir, "workspace.json");
     const content = await Deno.readTextFile(workspaceJsonPath);
     const config = JSON.parse(content);
-    config.sync.sync_mode = "auto-sync";
+    config.sync.mode = "auto-sync";
     await Deno.writeTextFile(workspaceJsonPath, JSON.stringify(config, null, 2));
   });
 

@@ -85,7 +85,7 @@ describe("Scenario 21: Git Sync Initialization", () => {
     assertEquals(config.sync.vcs, "git");
     assertEquals(config.sync.git.remote, bareRepoDir);
     assertEquals(config.sync.git.branch, "main");
-    assertEquals(config.sync.sync_mode, "auto-commit");
+    assertEquals(config.sync.mode, "auto-commit");
   });
 
   it("initializes git repository", async () => {

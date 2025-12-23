@@ -75,7 +75,7 @@ Deno.test("AutoCommitWorkflow - skips when sync.enabled is false", async () => {
     sync: {
       vcs: "git",
       enabled: false,
-      syncMode: "auto-commit",
+      mode: "auto-commit",
       git: null,
     },
   });
@@ -107,7 +107,7 @@ Deno.test("AutoCommitWorkflow - commits successfully in auto-commit mode (no pus
     sync: {
       vcs: "git",
       enabled: true,
-      syncMode: "auto-commit",
+      mode: "auto-commit",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "main",
@@ -143,7 +143,7 @@ Deno.test("AutoCommitWorkflow - auto-sync: commits and pushes successfully", asy
     sync: {
       vcs: "git",
       enabled: true,
-      syncMode: "auto-sync",
+      mode: "auto-sync",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "main",
@@ -179,7 +179,7 @@ Deno.test("AutoCommitWorkflow - auto-sync: pull succeeds, push succeeds", async 
     sync: {
       vcs: "git",
       enabled: true,
-      syncMode: "auto-sync",
+      mode: "auto-sync",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "main",
@@ -215,7 +215,7 @@ Deno.test("AutoCommitWorkflow - auto-sync: pull fails (rebase conflict)", async 
     sync: {
       vcs: "git",
       enabled: true,
-      syncMode: "auto-sync",
+      mode: "auto-sync",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "main",
@@ -259,7 +259,7 @@ Deno.test("AutoCommitWorkflow - auto-sync: pull succeeds, push fails", async () 
     sync: {
       vcs: "git",
       enabled: true,
-      syncMode: "auto-sync",
+      mode: "auto-sync",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "main",
@@ -301,7 +301,7 @@ Deno.test("AutoCommitWorkflow - auto-sync: skips when no remote configured", asy
     sync: {
       vcs: "git",
       enabled: true,
-      syncMode: "auto-sync",
+      mode: "auto-sync",
       git: {
         remote: null,
         branch: "main",
@@ -339,7 +339,7 @@ Deno.test("AutoCommitWorkflow - auto-sync: skips when no branch configured", asy
     sync: {
       vcs: "git",
       enabled: true,
-      syncMode: "auto-sync",
+      mode: "auto-sync",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: undefined,
@@ -377,7 +377,7 @@ Deno.test("AutoCommitWorkflow - handles stage failure gracefully", async () => {
     sync: {
       vcs: "git",
       enabled: true,
-      syncMode: "auto-commit",
+      mode: "auto-commit",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "main",
@@ -418,7 +418,7 @@ Deno.test("AutoCommitWorkflow - handles commit failure gracefully", async () => 
     sync: {
       vcs: "git",
       enabled: true,
-      syncMode: "auto-commit",
+      mode: "auto-commit",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "main",
@@ -459,7 +459,7 @@ Deno.test("AutoCommitWorkflow - handles 'nothing to commit' gracefully", async (
     sync: {
       vcs: "git",
       enabled: true,
-      syncMode: "auto-commit",
+      mode: "auto-commit",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "main",

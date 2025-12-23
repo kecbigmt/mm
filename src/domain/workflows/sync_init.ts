@@ -114,7 +114,7 @@ export const SyncInitWorkflow = {
       sync: {
         vcs: "git",
         enabled: true,
-        syncMode: "auto-commit",
+        mode: "auto-commit",
         git: {
           remote: input.remoteUrl,
           branch: actualBranch,

@@ -30,14 +30,14 @@ export type GitSyncSettingsSnapshot = Readonly<{
 export type SyncSettings = Readonly<{
   vcs: VcsType;
   enabled: boolean;
-  syncMode: VersionControlSyncMode;
+  mode: VersionControlSyncMode;
   git: GitSyncSettings | null;
 }>;
 
 export type SyncSettingsSnapshot = Readonly<{
   vcs: string;
   enabled: boolean;
-  sync_mode: string;
+  mode: string;
   git?: GitSyncSettingsSnapshot | null;
 }>;
 
@@ -62,7 +62,7 @@ export type WorkspaceSettingsValidationError = ValidationError<typeof WORKSPACE_
 export const DEFAULT_SYNC_SETTINGS: SyncSettings = {
   vcs: "git",
   enabled: false,
-  syncMode: "auto-commit",
+  mode: "auto-commit",
   git: null,
 };
 
@@ -72,7 +72,7 @@ const instantiate = (data: WorkspaceSettingsData): WorkspaceSettings => {
     sync: Object.freeze({
       vcs: data.sync.vcs,
       enabled: data.sync.enabled,
-      syncMode: data.sync.syncMode,
+      mode: data.sync.mode,
       git: data.sync.git ? Object.freeze({ ...data.sync.git }) : null,
     }),
   });
@@ -94,7 +94,7 @@ const instantiate = (data: WorkspaceSettingsData): WorkspaceSettings => {
       const syncSnapshot: SyncSettingsSnapshot = {
         vcs: frozen.sync.vcs,
         enabled: frozen.sync.enabled,
-        sync_mode: frozen.sync.syncMode,
+        mode: frozen.sync.mode,
         git: gitSnapshot,
       };
 
@@ -132,7 +132,7 @@ export const parseWorkspaceSettings = (
 
   let syncSettings = DEFAULT_SYNC_SETTINGS;
   if (snapshot.sync) {
-    const mode: VersionControlSyncMode = snapshot.sync.sync_mode === "auto-sync"
+    const mode: VersionControlSyncMode = snapshot.sync.mode === "auto-sync"
       ? "auto-sync"
       : "auto-commit";
 
@@ -149,7 +149,7 @@ export const parseWorkspaceSettings = (
     syncSettings = {
       vcs: "git", // Currently only git is supported
       enabled: typeof snapshot.sync.enabled === "boolean" ? snapshot.sync.enabled : false,
-      syncMode: mode,
+      mode: mode,
       git: gitSyncSettings,
     };
   }
