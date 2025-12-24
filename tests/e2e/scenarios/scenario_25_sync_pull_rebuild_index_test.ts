@@ -53,33 +53,97 @@ describe("Scenario 25: Sync Pull Index Rebuild", () => {
     await cleanupTestEnvironment(ctx);
   });
 
-  it("rebuilds index when new item ADDED by pull", async () => {
-    // Setup: create initial note and push
-    await runCommand(ctx.testHome, ["note", "first note"]);
-    await runCommand(ctx.testHome, ["sync", "push"]);
+  it("rebuilds index when new item ADDED by pull, making it searchable by alias", async () => {
+    // This test uses TWO separate workspaces to simulate real multi-device sync:
+    // - Device A: pulls items created by Device B
+    // - Device B: creates and pushes items
+    // Both workspaces sync to the same bare repository.
 
-    // Simulate remote: add a NEW item file to items/ directory
-    await runCommand(ctx.testHome, ["note", "remote note"]);
-    await runCommand(ctx.testHome, ["sync", "push"]);
-
-    // Reset local to before the "remote note" commit
-    const resetCmd = new Deno.Command("git", {
-      args: ["reset", "--hard", "HEAD~1"],
-      cwd: workspaceDir,
-      env: Deno.env.toObject(),
-    });
-    await resetCmd.output();
-
-    // Act: pull should receive the new item and trigger index rebuild
-    const result = await runCommand(ctx.testHome, ["sync", "pull"]);
-
-    // Assert: index rebuild message should appear
-    assertEquals(result.success, true, `Pull should succeed: ${result.stderr}`);
-    assertEquals(
-      result.stdout.includes("Index rebuilt:"),
-      true,
-      `Should rebuild index when new item added. Stdout: ${result.stdout}`,
+    // Setup Device A: create a separate workspace pointing to same bare repo
+    const deviceAHome = await Deno.makeTempDir({ prefix: "mm_device_a_" });
+    const gitConfigPath = join(deviceAHome, ".gitconfig");
+    await Deno.writeTextFile(
+      gitConfigPath,
+      `[user]
+	name = MM Test
+	email = test@mm.local
+`,
     );
+
+    const runOnDeviceA = async (
+      args: string[],
+    ): Promise<{ success: boolean; stdout: string; stderr: string }> => {
+      const command = new Deno.Command(Deno.execPath(), {
+        args: [
+          "run",
+          "--allow-read",
+          "--allow-write",
+          "--allow-env",
+          "--allow-run",
+          "src/main.ts",
+          ...args,
+        ],
+        cwd: Deno.cwd(),
+        env: { ...Deno.env.toObject(), MM_HOME: deviceAHome, GIT_CONFIG_GLOBAL: gitConfigPath },
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { success, stdout, stderr } = await command.output();
+      return {
+        success,
+        stdout: new TextDecoder().decode(stdout).trim(),
+        stderr: new TextDecoder().decode(stderr).trim(),
+      };
+    };
+
+    try {
+      // Initialize Device A workspace with sync to the same bare repo
+      await runOnDeviceA(["workspace", "init", "device-a-ws"]);
+      await runOnDeviceA(["sync", "init", bareRepoDir, "--branch", "main"]);
+
+      // Device B (using ctx.testHome): Create a note with explicit alias and push
+      const noteResult = await runCommand(ctx.testHome, [
+        "note",
+        "note-from-device-b",
+        "--alias",
+        "device-b-alias",
+      ]);
+      assertEquals(
+        noteResult.success,
+        true,
+        `Device B note creation should succeed: ${noteResult.stderr}`,
+      );
+
+      const pushResult = await runCommand(ctx.testHome, ["sync", "push"]);
+      assertEquals(pushResult.success, true, `Device B push should succeed: ${pushResult.stderr}`);
+
+      // Device A: Run mm sync pull to get the remote item from Device B
+      const pullResult = await runOnDeviceA(["sync", "pull"]);
+      assertEquals(pullResult.success, true, `Device A pull should succeed: ${pullResult.stderr}`);
+
+      // Device A: Verify the synced item is searchable by alias
+      // Without proper index rebuild, this would fail because alias wouldn't be indexed
+      const showResult = await runOnDeviceA(["show", "device-b-alias"]);
+      assertEquals(
+        showResult.success,
+        true,
+        `Device A should be able to show synced item by alias after pull. ` +
+          `This proves the index was rebuilt. stderr: ${showResult.stderr}`,
+      );
+      assertEquals(
+        showResult.stdout.includes("device-b-alias"),
+        true,
+        `Output should contain the item alias. stdout: ${showResult.stdout}`,
+      );
+      assertEquals(
+        showResult.stdout.includes("note-from-device-b"),
+        true,
+        `Output should contain the item title. stdout: ${showResult.stdout}`,
+      );
+    } finally {
+      // Cleanup Device A's temp directory
+      await Deno.remove(deviceAHome, { recursive: true });
+    }
   });
 
   it("skips index rebuild when changes are OUTSIDE items/", async () => {
