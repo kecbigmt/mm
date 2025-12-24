@@ -211,4 +211,97 @@ describe("Scenario 24: Sync Commands", () => {
       "remote commit should still be in remote",
     );
   });
+
+  it("rebuilds index when items changed during sync, making remote items searchable by alias", async () => {
+    // This test uses TWO separate workspaces to simulate real multi-device sync:
+    // - Device A: pulls items created by Device B
+    // - Device B: creates and pushes items
+    // Both workspaces sync to the same bare repository.
+
+    // Setup Device A: create a separate workspace pointing to same bare repo
+    const deviceAHome = await Deno.makeTempDir({ prefix: "mm_device_a_" });
+    const gitConfigPath = join(deviceAHome, ".gitconfig");
+    await Deno.writeTextFile(
+      gitConfigPath,
+      `[user]
+	name = MM Test
+	email = test@mm.local
+`,
+    );
+
+    const runOnDeviceA = async (
+      args: string[],
+    ): Promise<{ success: boolean; stdout: string; stderr: string }> => {
+      const command = new Deno.Command(Deno.execPath(), {
+        args: [
+          "run",
+          "--allow-read",
+          "--allow-write",
+          "--allow-env",
+          "--allow-run",
+          "src/main.ts",
+          ...args,
+        ],
+        cwd: Deno.cwd(),
+        env: { ...Deno.env.toObject(), MM_HOME: deviceAHome, GIT_CONFIG_GLOBAL: gitConfigPath },
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { success, stdout, stderr } = await command.output();
+      return {
+        success,
+        stdout: new TextDecoder().decode(stdout).trim(),
+        stderr: new TextDecoder().decode(stderr).trim(),
+      };
+    };
+
+    try {
+      // Initialize Device A workspace with sync to the same bare repo
+      await runOnDeviceA(["workspace", "init", "device-a-ws"]);
+      await runOnDeviceA(["sync", "init", bareRepoDir, "--branch", "main"]);
+
+      // Device B (using ctx.testHome): Create a note with explicit alias and push
+      const noteResult = await runCommand(ctx.testHome, [
+        "note",
+        "synced-from-device-b",
+        "--alias",
+        "device-b-note",
+      ]);
+      assertEquals(
+        noteResult.success,
+        true,
+        `Device B note creation should succeed: ${noteResult.stderr}`,
+      );
+
+      const pushResult = await runCommand(ctx.testHome, ["sync", "push"]);
+      assertEquals(pushResult.success, true, `Device B push should succeed: ${pushResult.stderr}`);
+
+      // Device A: Run mm sync to pull the remote item from Device B
+      const syncResult = await runOnDeviceA(["sync"]);
+      assertEquals(syncResult.success, true, `Device A sync should succeed: ${syncResult.stderr}`);
+
+      // Device A: Verify the synced item is searchable by alias
+      // Without proper index rebuild, this would fail because alias wouldn't be indexed
+      const showResult = await runOnDeviceA(["show", "device-b-note"]);
+      assertEquals(
+        showResult.success,
+        true,
+        `Device A should be able to show synced item by alias after sync. ` +
+          `This proves the index was rebuilt. stderr: ${showResult.stderr}`,
+      );
+      assertEquals(
+        showResult.stdout.includes("device-b-note"),
+        true,
+        `Output should contain the item alias. stdout: ${showResult.stdout}`,
+      );
+      assertEquals(
+        showResult.stdout.includes("synced-from-device-b"),
+        true,
+        `Output should contain the item title. stdout: ${showResult.stdout}`,
+      );
+    } finally {
+      // Cleanup Device A's temp directory
+      await Deno.remove(deviceAHome, { recursive: true });
+    }
+  });
 });

@@ -363,6 +363,29 @@ export const createSyncCommand = () => {
       }
 
       console.log(result.value.trim());
+
+      // Rebuild index if items changed during pull
+      const rebuildResult = await rebuildIndexIfNeeded(
+        deps.root,
+        deps.versionControlService,
+      );
+
+      switch (rebuildResult.status) {
+        case "rebuilt":
+          console.log(
+            `Index rebuilt: ${rebuildResult.itemsProcessed} items, ${rebuildResult.edgesCreated} edges, ${rebuildResult.aliasesCreated} aliases`,
+          );
+          break;
+        case "skipped":
+          if (rebuildResult.reason === "diff_failed") {
+            console.warn(`Warning: Could not detect item changes: ${rebuildResult.message}`);
+          }
+          // no_changes: silent, no message needed
+          break;
+        case "failed":
+          console.warn(`Warning: Index rebuild failed: ${rebuildResult.message}`);
+          break;
+      }
     })
     .command("init", initCommand)
     .command("push", pushCommand)
