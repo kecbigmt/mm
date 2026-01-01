@@ -126,3 +126,128 @@ Deno.test({
     }
   },
 });
+
+Deno.test({
+  name: "state repository returns default sync state for missing file",
+  permissions: {
+    read: true,
+    write: true,
+  },
+  async fn() {
+    const workspaceRoot = await Deno.makeTempDir({ prefix: "mm-state-test-" });
+    try {
+      const repository = createFileSystemStateRepository({ workspaceRoot });
+
+      const loadResult = await repository.loadSyncState();
+      assert(loadResult.type === "ok", "should succeed even when file doesn't exist");
+      assertEquals(loadResult.value.commitsSinceLastSync, 0);
+      assertEquals(loadResult.value.lastSyncTimestamp, null);
+    } finally {
+      await Deno.remove(workspaceRoot, { recursive: true });
+    }
+  },
+});
+
+Deno.test({
+  name: "state repository saves and loads sync state",
+  permissions: {
+    read: true,
+    write: true,
+  },
+  async fn() {
+    const workspaceRoot = await Deno.makeTempDir({ prefix: "mm-state-test-" });
+    try {
+      const repository = createFileSystemStateRepository({ workspaceRoot });
+
+      const saveResult = await repository.saveSyncState({
+        commitsSinceLastSync: 5,
+        lastSyncTimestamp: 1704067200000, // 2024-01-01 00:00:00 UTC
+      });
+      assert(saveResult.type === "ok", "failed to save sync state");
+
+      const loadResult = await repository.loadSyncState();
+      assert(loadResult.type === "ok", "failed to load sync state");
+      assertEquals(loadResult.value.commitsSinceLastSync, 5);
+      assertEquals(loadResult.value.lastSyncTimestamp, 1704067200000);
+    } finally {
+      await Deno.remove(workspaceRoot, { recursive: true });
+    }
+  },
+});
+
+Deno.test({
+  name: "state repository preserves CWD when saving sync state",
+  permissions: {
+    read: true,
+    write: true,
+  },
+  async fn() {
+    const workspaceRoot = await Deno.makeTempDir({ prefix: "mm-state-test-" });
+    try {
+      const repository = createFileSystemStateRepository({ workspaceRoot });
+
+      // Save CWD first
+      const placementResult = parsePlacement("2024-01-15");
+      assert(placementResult.type === "ok");
+      await repository.saveCwd(placementResult.value);
+
+      // Save sync state
+      await repository.saveSyncState({
+        commitsSinceLastSync: 3,
+        lastSyncTimestamp: 1704067200000,
+      });
+
+      // Verify CWD is preserved
+      const cwdResult = await repository.loadCwd();
+      assert(cwdResult.type === "ok");
+      assert(cwdResult.value !== undefined);
+      assertEquals(cwdResult.value.toString(), "2024-01-15");
+
+      // Verify sync state is saved
+      const syncResult = await repository.loadSyncState();
+      assert(syncResult.type === "ok");
+      assertEquals(syncResult.value.commitsSinceLastSync, 3);
+    } finally {
+      await Deno.remove(workspaceRoot, { recursive: true });
+    }
+  },
+});
+
+Deno.test({
+  name: "state repository preserves sync state when saving CWD",
+  permissions: {
+    read: true,
+    write: true,
+  },
+  async fn() {
+    const workspaceRoot = await Deno.makeTempDir({ prefix: "mm-state-test-" });
+    try {
+      const repository = createFileSystemStateRepository({ workspaceRoot });
+
+      // Save sync state first
+      await repository.saveSyncState({
+        commitsSinceLastSync: 7,
+        lastSyncTimestamp: 1704067200000,
+      });
+
+      // Save CWD
+      const placementResult = parsePlacement("2024-02-20");
+      assert(placementResult.type === "ok");
+      await repository.saveCwd(placementResult.value);
+
+      // Verify sync state is preserved
+      const syncResult = await repository.loadSyncState();
+      assert(syncResult.type === "ok");
+      assertEquals(syncResult.value.commitsSinceLastSync, 7);
+      assertEquals(syncResult.value.lastSyncTimestamp, 1704067200000);
+
+      // Verify CWD is saved
+      const cwdResult = await repository.loadCwd();
+      assert(cwdResult.type === "ok");
+      assert(cwdResult.value !== undefined);
+      assertEquals(cwdResult.value.toString(), "2024-02-20");
+    } finally {
+      await Deno.remove(workspaceRoot, { recursive: true });
+    }
+  },
+});
