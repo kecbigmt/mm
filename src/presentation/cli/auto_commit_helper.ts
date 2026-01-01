@@ -1,11 +1,13 @@
 import { AutoCommitError, AutoCommitWorkflow } from "../../domain/workflows/auto_commit.ts";
 import { VersionControlService } from "../../domain/services/version_control_service.ts";
 import { WorkspaceRepository } from "../../domain/repositories/workspace_repository.ts";
+import { StateRepository } from "../../domain/repositories/state_repository.ts";
 
 export type AutoCommitHelperDeps = {
   workspaceRoot: string;
   versionControlService: VersionControlService;
   workspaceRepository: WorkspaceRepository;
+  stateRepository: StateRepository;
 };
 
 function formatAutoCommitError(error: AutoCommitError): string {
@@ -26,6 +28,8 @@ function formatAutoCommitError(error: AutoCommitError): string {
       return `Warning: Auto-commit failed: ${error.details}`;
     case "get_current_branch_failed":
       return `Warning: Auto-sync failed - cannot get current branch: ${error.details}`;
+    case "state_save_failed":
+      return `Warning: Failed to save sync state: ${error.details}`;
   }
 }
 
@@ -38,6 +42,7 @@ function formatAutoCommitError(error: AutoCommitError): string {
  *   workspaceRoot: deps.root,
  *   versionControlService: deps.versionControlService,
  *   workspaceRepository: deps.workspaceRepository,
+ *   stateRepository: deps.stateRepository,
  * }, "create new note");
  * ```
  *
@@ -57,6 +62,7 @@ export async function executeAutoCommit(
     {
       versionControlService: deps.versionControlService,
       workspaceRepository: deps.workspaceRepository,
+      stateRepository: deps.stateRepository,
     },
   );
 

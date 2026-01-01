@@ -77,6 +77,7 @@ export function createReopenCommand() {
           workspaceRoot: deps.root,
           versionControlService: deps.versionControlService,
           workspaceRepository: deps.workspaceRepository,
+          stateRepository: deps.stateRepository,
         };
         await executeAutoCommit(autoCommitDeps, `reopen ${succeeded.length} item(s)`);
       }

@@ -156,6 +156,7 @@ export function createNoteCommand() {
         workspaceRoot: deps.root,
         versionControlService: deps.versionControlService,
         workspaceRepository: deps.workspaceRepository,
+        stateRepository: deps.stateRepository,
       };
       await executeAutoCommit(autoCommitDeps, `create new note "${resolvedTitle}"`);
 
