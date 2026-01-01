@@ -16,6 +16,18 @@ import {
 } from "../../../infrastructure/fileSystem/index_writer.ts";
 import { Item } from "../../../domain/models/item.ts";
 import { withLoadingIndicator } from "../utils/loading_indicator.ts";
+import { StateRepository } from "../../../domain/repositories/state_repository.ts";
+
+/**
+ * Reset sync state after a successful push.
+ * This ensures lazy-sync counters are reset when user manually syncs.
+ */
+async function resetSyncState(stateRepository: StateRepository): Promise<void> {
+  await stateRepository.saveSyncState({
+    commitsSinceLastSync: 0,
+    lastSyncTimestamp: Date.now(),
+  });
+}
 
 type IndexRebuildResult =
   | { status: "rebuilt"; itemsProcessed: number; edgesCreated: number; aliasesCreated: number }
@@ -258,6 +270,9 @@ export const createSyncCommand = () => {
         Deno.exit(1);
       }
 
+      // Reset sync state after successful push
+      await resetSyncState(deps.stateRepository);
+
       // Silent on success
       const output = result.value.trim();
       if (output && !output.toLowerCase().includes("everything up-to-date")) {
@@ -415,6 +430,9 @@ export const createSyncCommand = () => {
         }
         Deno.exit(1);
       }
+
+      // Reset sync state after successful push
+      await resetSyncState(deps.stateRepository);
 
       // Silent on success - no output needed
     })
