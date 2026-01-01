@@ -3,6 +3,7 @@ import type { PlacementRange } from "../../../domain/primitives/placement_range.
 import type { SectionSummary } from "../../../domain/services/section_query_service.ts";
 import { type CalendarDay, parseCalendarDay } from "../../../domain/primitives/calendar_day.ts";
 import { createPlacement, type Placement } from "../../../domain/primitives/placement.ts";
+import { profilerEnd, profilerStart } from "../../../shared/profiler.ts";
 
 /**
  * Partition header for grouping items in ls output.
@@ -204,6 +205,7 @@ const buildDateRangePartitions = (
   const warnings: PartitionWarning[] = [];
 
   // Filter out item-head events
+  profilerStart("partition:filterEvents");
   const filteredItems: Item[] = [];
   let skippedEventCount = 0;
 
@@ -218,14 +220,18 @@ const buildDateRangePartitions = (
   if (skippedEventCount > 0) {
     warnings.push({ kind: "itemHeadEventsSkipped", count: skippedEventCount });
   }
+  profilerEnd();
 
   // Generate date range with cap
+  profilerStart("partition:generateDateRange");
   const { dates, capped, requested } = generateDateRange(from, to, limit);
   if (capped) {
     warnings.push({ kind: "dateRangeCapped", requested, limit });
   }
+  profilerEnd();
 
   // Group items by their placement head date
+  profilerStart("partition:groupByDate");
   const itemsByDate = new Map<string, Item[]>();
   for (const item of filteredItems) {
     if (item.data.placement.head.kind === "date") {
@@ -235,8 +241,10 @@ const buildDateRangePartitions = (
       itemsByDate.set(dateStr, existing);
     }
   }
+  profilerEnd();
 
   // Build partitions (only for dates with items)
+  profilerStart("partition:buildPartitions");
   const partitions: Partition[] = [];
   for (const date of dates) {
     const dateStr = date.toString();
@@ -249,6 +257,7 @@ const buildDateRangePartitions = (
       });
     }
   }
+  profilerEnd();
 
   return { partitions, warnings };
 };

@@ -23,6 +23,13 @@ import {
 import { outputWithPager } from "../pager.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
+import {
+  profileAsync,
+  profilerEnd,
+  profilerFinish,
+  profilerInit,
+  profilerStart,
+} from "../../../shared/profiler.ts";
 
 type ListOptions = {
   workspace?: string;
@@ -85,30 +92,38 @@ export function createListCommand() {
     .option("-p, --print", "Plain output without colors (includes ISO date)")
     .option("--no-pager", "Do not use pager")
     .action(async (options: ListOptions, locatorArg?: string) => {
+      profilerInit("ls command");
       const debug = isDebugMode();
-      const depsResult = await loadCliDependencies(options.workspace);
+
+      const depsResult = await profileAsync(
+        "loadCliDependencies",
+        () => loadCliDependencies(options.workspace),
+      );
       if (depsResult.type === "error") {
         if (depsResult.error.type === "repository") {
           console.error(formatError(depsResult.error.error, debug));
         } else {
           console.error(formatError(depsResult.error, debug));
         }
+        profilerFinish();
         return;
       }
 
       const deps = depsResult.value;
       const now = new Date();
 
-      const cwdResult = await CwdResolutionService.getCwd(
-        {
-          stateRepository: deps.stateRepository,
-          itemRepository: deps.itemRepository,
-        },
-        now,
-      );
+      const cwdResult = await profileAsync("getCwd", () =>
+        CwdResolutionService.getCwd(
+          {
+            stateRepository: deps.stateRepository,
+            itemRepository: deps.itemRepository,
+          },
+          now,
+        ));
 
       if (cwdResult.type === "error") {
         console.error(formatError(cwdResult.error, debug));
+        profilerFinish();
         return;
       }
 
@@ -121,10 +136,13 @@ export function createListCommand() {
       let effectiveExpression: string | undefined;
 
       if (locatorArg) {
+        profilerStart("resolveRange");
         // Parse and resolve locator expression
         const rangeExprResult = parseRangeExpression(locatorArg);
         if (rangeExprResult.type === "error") {
           console.error(formatError(rangeExprResult.error, debug));
+          profilerEnd();
+          profilerFinish();
           return;
         }
 
@@ -138,11 +156,14 @@ export function createListCommand() {
         const resolveResult = await pathResolver.resolveRange(cwd, rangeExprResult.value);
         if (resolveResult.type === "error") {
           console.error(formatError(resolveResult.error, debug));
+          profilerEnd();
+          profilerFinish();
           return;
         }
 
         placementRange = resolveResult.value;
         effectiveExpression = locatorArg;
+        profilerEnd();
       } else {
         // If cwd is an item-head section, use cwd as the target
         // Otherwise, default to today-7d..today+7d date range
@@ -172,30 +193,38 @@ export function createListCommand() {
       }
 
       // Execute workflow to get items
-      const workflowResult = await ListItemsWorkflow.execute(
-        {
-          expression: effectiveExpression,
-          cwd,
-          today: now,
-          timezone: deps.timezone,
-          status: statusFilter,
-          icon: options.type,
-        },
-        {
-          itemRepository: deps.itemRepository,
-          aliasRepository: deps.aliasRepository,
-        },
+      const workflowResult = await profileAsync(
+        "ListItemsWorkflow.execute",
+        () =>
+          ListItemsWorkflow.execute(
+            {
+              expression: effectiveExpression,
+              cwd,
+              today: now,
+              timezone: deps.timezone,
+              status: statusFilter,
+              icon: options.type,
+            },
+            {
+              itemRepository: deps.itemRepository,
+              aliasRepository: deps.aliasRepository,
+            },
+          ),
       );
 
       if (workflowResult.type === "error") {
         console.error(formatError(workflowResult.error, debug));
+        profilerFinish();
         return;
       }
 
       const { items } = workflowResult.value;
 
       // Update cache with displayed items
-      await deps.cacheUpdateService.updateFromItems(items);
+      await profileAsync(
+        "cacheUpdateService.updateFromItems",
+        () => deps.cacheUpdateService.updateFromItems(items),
+      );
 
       // Query sections for numeric ranges
       let sections: ReadonlyArray<SectionSummary> = [];
@@ -204,9 +233,13 @@ export function createListCommand() {
           ? placementRange.parent
           : placementRange.at;
 
-        const sectionsResult = await deps.sectionQueryService.listSections(parent);
+        const sectionsResult = await profileAsync(
+          "sectionQueryService.listSections",
+          () => deps.sectionQueryService.listSections(parent),
+        );
         if (sectionsResult.type === "error") {
           console.error(`Failed to query sections: ${sectionsResult.error.message}`);
+          profilerFinish();
           return;
         }
         sections = sectionsResult.value;
@@ -276,12 +309,14 @@ export function createListCommand() {
       };
 
       // Build partitions
+      profilerStart("buildPartitions");
       const partitionResult = buildPartitions({
         items,
         range: placementRange,
         sections,
         getDisplayLabel,
       });
+      profilerEnd();
 
       // Emit warnings to stderr
       for (const warning of partitionResult.warnings) {
@@ -293,10 +328,12 @@ export function createListCommand() {
       // Check for empty result
       if (partitions.length === 0) {
         console.log("(empty)");
+        profilerFinish();
         return;
       }
 
       // Format and output
+      profilerStart("formatOutput");
       const formatterOptions: ListFormatterOptions = {
         printMode: isPrintMode,
         timezone: deps.timezone,
@@ -351,12 +388,17 @@ export function createListCommand() {
       }
 
       const output = outputLines.join("\n");
+      profilerEnd();
 
       // Output handling: pager/no-pager/print
+      profilerStart("output");
       if (isPrintMode || options.noPager) {
         console.log(output);
       } else {
         await outputWithPager(output);
       }
+      profilerEnd();
+
+      profilerFinish();
     });
 }
