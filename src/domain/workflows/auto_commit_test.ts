@@ -6,9 +6,11 @@ import {
   VersionControlService,
 } from "../services/version_control_service.ts";
 import { WorkspaceRepository } from "../repositories/workspace_repository.ts";
+import { StateRepository, SyncState } from "../repositories/state_repository.ts";
 import { createWorkspaceSettings } from "../models/workspace.ts";
 import { createRepositoryError } from "../repositories/repository_error.ts";
 import { parseTimezoneIdentifier } from "../primitives/timezone_identifier.ts";
+import { parsePlacement } from "../primitives/placement.ts";
 
 // Mock VersionControlService
 const createMockGitService = (
@@ -47,16 +49,38 @@ const createMockWorkspaceRepository = (
   pathFor: () => "/test/workspace/workspace.json",
 });
 
+// Mock StateRepository
+const createMockStateRepository = (
+  overrides?: Partial<StateRepository>,
+): StateRepository => {
+  const defaultPlacement = parsePlacement("2024-01-01");
+  if (defaultPlacement.type === "error") throw new Error("Invalid default placement");
+  return {
+    loadCwd: () => Promise.resolve(Result.ok(defaultPlacement.value)),
+    saveCwd: () => Promise.resolve(Result.ok(undefined)),
+    loadSyncState: () =>
+      Promise.resolve(
+        Result.ok({
+          commitsSinceLastSync: 0,
+          lastSyncTimestamp: null,
+        } as SyncState),
+      ),
+    saveSyncState: () => Promise.resolve(Result.ok(undefined)),
+    ...overrides,
+  };
+};
+
 Deno.test("AutoCommitWorkflow - skips when workspace settings cannot be loaded", async () => {
   const versionControlService = createMockGitService();
   const workspaceRepository = createMockWorkspaceRepository();
+  const stateRepository = createMockStateRepository();
 
   const result = await AutoCommitWorkflow.execute(
     {
       workspaceRoot: "/test/workspace",
       summary: "create new note",
     },
-    { versionControlService, workspaceRepository },
+    { versionControlService, workspaceRepository, stateRepository },
   );
 
   assertEquals(result.type, "ok");
@@ -82,13 +106,14 @@ Deno.test("AutoCommitWorkflow - skips when sync.enabled is false", async () => {
 
   const versionControlService = createMockGitService();
   const workspaceRepository = createMockWorkspaceRepository(settings);
+  const stateRepository = createMockStateRepository();
 
   const result = await AutoCommitWorkflow.execute(
     {
       workspaceRoot: "/test/workspace",
       summary: "create new note",
     },
-    { versionControlService, workspaceRepository },
+    { versionControlService, workspaceRepository, stateRepository },
   );
 
   assertEquals(result.type, "ok");
@@ -117,13 +142,14 @@ Deno.test("AutoCommitWorkflow - commits successfully in auto-commit mode (no pus
 
   const versionControlService = createMockGitService();
   const workspaceRepository = createMockWorkspaceRepository(settings);
+  const stateRepository = createMockStateRepository();
 
   const result = await AutoCommitWorkflow.execute(
     {
       workspaceRoot: "/test/workspace",
       summary: "create new note",
     },
-    { versionControlService, workspaceRepository },
+    { versionControlService, workspaceRepository, stateRepository },
   );
 
   assertEquals(result.type, "ok");
@@ -153,13 +179,14 @@ Deno.test("AutoCommitWorkflow - auto-sync: commits and pushes successfully", asy
 
   const versionControlService = createMockGitService();
   const workspaceRepository = createMockWorkspaceRepository(settings);
+  const stateRepository = createMockStateRepository();
 
   const result = await AutoCommitWorkflow.execute(
     {
       workspaceRoot: "/test/workspace",
       summary: "create new task",
     },
-    { versionControlService, workspaceRepository },
+    { versionControlService, workspaceRepository, stateRepository },
   );
 
   assertEquals(result.type, "ok");
@@ -189,13 +216,14 @@ Deno.test("AutoCommitWorkflow - auto-sync: pull succeeds, push succeeds", async 
 
   const versionControlService = createMockGitService();
   const workspaceRepository = createMockWorkspaceRepository(settings);
+  const stateRepository = createMockStateRepository();
 
   const result = await AutoCommitWorkflow.execute(
     {
       workspaceRoot: "/test/workspace",
       summary: "create new task",
     },
-    { versionControlService, workspaceRepository },
+    { versionControlService, workspaceRepository, stateRepository },
   );
 
   assertEquals(result.type, "ok");
@@ -230,13 +258,14 @@ Deno.test("AutoCommitWorkflow - auto-sync: pull fails (rebase conflict)", async 
       ),
   });
   const workspaceRepository = createMockWorkspaceRepository(settings);
+  const stateRepository = createMockStateRepository();
 
   const result = await AutoCommitWorkflow.execute(
     {
       workspaceRoot: "/test/workspace",
       summary: "create new task",
     },
-    { versionControlService, workspaceRepository },
+    { versionControlService, workspaceRepository, stateRepository },
   );
 
   assertEquals(result.type, "ok");
@@ -272,13 +301,14 @@ Deno.test("AutoCommitWorkflow - auto-sync: pull succeeds, push fails", async () 
       Promise.resolve(Result.error(createVersionControlCommandFailedError("push rejected"))),
   });
   const workspaceRepository = createMockWorkspaceRepository(settings);
+  const stateRepository = createMockStateRepository();
 
   const result = await AutoCommitWorkflow.execute(
     {
       workspaceRoot: "/test/workspace",
       summary: "create new task",
     },
-    { versionControlService, workspaceRepository },
+    { versionControlService, workspaceRepository, stateRepository },
   );
 
   assertEquals(result.type, "ok");
@@ -311,13 +341,14 @@ Deno.test("AutoCommitWorkflow - auto-sync: skips when no remote configured", asy
 
   const versionControlService = createMockGitService();
   const workspaceRepository = createMockWorkspaceRepository(settings);
+  const stateRepository = createMockStateRepository();
 
   const result = await AutoCommitWorkflow.execute(
     {
       workspaceRoot: "/test/workspace",
       summary: "create new task",
     },
-    { versionControlService, workspaceRepository },
+    { versionControlService, workspaceRepository, stateRepository },
   );
 
   assertEquals(result.type, "ok");
@@ -349,13 +380,14 @@ Deno.test("AutoCommitWorkflow - auto-sync: skips when no branch configured", asy
 
   const versionControlService = createMockGitService();
   const workspaceRepository = createMockWorkspaceRepository(settings);
+  const stateRepository = createMockStateRepository();
 
   const result = await AutoCommitWorkflow.execute(
     {
       workspaceRoot: "/test/workspace",
       summary: "create new task",
     },
-    { versionControlService, workspaceRepository },
+    { versionControlService, workspaceRepository, stateRepository },
   );
 
   assertEquals(result.type, "ok");
@@ -390,13 +422,14 @@ Deno.test("AutoCommitWorkflow - handles stage failure gracefully", async () => {
       Promise.resolve(Result.error(createVersionControlCommandFailedError("Permission denied"))),
   });
   const workspaceRepository = createMockWorkspaceRepository(settings);
+  const stateRepository = createMockStateRepository();
 
   const result = await AutoCommitWorkflow.execute(
     {
       workspaceRoot: "/test/workspace",
       summary: "create new note",
     },
-    { versionControlService, workspaceRepository },
+    { versionControlService, workspaceRepository, stateRepository },
   );
 
   assertEquals(result.type, "ok");
@@ -431,13 +464,14 @@ Deno.test("AutoCommitWorkflow - handles commit failure gracefully", async () => 
       Promise.resolve(Result.error(createVersionControlCommandFailedError("Git not found"))),
   });
   const workspaceRepository = createMockWorkspaceRepository(settings);
+  const stateRepository = createMockStateRepository();
 
   const result = await AutoCommitWorkflow.execute(
     {
       workspaceRoot: "/test/workspace",
       summary: "create new note",
     },
-    { versionControlService, workspaceRepository },
+    { versionControlService, workspaceRepository, stateRepository },
   );
 
   assertEquals(result.type, "ok");
@@ -476,13 +510,14 @@ Deno.test("AutoCommitWorkflow - handles 'nothing to commit' gracefully", async (
       ),
   });
   const workspaceRepository = createMockWorkspaceRepository(settings);
+  const stateRepository = createMockStateRepository();
 
   const result = await AutoCommitWorkflow.execute(
     {
       workspaceRoot: "/test/workspace",
       summary: "create new note",
     },
-    { versionControlService, workspaceRepository },
+    { versionControlService, workspaceRepository, stateRepository },
   );
 
   assertEquals(result.type, "ok");

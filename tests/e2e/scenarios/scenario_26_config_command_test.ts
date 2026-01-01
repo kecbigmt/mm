@@ -130,7 +130,9 @@ describe("Scenario 26: Config Command", () => {
 
       assertEquals(result.success, false);
       assertEquals(
-        result.stderr.includes("Invalid value for sync.mode: must be 'auto-commit' or 'auto-sync'"),
+        result.stderr.includes(
+          "Invalid value for sync.mode: must be 'auto-commit', 'auto-sync', or 'lazy-sync'",
+        ),
         true,
       );
     });
