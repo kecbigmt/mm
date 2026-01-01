@@ -187,10 +187,32 @@ _mm() {
                     esac
                     ;;
                 list|ls)
+                    local -a date_keywords
+                    date_keywords=(
+                        'today:Today'
+                        'td:Today (alias)'
+                        'tomorrow:Tomorrow'
+                        'tm:Tomorrow (alias)'
+                        'yesterday:Yesterday'
+                        'this-week:This week (Mon-Sun)'
+                        'tw:This week (alias)'
+                        'next-week:Next week (Mon-Sun)'
+                        'nw:Next week (alias)'
+                        'last-week:Last week (Mon-Sun)'
+                        'lw:Last week (alias)'
+                        'this-month:This month (1st-last)'
+                        'next-month:Next month (1st-last)'
+                        'last-month:Last month (1st-last)'
+                    )
                     _arguments \\
-                        '1: :' \\
+                        '1: :->path' \\
                         '--all[Show all items including closed]' \\
                         $common_flags
+                    case "$state" in
+                        path)
+                            _describe -t date_keywords 'date keyword' date_keywords
+                            ;;
+                    esac
                     ;;
                 move|mv)
                     _arguments \\
@@ -425,6 +447,14 @@ _mm() {
 
     # Complete item IDs/aliases for commands that take them
     case "$cmd" in
+        list|ls)
+            # Complete date keywords for first argument
+            if [[ $cword -eq 2 ]]; then
+                local date_keywords="today td tomorrow tm yesterday this-week tw next-week nw last-week lw this-month next-month last-month"
+                COMPREPLY=($(compgen -W "$date_keywords" -- "$cur"))
+            fi
+            return 0
+            ;;
         edit|e|show|s|where)
             # Single item commands - only complete first argument
             if [[ $cword -eq 2 ]]; then
