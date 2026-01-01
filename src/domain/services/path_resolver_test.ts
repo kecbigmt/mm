@@ -630,3 +630,210 @@ Deno.test("PathResolver - resolveRange keeps today as single date (not period ke
     assertEquals(result.value.kind, "single");
   }
 });
+
+// Tests for resolvePath with relative date keywords (scenario_04 coverage)
+Deno.test("PathResolver - resolvePath resolves 'today' keyword to current date", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
+
+  const expr = Result.unwrap(parsePathExpression("today"));
+  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.head.kind, "date");
+    if (result.value.head.kind === "date") {
+      assertEquals(result.value.head.date.toString(), "2025-11-16");
+    }
+  }
+});
+
+Deno.test("PathResolver - resolvePath resolves 'tomorrow' keyword to next day", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
+
+  const expr = Result.unwrap(parsePathExpression("tomorrow"));
+  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.head.kind, "date");
+    if (result.value.head.kind === "date") {
+      assertEquals(result.value.head.date.toString(), "2025-11-17");
+    }
+  }
+});
+
+Deno.test("PathResolver - resolvePath resolves 'yesterday' keyword to previous day", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
+
+  const expr = Result.unwrap(parsePathExpression("yesterday"));
+  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.head.kind, "date");
+    if (result.value.head.kind === "date") {
+      assertEquals(result.value.head.date.toString(), "2025-11-15");
+    }
+  }
+});
+
+Deno.test("PathResolver - resolvePath resolves '+1d' to one day forward", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
+
+  const expr = Result.unwrap(parsePathExpression("+1d"));
+  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.head.kind, "date");
+    if (result.value.head.kind === "date") {
+      assertEquals(result.value.head.date.toString(), "2025-11-17");
+    }
+  }
+});
+
+Deno.test("PathResolver - resolvePath resolves '+1w' to one week forward", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
+
+  const expr = Result.unwrap(parsePathExpression("+1w"));
+  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.head.kind, "date");
+    if (result.value.head.kind === "date") {
+      // 2025-11-16 + 7 days = 2025-11-23
+      assertEquals(result.value.head.date.toString(), "2025-11-23");
+    }
+  }
+});
+
+Deno.test("PathResolver - resolvePath resolves '~1w' to one week backward", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
+
+  const expr = Result.unwrap(parsePathExpression("~1w"));
+  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.head.kind, "date");
+    if (result.value.head.kind === "date") {
+      // 2025-11-16 - 7 days = 2025-11-09
+      assertEquals(result.value.head.date.toString(), "2025-11-09");
+    }
+  }
+});
+
+Deno.test("PathResolver - resolvePath resolves '~mon' to previous Monday", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  // 2025-11-16 is Sunday
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
+
+  const expr = Result.unwrap(parsePathExpression("~mon"));
+  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.head.kind, "date");
+    if (result.value.head.kind === "date") {
+      // 2025-11-16 (Sunday) -> previous Monday is 2025-11-10
+      assertEquals(result.value.head.date.toString(), "2025-11-10");
+    }
+  }
+});
+
+Deno.test("PathResolver - resolvePath resolves '+fri' to next Friday", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  // 2025-11-16 is Sunday
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
+
+  const expr = Result.unwrap(parsePathExpression("+fri"));
+  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.head.kind, "date");
+    if (result.value.head.kind === "date") {
+      // 2025-11-16 (Sunday) -> next Friday is 2025-11-21
+      assertEquals(result.value.head.date.toString(), "2025-11-21");
+    }
+  }
+});
