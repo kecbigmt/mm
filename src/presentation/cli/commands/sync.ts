@@ -4,7 +4,6 @@ import { loadCliDependencies } from "../dependencies.ts";
 import { SyncInitWorkflow } from "../../../domain/workflows/sync_init.ts";
 import { SyncPushValidationError, SyncPushWorkflow } from "../../../domain/workflows/sync_push.ts";
 import { SyncPullValidationError, SyncPullWorkflow } from "../../../domain/workflows/sync_pull.ts";
-import { SyncWorkflow } from "../../../domain/workflows/sync.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import { VersionControlService } from "../../../domain/services/version_control_service.ts";
@@ -16,6 +15,7 @@ import {
   writeGraphIndex,
 } from "../../../infrastructure/fileSystem/index_writer.ts";
 import { Item } from "../../../domain/models/item.ts";
+import { withLoadingIndicator } from "../utils/loading_indicator.ts";
 
 type IndexRebuildResult =
   | { status: "rebuilt"; itemsProcessed: number; edgesCreated: number; aliasesCreated: number }
@@ -235,16 +235,17 @@ export const createSyncCommand = () => {
       }
       const deps = depsResult.value;
 
-      const result = await SyncPushWorkflow.execute(
-        {
-          workspaceRoot: deps.root,
-          force,
-        },
-        {
-          gitService: deps.versionControlService,
-          workspaceRepository: deps.workspaceRepository,
-        },
-      );
+      const result = await withLoadingIndicator("Pushing...", () =>
+        SyncPushWorkflow.execute(
+          {
+            workspaceRoot: deps.root,
+            force,
+          },
+          {
+            gitService: deps.versionControlService,
+            workspaceRepository: deps.workspaceRepository,
+          },
+        ));
 
       if (result.type === "error") {
         const error = result.error;
@@ -257,7 +258,11 @@ export const createSyncCommand = () => {
         Deno.exit(1);
       }
 
-      console.log(result.value.trim());
+      // Silent on success
+      const output = result.value.trim();
+      if (output && !output.toLowerCase().includes("everything up-to-date")) {
+        console.log(output);
+      }
     });
 
   const pullCommand = new Command()
@@ -272,15 +277,16 @@ export const createSyncCommand = () => {
       }
       const deps = depsResult.value;
 
-      const result = await SyncPullWorkflow.execute(
-        {
-          workspaceRoot: deps.root,
-        },
-        {
-          gitService: deps.versionControlService,
-          workspaceRepository: deps.workspaceRepository,
-        },
-      );
+      const result = await withLoadingIndicator("Pulling...", () =>
+        SyncPullWorkflow.execute(
+          {
+            workspaceRoot: deps.root,
+          },
+          {
+            gitService: deps.versionControlService,
+            workspaceRepository: deps.workspaceRepository,
+          },
+        ));
 
       if (result.type === "error") {
         const error = result.error;
@@ -302,7 +308,11 @@ export const createSyncCommand = () => {
         Deno.exit(1);
       }
 
-      console.log(result.value.trim());
+      // Silent on success
+      const output = result.value.trim();
+      if (output && !output.toLowerCase().includes("already up to date")) {
+        console.log(output);
+      }
 
       // Rebuild index if items changed
       const rebuildResult = await rebuildIndexIfNeeded(
@@ -341,28 +351,26 @@ export const createSyncCommand = () => {
       }
       const deps = depsResult.value;
 
-      const result = await SyncWorkflow.execute(
-        { workspaceRoot: deps.root },
-        {
-          gitService: deps.versionControlService,
-          workspaceRepository: deps.workspaceRepository,
-        },
-      );
+      // Pull with loading indicator
+      const pullResult = await withLoadingIndicator("Pulling...", () =>
+        SyncPullWorkflow.execute(
+          { workspaceRoot: deps.root },
+          {
+            gitService: deps.versionControlService,
+            workspaceRepository: deps.workspaceRepository,
+          },
+        ));
 
-      if (result.type === "error") {
-        const error = result.error;
+      if (pullResult.type === "error") {
+        const error = pullResult.error;
         if (isSyncPullValidationError(error)) {
           console.error(`error: ${formatSyncPullError(error)}`);
-        } else if (isSyncPushValidationError(error)) {
-          console.error(`error: ${formatSyncPushError(error)}`);
         } else {
           const debug = isDebugMode();
           console.error(formatError(error, debug));
         }
         Deno.exit(1);
       }
-
-      console.log(result.value.trim());
 
       // Rebuild index if items changed during pull
       const rebuildResult = await rebuildIndexIfNeeded(
@@ -386,6 +394,29 @@ export const createSyncCommand = () => {
           console.warn(`Warning: Index rebuild failed: ${rebuildResult.message}`);
           break;
       }
+
+      // Push with loading indicator
+      const pushResult = await withLoadingIndicator("Pushing...", () =>
+        SyncPushWorkflow.execute(
+          { workspaceRoot: deps.root, force: false },
+          {
+            gitService: deps.versionControlService,
+            workspaceRepository: deps.workspaceRepository,
+          },
+        ));
+
+      if (pushResult.type === "error") {
+        const error = pushResult.error;
+        if (isSyncPushValidationError(error)) {
+          console.error(`error: ${formatSyncPushError(error)}`);
+        } else {
+          const debug = isDebugMode();
+          console.error(formatError(error, debug));
+        }
+        Deno.exit(1);
+      }
+
+      // Silent on success - no output needed
     })
     .command("init", initCommand)
     .command("push", pushCommand)
