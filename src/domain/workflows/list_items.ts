@@ -11,6 +11,7 @@ import { RepositoryError } from "../repositories/repository_error.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
 import type { ItemIconValue } from "../primitives/item_icon.ts";
 import { dateTimeFromDate } from "../primitives/date_time.ts";
+import { profileAsync, profileSync } from "../../shared/profiler.ts";
 
 export type ListItemsStatusFilter = "open" | "closed" | "all";
 
@@ -71,9 +72,9 @@ export const ListItemsWorkflow = {
       }
 
       // Resolve to PlacementRange
-      const resolveResult = await pathResolver.resolveRange(
-        input.cwd,
-        rangeExprResult.value,
+      const resolveResult = await profileAsync(
+        "workflow:resolveRange",
+        () => pathResolver.resolveRange(input.cwd, rangeExprResult.value),
       );
       if (resolveResult.type === "error") {
         return Result.error(
@@ -88,7 +89,10 @@ export const ListItemsWorkflow = {
     }
 
     // Query items using PlacementRange
-    const itemsResult = await deps.itemRepository.listByPlacement(placementRange);
+    const itemsResult = await profileAsync(
+      "workflow:listByPlacement",
+      () => deps.itemRepository.listByPlacement(placementRange),
+    );
     if (itemsResult.type === "error") {
       return Result.error(itemsResult.error);
     }
@@ -124,25 +128,26 @@ export const ListItemsWorkflow = {
     }
 
     // Sort: rank ascending, then createdAt ascending, then id ascending
-    const sorted = [...filtered].sort((a, b) => {
-      // 1. rank ascending
-      const rankCmp = a.data.rank.compare(b.data.rank);
-      if (rankCmp !== 0) return rankCmp;
+    const sorted = profileSync("workflow:sort", () =>
+      [...filtered].sort((a, b) => {
+        // 1. rank ascending
+        const rankCmp = a.data.rank.compare(b.data.rank);
+        if (rankCmp !== 0) return rankCmp;
 
-      // 2. createdAt ascending
-      const aCreated = a.data.createdAt.toString();
-      const bCreated = b.data.createdAt.toString();
-      if (aCreated < bCreated) return -1;
-      if (aCreated > bCreated) return 1;
+        // 2. createdAt ascending
+        const aCreated = a.data.createdAt.toString();
+        const bCreated = b.data.createdAt.toString();
+        if (aCreated < bCreated) return -1;
+        if (aCreated > bCreated) return 1;
 
-      // 3. id ascending (final tie-break)
-      const aId = a.data.id.toString();
-      const bId = b.data.id.toString();
-      if (aId < bId) return -1;
-      if (aId > bId) return 1;
+        // 3. id ascending (final tie-break)
+        const aId = a.data.id.toString();
+        const bId = b.data.id.toString();
+        if (aId < bId) return -1;
+        if (aId > bId) return 1;
 
-      return 0;
-    });
+        return 0;
+      }));
 
     return Result.ok({
       items: sorted,
