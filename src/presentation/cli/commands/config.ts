@@ -134,7 +134,8 @@ export const createConfigCommand = () => {
         Deno.exit(1);
       }
 
-      const { root, workspaceRepository, versionControlService } = depsResult.value;
+      const { root, workspaceRepository, versionControlService, stateRepository } =
+        depsResult.value;
       const settingsResult = await workspaceRepository.load(root);
       if (settingsResult.type === "error") {
         console.error(formatError(settingsResult.error, debug));
@@ -190,8 +191,10 @@ export const createConfigCommand = () => {
           }
 
           case "sync.mode": {
-            if (value !== "auto-commit" && value !== "auto-sync") {
-              console.error(`Invalid value for sync.mode: must be 'auto-commit' or 'auto-sync'`);
+            if (value !== "auto-commit" && value !== "auto-sync" && value !== "lazy-sync") {
+              console.error(
+                `Invalid value for sync.mode: must be 'auto-commit', 'auto-sync', or 'lazy-sync'`,
+              );
               Deno.exit(1);
             }
             newSettings = createWorkspaceSettings({
@@ -288,6 +291,7 @@ export const createConfigCommand = () => {
             workspaceRoot: root,
             workspaceRepository,
             versionControlService,
+            stateRepository,
           },
           "update workspace configuration",
         );
