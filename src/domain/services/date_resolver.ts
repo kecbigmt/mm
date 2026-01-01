@@ -19,7 +19,7 @@ const RELATIVE_DAY_KEYWORDS = new Map<string, number>([
   ["yd", -1],
 ]);
 
-const RANGE_KEYWORDS = new Set([
+const PERIOD_KEYWORDS = new Set([
   "this-week",
   "tw",
   "next-week",
@@ -367,9 +367,144 @@ export const resolveRelativeDate = (
 export const isDateExpression = (token: string): boolean => {
   const normalized = token.toLowerCase();
   return RELATIVE_DAY_KEYWORDS.has(normalized) ||
-    RANGE_KEYWORDS.has(normalized) ||
+    PERIOD_KEYWORDS.has(normalized) ||
     RELATIVE_PERIOD_REGEX.test(normalized) ||
     RELATIVE_WEEKDAY_REGEX.test(normalized) ||
     LONG_WEEKDAY_REGEX.test(normalized) ||
     DATE_REGEX.test(normalized);
+};
+
+/**
+ * Check if a token is a period keyword (this-week, this-month, etc.)
+ * Period keywords represent date ranges, not single dates.
+ */
+export const isPeriodKeyword = (token: string): boolean => {
+  return PERIOD_KEYWORDS.has(token.toLowerCase());
+};
+
+/**
+ * Result type for period range resolution
+ */
+export type PeriodRangeResult = Readonly<{
+  from: CalendarDay;
+  to: CalendarDay;
+}>;
+
+/**
+ * Resolve a period keyword to a date range (from/to)
+ *
+ * Supports:
+ * - this-week, tw: Monday to Sunday of current week
+ * - next-week, nw: Monday to Sunday of next week
+ * - last-week, lw: Monday to Sunday of previous week
+ * - this-month: 1st to last day of current month
+ * - next-month: 1st to last day of next month
+ * - last-month: 1st to last day of previous month
+ */
+export const resolvePeriodRange = (
+  expr: string,
+  timezone: TimezoneIdentifier,
+  referenceDate: Date,
+): Result<PeriodRangeResult, DateResolverError> => {
+  const normalized = expr.trim().toLowerCase();
+
+  if (!PERIOD_KEYWORDS.has(normalized)) {
+    return Result.error(
+      createValidationError(DATE_RESOLVER_ERROR_KIND, [
+        createValidationIssue(`'${expr}' is not a period keyword`, {
+          code: "not_period_keyword",
+          path: ["periodRange"],
+        }),
+      ]),
+    );
+  }
+
+  const { year, month, day } = getTodayComponents(referenceDate, timezone);
+  const base = new Date(year, month - 1, day);
+
+  // Week range handling
+  if (
+    normalized === "this-week" || normalized === "tw" ||
+    normalized === "next-week" || normalized === "nw" ||
+    normalized === "last-week" || normalized === "lw"
+  ) {
+    const currentDayOfWeek = getDayOfWeek(referenceDate, timezone);
+    const daysToMonday = (currentDayOfWeek + 6) % 7;
+
+    let weekOffset = 0;
+    if (normalized === "next-week" || normalized === "nw") {
+      weekOffset = 7;
+    } else if (normalized === "last-week" || normalized === "lw") {
+      weekOffset = -7;
+    }
+
+    // Monday of target week
+    const monday = new Date(base);
+    monday.setDate(monday.getDate() - daysToMonday + weekOffset);
+
+    // Sunday of target week (Monday + 6 days)
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+
+    const fromStr = formatDateString(monday.getFullYear(), monday.getMonth() + 1, monday.getDate());
+    const toStr = formatDateString(sunday.getFullYear(), sunday.getMonth() + 1, sunday.getDate());
+
+    const fromResult = parseCalendarDay(fromStr);
+    const toResult = parseCalendarDay(toStr);
+
+    if (fromResult.type === "error") {
+      return Result.error(
+        createValidationError(DATE_RESOLVER_ERROR_KIND, fromResult.error.issues),
+      );
+    }
+    if (toResult.type === "error") {
+      return Result.error(
+        createValidationError(DATE_RESOLVER_ERROR_KIND, toResult.error.issues),
+      );
+    }
+
+    return Result.ok(Object.freeze({ from: fromResult.value, to: toResult.value }));
+  }
+
+  // Month range handling
+  const targetMonth = new Date(year, month - 1, 1);
+
+  if (normalized === "next-month") {
+    targetMonth.setMonth(targetMonth.getMonth() + 1);
+  } else if (normalized === "last-month") {
+    targetMonth.setMonth(targetMonth.getMonth() - 1);
+  }
+
+  // First day of month
+  const firstDay = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
+
+  // Last day of month (day 0 of next month = last day of current month)
+  const lastDay = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0);
+
+  const fromStr = formatDateString(
+    firstDay.getFullYear(),
+    firstDay.getMonth() + 1,
+    firstDay.getDate(),
+  );
+  const toStr = formatDateString(
+    lastDay.getFullYear(),
+    lastDay.getMonth() + 1,
+    lastDay.getDate(),
+  );
+
+  const fromResult = parseCalendarDay(fromStr);
+  const toResult = parseCalendarDay(toStr);
+
+  if (fromResult.type === "error") {
+    return Result.error(
+      createValidationError(DATE_RESOLVER_ERROR_KIND, fromResult.error.issues),
+    );
+  }
+  if (toResult.type === "error") {
+    return Result.error(
+      createValidationError(DATE_RESOLVER_ERROR_KIND, toResult.error.issues),
+    );
+  }
+
+  return Result.ok(Object.freeze({ from: fromResult.value, to: toResult.value }));
 };

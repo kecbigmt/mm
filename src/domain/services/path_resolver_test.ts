@@ -465,3 +465,168 @@ Deno.test("PathResolver - returns error for different item parents", async () =>
     assertEquals(result.error.issues[0].code, "range_different_parents");
   }
 });
+
+// Test: Period keyword expansion
+Deno.test("PathResolver - resolveRange expands this-week to Mon-Sun date range", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  // Reference: Saturday 2025-12-06
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-12-06T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-12-06"));
+
+  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const rangeExpr = Result.unwrap(parseRangeExpression("this-week"));
+  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.kind, "dateRange");
+    if (result.value.kind === "dateRange") {
+      // Week containing Sat 2025-12-06: Mon 2025-12-01 to Sun 2025-12-07
+      assertEquals(result.value.from.toString(), "2025-12-01");
+      assertEquals(result.value.to.toString(), "2025-12-07");
+    }
+  }
+});
+
+Deno.test("PathResolver - resolveRange expands tw alias to Mon-Sun date range", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-12-06T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-12-06"));
+
+  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const rangeExpr = Result.unwrap(parseRangeExpression("tw"));
+  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.kind, "dateRange");
+    if (result.value.kind === "dateRange") {
+      assertEquals(result.value.from.toString(), "2025-12-01");
+      assertEquals(result.value.to.toString(), "2025-12-07");
+    }
+  }
+});
+
+Deno.test("PathResolver - resolveRange expands next-week to Mon-Sun of next week", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-12-06T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-12-06"));
+
+  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const rangeExpr = Result.unwrap(parseRangeExpression("next-week"));
+  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.kind, "dateRange");
+    if (result.value.kind === "dateRange") {
+      // Next week: Mon 2025-12-08 to Sun 2025-12-14
+      assertEquals(result.value.from.toString(), "2025-12-08");
+      assertEquals(result.value.to.toString(), "2025-12-14");
+    }
+  }
+});
+
+Deno.test("PathResolver - resolveRange expands this-month to 1st to last day", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-12-06T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-12-06"));
+
+  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const rangeExpr = Result.unwrap(parseRangeExpression("this-month"));
+  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.kind, "dateRange");
+    if (result.value.kind === "dateRange") {
+      // December 2025: 1st to 31st
+      assertEquals(result.value.from.toString(), "2025-12-01");
+      assertEquals(result.value.to.toString(), "2025-12-31");
+    }
+  }
+});
+
+Deno.test("PathResolver - resolveRange expands next-month crossing year boundary", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-12-06T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-12-06"));
+
+  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const rangeExpr = Result.unwrap(parseRangeExpression("next-month"));
+  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.kind, "dateRange");
+    if (result.value.kind === "dateRange") {
+      // January 2026: 1st to 31st
+      assertEquals(result.value.from.toString(), "2026-01-01");
+      assertEquals(result.value.to.toString(), "2026-01-31");
+    }
+  }
+});
+
+Deno.test("PathResolver - resolveRange keeps today as single date (not period keyword)", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-12-06T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-12-06"));
+
+  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const rangeExpr = Result.unwrap(parseRangeExpression("today"));
+  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    // today is NOT a period keyword, should be single range
+    assertEquals(result.value.kind, "single");
+  }
+});

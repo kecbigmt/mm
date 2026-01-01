@@ -1,5 +1,10 @@
 import { assertEquals } from "@std/assert";
-import { isDateExpression, resolveRelativeDate } from "./date_resolver.ts";
+import {
+  isDateExpression,
+  isPeriodKeyword,
+  resolvePeriodRange,
+  resolveRelativeDate,
+} from "./date_resolver.ts";
 import { timezoneIdentifierFromString } from "../primitives/mod.ts";
 import { Result } from "../../shared/result.ts";
 
@@ -159,4 +164,129 @@ Deno.test("resolveRelativeDate - literal date", () => {
 Deno.test("resolveRelativeDate - invalid input", () => {
   const result = resolveRelativeDate("invalid-date", timezone, referenceDate);
   assertEquals(result.type, "error");
+});
+
+// Test: isPeriodKeyword
+Deno.test("isPeriodKeyword - week keywords", () => {
+  assertEquals(isPeriodKeyword("this-week"), true);
+  assertEquals(isPeriodKeyword("tw"), true);
+  assertEquals(isPeriodKeyword("next-week"), true);
+  assertEquals(isPeriodKeyword("nw"), true);
+  assertEquals(isPeriodKeyword("last-week"), true);
+  assertEquals(isPeriodKeyword("lw"), true);
+});
+
+Deno.test("isPeriodKeyword - month keywords", () => {
+  assertEquals(isPeriodKeyword("this-month"), true);
+  assertEquals(isPeriodKeyword("next-month"), true);
+  assertEquals(isPeriodKeyword("last-month"), true);
+});
+
+Deno.test("isPeriodKeyword - case insensitive", () => {
+  assertEquals(isPeriodKeyword("THIS-WEEK"), true);
+  assertEquals(isPeriodKeyword("This-Month"), true);
+});
+
+Deno.test("isPeriodKeyword - non-period keywords", () => {
+  assertEquals(isPeriodKeyword("today"), false);
+  assertEquals(isPeriodKeyword("tomorrow"), false);
+  assertEquals(isPeriodKeyword("next-monday"), false);
+  assertEquals(isPeriodKeyword("+2w"), false);
+  assertEquals(isPeriodKeyword("2025-12-01"), false);
+});
+
+// Test: resolvePeriodRange
+// Reference date: 2025-12-06 (Saturday) in Asia/Tokyo
+Deno.test("resolvePeriodRange - this-week returns Mon-Sun", () => {
+  const result = resolvePeriodRange("this-week", timezone, referenceDate);
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    // Week containing Saturday 2025-12-06: Mon 2025-12-01 to Sun 2025-12-07
+    assertEquals(result.value.from.toString(), "2025-12-01");
+    assertEquals(result.value.to.toString(), "2025-12-07");
+  }
+});
+
+Deno.test("resolvePeriodRange - tw alias works same as this-week", () => {
+  const result = resolvePeriodRange("tw", timezone, referenceDate);
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.from.toString(), "2025-12-01");
+    assertEquals(result.value.to.toString(), "2025-12-07");
+  }
+});
+
+Deno.test("resolvePeriodRange - next-week returns Mon-Sun of next week", () => {
+  const result = resolvePeriodRange("next-week", timezone, referenceDate);
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    // Next week: Mon 2025-12-08 to Sun 2025-12-14
+    assertEquals(result.value.from.toString(), "2025-12-08");
+    assertEquals(result.value.to.toString(), "2025-12-14");
+  }
+});
+
+Deno.test("resolvePeriodRange - last-week returns Mon-Sun of last week", () => {
+  const result = resolvePeriodRange("last-week", timezone, referenceDate);
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    // Last week: Mon 2025-11-24 to Sun 2025-11-30
+    assertEquals(result.value.from.toString(), "2025-11-24");
+    assertEquals(result.value.to.toString(), "2025-11-30");
+  }
+});
+
+Deno.test("resolvePeriodRange - this-month returns 1st to last day", () => {
+  const result = resolvePeriodRange("this-month", timezone, referenceDate);
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    // December 2025: 1st to 31st
+    assertEquals(result.value.from.toString(), "2025-12-01");
+    assertEquals(result.value.to.toString(), "2025-12-31");
+  }
+});
+
+Deno.test("resolvePeriodRange - next-month returns 1st to last day of next month", () => {
+  const result = resolvePeriodRange("next-month", timezone, referenceDate);
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    // January 2026: 1st to 31st
+    assertEquals(result.value.from.toString(), "2026-01-01");
+    assertEquals(result.value.to.toString(), "2026-01-31");
+  }
+});
+
+Deno.test("resolvePeriodRange - last-month returns 1st to last day of last month", () => {
+  const result = resolvePeriodRange("last-month", timezone, referenceDate);
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    // November 2025: 1st to 30th
+    assertEquals(result.value.from.toString(), "2025-11-01");
+    assertEquals(result.value.to.toString(), "2025-11-30");
+  }
+});
+
+Deno.test("resolvePeriodRange - February leap year handling", () => {
+  // February 2024 is a leap year (29 days)
+  const febReference = new Date("2024-02-15T12:00:00Z");
+  const result = resolvePeriodRange("this-month", timezone, febReference);
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.from.toString(), "2024-02-01");
+    assertEquals(result.value.to.toString(), "2024-02-29");
+  }
+});
+
+Deno.test("resolvePeriodRange - returns error for non-period keywords", () => {
+  const result = resolvePeriodRange("today", timezone, referenceDate);
+  assertEquals(result.type, "error");
+});
+
+Deno.test("resolvePeriodRange - case insensitive", () => {
+  const result = resolvePeriodRange("THIS-WEEK", timezone, referenceDate);
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.from.toString(), "2025-12-01");
+    assertEquals(result.value.to.toString(), "2025-12-07");
+  }
 });
