@@ -25,10 +25,9 @@ import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import {
   profileAsync,
-  profilerEnd,
   profilerFinish,
   profilerInit,
-  profilerStart,
+  profileSync,
 } from "../../../shared/profiler.ts";
 
 type ListOptions = {
@@ -136,12 +135,10 @@ export function createListCommand() {
       let effectiveExpression: string | undefined;
 
       if (locatorArg) {
-        profilerStart("resolveRange");
         // Parse and resolve locator expression
         const rangeExprResult = parseRangeExpression(locatorArg);
         if (rangeExprResult.type === "error") {
           console.error(formatError(rangeExprResult.error, debug));
-          profilerEnd();
           profilerFinish();
           return;
         }
@@ -156,14 +153,12 @@ export function createListCommand() {
         const resolveResult = await pathResolver.resolveRange(cwd, rangeExprResult.value);
         if (resolveResult.type === "error") {
           console.error(formatError(resolveResult.error, debug));
-          profilerEnd();
           profilerFinish();
           return;
         }
 
         placementRange = resolveResult.value;
         effectiveExpression = locatorArg;
-        profilerEnd();
       } else {
         // If cwd is an item-head section, use cwd as the target
         // Otherwise, default to today-7d..today+7d date range
@@ -309,14 +304,13 @@ export function createListCommand() {
       };
 
       // Build partitions
-      profilerStart("buildPartitions");
-      const partitionResult = buildPartitions({
-        items,
-        range: placementRange,
-        sections,
-        getDisplayLabel,
-      });
-      profilerEnd();
+      const partitionResult = profileSync("buildPartitions", () =>
+        buildPartitions({
+          items,
+          range: placementRange,
+          sections,
+          getDisplayLabel,
+        }));
 
       // Emit warnings to stderr
       for (const warning of partitionResult.warnings) {
@@ -332,72 +326,72 @@ export function createListCommand() {
         return;
       }
 
-      // Format and output
-      profilerStart("formatOutput");
-      const formatterOptions: ListFormatterOptions = {
-        printMode: isPrintMode,
-        timezone: deps.timezone,
-      };
+      // Format output
+      const output = profileSync("formatOutput", () => {
+        const formatterOptions: ListFormatterOptions = {
+          printMode: isPrintMode,
+          timezone: deps.timezone,
+        };
 
-      const outputLines: string[] = [];
+        const outputLines: string[] = [];
 
-      for (const partition of partitions) {
-        // Format header
-        if (partition.header.kind === "date") {
-          outputLines.push(formatDateHeader(partition.header.date, now, formatterOptions));
-        } else {
-          outputLines.push(
-            formatItemHeadHeader(
-              partition.header.displayLabel,
-              undefined,
-              formatterOptions,
-            ),
-          );
+        for (const partition of partitions) {
+          // Format header
+          if (partition.header.kind === "date") {
+            outputLines.push(formatDateHeader(partition.header.date, now, formatterOptions));
+          } else {
+            outputLines.push(
+              formatItemHeadHeader(
+                partition.header.displayLabel,
+                undefined,
+                formatterOptions,
+              ),
+            );
+          }
+
+          // Format items
+          for (const item of partition.items) {
+            const dateStr = item.data.placement.head.kind === "date"
+              ? item.data.placement.head.date.toString()
+              : undefined;
+            outputLines.push(formatItemLine(item, formatterOptions, dateStr));
+          }
+
+          // Format stubs
+          for (const stub of partition.stubs) {
+            const stubSummary: SectionSummary = {
+              placement: createPlacement(
+                partition.header.kind === "date"
+                  ? { kind: "date", date: partition.header.date }
+                  : partition.header.parent.head,
+                [],
+              ),
+              itemCount: stub.itemCount,
+              sectionCount: stub.sectionCount,
+            };
+            outputLines.push(formatSectionStub(stubSummary, stub.relativePath, formatterOptions));
+          }
+
+          // Add empty line between partitions
+          outputLines.push("");
         }
 
-        // Format items
-        for (const item of partition.items) {
-          const dateStr = item.data.placement.head.kind === "date"
-            ? item.data.placement.head.date.toString()
-            : undefined;
-          outputLines.push(formatItemLine(item, formatterOptions, dateStr));
+        // Remove trailing empty line
+        while (outputLines.length > 0 && outputLines[outputLines.length - 1] === "") {
+          outputLines.pop();
         }
 
-        // Format stubs
-        for (const stub of partition.stubs) {
-          const stubSummary: SectionSummary = {
-            placement: createPlacement(
-              partition.header.kind === "date"
-                ? { kind: "date", date: partition.header.date }
-                : partition.header.parent.head,
-              [],
-            ),
-            itemCount: stub.itemCount,
-            sectionCount: stub.sectionCount,
-          };
-          outputLines.push(formatSectionStub(stubSummary, stub.relativePath, formatterOptions));
-        }
-
-        // Add empty line between partitions
-        outputLines.push("");
-      }
-
-      // Remove trailing empty line
-      while (outputLines.length > 0 && outputLines[outputLines.length - 1] === "") {
-        outputLines.pop();
-      }
-
-      const output = outputLines.join("\n");
-      profilerEnd();
+        return outputLines.join("\n");
+      });
 
       // Output handling: pager/no-pager/print
-      profilerStart("output");
-      if (isPrintMode || options.noPager) {
-        console.log(output);
-      } else {
-        await outputWithPager(output);
-      }
-      profilerEnd();
+      await profileAsync("output", async () => {
+        if (isPrintMode || options.noPager) {
+          console.log(output);
+        } else {
+          await outputWithPager(output);
+        }
+      });
 
       profilerFinish();
     });

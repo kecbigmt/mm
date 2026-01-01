@@ -11,7 +11,7 @@ import { RepositoryError } from "../repositories/repository_error.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
 import type { ItemIconValue } from "../primitives/item_icon.ts";
 import { dateTimeFromDate } from "../primitives/date_time.ts";
-import { profileAsync, profilerEnd, profilerStart, profileSync } from "../../shared/profiler.ts";
+import { profileAsync, profileSync } from "../../shared/profiler.ts";
 
 export type ListItemsStatusFilter = "open" | "closed" | "all";
 
@@ -63,16 +63,13 @@ export const ListItemsWorkflow = {
     let placementRange;
 
     if (input.expression) {
-      profilerStart("workflow:parseExpression");
       // Parse expression
       const rangeExprResult = parseRangeExpression(input.expression);
       if (rangeExprResult.type === "error") {
-        profilerEnd();
         return Result.error(
           createValidationError("ListItems", rangeExprResult.error.issues),
         );
       }
-      profilerEnd();
 
       // Resolve to PlacementRange
       const resolveResult = await profileAsync(
@@ -101,7 +98,6 @@ export const ListItemsWorkflow = {
     }
 
     // Apply filters
-    profilerStart("workflow:filters");
     const statusFilter = input.status ?? "open";
     let filtered = itemsResult.value;
 
@@ -116,7 +112,6 @@ export const ListItemsWorkflow = {
     if (statusFilter !== "all") {
       const nowResult = dateTimeFromDate(today);
       if (nowResult.type === "error") {
-        profilerEnd();
         return Result.error(
           createValidationError("ListItems", nowResult.error.issues),
         );
@@ -131,7 +126,6 @@ export const ListItemsWorkflow = {
       const targetIcon = input.icon;
       filtered = filtered.filter((item) => item.data.icon.toString() === targetIcon);
     }
-    profilerEnd();
 
     // Sort: rank ascending, then createdAt ascending, then id ascending
     const sorted = profileSync("workflow:sort", () =>

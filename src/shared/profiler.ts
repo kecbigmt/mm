@@ -53,10 +53,7 @@ export const profilerInit = (rootName: string): void => {
   };
 };
 
-/**
- * Start a new profiling section. Sections can be nested.
- */
-export const profilerStart = (name: string): void => {
+const profilerStart = (name: string): void => {
   if (!state?.enabled) return;
 
   const entry: ProfileEntry = {
@@ -70,10 +67,7 @@ export const profilerStart = (name: string): void => {
   state.stack.push(entry);
 };
 
-/**
- * End the current profiling section.
- */
-export const profilerEnd = (): void => {
+const profilerEnd = (): void => {
   if (!state?.enabled) return;
   if (state.stack.length <= 1) return; // Don't pop root
 

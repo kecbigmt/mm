@@ -3,7 +3,7 @@ import type { PlacementRange } from "../../../domain/primitives/placement_range.
 import type { SectionSummary } from "../../../domain/services/section_query_service.ts";
 import { type CalendarDay, parseCalendarDay } from "../../../domain/primitives/calendar_day.ts";
 import { createPlacement, type Placement } from "../../../domain/primitives/placement.ts";
-import { profilerEnd, profilerStart } from "../../../shared/profiler.ts";
+import { profileSync } from "../../../shared/profiler.ts";
 
 /**
  * Partition header for grouping items in ls output.
@@ -205,59 +205,62 @@ const buildDateRangePartitions = (
   const warnings: PartitionWarning[] = [];
 
   // Filter out item-head events
-  profilerStart("partition:filterEvents");
-  const filteredItems: Item[] = [];
-  let skippedEventCount = 0;
-
-  for (const item of items) {
-    if (isItemHeadEvent(item)) {
-      skippedEventCount++;
-    } else {
-      filteredItems.push(item);
+  const { filteredItems, skippedEventCount } = profileSync("partition:filterEvents", () => {
+    const filtered: Item[] = [];
+    let skipped = 0;
+    for (const item of items) {
+      if (isItemHeadEvent(item)) {
+        skipped++;
+      } else {
+        filtered.push(item);
+      }
     }
-  }
+    return { filteredItems: filtered, skippedEventCount: skipped };
+  });
 
   if (skippedEventCount > 0) {
     warnings.push({ kind: "itemHeadEventsSkipped", count: skippedEventCount });
   }
-  profilerEnd();
 
   // Generate date range with cap
-  profilerStart("partition:generateDateRange");
-  const { dates, capped, requested } = generateDateRange(from, to, limit);
+  const { dates, capped, requested } = profileSync(
+    "partition:generateDateRange",
+    () => generateDateRange(from, to, limit),
+  );
   if (capped) {
     warnings.push({ kind: "dateRangeCapped", requested, limit });
   }
-  profilerEnd();
 
   // Group items by their placement head date
-  profilerStart("partition:groupByDate");
-  const itemsByDate = new Map<string, Item[]>();
-  for (const item of filteredItems) {
-    if (item.data.placement.head.kind === "date") {
-      const dateStr = item.data.placement.head.date.toString();
-      const existing = itemsByDate.get(dateStr) ?? [];
-      existing.push(item);
-      itemsByDate.set(dateStr, existing);
+  const itemsByDate = profileSync("partition:groupByDate", () => {
+    const map = new Map<string, Item[]>();
+    for (const item of filteredItems) {
+      if (item.data.placement.head.kind === "date") {
+        const dateStr = item.data.placement.head.date.toString();
+        const existing = map.get(dateStr) ?? [];
+        existing.push(item);
+        map.set(dateStr, existing);
+      }
     }
-  }
-  profilerEnd();
+    return map;
+  });
 
   // Build partitions (only for dates with items)
-  profilerStart("partition:buildPartitions");
-  const partitions: Partition[] = [];
-  for (const date of dates) {
-    const dateStr = date.toString();
-    const dateItems = itemsByDate.get(dateStr);
-    if (dateItems && dateItems.length > 0) {
-      partitions.push({
-        header: { kind: "date", date },
-        items: dateItems,
-        stubs: [],
-      });
+  const partitions = profileSync("partition:buildPartitions", () => {
+    const result: Partition[] = [];
+    for (const date of dates) {
+      const dateStr = date.toString();
+      const dateItems = itemsByDate.get(dateStr);
+      if (dateItems && dateItems.length > 0) {
+        result.push({
+          header: { kind: "date", date },
+          items: dateItems,
+          stubs: [],
+        });
+      }
     }
-  }
-  profilerEnd();
+    return result;
+  });
 
   return { partitions, warnings };
 };
