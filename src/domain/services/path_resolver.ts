@@ -21,7 +21,11 @@ import {
 } from "../primitives/mod.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
-import { resolveRelativeDate as resolveDateExpression } from "./date_resolver.ts";
+import {
+  isPeriodKeyword,
+  resolvePeriodRange,
+  resolveRelativeDate as resolveDateExpression,
+} from "./date_resolver.ts";
 
 const PATH_RESOLVER_ERROR_KIND = "PathResolver" as const;
 
@@ -273,6 +277,23 @@ export const createPathResolver = (
     expr: RangeExpression,
   ): Promise<Result<PlacementRange, PathResolverError>> => {
     if (expr.kind === "single") {
+      // Check if this is a period keyword (this-week, this-month, etc.)
+      // Period keywords should expand to date ranges, not single dates
+      const segments = expr.path.segments;
+      if (
+        segments.length === 1 &&
+        segments[0].kind === "relativeDate" &&
+        isPeriodKeyword(segments[0].expr)
+      ) {
+        const periodResult = resolvePeriodRange(segments[0].expr, timezone, today);
+        if (periodResult.type === "error") {
+          return Result.error(
+            createValidationError(PATH_RESOLVER_ERROR_KIND, periodResult.error.issues),
+          );
+        }
+        return Result.ok(createDateRange(periodResult.value.from, periodResult.value.to));
+      }
+
       const pathResult = await resolvePath(cwd, expr.path);
       if (pathResult.type === "error") {
         return pathResult;
