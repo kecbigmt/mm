@@ -544,8 +544,8 @@ Deno.test("AutoCommitWorkflow - lazy-sync: increments commit count when below th
         branch: "main",
       },
       lazy: {
-        commitThreshold: 10,
-        timeThreshold: 600,
+        commits: 10,
+        minutes: 10,
       },
     },
   });
@@ -599,8 +599,8 @@ Deno.test("AutoCommitWorkflow - lazy-sync: triggers sync when commit threshold m
         branch: "main",
       },
       lazy: {
-        commitThreshold: 5,
-        timeThreshold: 600,
+        commits: 5,
+        minutes: 10,
       },
     },
   });
@@ -655,8 +655,8 @@ Deno.test("AutoCommitWorkflow - lazy-sync: triggers sync when time threshold met
         branch: "main",
       },
       lazy: {
-        commitThreshold: 100, // High threshold so it won't be met
-        timeThreshold: 60, // 60 seconds
+        commits: 100, // High threshold so it won't be met
+        minutes: 1, // 1 minute
       },
     },
   });
@@ -669,7 +669,7 @@ Deno.test("AutoCommitWorkflow - lazy-sync: triggers sync when time threshold met
       Promise.resolve(
         Result.ok({
           commitsSinceLastSync: 1,
-          lastSyncTimestamp: Date.now() - 120 * 1000, // 120 seconds ago, exceeds 60s threshold
+          lastSyncTimestamp: Date.now() - 2 * 60 * 1000, // 2 minutes ago, exceeds 1 minute threshold
         } as SyncState),
       ),
     saveSyncState: (state) => {
@@ -710,8 +710,8 @@ Deno.test("AutoCommitWorkflow - lazy-sync: does not reset count on sync failure"
         branch: "main",
       },
       lazy: {
-        commitThreshold: 5,
-        timeThreshold: 600,
+        commits: 5,
+        minutes: 10,
       },
     },
   });
