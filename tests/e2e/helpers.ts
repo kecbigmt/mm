@@ -68,6 +68,11 @@ export const cleanupTestEnvironment = async (ctx: TestContext): Promise<void> =>
 };
 
 /**
+ * Path to the compiled mm binary. Set MM_TEST_BINARY env to use compiled binary.
+ */
+const MM_BINARY_PATH = Deno.env.get("MM_TEST_BINARY");
+
+/**
  * Runs an mm CLI command in a subprocess with the test MM_HOME.
  */
 export const runCommand = async (
@@ -80,21 +85,29 @@ export const runCommand = async (
     MM_HOME: testHome,
   };
 
-  const command = new Deno.Command(Deno.execPath(), {
-    args: [
-      "run",
-      "--allow-read",
-      "--allow-write",
-      "--allow-env",
-      "--allow-run",
-      "src/main.ts",
-      ...args,
-    ],
-    cwd: Deno.cwd(),
-    env,
-    stdout: "piped",
-    stderr: "piped",
-  });
+  const command = MM_BINARY_PATH
+    ? new Deno.Command(MM_BINARY_PATH, {
+      args,
+      cwd: Deno.cwd(),
+      env,
+      stdout: "piped",
+      stderr: "piped",
+    })
+    : new Deno.Command(Deno.execPath(), {
+      args: [
+        "run",
+        "--allow-read",
+        "--allow-write",
+        "--allow-env",
+        "--allow-run",
+        "src/main.ts",
+        ...args,
+      ],
+      cwd: Deno.cwd(),
+      env,
+      stdout: "piped",
+      stderr: "piped",
+    });
 
   const process = command.spawn();
   const { success, stdout, stderr } = await process.output();
