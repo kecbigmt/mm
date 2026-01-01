@@ -4,6 +4,7 @@ import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import {
   createWorkspaceSettings,
+  DEFAULT_LAZY_SYNC_SETTINGS,
   VersionControlSyncMode,
   WorkspaceSettings,
 } from "../../../domain/models/workspace.ts";
@@ -16,7 +17,9 @@ type ConfigKey =
   | "sync.enabled"
   | "sync.mode"
   | "sync.git.remote"
-  | "sync.git.branch";
+  | "sync.git.branch"
+  | "sync.lazy.commits"
+  | "sync.lazy.minutes";
 
 const VALID_KEYS: ConfigKey[] = [
   "timezone",
@@ -24,6 +27,8 @@ const VALID_KEYS: ConfigKey[] = [
   "sync.mode",
   "sync.git.remote",
   "sync.git.branch",
+  "sync.lazy.commits",
+  "sync.lazy.minutes",
 ];
 
 function isValidKey(key: string): key is ConfigKey {
@@ -33,7 +38,7 @@ function isValidKey(key: string): key is ConfigKey {
 function getValueByKey(
   settings: WorkspaceSettings,
   key: ConfigKey,
-): string | boolean | null | undefined {
+): string | boolean | number | null | undefined {
   const data = settings.data;
   switch (key) {
     case "timezone":
@@ -46,13 +51,18 @@ function getValueByKey(
       return data.sync.git?.remote ?? null;
     case "sync.git.branch":
       return data.sync.git?.branch;
+    case "sync.lazy.commits":
+      return data.sync.lazy?.commits ?? DEFAULT_LAZY_SYNC_SETTINGS.commits;
+    case "sync.lazy.minutes":
+      return data.sync.lazy?.minutes ?? DEFAULT_LAZY_SYNC_SETTINGS.minutes;
   }
 }
 
-function formatValue(value: string | boolean | null | undefined): string {
+function formatValue(value: string | boolean | number | null | undefined): string {
   if (value === null) return "(not set)";
   if (value === undefined) return "(not set)";
   if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return value.toString();
   return value;
 }
 
@@ -260,6 +270,46 @@ export const createConfigCommand = () => {
                   ...(currentData.sync.git ?? {}),
                   remote: currentData.sync.git?.remote ?? null,
                   branch: value,
+                },
+              },
+            });
+            break;
+          }
+
+          case "sync.lazy.commits": {
+            const commits = parseInt(value, 10);
+            if (isNaN(commits) || commits < 1) {
+              console.error(`Invalid value for sync.lazy.commits: must be a positive integer`);
+              Deno.exit(1);
+            }
+            const currentLazy = currentData.sync.lazy ?? DEFAULT_LAZY_SYNC_SETTINGS;
+            newSettings = createWorkspaceSettings({
+              timezone: currentData.timezone,
+              sync: {
+                ...currentData.sync,
+                lazy: {
+                  ...currentLazy,
+                  commits,
+                },
+              },
+            });
+            break;
+          }
+
+          case "sync.lazy.minutes": {
+            const minutes = parseInt(value, 10);
+            if (isNaN(minutes) || minutes < 1) {
+              console.error(`Invalid value for sync.lazy.minutes: must be a positive integer`);
+              Deno.exit(1);
+            }
+            const currentLazy = currentData.sync.lazy ?? DEFAULT_LAZY_SYNC_SETTINGS;
+            newSettings = createWorkspaceSettings({
+              timezone: currentData.timezone,
+              sync: {
+                ...currentData.sync,
+                lazy: {
+                  ...currentLazy,
+                  minutes,
                 },
               },
             });
