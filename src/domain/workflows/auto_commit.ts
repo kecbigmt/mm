@@ -248,9 +248,9 @@ export const AutoCommitWorkflow = {
       const now = Date.now();
 
       // Check thresholds (OR condition)
-      const commitThresholdMet = newCommitCount >= lazySettings.commitThreshold;
+      const commitThresholdMet = newCommitCount >= lazySettings.commits;
       const timeThresholdMet = syncState.lastSyncTimestamp !== null &&
-        (now - syncState.lastSyncTimestamp) / 1000 >= lazySettings.timeThreshold;
+        (now - syncState.lastSyncTimestamp) >= lazySettings.minutes * 60 * 1000;
 
       const shouldSync = commitThresholdMet || timeThresholdMet;
 

@@ -16,13 +16,13 @@ const WORKSPACE_SETTINGS_KIND = "WorkspaceSettings" as const;
 export type VersionControlSyncMode = "auto-commit" | "auto-sync" | "lazy-sync";
 
 export type LazySyncSettings = Readonly<{
-  commitThreshold: number;
-  timeThreshold: number;
+  commits: number;
+  minutes: number;
 }>;
 
 export const DEFAULT_LAZY_SYNC_SETTINGS: LazySyncSettings = {
-  commitThreshold: 10,
-  timeThreshold: 600,
+  commits: 10,
+  minutes: 10,
 };
 
 export type VcsType = "git";
@@ -51,8 +51,8 @@ export type SyncSettingsSnapshot = Readonly<{
   mode: string;
   git?: GitSyncSettingsSnapshot | null;
   lazy?: {
-    commitThreshold?: number;
-    timeThreshold?: number;
+    commits?: number;
+    minutes?: number;
   };
 }>;
 
@@ -114,8 +114,8 @@ const instantiate = (data: WorkspaceSettingsData): WorkspaceSettings => {
         git: gitSnapshot,
         lazy: frozen.sync.lazy
           ? {
-            commitThreshold: frozen.sync.lazy.commitThreshold,
-            timeThreshold: frozen.sync.lazy.timeThreshold,
+            commits: frozen.sync.lazy.commits,
+            minutes: frozen.sync.lazy.minutes,
           }
           : undefined,
       };
@@ -176,12 +176,12 @@ export const parseWorkspaceSettings = (
     let lazySyncSettings: LazySyncSettings | undefined = undefined;
     if (snapshot.sync.lazy) {
       lazySyncSettings = {
-        commitThreshold: typeof snapshot.sync.lazy.commitThreshold === "number"
-          ? snapshot.sync.lazy.commitThreshold
-          : DEFAULT_LAZY_SYNC_SETTINGS.commitThreshold,
-        timeThreshold: typeof snapshot.sync.lazy.timeThreshold === "number"
-          ? snapshot.sync.lazy.timeThreshold
-          : DEFAULT_LAZY_SYNC_SETTINGS.timeThreshold,
+        commits: typeof snapshot.sync.lazy.commits === "number"
+          ? snapshot.sync.lazy.commits
+          : DEFAULT_LAZY_SYNC_SETTINGS.commits,
+        minutes: typeof snapshot.sync.lazy.minutes === "number"
+          ? snapshot.sync.lazy.minutes
+          : DEFAULT_LAZY_SYNC_SETTINGS.minutes,
       };
     }
 
