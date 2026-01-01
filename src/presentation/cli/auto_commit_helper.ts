@@ -2,6 +2,7 @@ import { AutoCommitError, AutoCommitWorkflow } from "../../domain/workflows/auto
 import { VersionControlService } from "../../domain/services/version_control_service.ts";
 import { WorkspaceRepository } from "../../domain/repositories/workspace_repository.ts";
 import { StateRepository } from "../../domain/repositories/state_repository.ts";
+import { withLoadingIndicator } from "./utils/loading_indicator.ts";
 
 export type AutoCommitHelperDeps = {
   workspaceRoot: string;
@@ -58,6 +59,7 @@ export async function executeAutoCommit(
     {
       workspaceRoot: deps.workspaceRoot,
       summary,
+      onSync: (operation) => withLoadingIndicator("Syncing...", operation),
     },
     {
       versionControlService: deps.versionControlService,

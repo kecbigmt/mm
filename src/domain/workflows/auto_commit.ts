@@ -7,6 +7,8 @@ import { DEFAULT_LAZY_SYNC_SETTINGS } from "../models/workspace.ts";
 export type AutoCommitInput = {
   workspaceRoot: string;
   summary: string;
+  /** Optional wrapper for sync operations (e.g., to show loading indicator) */
+  onSync?: <T>(operation: () => Promise<T>) => Promise<T>;
 };
 
 export type AutoCommitDependencies = {
@@ -226,10 +228,13 @@ export const AutoCommitWorkflow = {
       };
     };
 
+    // Helper to execute sync with optional wrapper (e.g., loading indicator)
+    const executeSync = input.onSync ? () => input.onSync!(performSync) : performSync;
+
     // 6. Handle sync based on mode
     if (mode === "auto-sync") {
       // Auto-sync: always sync after commit
-      return Result.ok(await performSync());
+      return Result.ok(await executeSync());
     }
 
     if (mode === "lazy-sync") {
@@ -256,7 +261,7 @@ export const AutoCommitWorkflow = {
 
       if (shouldSync) {
         // Perform sync
-        const syncResult = await performSync();
+        const syncResult = await executeSync();
 
         if (syncResult.pushed) {
           // Sync succeeded - reset state
