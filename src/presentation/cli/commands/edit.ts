@@ -124,6 +124,7 @@ export function createEditCommand() {
             workspaceRoot: deps.root,
             versionControlService: deps.versionControlService,
             workspaceRepository: deps.workspaceRepository,
+            stateRepository: deps.stateRepository,
           };
           await executeAutoCommit(autoCommitDeps, `edit item via editor`);
         } catch (error) {
@@ -191,6 +192,7 @@ export function createEditCommand() {
         workspaceRoot: deps.root,
         versionControlService: deps.versionControlService,
         workspaceRepository: deps.workspaceRepository,
+        stateRepository: deps.stateRepository,
       };
       await executeAutoCommit(autoCommitDeps, `edit item metadata`);
     });

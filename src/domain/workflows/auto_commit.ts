@@ -1,15 +1,20 @@
 import { Result } from "../../shared/result.ts";
 import { VersionControlService } from "../services/version_control_service.ts";
 import { WorkspaceRepository } from "../repositories/workspace_repository.ts";
+import { StateRepository } from "../repositories/state_repository.ts";
+import { DEFAULT_LAZY_SYNC_SETTINGS } from "../models/workspace.ts";
 
 export type AutoCommitInput = {
   workspaceRoot: string;
   summary: string;
+  /** Optional wrapper for sync operations (e.g., to show loading indicator) */
+  onSync?: <T>(operation: () => Promise<T>) => Promise<T>;
 };
 
 export type AutoCommitDependencies = {
   versionControlService: VersionControlService;
   workspaceRepository: WorkspaceRepository;
+  stateRepository: StateRepository;
 };
 
 export type AutoCommitError =
@@ -20,11 +25,13 @@ export type AutoCommitError =
   | { type: "no_branch_configured" }
   | { type: "stage_failed"; details: string }
   | { type: "commit_failed"; details: string }
-  | { type: "get_current_branch_failed"; details: string };
+  | { type: "get_current_branch_failed"; details: string }
+  | { type: "state_save_failed"; details: string };
 
 export type AutoCommitResult = {
   committed: boolean;
   pushed?: boolean;
+  syncTriggered?: boolean;
   error?: AutoCommitError;
 };
 
@@ -48,12 +55,19 @@ function isNetworkConnectivityError(errorMessage: string): boolean {
 /**
  * Auto-commit workflow
  *
- * Automatically commits changes when sync.mode is "auto-commit" or "auto-sync".
+ * Automatically commits changes when sync.mode is "auto-commit", "auto-sync", or "lazy-sync".
  *
  * For "auto-sync" mode, follows commit→pull(rebase)→push pattern:
  * - Commits are always created first (offline resilience)
  * - Pull with rebase integrates remote changes
  * - Push completes synchronization
+ *
+ * For "lazy-sync" mode:
+ * - Commits are created immediately (like auto-commit)
+ * - Sync is triggered when either threshold is met:
+ *   - Commit count threshold (default: 10)
+ *   - Time threshold (default: 600 seconds)
+ * - When triggered, follows same commit→pull(rebase)→push pattern
  *
  * This workflow is designed to be failure-tolerant:
  * - If Git is not configured or disabled, it silently skips
@@ -80,10 +94,10 @@ export const AutoCommitWorkflow = {
       return Result.ok({ committed: false });
     }
 
-    // 3. Check sync mode (auto-commit or auto-sync)
+    // 3. Check sync mode (auto-commit, auto-sync, or lazy-sync)
     const mode = settings.data.sync.mode;
-    if (mode !== "auto-commit" && mode !== "auto-sync") {
-      // Not in auto-commit or auto-sync mode - skip
+    if (mode !== "auto-commit" && mode !== "auto-sync" && mode !== "lazy-sync") {
+      // Not in a recognized auto-commit mode - skip
       return Result.ok({ committed: false });
     }
 
@@ -117,26 +131,25 @@ export const AutoCommitWorkflow = {
       });
     }
 
-    // 6. Auto-sync: pull and push after commit if mode is "auto-sync"
-    if (mode === "auto-sync") {
-      // Get remote and branch configuration
+    // Helper function to perform sync (pull + push)
+    const performSync = async (): Promise<AutoCommitResult> => {
       const remote = settings.data.sync.git?.remote;
       const branch = settings.data.sync.git?.branch;
 
       if (!remote) {
-        return Result.ok({
+        return {
           committed: true,
           pushed: false,
           error: { type: "no_remote_configured" },
-        });
+        };
       }
 
       if (!branch) {
-        return Result.ok({
+        return {
           committed: true,
           pushed: false,
           error: { type: "no_branch_configured" },
-        });
+        };
       }
 
       // Pull with rebase to integrate remote changes
@@ -147,34 +160,29 @@ export const AutoCommitWorkflow = {
       );
 
       if (pullResult.type === "error") {
-        // Pull/rebase failed - could be network error, conflict, or missing remote branch
         const errorMsg = pullResult.error.message;
 
         if (isNetworkConnectivityError(errorMsg)) {
-          return Result.ok({
+          return {
             committed: true,
             pushed: false,
             error: { type: "network_error", operation: "pull" },
-          });
+          };
         }
 
         // Check if this is a "remote branch doesn't exist" error
-        // This happens on first push to a new remote repository
         const isNoRemoteBranch = errorMsg.toLowerCase().includes("couldn't find remote ref") ||
           errorMsg.toLowerCase().includes("does not exist") ||
           errorMsg.toLowerCase().includes("no such ref");
 
         if (!isNoRemoteBranch) {
-          // Conflict or other rebase errors
-          return Result.ok({
+          return {
             committed: true,
             pushed: false,
             error: { type: "pull_failed", details: errorMsg },
-          });
+          };
         }
-
-        // Remote branch doesn't exist yet - skip pull and proceed to push
-        // This is expected for first push after sync init
+        // Remote branch doesn't exist yet - proceed to push
       }
 
       // Get current branch
@@ -182,17 +190,16 @@ export const AutoCommitWorkflow = {
         input.workspaceRoot,
       );
       if (currentBranchResult.type === "error") {
-        return Result.ok({
+        return {
           committed: true,
           pushed: false,
           error: { type: "get_current_branch_failed", details: currentBranchResult.error.message },
-        });
+        };
       }
 
       const currentBranch = currentBranchResult.value;
 
       // Push to remote
-      // Use --set-upstream for the first push or when remote branch doesn't exist
       const pushResult = await deps.versionControlService.push(
         input.workspaceRoot,
         remote,
@@ -201,29 +208,93 @@ export const AutoCommitWorkflow = {
       );
 
       if (pushResult.type === "ok") {
-        // Push succeeded
-        return Result.ok({
-          committed: true,
-          pushed: true,
-        });
+        return { committed: true, pushed: true };
       }
 
-      // Push failed
       const pushErrorMsg = pushResult.error.message;
 
       if (isNetworkConnectivityError(pushErrorMsg)) {
-        return Result.ok({
+        return {
           committed: true,
           pushed: false,
           error: { type: "network_error", operation: "push" },
-        });
+        };
       }
 
-      return Result.ok({
+      return {
         committed: true,
         pushed: false,
         error: { type: "push_failed", details: pushErrorMsg },
+      };
+    };
+
+    // Helper to execute sync with optional wrapper (e.g., loading indicator)
+    const executeSync = input.onSync ? () => input.onSync!(performSync) : performSync;
+
+    // 6. Handle sync based on mode
+    if (mode === "auto-sync") {
+      // Auto-sync: always sync after commit
+      return Result.ok(await executeSync());
+    }
+
+    if (mode === "lazy-sync") {
+      // Lazy-sync: sync only when thresholds are met
+      const lazySettings = settings.data.sync.lazy ?? DEFAULT_LAZY_SYNC_SETTINGS;
+
+      // Load current sync state
+      const syncStateResult = await deps.stateRepository.loadSyncState();
+      if (syncStateResult.type === "error") {
+        // Can't load state - just commit without sync
+        return Result.ok({ committed: true, pushed: false });
+      }
+
+      const syncState = syncStateResult.value;
+      const newCommitCount = syncState.commitsSinceLastSync + 1;
+      const now = Date.now();
+
+      // Check thresholds (OR condition)
+      const commitThresholdMet = newCommitCount >= lazySettings.commits;
+      const timeThresholdMet = syncState.lastSyncTimestamp !== null &&
+        (now - syncState.lastSyncTimestamp) >= lazySettings.minutes * 60 * 1000;
+
+      const shouldSync = commitThresholdMet || timeThresholdMet;
+
+      if (shouldSync) {
+        // Perform sync
+        const syncResult = await executeSync();
+
+        if (syncResult.pushed) {
+          // Sync succeeded - reset state
+          await deps.stateRepository.saveSyncState({
+            commitsSinceLastSync: 0,
+            lastSyncTimestamp: now,
+          });
+          return Result.ok({ ...syncResult, syncTriggered: true });
+        }
+
+        // Sync failed - don't reset count, but save incremented count
+        await deps.stateRepository.saveSyncState({
+          commitsSinceLastSync: newCommitCount,
+          lastSyncTimestamp: syncState.lastSyncTimestamp,
+        });
+        return Result.ok({ ...syncResult, syncTriggered: true });
+      }
+
+      // Thresholds not met - just save incremented count
+      const saveResult = await deps.stateRepository.saveSyncState({
+        commitsSinceLastSync: newCommitCount,
+        lastSyncTimestamp: syncState.lastSyncTimestamp,
       });
+
+      if (saveResult.type === "error") {
+        return Result.ok({
+          committed: true,
+          pushed: false,
+          error: { type: "state_save_failed", details: saveResult.error.message },
+        });
+      }
+
+      return Result.ok({ committed: true, pushed: false });
     }
 
     // Auto-commit mode (no push)

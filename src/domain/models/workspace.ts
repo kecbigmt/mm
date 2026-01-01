@@ -13,7 +13,17 @@ import {
 
 const WORKSPACE_SETTINGS_KIND = "WorkspaceSettings" as const;
 
-export type VersionControlSyncMode = "auto-commit" | "auto-sync";
+export type VersionControlSyncMode = "auto-commit" | "auto-sync" | "lazy-sync";
+
+export type LazySyncSettings = Readonly<{
+  commits: number;
+  minutes: number;
+}>;
+
+export const DEFAULT_LAZY_SYNC_SETTINGS: LazySyncSettings = {
+  commits: 10,
+  minutes: 10,
+};
 
 export type VcsType = "git";
 
@@ -32,6 +42,7 @@ export type SyncSettings = Readonly<{
   enabled: boolean;
   mode: VersionControlSyncMode;
   git: GitSyncSettings | null;
+  lazy?: LazySyncSettings;
 }>;
 
 export type SyncSettingsSnapshot = Readonly<{
@@ -39,6 +50,10 @@ export type SyncSettingsSnapshot = Readonly<{
   enabled: boolean;
   mode: string;
   git?: GitSyncSettingsSnapshot | null;
+  lazy?: {
+    commits?: number;
+    minutes?: number;
+  };
 }>;
 
 export type WorkspaceSettingsData = Readonly<{
@@ -74,6 +89,7 @@ const instantiate = (data: WorkspaceSettingsData): WorkspaceSettings => {
       enabled: data.sync.enabled,
       mode: data.sync.mode,
       git: data.sync.git ? Object.freeze({ ...data.sync.git }) : null,
+      lazy: data.sync.lazy ? Object.freeze({ ...data.sync.lazy }) : undefined,
     }),
   });
   return Object.freeze({
@@ -96,6 +112,12 @@ const instantiate = (data: WorkspaceSettingsData): WorkspaceSettings => {
         enabled: frozen.sync.enabled,
         mode: frozen.sync.mode,
         git: gitSnapshot,
+        lazy: frozen.sync.lazy
+          ? {
+            commits: frozen.sync.lazy.commits,
+            minutes: frozen.sync.lazy.minutes,
+          }
+          : undefined,
       };
 
       return Object.freeze({
@@ -132,9 +154,14 @@ export const parseWorkspaceSettings = (
 
   let syncSettings = DEFAULT_SYNC_SETTINGS;
   if (snapshot.sync) {
-    const mode: VersionControlSyncMode = snapshot.sync.mode === "auto-sync"
-      ? "auto-sync"
-      : "auto-commit";
+    let mode: VersionControlSyncMode;
+    if (snapshot.sync.mode === "auto-sync") {
+      mode = "auto-sync";
+    } else if (snapshot.sync.mode === "lazy-sync") {
+      mode = "lazy-sync";
+    } else {
+      mode = "auto-commit";
+    }
 
     let gitSyncSettings: GitSyncSettings | null = null;
     if (snapshot.sync.git) {
@@ -146,11 +173,24 @@ export const parseWorkspaceSettings = (
       };
     }
 
+    let lazySyncSettings: LazySyncSettings | undefined = undefined;
+    if (snapshot.sync.lazy) {
+      lazySyncSettings = {
+        commits: typeof snapshot.sync.lazy.commits === "number"
+          ? snapshot.sync.lazy.commits
+          : DEFAULT_LAZY_SYNC_SETTINGS.commits,
+        minutes: typeof snapshot.sync.lazy.minutes === "number"
+          ? snapshot.sync.lazy.minutes
+          : DEFAULT_LAZY_SYNC_SETTINGS.minutes,
+      };
+    }
+
     syncSettings = {
       vcs: "git", // Currently only git is supported
       enabled: typeof snapshot.sync.enabled === "boolean" ? snapshot.sync.enabled : false,
       mode: mode,
       git: gitSyncSettings,
+      lazy: lazySyncSettings,
     };
   }
 

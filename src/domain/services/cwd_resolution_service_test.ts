@@ -37,6 +37,14 @@ const createMockStateRepository = (
   },
   saveCwd: () =>
     shouldSave ? Promise.resolve(Result.ok(undefined)) : Promise.resolve(Result.ok(undefined)),
+  loadSyncState: () =>
+    Promise.resolve(
+      Result.ok({
+        commitsSinceLastSync: 0,
+        lastSyncTimestamp: null,
+      }),
+    ),
+  saveSyncState: () => Promise.resolve(Result.ok(undefined)),
 });
 
 Deno.test("CwdResolutionService.getCwd returns default today path when nothing is stored", async () => {

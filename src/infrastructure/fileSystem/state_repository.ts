@@ -2,13 +2,17 @@ import { dirname, join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
-import { StateRepository } from "../../domain/repositories/state_repository.ts";
+import { StateRepository, SyncState } from "../../domain/repositories/state_repository.ts";
 import { parsePlacement, Placement } from "../../domain/primitives/mod.ts";
 
 const STATE_FILE_NAME = ".state.json";
 
 type StateSnapshot = Readonly<{
   readonly default_cwd?: string;
+  readonly sync_state?: {
+    readonly commits_since_last_sync?: number;
+    readonly last_sync_timestamp?: number | null;
+  };
 }>;
 
 const readState = async (
@@ -100,12 +104,46 @@ export const createFileSystemStateRepository = (
       return stateResult;
     }
 
-    const nextState: StateSnapshot = { default_cwd: placement.toString() };
+    const nextState: StateSnapshot = {
+      ...stateResult.value,
+      default_cwd: placement.toString(),
+    };
+    return await writeState(statePath, nextState);
+  };
+
+  const loadSyncState = async (): Promise<Result<SyncState, RepositoryError>> => {
+    const stateResult = await readState(statePath);
+    if (stateResult.type === "error") {
+      return stateResult;
+    }
+
+    const syncState = stateResult.value?.sync_state;
+    return Result.ok({
+      commitsSinceLastSync: syncState?.commits_since_last_sync ?? 0,
+      lastSyncTimestamp: syncState?.last_sync_timestamp ?? null,
+    });
+  };
+
+  const saveSyncState = async (state: SyncState): Promise<Result<void, RepositoryError>> => {
+    const stateResult = await readState(statePath);
+    if (stateResult.type === "error") {
+      return stateResult;
+    }
+
+    const nextState: StateSnapshot = {
+      ...stateResult.value,
+      sync_state: {
+        commits_since_last_sync: state.commitsSinceLastSync,
+        last_sync_timestamp: state.lastSyncTimestamp,
+      },
+    };
     return await writeState(statePath, nextState);
   };
 
   return {
     loadCwd,
     saveCwd,
+    loadSyncState,
+    saveSyncState,
   };
 };

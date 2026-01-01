@@ -206,6 +206,7 @@ export function createEventCommand() {
         workspaceRoot: deps.root,
         versionControlService: deps.versionControlService,
         workspaceRepository: deps.workspaceRepository,
+        stateRepository: deps.stateRepository,
       };
       await executeAutoCommit(autoCommitDeps, `create new event "${resolvedTitle}"`);
 

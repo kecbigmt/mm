@@ -102,6 +102,7 @@ export function createMoveCommand() {
         workspaceRoot: deps.root,
         versionControlService: deps.versionControlService,
         workspaceRepository: deps.workspaceRepository,
+        stateRepository: deps.stateRepository,
       };
       const commitMessage = itemRefs.length === 1
         ? `move item to ${placement}`

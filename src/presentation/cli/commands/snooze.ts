@@ -184,6 +184,7 @@ export function createSnoozeCommand() {
           workspaceRoot: deps.root,
           versionControlService: deps.versionControlService,
           workspaceRepository: deps.workspaceRepository,
+          stateRepository: deps.stateRepository,
         };
         await executeAutoCommit(autoCommitDeps, `${action} ${successCount} item(s)`);
       }

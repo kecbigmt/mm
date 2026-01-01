@@ -82,6 +82,7 @@ export function createCloseCommand() {
           workspaceRoot: deps.root,
           versionControlService: deps.versionControlService,
           workspaceRepository: deps.workspaceRepository,
+          stateRepository: deps.stateRepository,
         };
         await executeAutoCommit(autoCommitDeps, `close ${succeeded.length} item(s)`);
       }

@@ -130,7 +130,9 @@ describe("Scenario 26: Config Command", () => {
 
       assertEquals(result.success, false);
       assertEquals(
-        result.stderr.includes("Invalid value for sync.mode: must be 'auto-commit' or 'auto-sync'"),
+        result.stderr.includes(
+          "Invalid value for sync.mode: must be 'auto-commit', 'auto-sync', or 'lazy-sync'",
+        ),
         true,
       );
     });
@@ -160,6 +162,84 @@ describe("Scenario 26: Config Command", () => {
 
       assertEquals(result.success, false);
       assertEquals(result.stderr.includes("Unknown config key: unknown.key"), true);
+    });
+
+    it("sets sync.lazy.commits", async () => {
+      const result = await runCommand(ctx.testHome, [
+        "config",
+        "set",
+        "sync.lazy.commits",
+        "5",
+      ]);
+
+      assertEquals(result.success, true, `config set failed: ${result.stderr}`);
+
+      // Verify in workspace.json
+      const workspaceDir = getWorkspacePath(ctx.testHome, "test-config");
+      const content = await Deno.readTextFile(join(workspaceDir, "workspace.json"));
+      const config = JSON.parse(content);
+      assertEquals(config.sync.lazy.commits, 5);
+    });
+
+    it("sets sync.lazy.minutes", async () => {
+      const result = await runCommand(ctx.testHome, [
+        "config",
+        "set",
+        "sync.lazy.minutes",
+        "15",
+      ]);
+
+      assertEquals(result.success, true, `config set failed: ${result.stderr}`);
+
+      // Verify in workspace.json
+      const workspaceDir = getWorkspacePath(ctx.testHome, "test-config");
+      const content = await Deno.readTextFile(join(workspaceDir, "workspace.json"));
+      const config = JSON.parse(content);
+      assertEquals(config.sync.lazy.minutes, 15);
+    });
+
+    it("rejects invalid sync.lazy.commits value", async () => {
+      const result = await runCommand(ctx.testHome, [
+        "config",
+        "set",
+        "sync.lazy.commits",
+        "invalid",
+      ]);
+
+      assertEquals(result.success, false);
+      assertEquals(
+        result.stderr.includes("must be a positive integer"),
+        true,
+      );
+    });
+
+    it("rejects zero for sync.lazy.minutes", async () => {
+      const result = await runCommand(ctx.testHome, [
+        "config",
+        "set",
+        "sync.lazy.minutes",
+        "0",
+      ]);
+
+      assertEquals(result.success, false);
+      assertEquals(
+        result.stderr.includes("must be a positive integer"),
+        true,
+      );
+    });
+
+    it("gets sync.lazy.commits with default value", async () => {
+      const result = await runCommand(ctx.testHome, ["config", "get", "sync.lazy.commits"]);
+
+      assertEquals(result.success, true);
+      assertEquals(result.stdout.trim(), "10"); // Default value
+    });
+
+    it("gets sync.lazy.minutes with default value", async () => {
+      const result = await runCommand(ctx.testHome, ["config", "get", "sync.lazy.minutes"]);
+
+      assertEquals(result.success, true);
+      assertEquals(result.stdout.trim(), "10"); // Default value
     });
   });
 

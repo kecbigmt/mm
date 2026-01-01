@@ -62,6 +62,7 @@ export function createRemoveCommand() {
           workspaceRoot: deps.root,
           versionControlService: deps.versionControlService,
           workspaceRepository: deps.workspaceRepository,
+          stateRepository: deps.stateRepository,
         };
         await executeAutoCommit(autoCommitDeps, `remove ${succeeded.length} item(s)`);
       }
