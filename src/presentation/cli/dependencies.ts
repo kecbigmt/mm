@@ -34,6 +34,7 @@ import { VersionControlService } from "../../domain/services/version_control_ser
 import { createGitVersionControlService } from "../../infrastructure/git/git_client.ts";
 import { CacheUpdateService } from "../../infrastructure/completion_cache/cache_update_service.ts";
 import { CacheManager } from "../../infrastructure/completion_cache/cache_manager.ts";
+import { profileAsync, profileSync } from "../../shared/profiler.ts";
 
 export type CliDependencies = Readonly<{
   readonly root: string;
@@ -197,26 +198,33 @@ const determineWorkspaceRoot = async (
 export const loadCliDependencies = async (
   workspacePath?: string,
 ): Promise<Result<CliDependencies, CliDependencyError>> => {
-  const homeResult = resolveMmHome();
+  const homeResult = profileSync("deps:resolveMmHome", () => resolveMmHome());
   if (homeResult.type === "error") {
     return homeResult;
   }
   const home = homeResult.value;
 
-  const workspaceRepository = createFileSystemWorkspaceRepository({ home });
-  const configRepository = createFileSystemConfigRepository({ home });
+  const { workspaceRepository, configRepository } = profileSync(
+    "deps:createRepositories",
+    () => ({
+      workspaceRepository: createFileSystemWorkspaceRepository({ home }),
+      configRepository: createFileSystemConfigRepository({ home }),
+    }),
+  );
 
-  const rootResult = await determineWorkspaceRoot(
-    workspacePath,
-    workspaceRepository,
-    configRepository,
+  const rootResult = await profileAsync(
+    "deps:determineWorkspaceRoot",
+    () => determineWorkspaceRoot(workspacePath, workspaceRepository, configRepository),
   );
   if (rootResult.type === "error") {
     return rootResult;
   }
 
   const root = rootResult.value;
-  const workspaceResult = await workspaceRepository.load(root);
+  const workspaceResult = await profileAsync(
+    "deps:workspaceRepository.load",
+    () => workspaceRepository.load(root),
+  );
   if (workspaceResult.type === "error") {
     return Result.error({ type: "repository", error: workspaceResult.error });
   }
@@ -230,33 +238,42 @@ export const loadCliDependencies = async (
     });
   }
 
-  const itemRepository = createFileSystemItemRepository({ root, timezone });
-  const hashingService = createSha256HashingService();
-  const aliasRepository = createFileSystemAliasRepository({ root, hashingService });
-  const aliasAutoGenerator = createAliasAutoGenerator(createCryptoRandomSource());
-  const stateRepository = createFileSystemStateRepository({ workspaceRoot: root });
-  const sectionQueryService = createFileSystemSectionQueryService({ root });
-  const rankService = createLexoRankService();
-  const idGenerationService = createIdGenerationService(createUuidV7Generator());
-  const versionControlService = createGitVersionControlService();
-  const cacheManager = new CacheManager(root, {
-    maxEntries: 1000,
+  const itemRepository = profileSync(
+    "deps:createItemRepository",
+    () => createFileSystemItemRepository({ root, timezone }),
+  );
+
+  const services = profileSync("deps:createOtherServices", () => {
+    const hashingService = createSha256HashingService();
+    const aliasRepository = createFileSystemAliasRepository({ root, hashingService });
+    const aliasAutoGenerator = createAliasAutoGenerator(createCryptoRandomSource());
+    const stateRepository = createFileSystemStateRepository({ workspaceRoot: root });
+    const sectionQueryService = createFileSystemSectionQueryService({ root });
+    const rankService = createLexoRankService();
+    const idGenerationService = createIdGenerationService(createUuidV7Generator());
+    const versionControlService = createGitVersionControlService();
+    const cacheManager = new CacheManager(root, {
+      maxEntries: 1000,
+    });
+    const cacheUpdateService = new CacheUpdateService(cacheManager);
+    return {
+      aliasRepository,
+      aliasAutoGenerator,
+      stateRepository,
+      sectionQueryService,
+      rankService,
+      idGenerationService,
+      versionControlService,
+      cacheUpdateService,
+    };
   });
-  const cacheUpdateService = new CacheUpdateService(cacheManager);
 
   return Result.ok({
     root,
     workspace,
     timezone,
     itemRepository,
-    aliasRepository,
-    aliasAutoGenerator,
     workspaceRepository,
-    stateRepository,
-    sectionQueryService,
-    rankService,
-    idGenerationService,
-    versionControlService,
-    cacheUpdateService,
+    ...services,
   });
 };

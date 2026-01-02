@@ -10,6 +10,7 @@ import {
 } from "../../domain/models/workspace.ts";
 import { WorkspaceName, workspaceNameFromString } from "../../domain/primitives/workspace_name.ts";
 import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.ts";
+import { profileAsync, profileSync } from "../../shared/profiler.ts";
 
 export type FileSystemWorkspaceRepositoryDependencies = Readonly<{
   readonly home: string;
@@ -109,11 +110,17 @@ export const createFileSystemWorkspaceRepository = (
   dependencies: FileSystemWorkspaceRepositoryDependencies,
 ): WorkspaceRepository => {
   const load = async (root: string): Promise<LoadResult> => {
-    const snapshotResult = await readWorkspaceSnapshot(workspaceFilePath(root));
+    const snapshotResult = await profileAsync(
+      "workspace:readSnapshot",
+      () => readWorkspaceSnapshot(workspaceFilePath(root)),
+    );
     if (snapshotResult.type === "error") {
       return snapshotResult;
     }
-    const parsed = parseWorkspaceSettings(snapshotResult.value);
+    const parsed = profileSync(
+      "workspace:parseSettings",
+      () => parseWorkspaceSettings(snapshotResult.value),
+    );
     if (parsed.type === "error") {
       return Result.error(
         createRepositoryError(
