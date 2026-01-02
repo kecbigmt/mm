@@ -265,6 +265,126 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
   }
 });
 
+Deno.test("CreateItemWorkflow rejects alias with same canonical key (uppercase)", async () => {
+  const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+  const rankService = createTestRankService();
+  const idService1 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
+  const idService2 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd121");
+
+  const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
+  const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
+
+  // Create first item with lowercase alias
+  const firstResult = await CreateItemWorkflow.execute({
+    title: "First",
+    itemType: "note",
+    alias: "test-item",
+    parentPlacement,
+    createdAt,
+    timezone: TEST_TIMEZONE,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService1,
+  });
+
+  if (firstResult.type !== "ok") {
+    throw new Error(`first item creation should succeed`);
+  }
+
+  // Try to create second item with uppercase alias (same canonical key)
+  const secondResult = await CreateItemWorkflow.execute({
+    title: "Second",
+    itemType: "note",
+    alias: "TEST-ITEM",
+    parentPlacement,
+    createdAt,
+    timezone: TEST_TIMEZONE,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService2,
+  });
+
+  if (secondResult.type === "ok") {
+    throw new Error("should reject uppercase variant of existing alias");
+  }
+
+  assertEquals(secondResult.error.kind, "validation");
+  if (secondResult.error.kind === "validation") {
+    assertEquals(
+      secondResult.error.issues.some((issue) => issue.message.includes("already exists")),
+      true,
+    );
+  }
+});
+
+Deno.test("CreateItemWorkflow rejects alias with same canonical key (diacritics)", async () => {
+  const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+  const rankService = createTestRankService();
+  const idService1 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
+  const idService2 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd121");
+
+  const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
+  const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
+
+  // Create first item with ASCII alias
+  const firstResult = await CreateItemWorkflow.execute({
+    title: "First",
+    itemType: "note",
+    alias: "test-item",
+    parentPlacement,
+    createdAt,
+    timezone: TEST_TIMEZONE,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService1,
+  });
+
+  if (firstResult.type !== "ok") {
+    throw new Error(`first item creation should succeed`);
+  }
+
+  // Try to create second item with diacritic alias (same canonical key)
+  const secondResult = await CreateItemWorkflow.execute({
+    title: "Second",
+    itemType: "note",
+    alias: "tëst-item",
+    parentPlacement,
+    createdAt,
+    timezone: TEST_TIMEZONE,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService2,
+  });
+
+  if (secondResult.type === "ok") {
+    throw new Error("should reject diacritic variant of existing alias");
+  }
+
+  assertEquals(secondResult.error.kind, "validation");
+  if (secondResult.error.kind === "validation") {
+    assertEquals(
+      secondResult.error.issues.some((issue) => issue.message.includes("already exists")),
+      true,
+    );
+  }
+});
+
 // CreateItemWorkflow with scheduling fields
 Deno.test("CreateItemWorkflow - creates task with dueAt", async () => {
   const repository = new InMemoryItemRepository();
