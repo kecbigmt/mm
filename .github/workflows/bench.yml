@@ -27,14 +27,21 @@ jobs:
           ref: main
           path: main
 
+      - name: Compile main binary
+        working-directory: main
+        run: deno task compile
+
       - name: Run bench on main
         working-directory: main
         run: |
-          deno bench --json --allow-read --allow-write --allow-env --allow-run tests/performance/ci/*.ts > ../bench-main.json
+          MM_TEST_BINARY=./mm deno bench --json --allow-read --allow-write --allow-env --allow-run tests/performance/ci/*.ts > ../bench-main.json
+
+      - name: Compile PR binary
+        run: deno task compile
 
       - name: Run bench on PR
         run: |
-          deno bench --json --allow-read --allow-write --allow-env --allow-run tests/performance/ci/*.ts > bench-pr.json
+          MM_TEST_BINARY=./mm deno bench --json --allow-read --allow-write --allow-env --allow-run tests/performance/ci/*.ts > bench-pr.json
 
       - name: Generate comparison report (Markdown)
         if: ${{ success() }}
