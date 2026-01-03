@@ -100,7 +100,43 @@ State-changing commands that should trigger pre-pull:
 
 ### Acceptance Checks
 
-**Status: Pending Developer Verification**
+**Status: Pending Product Owner Review**
+
+Developer verification completed:
+
+#### AC1: Pull Before File Operations
+- ✓ auto-sync mode: Verified by unit test "executes pull when mode is auto-sync" and E2E test "pulls remote changes before creating a new note"
+- ✓ lazy-sync mode: Verified by unit test "executes pull when mode is lazy-sync" and E2E test "pre-pulls in lazy-sync mode"
+- ✓ auto-commit mode skips: Verified by unit test "skips pull when mode is auto-commit" and E2E test "skips pre-pull in auto-commit mode"
+
+#### AC2: Commit and Push After Operations
+- ✓ All 9 CLI commands call `executeAutoCommit` after file operations (verified by code review)
+- ✓ Sequence preserved: pre-pull → file operation → commit → push
+
+#### AC3: Error Handling
+- ✓ Network error warning: Verified by unit test "returns warning when pull fails due to network error" and E2E test "continues operation with warning when pull fails"
+- ✓ Rebase conflict warning: Verified by unit test "returns warning when pull fails due to rebase conflict"
+- ✓ No remote configured: Verified by unit test "skips pull when no remote configured"
+
+#### AC4: Affected Commands
+- ✓ All 9 state-changing commands have `executePrePull` integration:
+  - task.ts, note.ts, event.ts (create)
+  - edit.ts (update)
+  - close.ts, reopen.ts (status change)
+  - remove.ts (delete)
+  - move.ts, snooze.ts (additional state changes)
+
+#### Code Quality
+- ✓ No debug console.log statements
+- ✓ No uncontextualized TODO comments
+- ✓ Code follows project conventions
+
+#### Test Coverage
+- 9 unit tests in `src/domain/workflows/pre_pull_test.ts`
+- 4 E2E tests in `tests/e2e/scenarios/scenario_26_pre_pull_test.ts`
+
+**Tests verified**: All 536 unit tests and 212 E2E test steps passed (2026-01-03).
+- 2 E2E test steps failed in `completions_test.ts` due to missing `zsh`/`bash` shells in CI environment (unrelated to pre-pull feature).
 
 ### Follow-ups / Open Risks
 
