@@ -1,6 +1,6 @@
 # Story: Execute sync pull before file operations instead of after
 
-**Status:** Draft
+**Status:** Implementation Complete
 **Created:** 2026-01-03T03:12:40
 **Reference:** mm task yoni-0h6
 
@@ -76,11 +76,31 @@ State-changing commands that should trigger pre-pull:
 
 ### Completed Work Summary
 
-Not yet started.
+#### New Files
+- `src/domain/workflows/pre_pull.ts` - PrePullWorkflow that checks sync mode and performs pull
+- `src/domain/workflows/pre_pull_test.ts` - Unit tests (9 test cases)
+- `src/presentation/cli/pre_pull_helper.ts` - CLI helper with loading indicator and warning formatting
+
+#### Modified Files (pre-pull integration)
+- `src/presentation/cli/commands/task.ts`
+- `src/presentation/cli/commands/note.ts`
+- `src/presentation/cli/commands/event.ts`
+- `src/presentation/cli/commands/edit.ts`
+- `src/presentation/cli/commands/close.ts`
+- `src/presentation/cli/commands/reopen.ts`
+- `src/presentation/cli/commands/remove.ts`
+- `src/presentation/cli/commands/move.ts`
+- `src/presentation/cli/commands/snooze.ts`
+
+#### Key Design Decisions
+- Pre-pull is failure-tolerant: warnings are displayed but operations proceed
+- Loading indicator uses same "Syncing..." message as post-sync
+- Network errors and pull failures show specific warning messages
+- Skips pre-pull for `auto-commit` mode (only for `auto-sync` and `lazy-sync`)
 
 ### Acceptance Checks
 
-**Status: Pending Implementation**
+**Status: Pending Developer Verification**
 
 ### Follow-ups / Open Risks
 
