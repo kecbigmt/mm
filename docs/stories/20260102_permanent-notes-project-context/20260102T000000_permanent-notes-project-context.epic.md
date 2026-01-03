@@ -22,7 +22,7 @@ Target version: mm v0.x
 * Tag management commands (`mm tag create/delete/list`) - replaced by permanent Items
 * Filtering by project/context in `mm ls` (e.g., `mm ls --project deep-work`)
 * Hierarchical project relationships (project of a project)
-* Migration of existing `context` field to new `contexts` array
+* `mm doctor fix-dangling` command for repairing dangling references
 
 ---
 
@@ -185,16 +185,16 @@ permanent
 mm ls 2025-01-02
 ```
 
-Output (with project/contexts shown):
+Output (with project/contexts shown, todo.txt format):
 ```
 2025-01-02
-  ☑️ buy-book    Buy the book @deep-work
-  📝 notes       Meeting notes #work #office
+  ☑️ buy-book    Buy the book +deep-work
+  📝 notes       Meeting notes @work @office
 ```
 
-Display format TBD:
-- `@project` for project reference
-- `#context` for context references (or keep `@context`?)
+Display format (todo.txt convention):
+- `+project` for project reference
+- `@context` for context references
 
 ---
 
@@ -245,14 +245,12 @@ When resolving `--project deep-work`:
 
 ## 6. Error Handling & Edge Cases
 
-### 6.1 Invalid Alias Reference
+### 6.1 Auto-creation (Default Behavior)
 
-If auto-creation is disabled and alias doesn't exist:
-```
-Error: Project "deep-work" not found. Use --create-missing to auto-create.
-```
+When `--project` or `--context` references a non-existent alias, a permanent Item is
+automatically created. This is the default behavior for better UX.
 
-(TBD: Should auto-creation be default or opt-in?)
+No opt-out flag is provided in the initial release.
 
 ### 6.2 Moving Permanent Item to Date
 
@@ -264,11 +262,16 @@ This is allowed. The Item becomes a regular date-bound Item. References from oth
 
 ### 6.3 Deleting Referenced Item
 
-If a permanent Item is deleted but other Items reference it:
-- Option A: Prevent deletion (referential integrity)
-- Option B: Allow deletion, leave dangling references (doctor can detect)
+If a permanent Item is deleted but other Items reference it, **deletion is allowed**
+and dangling references are left in place.
 
-TBD: Which approach?
+Rationale:
+- **Git-friendly**: Each device can operate independently during offline periods
+- **Conflict-resistant**: No complex cascade or integrity checks during merge
+- **Eventual consistency**: `mm doctor check` detects dangling references after sync
+
+Detection: `mm doctor check` will report dangling `project` and `contexts` references.
+Repair: `mm doctor fix-dangling` (out of scope for this epic).
 
 ---
 
@@ -287,13 +290,16 @@ TBD: Which approach?
 
 ### 8.1 Existing `context` Field
 
-Current Items may have `context: "some-value"` (singular). Migration options:
+Current Items may have `context: "some-value"` (singular).
 
-1. **Automatic migration**: On read, convert `context` to `contexts: [context]`
-2. **Schema version bump**: New schema version handles both formats
-3. **Manual migration**: `mm doctor migrate-contexts`
+**Approach**: Simple migration script (run once by developer).
 
-TBD: Which approach?
+Since the project is not yet released publicly, a simple one-time script is sufficient:
+1. Find all Items with `context` field
+2. Convert `context: "value"` to `contexts: ["value"]`
+3. Remove old `context` field
+
+No runtime compatibility layer needed.
 
 ### 8.2 Existing Tag Infrastructure
 
@@ -306,13 +312,15 @@ Since project is not yet released, removal is preferred.
 
 ---
 
-## 9. Open Questions
+## 9. Design Decisions (Resolved)
 
-1. **Display format**: `@project` vs `#project` vs other notation?
-2. **Auto-creation default**: Always auto-create or require flag?
-3. **Deletion policy**: Prevent or allow deleting referenced Items?
-4. **Context field migration**: Auto-migrate or explicit command?
-5. **Section support**: Can permanent Items have sections? (`permanent/1`, `permanent/2`)
+| Question | Decision |
+|----------|----------|
+| Display format | `+project` / `@context` (todo.txt convention) |
+| Auto-creation | Default enabled (no opt-out flag) |
+| Deletion policy | Allow deletion, dangling references detected by `mm doctor check` |
+| Context field migration | Simple one-time migration script |
+| Section support | Yes, same as regular Items (`permanent/1`, `permanent/2`) |
 
 ---
 
@@ -327,4 +335,5 @@ Since project is not yet released, removal is preferred.
 7. **CLI: mv <item> permanent**: Move Item to permanent placement
 8. **Auto-creation**: Create permanent Items on missing alias reference
 9. **Remove old Tag infrastructure**: Clean up TagRepository, Tag model, tags/ directory
-10. **Migration**: Handle existing `context` field
+10. **Migration script**: One-time script to convert `context` → `contexts`
+11. **Doctor: dangling detection**: Add dangling project/contexts check to `mm doctor check`
