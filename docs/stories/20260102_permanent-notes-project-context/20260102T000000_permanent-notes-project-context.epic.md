@@ -102,7 +102,21 @@ type ItemData = {
 
 Note: `context` (singular) is renamed to `contexts` (plural) and changed to array.
 
-### 3.3 Physical File Location
+### 3.4 ItemIcon Extension
+
+Current:
+```typescript
+type ItemIconValue = "note" | "task" | "event";
+```
+
+New:
+```typescript
+type ItemIconValue = "note" | "task" | "event" | "topic";  // NEW
+```
+
+The `topic` icon (📌) is used for permanent Items created via auto-creation.
+
+### 3.5 Physical File Location
 
 Permanent Items are still stored under `items/YYYY/MM/DD/<uuid>.md` based on their creation date. The `placement: "permanent"` field makes them logically independent of the date hierarchy.
 
@@ -155,7 +169,7 @@ When `--project` or `--context` references an alias that doesn't exist:
    - `placement: "permanent"`
    - `alias: <referenced-alias>`
    - `title: <referenced-alias>` (alias as title)
-   - `icon: "note"`
+   - `icon: "topic"` (📌)
    - `status: "open"`
 2. Then create/update the original Item with the reference
 
@@ -163,7 +177,7 @@ Example:
 ```bash
 mm task "Research options" --project home-renovation
 # If "home-renovation" doesn't exist:
-# 1. Creates permanent note with alias "home-renovation", title "home-renovation"
+# 1. Creates permanent topic (📌) with alias "home-renovation", title "home-renovation"
 # 2. Creates task with project: "home-renovation"
 ```
 
@@ -176,9 +190,9 @@ mm ls permanent
 Output:
 ```
 permanent
-  📝 deep-work        Deep Work
-  📝 home-renovation  Home Renovation
-  📝 office           Office (context)
+  📌 deep-work        Deep Work
+  📌 home-renovation  Home Renovation
+  📌 office           Office
 ```
 
 ```bash
@@ -239,7 +253,23 @@ When resolving `--project deep-work`:
 
 - `project` must reference an existing alias (or trigger auto-create)
 - `contexts` elements must each reference existing aliases (or trigger auto-create)
-- Circular references: Item cannot be its own project/context (TBD: deeper cycle detection?)
+- **Self-reference**: Item cannot be its own project/context (checked at input time)
+- **Deep cycles**: Detected by `mm doctor check` (same approach as placement cycles)
+
+### 5.5 YAML Frontmatter Format
+
+Use block format for `contexts` array to minimize Git merge conflicts:
+
+```yaml
+# Good: block format (conflict-resistant)
+contexts:
+  - work
+  - office
+  - phone
+
+# Avoid: inline format (conflict-prone)
+contexts: [work, office, phone]
+```
 
 ---
 
@@ -321,19 +351,23 @@ Since project is not yet released, removal is preferred.
 | Deletion policy | Allow deletion, dangling references detected by `mm doctor check` |
 | Context field migration | Simple one-time migration script |
 | Section support | Yes, same as regular Items (`permanent/1`, `permanent/2`) |
+| New icon | `topic` with 📌 emoji for permanent Items |
+| Circular references | Self-reference blocked at input; deep cycles detected by `mm doctor check` |
+| YAML contexts format | Block format (not inline) for Git conflict resistance |
 
 ---
 
 ## 10. Story Breakdown (Draft)
 
 1. **PlacementHead extension**: Add `kind: "permanent"` to domain model
-2. **Item fields**: Add `project` and rename `context` to `contexts` (array)
-3. **Index structure**: Add `.index/graph/permanent/` handling
-4. **CLI: placement option**: `--placement permanent` for note/task/event
-5. **CLI: project/contexts options**: `--project`, `--context` for note/task/event/edit
-6. **CLI: ls permanent**: List permanent Items
-7. **CLI: mv <item> permanent**: Move Item to permanent placement
-8. **Auto-creation**: Create permanent Items on missing alias reference
-9. **Remove old Tag infrastructure**: Clean up TagRepository, Tag model, tags/ directory
-10. **Migration script**: One-time script to convert `context` → `contexts`
-11. **Doctor: dangling detection**: Add dangling project/contexts check to `mm doctor check`
+2. **ItemIcon extension**: Add `topic` (📌) to ItemIcon
+3. **Item fields**: Add `project` and rename `context` to `contexts` (array)
+4. **Index structure**: Add `.index/graph/permanent/` handling
+5. **CLI: placement option**: `--placement permanent` for note/task/event
+6. **CLI: project/contexts options**: `--project`, `--context` for note/task/event/edit
+7. **CLI: ls permanent**: List permanent Items
+8. **CLI: mv <item> permanent**: Move Item to permanent placement
+9. **Auto-creation**: Create permanent Items on missing alias reference
+10. **Remove old Tag infrastructure**: Clean up TagRepository, Tag model, tags/ directory
+11. **Migration script**: One-time script to convert `context` → `contexts`
+12. **Doctor: dangling detection**: Add dangling project/contexts check to `mm doctor check`
