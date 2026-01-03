@@ -425,10 +425,13 @@ const deriveExpectedEdgeDirectory = (item: Item): string => {
     // Use ISO format (YYYY-MM-DD) to match graph_index storage
     const dateStr = date.data.iso;
     basePath = `dates/${dateStr}`;
-  } else {
+  } else if (placement.head.kind === "item") {
     // item placement
     const parentId = placement.head.id.toString();
     basePath = `parents/${parentId}`;
+  } else {
+    // permanent placement
+    basePath = `permanent`;
   }
 
   if (sections.length > 0) {

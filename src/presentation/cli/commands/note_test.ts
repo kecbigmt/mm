@@ -144,3 +144,133 @@ Deno.test({
     }
   },
 });
+
+Deno.test({
+  name: "note command with --placement permanent creates note with permanent placement",
+  permissions: {
+    env: true,
+    read: true,
+    write: true,
+  },
+  async fn() {
+    const workspace = await Deno.makeTempDir({ prefix: "mm-cli-permanent-" });
+    try {
+      await Deno.writeTextFile(
+        join(workspace, "workspace.json"),
+        JSON.stringify({ timezone: "Asia/Tokyo" }, null, 2),
+      );
+
+      const noteConsole = captureConsole();
+      try {
+        await buildCli().parse([
+          "note",
+          "Permanent Note",
+          "--placement",
+          "permanent",
+          "--workspace",
+          workspace,
+        ]);
+      } finally {
+        noteConsole.restore();
+      }
+
+      assert(
+        noteConsole.errors.length === 0,
+        `note command produced errors: ${noteConsole.errors}`,
+      );
+      const successLine = noteConsole.logs.find((line) => line.includes("Permanent Note"));
+      assert(successLine, "note command did not report created note");
+      assert(successLine.includes("permanent"), "success message should mention permanent");
+
+      // Find the created item file
+      const itemsDirectory = join(workspace, "items");
+      const itemFiles: Array<{ id: string; path: string }> = [];
+      for await (const yearEntry of Deno.readDir(itemsDirectory)) {
+        if (!yearEntry.isDirectory || yearEntry.name.startsWith(".")) {
+          continue;
+        }
+        const yearPath = join(itemsDirectory, yearEntry.name);
+        for await (const monthEntry of Deno.readDir(yearPath)) {
+          if (!monthEntry.isDirectory || monthEntry.name.startsWith(".")) {
+            continue;
+          }
+          const monthPath = join(yearPath, monthEntry.name);
+          for await (const dayEntry of Deno.readDir(monthPath)) {
+            if (!dayEntry.isDirectory || dayEntry.name.startsWith(".")) {
+              continue;
+            }
+            const dayPath = join(monthPath, dayEntry.name);
+            for await (const fileEntry of Deno.readDir(dayPath)) {
+              if (fileEntry.isDirectory || !fileEntry.name.endsWith(".md")) {
+                continue;
+              }
+              const filePath = join(dayPath, fileEntry.name);
+              const itemId = fileEntry.name.slice(0, -3);
+              itemFiles.push({ id: itemId, path: filePath });
+            }
+          }
+        }
+      }
+
+      assertEquals(itemFiles.length, 1, "expected exactly one item file");
+      const [{ path: itemFilePath }] = itemFiles;
+
+      // Read and verify frontmatter contains permanent placement
+      const fileContent = await Deno.readTextFile(itemFilePath);
+      const frontmatterEnd = fileContent.indexOf("\n---\n", 4);
+      const yamlContent = fileContent.slice(4, frontmatterEnd);
+
+      assert(
+        yamlContent.includes("placement: permanent") ||
+          yamlContent.includes("placement: 'permanent'"),
+        "frontmatter should contain placement: permanent",
+      );
+    } finally {
+      await Deno.remove(workspace, { recursive: true });
+    }
+  },
+});
+
+Deno.test({
+  name: "note command with --placement invalid shows error",
+  permissions: {
+    env: true,
+    read: true,
+    write: true,
+  },
+  async fn() {
+    const workspace = await Deno.makeTempDir({ prefix: "mm-cli-invalid-placement-" });
+    try {
+      await Deno.writeTextFile(
+        join(workspace, "workspace.json"),
+        JSON.stringify({ timezone: "Asia/Tokyo" }, null, 2),
+      );
+
+      const noteConsole = captureConsole();
+      try {
+        await buildCli().parse([
+          "note",
+          "Test Note",
+          "--placement",
+          "invalid",
+          "--workspace",
+          workspace,
+        ]);
+      } finally {
+        noteConsole.restore();
+      }
+
+      // Should have an error
+      assert(
+        noteConsole.errors.length > 0,
+        "note command should produce an error for invalid placement",
+      );
+      const errorLine = noteConsole.errors.find((line) =>
+        line.toLowerCase().includes("invalid") || line.toLowerCase().includes("placement")
+      );
+      assert(errorLine, "error message should mention invalid placement");
+    } finally {
+      await Deno.remove(workspace, { recursive: true });
+    }
+  },
+});

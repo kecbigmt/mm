@@ -10,6 +10,7 @@ import {
   createDateRange,
   createItemPlacement,
   createNumericRange,
+  createPermanentPlacement,
   createPlacement,
   createSingleRange,
   parseAliasSlug,
@@ -127,7 +128,7 @@ export const createPathResolver = (
           return Result.ok(item.data.placement);
         }
 
-        // Date head with no sections - cannot go higher
+        // Date or permanent head with no sections - cannot go higher
         return Result.error(
           createValidationError(PATH_RESOLVER_ERROR_KIND, [
             createValidationIssue("cannot navigate above root", {
@@ -207,6 +208,10 @@ export const createPathResolver = (
 
         return Result.ok(createItemPlacement(alias.data.itemId, []));
       }
+
+      case "permanent": {
+        return Result.ok(createPermanentPlacement([]));
+      }
     }
   };
 
@@ -220,7 +225,7 @@ export const createPathResolver = (
         return Result.error(
           createValidationError(PATH_RESOLVER_ERROR_KIND, [
             createValidationIssue(
-              "absolute path requires at least one segment to define head (date or item)",
+              "absolute path requires at least one segment to define head (date, item, or permanent)",
               { code: "absolute_path_missing_head" },
             ),
           ]),
@@ -232,7 +237,7 @@ export const createPathResolver = (
         return Result.error(
           createValidationError(PATH_RESOLVER_ERROR_KIND, [
             createValidationIssue(
-              "absolute path must start with date or item, not numeric section",
+              "absolute path must start with date, item, or permanent, not numeric section",
               { code: "absolute_path_invalid_head" },
             ),
           ]),
