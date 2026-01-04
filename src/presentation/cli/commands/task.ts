@@ -12,6 +12,7 @@ import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import { executeAutoCommit } from "../auto_commit_helper.ts";
+import { executePrePull } from "../pre_pull_helper.ts";
 import { deriveFilePathFromId } from "../../../infrastructure/fileSystem/item_repository.ts";
 import { handlePostEditUpdates, launchEditor } from "../utils/edit_item_helper.ts";
 
@@ -53,6 +54,14 @@ export function createTaskCommand() {
       }
 
       const deps = depsResult.value;
+
+      // Pre-pull to get latest changes before file operation
+      await executePrePull({
+        workspaceRoot: deps.root,
+        versionControlService: deps.versionControlService,
+        workspaceRepository: deps.workspaceRepository,
+      });
+
       const resolvedTitle = typeof title === "string" && title.trim().length > 0
         ? title
         : "Untitled";

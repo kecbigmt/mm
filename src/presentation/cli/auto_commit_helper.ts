@@ -1,4 +1,8 @@
-import { AutoCommitError, AutoCommitWorkflow } from "../../domain/workflows/auto_commit.ts";
+import {
+  AutoCommitError,
+  createSyncService,
+  SyncService,
+} from "../../infrastructure/git/sync_service.ts";
 import { VersionControlService } from "../../domain/services/version_control_service.ts";
 import { WorkspaceRepository } from "../../domain/repositories/workspace_repository.ts";
 import { StateRepository } from "../../domain/repositories/state_repository.ts";
@@ -9,6 +13,7 @@ export type AutoCommitHelperDeps = {
   versionControlService: VersionControlService;
   workspaceRepository: WorkspaceRepository;
   stateRepository: StateRepository;
+  syncService?: SyncService;
 };
 
 function formatAutoCommitError(error: AutoCommitError): string {
@@ -55,26 +60,39 @@ export async function executeAutoCommit(
   deps: AutoCommitHelperDeps,
   summary: string,
 ): Promise<void> {
-  const result = await AutoCommitWorkflow.execute(
+  // Load workspace settings
+  const settingsResult = await deps.workspaceRepository.load(deps.workspaceRoot);
+  if (settingsResult.type === "error") {
+    // Cannot load settings - skip auto-commit
+    return;
+  }
+
+  const settings = settingsResult.value;
+
+  // Check if sync is enabled
+  if (!settings.data.sync.enabled) {
+    return;
+  }
+
+  const syncService = deps.syncService ??
+    createSyncService({ versionControlService: deps.versionControlService });
+
+  const result = await syncService.autoCommit(
     {
       workspaceRoot: deps.workspaceRoot,
       summary,
+      syncEnabled: settings.data.sync.enabled,
+      syncMode: settings.data.sync.mode,
+      remote: settings.data.sync.git?.remote ?? undefined,
+      branch: settings.data.sync.git?.branch ?? undefined,
+      lazy: settings.data.sync.lazy ?? undefined,
       onSync: (operation) => withLoadingIndicator("Syncing...", operation),
     },
-    {
-      versionControlService: deps.versionControlService,
-      workspaceRepository: deps.workspaceRepository,
-      stateRepository: deps.stateRepository,
-    },
+    { stateRepository: deps.stateRepository },
   );
 
-  // AutoCommitWorkflow never returns error (Result<T, never>)
-  if (result.type === "ok") {
-    const autoCommitResult = result.value;
-
-    // Display warning messages for errors
-    if (autoCommitResult.error) {
-      console.warn(formatAutoCommitError(autoCommitResult.error));
-    }
+  // Display warning messages for errors
+  if (result.error) {
+    console.warn(formatAutoCommitError(result.error));
   }
 }
