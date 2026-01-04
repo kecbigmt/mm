@@ -14,10 +14,12 @@ const PLACEMENT_KIND = "Placement" as const;
  * PlacementHead represents the direct parent of an item
  * - date: Item is placed under a date shelf (calendar container)
  * - item: Item is placed under another item (UUID parent)
+ * - permanent: Item is placed outside the date hierarchy (permanent notes)
  */
 export type PlacementHead =
   | Readonly<{ readonly kind: "date"; readonly date: CalendarDay }>
-  | Readonly<{ readonly kind: "item"; readonly id: ItemId }>;
+  | Readonly<{ readonly kind: "item"; readonly id: ItemId }>
+  | Readonly<{ readonly kind: "permanent" }>;
 
 /**
  * Placement represents the canonical, absolute position of an item
@@ -109,7 +111,7 @@ const buildError = (
  * Serialize a Placement to a PlacementString
  *
  * Format: <head>[/<section>]*
- * - head: YYYY-MM-DD (date) or UUID (item)
+ * - head: YYYY-MM-DD (date), UUID (item), or "permanent"
  * - section: numeric segments separated by /
  *
  * Examples:
@@ -117,11 +119,22 @@ const buildError = (
  * - "2025-11-15/1/3" → date shelf, section [1, 3]
  * - "019a85fc-67c4-7a54-be8e-305bae009f9e" → item parent
  * - "019a85fc-67c4-7a54-be8e-305bae009f9e/1" → item parent, section [1]
+ * - "permanent" → permanent placement
+ * - "permanent/1" → permanent placement with section
  */
 export const serializePlacement = (placement: Placement): string => {
-  const headStr = placement.head.kind === "date"
-    ? placement.head.date.toString()
-    : placement.head.id.toString();
+  let headStr: string;
+  switch (placement.head.kind) {
+    case "date":
+      headStr = placement.head.date.toString();
+      break;
+    case "item":
+      headStr = placement.head.id.toString();
+      break;
+    case "permanent":
+      headStr = "permanent";
+      break;
+  }
 
   if (placement.section.length === 0) {
     return headStr;
@@ -193,10 +206,12 @@ export const parsePlacement = (
 
   const [headSegment, ...sectionSegments] = segments;
 
-  // Parse head (date or item UUID)
+  // Parse head (date, item UUID, or "permanent")
   let head: PlacementHead;
 
-  if (DATE_REGEX.test(headSegment)) {
+  if (headSegment === "permanent") {
+    head = { kind: "permanent" };
+  } else if (DATE_REGEX.test(headSegment)) {
     const dateResult = parseCalendarDay(headSegment);
     if (dateResult.type === "error") {
       return buildError(
@@ -279,6 +294,13 @@ export const createItemPlacement = (
   id: ItemId,
   section: ReadonlyArray<number> = [],
 ): Placement => createPlacement({ kind: "item", id }, section);
+
+/**
+ * Create a permanent placement
+ */
+export const createPermanentPlacement = (
+  section: ReadonlyArray<number> = [],
+): Placement => createPlacement({ kind: "permanent" }, section);
 
 export const isPlacement = (value: unknown): value is Placement =>
   typeof value === "object" && value !== null && (value as Placement).kind === PLACEMENT_KIND;

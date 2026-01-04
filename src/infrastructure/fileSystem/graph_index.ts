@@ -213,6 +213,104 @@ const listParentEdges = async (
 };
 
 /**
+ * List edge references for items under permanent placement
+ */
+const listPermanentEdges = async (
+  workspaceRoot: string,
+  sectionPath: string,
+): Promise<Result<ReadonlyArray<EdgeReference>, RepositoryError>> => {
+  const directory = sectionPath
+    ? join(workspaceRoot, ".index", "graph", "permanent", sectionPath)
+    : join(workspaceRoot, ".index", "graph", "permanent");
+
+  try {
+    const edges: EdgeReference[] = [];
+
+    for await (const entry of Deno.readDir(directory)) {
+      if (!entry.isFile || !entry.name.endsWith(EDGE_FILE_SUFFIX)) {
+        continue;
+      }
+
+      const edgeFilePath = join(directory, entry.name);
+      const edgeResult = await readPermanentEdge(edgeFilePath, entry.name);
+      if (edgeResult.type === "error") {
+        return edgeResult;
+      }
+
+      edges.push(edgeResult.value);
+    }
+
+    return Result.ok(edges);
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      // No edge directory means no items at this placement
+      return Result.ok([]);
+    }
+    return Result.error(
+      createRepositoryError("item", "list", "failed to read permanent edge directory", {
+        identifier: sectionPath || "permanent",
+        cause: error,
+      }),
+    );
+  }
+};
+
+/**
+ * Read permanent edge file
+ */
+const readPermanentEdge = async (
+  edgeFilePath: string,
+  fileName: string,
+): Promise<Result<EdgeReference, RepositoryError>> => {
+  try {
+    const text = await Deno.readTextFile(edgeFilePath);
+    const data = JSON.parse(text) as { schema?: string; rank: string };
+
+    // Extract item ID from filename (<itemId>.edge.json)
+    const itemIdStr = fileName.replace(EDGE_FILE_SUFFIX, "");
+    const itemIdResult = parseItemId(itemIdStr);
+    if (itemIdResult.type === "error") {
+      return Result.error(
+        createRepositoryError("item", "list", "invalid item ID in permanent edge filename", {
+          identifier: fileName,
+          cause: itemIdResult.error,
+        }),
+      );
+    }
+
+    const rankResult = parseItemRank(data.rank);
+    if (rankResult.type === "error") {
+      return Result.error(
+        createRepositoryError("item", "list", "invalid rank in permanent edge", {
+          identifier: itemIdStr,
+          cause: rankResult.error,
+        }),
+      );
+    }
+
+    return Result.ok({
+      itemId: itemIdResult.value,
+      rank: rankResult.value,
+    });
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return Result.error(
+        createRepositoryError("item", "list", "permanent edge file is invalid JSON", {
+          identifier: fileName,
+          cause: error,
+        }),
+      );
+    }
+    return Result.error(
+      createRepositoryError("item", "list", "failed to read permanent edge file", {
+        identifier: fileName,
+        cause: error,
+      }),
+    );
+  }
+};
+
+/**
  * Query edge references for items matching a placement range
  *
  * This function reads edge files from the .index/graph directory instead of
@@ -245,11 +343,15 @@ export const queryEdgeReferences = async (
           // For now, fall back to empty result
           return Result.ok([]);
         }
-      } else {
+      } else if (range.at.head.kind === "item") {
         // Under item parent
         const parentId = range.at.head.id;
         const sectionPath = range.at.section.join("/");
         return await listParentEdges(workspaceRoot, parentId, sectionPath);
+      } else {
+        // Permanent placement
+        const sectionPath = range.at.section.join("/");
+        return await listPermanentEdges(workspaceRoot, sectionPath);
       }
     }
 

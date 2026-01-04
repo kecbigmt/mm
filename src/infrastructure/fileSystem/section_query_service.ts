@@ -90,12 +90,18 @@ const buildDirectoryPath = (root: string, placement: Placement): string => {
     return sectionPath
       ? join(root, ".index", "graph", "dates", dateStr, sectionPath)
       : join(root, ".index", "graph", "dates", dateStr);
-  } else {
+  } else if (placement.head.kind === "item") {
     const itemId = placement.head.id.toString();
     const sectionPath = placement.section.join("/");
     return sectionPath
       ? join(root, ".index", "graph", "parents", itemId, sectionPath)
       : join(root, ".index", "graph", "parents", itemId);
+  } else {
+    // permanent placement
+    const sectionPath = placement.section.join("/");
+    return sectionPath
+      ? join(root, ".index", "graph", "permanent", sectionPath)
+      : join(root, ".index", "graph", "permanent");
   }
 };
 

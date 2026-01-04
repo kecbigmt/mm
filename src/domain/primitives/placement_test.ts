@@ -2,6 +2,7 @@ import { assertEquals } from "@std/assert";
 import {
   createDatePlacement,
   createItemPlacement,
+  createPermanentPlacement,
   createPlacement,
   parsePlacement,
   serializePlacement,
@@ -265,4 +266,80 @@ Deno.test("placement.parsePlacement - accepts existing Placement", () => {
   if (result.type === "ok") {
     assertEquals(result.value.equals(placement), true);
   }
+});
+
+// Permanent placement tests
+Deno.test("placement.parsePlacement - permanent head, no section", () => {
+  const result = parsePlacement("permanent");
+  assertEquals(result.type, "ok");
+
+  if (result.type === "ok") {
+    const placement = result.value;
+    assertEquals(placement.head.kind, "permanent");
+    assertEquals(placement.section.length, 0);
+  }
+});
+
+Deno.test("placement.parsePlacement - permanent head with sections", () => {
+  const result = parsePlacement("permanent/1/3");
+  assertEquals(result.type, "ok");
+
+  if (result.type === "ok") {
+    const placement = result.value;
+    assertEquals(placement.head.kind, "permanent");
+    assertEquals(placement.section, [1, 3]);
+  }
+});
+
+Deno.test("placement.serializePlacement - permanent head, no section", () => {
+  const placement = createPermanentPlacement();
+  assertEquals(serializePlacement(placement), "permanent");
+});
+
+Deno.test("placement.serializePlacement - permanent head with sections", () => {
+  const placement = createPermanentPlacement([1, 3]);
+  assertEquals(serializePlacement(placement), "permanent/1/3");
+});
+
+Deno.test("placement.equals - same permanent placements", () => {
+  const p1 = createPermanentPlacement([1]);
+  const p2 = createPermanentPlacement([1]);
+  assertEquals(p1.equals(p2), true);
+});
+
+Deno.test("placement.equals - different permanent placements (different sections)", () => {
+  const p1 = createPermanentPlacement([1]);
+  const p2 = createPermanentPlacement([2]);
+  assertEquals(p1.equals(p2), false);
+});
+
+Deno.test("placement.equals - permanent vs date placement", () => {
+  const date = Result.unwrap(parseCalendarDay("2025-11-15"));
+  const p1 = createPermanentPlacement();
+  const p2 = createDatePlacement(date);
+  assertEquals(p1.equals(p2), false);
+});
+
+Deno.test("placement.parent - permanent with sections returns parent", () => {
+  const placement = createPermanentPlacement([1, 3]);
+  const parent = placement.parent();
+
+  assertEquals(parent !== null, true);
+  if (parent) {
+    assertEquals(parent.head.kind, "permanent");
+    assertEquals(parent.section, [1]);
+  }
+});
+
+Deno.test("placement.parent - permanent no sections returns null", () => {
+  const placement = createPermanentPlacement();
+  const parent = placement.parent();
+  assertEquals(parent, null);
+});
+
+Deno.test("placement.parsePlacement - permanent roundtrip", () => {
+  const original = "permanent/1/3";
+  const parsed = Result.unwrap(parsePlacement(original));
+  const serialized = serializePlacement(parsed);
+  assertEquals(serialized, original);
 });

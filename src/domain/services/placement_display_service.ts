@@ -40,7 +40,7 @@ export async function placementToResolvedGraphPath(
   let currentPlacement = placement;
   const pathStack: Array<{ id: ItemId; alias?: AliasSlug; section: ReadonlyArray<number> }> = [];
 
-  // Traverse up to the root date
+  // Traverse up to the root (date or permanent)
   while (currentPlacement.head.kind === "item") {
     const itemId = currentPlacement.head.id;
     const itemResult = await deps.itemRepository.load(itemId);
@@ -68,11 +68,22 @@ export async function placementToResolvedGraphPath(
     currentPlacement = itemResult.value.data.placement;
   }
 
-  // Now currentPlacement has a date head - this is our root
-  segments.push({
-    kind: "date",
-    date: currentPlacement.head.date,
-  });
+  // Now currentPlacement has a date or permanent head - this is our root
+  if (currentPlacement.head.kind === "date") {
+    segments.push({
+      kind: "date",
+      date: currentPlacement.head.date,
+    });
+  } else {
+    // permanent head - use "permanent" as the root segment
+    // Note: ResolvedGraphPath doesn't have a "permanent" kind yet,
+    // so we represent it as a section with index 0 as placeholder
+    // This will need to be extended when permanent display is fully implemented
+    segments.push({
+      kind: "section",
+      index: 0,
+    });
+  }
 
   // Add root sections (if any)
   for (const sectionIndex of currentPlacement.section) {

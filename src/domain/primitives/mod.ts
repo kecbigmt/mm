@@ -75,6 +75,7 @@ export type { Placement, PlacementHead, PlacementValidationError } from "./place
 export {
   createDatePlacement,
   createItemPlacement,
+  createPermanentPlacement,
   createPlacement,
   isPlacement,
   parsePlacement,

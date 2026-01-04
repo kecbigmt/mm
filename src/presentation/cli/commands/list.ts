@@ -292,9 +292,14 @@ export function createListCommand() {
         parent: ReturnType<typeof createPlacement>,
         sectionPrefix: number,
       ): string => {
-        const headStr = parent.head.kind === "date"
-          ? parent.head.date.toString()
-          : (lookupAlias(parent.head.id.toString()) ?? parent.head.id.toString());
+        let headStr: string;
+        if (parent.head.kind === "date") {
+          headStr = parent.head.date.toString();
+        } else if (parent.head.kind === "item") {
+          headStr = lookupAlias(parent.head.id.toString()) ?? parent.head.id.toString();
+        } else {
+          headStr = "permanent";
+        }
 
         if (parent.section.length === 0) {
           return `${headStr}/${sectionPrefix}`;

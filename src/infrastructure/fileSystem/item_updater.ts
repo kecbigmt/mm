@@ -201,7 +201,7 @@ const updateItemRank = async (
           `${itemIdStr}.edge.json`,
         );
       }
-    } else {
+    } else if (placement.head.kind === "item") {
       // Item placement: .index/graph/parents/<parentId>/<section>/<itemId>.edge.json
       const parentIdStr = placement.head.id.toString();
       const sectionPath = placement.section.length > 0 ? placement.section.join("/") : "";
@@ -223,6 +223,28 @@ const updateItemRank = async (
           "graph",
           "parents",
           parentIdStr,
+          `${itemIdStr}.edge.json`,
+        );
+      }
+    } else {
+      // Permanent placement: .index/graph/permanent/<section>/<itemId>.edge.json
+      const sectionPath = placement.section.length > 0 ? placement.section.join("/") : "";
+
+      if (sectionPath) {
+        edgeFilePath = join(
+          workspaceRoot,
+          ".index",
+          "graph",
+          "permanent",
+          sectionPath,
+          `${itemIdStr}.edge.json`,
+        );
+      } else {
+        edgeFilePath = join(
+          workspaceRoot,
+          ".index",
+          "graph",
+          "permanent",
           `${itemIdStr}.edge.json`,
         );
       }

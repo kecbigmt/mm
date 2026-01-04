@@ -78,7 +78,7 @@ const getEdgeDirectoryPath = (item: Item): string => {
       const sectionPath = placement.section.join("/");
       return `dates/${dateStr}/${sectionPath}`;
     }
-  } else {
+  } else if (head.kind === "item") {
     // Item placement: parents/<parent-uuid> or parents/<parent-uuid>/1/3
     const parentId = head.id.toString();
     if (placement.section.length === 0) {
@@ -86,6 +86,14 @@ const getEdgeDirectoryPath = (item: Item): string => {
     } else {
       const sectionPath = placement.section.join("/");
       return `parents/${parentId}/${sectionPath}`;
+    }
+  } else {
+    // Permanent placement: permanent or permanent/1/3
+    if (placement.section.length === 0) {
+      return `permanent`;
+    } else {
+      const sectionPath = placement.section.join("/");
+      return `permanent/${sectionPath}`;
     }
   }
 };
