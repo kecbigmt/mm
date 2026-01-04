@@ -151,3 +151,71 @@ Developer verification completed:
 #### Remaining
 
 - Edge case: what if pull succeeds but local file was modified externally?
+
+---
+
+## Ongoing: AutoCommitWorkflow Refactoring
+
+### Background
+
+When refactoring PrePullWorkflow to align with DMMF (Domain Modeling Made Functional), we identified the same architectural issue in `AutoCommitWorkflow`. Git I/O operations are infrastructure concerns, not domain logic, and should be moved accordingly.
+
+### Design Approach
+
+**Before (current)**:
+```
+src/domain/workflows/auto_commit.ts          # Git I/O in domain layer
+src/presentation/cli/auto_commit_helper.ts   # CLI helper
+```
+
+**After (target)**:
+```
+src/infrastructure/git/sync_service.ts       # Consolidate into SyncService.autoCommit()
+src/presentation/cli/auto_commit_helper.ts   # Update to call SyncService
+```
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  CLI (Imperative Shell)                                     │
+│  - executePrePull()    → SyncService.prePull()   ✅ Done    │
+│  - executeAutoCommit() → SyncService.autoCommit() ⬜ TODO   │
+├─────────────────────────────────────────────────────────────┤
+│  Domain Workflows (pure business logic)                     │
+│  - EditItemWorkflow, CreateItemWorkflow, etc.              │
+├─────────────────────────────────────────────────────────────┤
+│  Infrastructure Services (I/O operations)                   │
+│  - SyncService.prePull()    ✅ Done                         │
+│  - SyncService.autoCommit() ⬜ TODO                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### TODO: AutoCommit Migration Tasks
+
+1. [ ] Add `SyncService.autoCommit()` to `sync_service.ts`
+   - Port logic from `AutoCommitWorkflow.execute()` in `auto_commit.ts`
+   - Type definitions: `AutoCommitInput`, `AutoCommitResult`, `AutoCommitError`
+   - Include lazy-sync threshold logic
+
+2. [ ] Add tests to `sync_service_test.ts`
+   - Port and adapt 17 test cases from `auto_commit_test.ts`
+   - Mock dependencies (StateRepository, etc.)
+
+3. [ ] Update `auto_commit_helper.ts`
+   - Change from `AutoCommitWorkflow` to `SyncService.autoCommit()` call
+   - Settings loading handled in helper (same pattern as prePull)
+
+4. [ ] Delete old files
+   - `src/domain/workflows/auto_commit.ts`
+   - `src/domain/workflows/auto_commit_test.ts`
+
+5. [ ] Run tests and verify
+   - `deno task test` - all tests should pass
+   - E2E: scenario_22 (auto-commit), scenario_23 (auto-sync) should work
+
+### Reference: Changes Made During PrePull Migration
+
+- Removed `Result<T, never>` wrapper, use simple return type instead
+- Moved settings loading responsibility to helper (Shell layer)
+- SyncService handles only pure Git operations
