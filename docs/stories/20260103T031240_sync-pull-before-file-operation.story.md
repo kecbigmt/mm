@@ -77,9 +77,9 @@ State-changing commands that should trigger pre-pull:
 ### Completed Work Summary
 
 #### New Files
-- `src/domain/workflows/pre_pull.ts` - PrePullWorkflow that checks sync mode and performs pull
-- `src/domain/workflows/pre_pull_test.ts` - Unit tests (9 test cases)
-- `src/presentation/cli/pre_pull_helper.ts` - CLI helper with loading indicator and warning formatting
+- `src/infrastructure/git/sync_service.ts` - SyncService with prePull operation (Infrastructure layer)
+- `src/infrastructure/git/sync_service_test.ts` - Unit tests (9 test cases)
+- `src/presentation/cli/pre_pull_helper.ts` - CLI helper for orchestrating pre-pull in Imperative Shell
 
 #### Modified Files (pre-pull integration)
 - `src/presentation/cli/commands/task.ts`
@@ -93,6 +93,9 @@ State-changing commands that should trigger pre-pull:
 - `src/presentation/cli/commands/snooze.ts`
 
 #### Key Design Decisions
+- **DMMF-aligned architecture**: Pre-pull is an Infrastructure Service, not a Domain Workflow
+  - Git sync operations are I/O concerns, not domain logic
+  - CLI (Imperative Shell) orchestrates: prePull → Domain Workflow → autoCommit
 - Pre-pull is failure-tolerant: warnings are displayed but operations proceed
 - Loading indicator uses same "Syncing..." message as post-sync
 - Network errors and pull failures show specific warning messages
@@ -132,7 +135,7 @@ Developer verification completed:
 - ✓ Code follows project conventions
 
 #### Test Coverage
-- 9 unit tests in `src/domain/workflows/pre_pull_test.ts`
+- 9 unit tests in `src/infrastructure/git/sync_service_test.ts`
 - 4 E2E tests in `tests/e2e/scenarios/scenario_26_pre_pull_test.ts`
 
 **Tests verified**: All 536 unit tests and 212 E2E test steps passed (2026-01-03).
