@@ -12,7 +12,8 @@ export type PathToken =
   | Readonly<{ readonly kind: "dotdot" }> // ".."
   | Readonly<{ readonly kind: "relativeDate"; readonly expr: string }> // "today", "td", "+2w", "~mon"
   | Readonly<{ readonly kind: "idOrAlias"; readonly value: string }> // UUID or alias
-  | Readonly<{ readonly kind: "numeric"; readonly value: number }>; // section number
+  | Readonly<{ readonly kind: "numeric"; readonly value: number }> // section number
+  | Readonly<{ readonly kind: "permanent" }>; // "permanent" for permanent placement
 
 /**
  * PathExpression represents a path input with potential syntactic sugar

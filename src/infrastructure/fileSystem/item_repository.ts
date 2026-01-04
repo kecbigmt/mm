@@ -617,6 +617,72 @@ export const createFileSystemItemRepository = (
           }),
         );
       }
+    } else if (item.data.placement.head.kind === "permanent") {
+      // Permanent placement - save edge file in .index/graph/permanent/
+      const sectionPath = item.data.placement.section.join("/");
+
+      // Delete old permanent edge if section changed
+      if (existingItem && existingItem.data.placement.head.kind === "permanent") {
+        const oldSectionPath = existingItem.data.placement.section.join("/");
+        const newSectionPath = item.data.placement.section.join("/");
+
+        if (oldSectionPath !== newSectionPath) {
+          const oldEdgeDir = oldSectionPath
+            ? join(dependencies.root, ".index", "graph", "permanent", oldSectionPath)
+            : join(dependencies.root, ".index", "graph", "permanent");
+          const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
+
+          try {
+            await Deno.remove(oldEdgeFilePath);
+          } catch (error) {
+            if (!(error instanceof Deno.errors.NotFound)) {
+              return Result.error(
+                createRepositoryError("item", "save", "failed to delete old permanent edge file", {
+                  identifier: snapshot.id,
+                  cause: error,
+                }),
+              );
+            }
+          }
+        }
+      }
+
+      // Save new permanent edge file
+      const edgeDir = sectionPath
+        ? join(dependencies.root, ".index", "graph", "permanent", sectionPath)
+        : join(dependencies.root, ".index", "graph", "permanent");
+
+      const edgeFilePath = join(edgeDir, `${item.data.id.toString()}.edge.json`);
+
+      try {
+        await Deno.mkdir(edgeDir, { recursive: true });
+      } catch (error) {
+        if (!(error instanceof Deno.errors.AlreadyExists)) {
+          return Result.error(
+            createRepositoryError("item", "save", "failed to create permanent edge directory", {
+              identifier: snapshot.id,
+              cause: error,
+            }),
+          );
+        }
+      }
+
+      const edgeSnapshot = {
+        schema: "mm.edge/1",
+        rank: item.data.rank.toString(),
+      };
+      const edgePayload = JSON.stringify(edgeSnapshot, null, 2);
+
+      try {
+        await Deno.writeTextFile(edgeFilePath, `${edgePayload}\n`);
+      } catch (error) {
+        return Result.error(
+          createRepositoryError("item", "save", "failed to write permanent edge file", {
+            identifier: snapshot.id,
+            cause: error,
+          }),
+        );
+      }
     }
 
     return Result.ok(undefined);
@@ -681,6 +747,27 @@ export const createFileSystemItemRepository = (
           if (!(error instanceof Deno.errors.NotFound)) {
             return Result.error(
               createRepositoryError("item", "delete", "failed to delete parent edge file", {
+                identifier: idStr,
+                cause: error,
+              }),
+            );
+          }
+        }
+      } else if (item.data.placement.head.kind === "permanent") {
+        // Delete permanent edge if item was under permanent placement
+        const sectionPath = item.data.placement.section.join("/");
+
+        const edgeDir = sectionPath
+          ? join(dependencies.root, ".index", "graph", "permanent", sectionPath)
+          : join(dependencies.root, ".index", "graph", "permanent");
+        const edgeFilePath = join(edgeDir, `${id.toString()}.edge.json`);
+
+        try {
+          await Deno.remove(edgeFilePath);
+        } catch (error) {
+          if (!(error instanceof Deno.errors.NotFound)) {
+            return Result.error(
+              createRepositoryError("item", "delete", "failed to delete permanent edge file", {
                 identifier: idStr,
                 cause: error,
               }),

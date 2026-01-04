@@ -169,16 +169,17 @@ const buildSinglePartition = (
   if (at.head.kind === "date") {
     header = { kind: "date", date: at.head.date };
   } else {
-    // Item head with optional section - use getDisplayLabel if available
+    // Item or permanent head with optional section - use getDisplayLabel if available
     const sectionPrefix = at.section.length > 0 ? at.section[at.section.length - 1] : 0;
     const parent = at.section.length > 0
       ? createPlacement(at.head, at.section.slice(0, -1))
       : createPlacement(at.head, []);
+    const headStr = at.head.kind === "item" ? at.head.id.toString() : "permanent";
     const displayLabel = getDisplayLabel
       ? getDisplayLabel(parent, sectionPrefix)
       : at.section.length > 0
-      ? `${at.head.id.toString()}/${at.section.join("/")}`
-      : at.head.id.toString();
+      ? `${headStr}/${at.section.join("/")}`
+      : headStr;
     header = {
       kind: "itemSection",
       parent: at,
@@ -399,6 +400,10 @@ const placementMatchesParent = (placement: Placement, parent: Placement): boolea
     return placement.head.id.toString() === parent.head.id.toString();
   }
 
+  if (placement.head.kind === "permanent" && parent.head.kind === "permanent") {
+    return true; // Both are permanent, they match
+  }
+
   return false;
 };
 
@@ -406,9 +411,18 @@ const placementMatchesParent = (placement: Placement, parent: Placement): boolea
  * Build default display label for item section partition.
  */
 const buildDefaultDisplayLabel = (parent: Placement, sectionPrefix: number): string => {
-  const headStr = parent.head.kind === "date"
-    ? parent.head.date.toString()
-    : parent.head.id.toString();
+  let headStr: string;
+  switch (parent.head.kind) {
+    case "date":
+      headStr = parent.head.date.toString();
+      break;
+    case "item":
+      headStr = parent.head.id.toString();
+      break;
+    case "permanent":
+      headStr = "permanent";
+      break;
+  }
 
   if (parent.section.length === 0) {
     return `${headStr}/${sectionPrefix}`;

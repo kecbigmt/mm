@@ -12,6 +12,7 @@ import {
   createDatePlacement,
   createItemIcon,
   createItemPlacement,
+  createPermanentPlacement,
   dateTimeFromDate,
   itemIdFromString,
   itemRankFromString,
@@ -835,5 +836,124 @@ Deno.test("PathResolver - resolvePath resolves '+fri' to next Friday", async () 
       // 2025-11-16 (Sunday) -> next Friday is 2025-11-21
       assertEquals(result.value.head.date.toString(), "2025-11-21");
     }
+  }
+});
+
+// Tests for permanent placement
+Deno.test("PathResolver - resolvePath resolves 'permanent' to permanent placement", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-11-16"));
+
+  const expr = Result.unwrap(parsePathExpression("permanent"));
+  const result = await pathResolver.resolvePath(createDatePlacement(today, []), expr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.head.kind, "permanent");
+    assertEquals(result.value.section.length, 0);
+  }
+});
+
+Deno.test("PathResolver - resolvePath resolves '/permanent' (absolute) to permanent placement", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-11-16"));
+
+  const expr = Result.unwrap(parsePathExpression("/permanent"));
+  const result = await pathResolver.resolvePath(createDatePlacement(today, []), expr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.head.kind, "permanent");
+    assertEquals(result.value.section.length, 0);
+  }
+});
+
+Deno.test("PathResolver - resolvePath resolves 'permanent/1' to permanent placement with section", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-11-16"));
+
+  const expr = Result.unwrap(parsePathExpression("permanent/1"));
+  const result = await pathResolver.resolvePath(createDatePlacement(today, []), expr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.head.kind, "permanent");
+    assertEquals(result.value.section.length, 1);
+    assertEquals(result.value.section[0], 1);
+  }
+});
+
+Deno.test("PathResolver - resolveRange resolves 'permanent' to single permanent placement", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const today = Result.unwrap(parseCalendarDay("2025-11-16"));
+
+  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const rangeExpr = Result.unwrap(parseRangeExpression("permanent"));
+  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.kind, "single");
+    if (result.value.kind === "single") {
+      assertEquals(result.value.at.head.kind, "permanent");
+    }
+  }
+});
+
+Deno.test("PathResolver - returns error when navigating above permanent root", async () => {
+  const itemRepository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+
+  const pathResolver = createPathResolver({
+    itemRepository,
+    aliasRepository,
+    timezone: Result.unwrap(parseTimezoneIdentifier("UTC")),
+    today: new Date("2025-11-16T00:00:00Z"),
+  });
+
+  const permanentPlacement = createPermanentPlacement([]);
+
+  const expr = Result.unwrap(parsePathExpression("../"));
+  const result = await pathResolver.resolvePath(permanentPlacement, expr);
+
+  assertEquals(result.type, "error");
+  if (result.type === "error") {
+    assertEquals(result.error.issues[0].code, "invalid_parent");
   }
 });

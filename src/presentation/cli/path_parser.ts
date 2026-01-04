@@ -20,6 +20,9 @@ const parsePathToken = (token: string): PathToken => {
   if (token === "..") {
     return { kind: "dotdot" };
   }
+  if (token === "permanent") {
+    return { kind: "permanent" };
+  }
   if (NUMERIC_REGEX.test(token)) {
     return { kind: "numeric", value: Number(token) };
   }

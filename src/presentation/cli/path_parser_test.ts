@@ -85,6 +85,46 @@ Deno.test("path_expression.parsePathExpression - idOrAlias token", () => {
   }
 });
 
+Deno.test("path_expression.parsePathExpression - permanent token", () => {
+  const result = parsePathExpression("permanent");
+  assertEquals(result.type, "ok");
+
+  if (result.type === "ok") {
+    const expr = result.value;
+    assertEquals(expr.isAbsolute, false);
+    assertEquals(expr.segments.length, 1);
+    assertEquals(expr.segments[0].kind, "permanent");
+  }
+});
+
+Deno.test("path_expression.parsePathExpression - absolute permanent path", () => {
+  const result = parsePathExpression("/permanent");
+  assertEquals(result.type, "ok");
+
+  if (result.type === "ok") {
+    const expr = result.value;
+    assertEquals(expr.isAbsolute, true);
+    assertEquals(expr.segments.length, 1);
+    assertEquals(expr.segments[0].kind, "permanent");
+  }
+});
+
+Deno.test("path_expression.parsePathExpression - permanent with section", () => {
+  const result = parsePathExpression("permanent/1");
+  assertEquals(result.type, "ok");
+
+  if (result.type === "ok") {
+    const expr = result.value;
+    assertEquals(expr.isAbsolute, false);
+    assertEquals(expr.segments.length, 2);
+    assertEquals(expr.segments[0].kind, "permanent");
+    assertEquals(expr.segments[1].kind, "numeric");
+    if (expr.segments[1].kind === "numeric") {
+      assertEquals(expr.segments[1].value, 1);
+    }
+  }
+});
+
 Deno.test("path_expression.parsePathExpression - complex path", () => {
   const result = parsePathExpression("../book/1");
   assertEquals(result.type, "ok");

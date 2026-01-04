@@ -33,7 +33,7 @@ const resolvePlacementToItem = async (
   placement: Placement,
   deps: CwdResolutionDependencies,
 ): Promise<Item | undefined> => {
-  if (placement.head.kind === "date") {
+  if (placement.head.kind === "date" || placement.head.kind === "permanent") {
     return undefined;
   }
 
