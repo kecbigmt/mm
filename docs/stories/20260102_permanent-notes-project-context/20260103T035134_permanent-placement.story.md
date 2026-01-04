@@ -15,23 +15,23 @@ date-independent knowledge items that persist across time.**
 ### Acceptance Criteria
 
 #### 1. Creating Permanent Items
-- [ ] **Given** mm is initialized, **When** you run `mm note "Deep Work" --placement permanent`,
+- [x] **Given** mm is initialized, **When** you run `mm note "Deep Work" --placement permanent`,
       **Then** a note is created with `placement: "permanent"` in frontmatter
-- [ ] **Given** mm is initialized, **When** you run `mm note "My Topic" --placement permanent --alias my-topic`,
+- [x] **Given** mm is initialized, **When** you run `mm note "My Topic" --placement permanent --alias my-topic`,
       **Then** a note is created with permanent placement and the specified alias
 
 #### 2. Listing Permanent Items
-- [ ] **Given** permanent Items exist, **When** you run `mm ls permanent`,
+- [x] **Given** permanent Items exist, **When** you run `mm ls permanent`,
       **Then** all Items with permanent placement are listed
-- [ ] **Given** no permanent Items exist, **When** you run `mm ls permanent`,
+- [x] **Given** no permanent Items exist, **When** you run `mm ls permanent`,
       **Then** an empty list is shown (no error)
 
 #### 3. Physical File Location
-- [ ] **Given** a permanent Item is created, **When** you check the file system,
+- [x] **Given** a permanent Item is created, **When** you check the file system,
       **Then** the file exists under `items/YYYY/MM/DD/<uuid>.md` based on creation date
 
 #### 4. Error Cases
-- [ ] **Given** mm is initialized, **When** you run `mm note "Test" --placement invalid`,
+- [x] **Given** mm is initialized, **When** you run `mm note "Test" --placement invalid`,
       **Then** an error is shown indicating invalid placement value
 
 ### Out of Scope
@@ -84,7 +84,7 @@ date-independent knowledge items that persist across time.**
 
 ### Acceptance Checks
 
-**Status: Ready for Product Owner Review**
+**Status: ✅ Accepted (2026-01-04)**
 
 Developer verification completed:
 - `mm note "Test" --placement permanent` creates note with `placement: permanent` in frontmatter ✓
@@ -97,7 +97,7 @@ Developer verification completed:
 - All 555 unit tests pass ✓
 - All 25 E2E tests pass (2 shell completion tests fail due to missing zsh/bash in CI environment) ✓
 
-**Awaiting product owner acceptance testing before marking this user story as complete.**
+**Product owner acceptance testing completed. This user story is complete.**
 
 ### Follow-ups / Open Risks
 
