@@ -510,6 +510,68 @@ export const createFileSystemItemRepository = (
       }
     }
 
+    // If placement changed from permanent to date or item, delete old permanent edge
+    if (
+      existingItem &&
+      existingItem.data.placement.head.kind === "permanent" &&
+      item.data.placement.head.kind !== "permanent"
+    ) {
+      const oldSectionPath = existingItem.data.placement.section.join("/");
+      const oldEdgeDir = oldSectionPath
+        ? join(dependencies.root, ".index", "graph", "permanent", oldSectionPath)
+        : join(dependencies.root, ".index", "graph", "permanent");
+      const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
+
+      try {
+        await Deno.remove(oldEdgeFilePath);
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) {
+          return Result.error(
+            createRepositoryError("item", "save", "failed to delete old permanent edge file", {
+              identifier: snapshot.id,
+              cause: error,
+            }),
+          );
+        }
+      }
+    }
+
+    // If placement changed from date/item to permanent, delete old edge
+    // (Date edges are already handled above by oldIsDirectUnderDate check)
+    // Handle item-to-permanent transition
+    if (
+      existingItem &&
+      existingItem.data.placement.head.kind === "item" &&
+      item.data.placement.head.kind === "permanent"
+    ) {
+      const oldParentId = existingItem.data.placement.head.id;
+      const oldSectionPath = existingItem.data.placement.section.join("/");
+      const oldEdgeDir = oldSectionPath
+        ? join(
+          dependencies.root,
+          ".index",
+          "graph",
+          "parents",
+          oldParentId.toString(),
+          oldSectionPath,
+        )
+        : join(dependencies.root, ".index", "graph", "parents", oldParentId.toString());
+      const oldEdgeFilePath = join(oldEdgeDir, `${item.data.id.toString()}.edge.json`);
+
+      try {
+        await Deno.remove(oldEdgeFilePath);
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) {
+          return Result.error(
+            createRepositoryError("item", "save", "failed to delete old parent edge file", {
+              identifier: snapshot.id,
+              cause: error,
+            }),
+          );
+        }
+      }
+    }
+
     // Save top-level placement edge if this item is directly under a date
     if (newIsDirectUnderDate) {
       if (item.data.placement.head.kind === "date") {
