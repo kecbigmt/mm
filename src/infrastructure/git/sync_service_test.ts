@@ -5,8 +5,6 @@ import {
   createVersionControlCommandFailedError,
   VersionControlService,
 } from "../../domain/services/version_control_service.ts";
-import { StateRepository, SyncState } from "../../domain/repositories/state_repository.ts";
-import { parsePlacement } from "../../domain/primitives/placement.ts";
 
 // Mock factory for VersionControlService
 const createMockVersionControlService = (
@@ -28,7 +26,7 @@ const createMockVersionControlService = (
   ...overrides,
 });
 
-Deno.test("SyncService.prePull", async (t) => {
+Deno.test("SyncService.pull", async (t) => {
   await t.step("skips pull when sync is disabled", async () => {
     let pullCalled = false;
     const vcs = createMockVersionControlService({
@@ -39,7 +37,7 @@ Deno.test("SyncService.prePull", async (t) => {
     });
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.prePull({
+    const result = await syncService.pull({
       workspaceRoot: "/test",
       syncEnabled: false,
       syncMode: "auto-sync",
@@ -61,7 +59,7 @@ Deno.test("SyncService.prePull", async (t) => {
     });
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.prePull({
+    const result = await syncService.pull({
       workspaceRoot: "/test",
       syncEnabled: true,
       syncMode: "auto-commit",
@@ -87,7 +85,7 @@ Deno.test("SyncService.prePull", async (t) => {
     });
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.prePull({
+    const result = await syncService.pull({
       workspaceRoot: "/test",
       syncEnabled: true,
       syncMode: "auto-sync",
@@ -112,7 +110,7 @@ Deno.test("SyncService.prePull", async (t) => {
     });
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.prePull({
+    const result = await syncService.pull({
       workspaceRoot: "/test",
       syncEnabled: true,
       syncMode: "lazy-sync",
@@ -134,7 +132,7 @@ Deno.test("SyncService.prePull", async (t) => {
     });
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.prePull({
+    const result = await syncService.pull({
       workspaceRoot: "/test",
       syncEnabled: true,
       syncMode: "auto-sync",
@@ -160,7 +158,7 @@ Deno.test("SyncService.prePull", async (t) => {
     });
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.prePull({
+    const result = await syncService.pull({
       workspaceRoot: "/test",
       syncEnabled: true,
       syncMode: "auto-sync",
@@ -187,7 +185,7 @@ Deno.test("SyncService.prePull", async (t) => {
     });
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.prePull({
+    const result = await syncService.pull({
       workspaceRoot: "/test",
       syncEnabled: true,
       syncMode: "auto-sync",
@@ -211,7 +209,7 @@ Deno.test("SyncService.prePull", async (t) => {
     });
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.prePull({
+    const result = await syncService.pull({
       workspaceRoot: "/test",
       syncEnabled: true,
       syncMode: "auto-sync",
@@ -242,7 +240,7 @@ Deno.test("SyncService.prePull", async (t) => {
     });
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.prePull({
+    const result = await syncService.pull({
       workspaceRoot: "/test",
       syncEnabled: true,
       syncMode: "auto-sync",
@@ -255,218 +253,54 @@ Deno.test("SyncService.prePull", async (t) => {
   });
 });
 
-// Mock factory for StateRepository
-const createMockStateRepository = (
-  overrides: Partial<StateRepository> = {},
-): StateRepository => {
-  const defaultPlacement = parsePlacement("2024-01-01");
-  if (defaultPlacement.type === "error") throw new Error("Invalid default placement");
-  return {
-    loadCwd: () => Promise.resolve(Result.ok(defaultPlacement.value)),
-    saveCwd: () => Promise.resolve(Result.ok(undefined)),
-    loadSyncState: () =>
-      Promise.resolve(
-        Result.ok({
-          commitsSinceLastSync: 0,
-          lastSyncTimestamp: null,
-        } as SyncState),
-      ),
-    saveSyncState: () => Promise.resolve(Result.ok(undefined)),
-    ...overrides,
-  };
-};
-
-Deno.test("SyncService.autoCommit", async (t) => {
-  await t.step("skips when sync is disabled", async () => {
-    const vcs = createMockVersionControlService();
-    const stateRepo = createMockStateRepository();
-
-    const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
-      workspaceRoot: "/test",
-      summary: "create new note",
-      syncEnabled: false,
-      syncMode: "auto-commit",
-    }, { stateRepository: stateRepo });
-
-    assertEquals(result.committed, false);
-    assertEquals(result.error, undefined);
-  });
-
-  await t.step("commits successfully in auto-commit mode (no push)", async () => {
+Deno.test("SyncService.commit", async (t) => {
+  await t.step("stages and commits successfully", async () => {
     let stageCalled = false;
     let commitCalled = false;
-    let pushCalled = false;
+    let commitMessage = "";
 
     const vcs = createMockVersionControlService({
       stage: () => {
         stageCalled = true;
         return Promise.resolve(Result.ok(undefined));
       },
-      commit: () => {
+      commit: (_cwd, message) => {
         commitCalled = true;
+        commitMessage = message;
         return Promise.resolve(Result.ok(undefined));
       },
-      push: () => {
-        pushCalled = true;
-        return Promise.resolve(Result.ok(""));
-      },
     });
-    const stateRepo = createMockStateRepository();
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
+    const result = await syncService.commit({
       workspaceRoot: "/test",
       summary: "create new note",
-      syncEnabled: true,
-      syncMode: "auto-commit",
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
-    }, { stateRepository: stateRepo });
+    });
 
     assertEquals(result.committed, true);
-    assertEquals(result.pushed, false);
     assertEquals(result.error, undefined);
     assertEquals(stageCalled, true);
     assertEquals(commitCalled, true);
-    assertEquals(pushCalled, false);
+    assertEquals(commitMessage, "mm: create new note");
   });
 
-  await t.step("auto-sync: commits and pushes successfully", async () => {
-    let stageCalled = false;
-    let commitCalled = false;
-    let pullCalled = false;
-    let pushCalled = false;
+  await t.step("stages correct files", async () => {
+    let stagedFiles: string[] = [];
 
     const vcs = createMockVersionControlService({
-      stage: () => {
-        stageCalled = true;
+      stage: (_cwd, files) => {
+        stagedFiles = files;
         return Promise.resolve(Result.ok(undefined));
       },
-      commit: () => {
-        commitCalled = true;
-        return Promise.resolve(Result.ok(undefined));
-      },
-      pull: () => {
-        pullCalled = true;
-        return Promise.resolve(Result.ok(""));
-      },
-      push: () => {
-        pushCalled = true;
-        return Promise.resolve(Result.ok(""));
-      },
     });
-    const stateRepo = createMockStateRepository();
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
+    await syncService.commit({
       workspaceRoot: "/test",
-      summary: "create new task",
-      syncEnabled: true,
-      syncMode: "auto-sync",
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
-    }, { stateRepository: stateRepo });
-
-    assertEquals(result.committed, true);
-    assertEquals(result.pushed, true);
-    assertEquals(result.error, undefined);
-    assertEquals(stageCalled, true);
-    assertEquals(commitCalled, true);
-    assertEquals(pullCalled, true);
-    assertEquals(pushCalled, true);
-  });
-
-  await t.step("auto-sync: pull fails (rebase conflict)", async () => {
-    const vcs = createMockVersionControlService({
-      pull: () =>
-        Promise.resolve(
-          Result.error(
-            createVersionControlCommandFailedError("CONFLICT (content): Merge conflict"),
-          ),
-        ),
+      summary: "create new note",
     });
-    const stateRepo = createMockStateRepository();
 
-    const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
-      workspaceRoot: "/test",
-      summary: "create new task",
-      syncEnabled: true,
-      syncMode: "auto-sync",
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
-    }, { stateRepository: stateRepo });
-
-    assertEquals(result.committed, true);
-    assertEquals(result.pushed, false);
-    assertEquals(result.error, {
-      type: "pull_failed",
-      details: "CONFLICT (content): Merge conflict",
-    });
-  });
-
-  await t.step("auto-sync: push fails", async () => {
-    const vcs = createMockVersionControlService({
-      push: () =>
-        Promise.resolve(Result.error(createVersionControlCommandFailedError("push rejected"))),
-    });
-    const stateRepo = createMockStateRepository();
-
-    const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
-      workspaceRoot: "/test",
-      summary: "create new task",
-      syncEnabled: true,
-      syncMode: "auto-sync",
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
-    }, { stateRepository: stateRepo });
-
-    assertEquals(result.committed, true);
-    assertEquals(result.pushed, false);
-    assertEquals(result.error, {
-      type: "push_failed",
-      details: "push rejected",
-    });
-  });
-
-  await t.step("auto-sync: returns error when no remote configured", async () => {
-    const vcs = createMockVersionControlService();
-    const stateRepo = createMockStateRepository();
-
-    const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
-      workspaceRoot: "/test",
-      summary: "create new task",
-      syncEnabled: true,
-      syncMode: "auto-sync",
-      remote: undefined,
-      branch: "main",
-    }, { stateRepository: stateRepo });
-
-    assertEquals(result.committed, true);
-    assertEquals(result.pushed, false);
-    assertEquals(result.error, { type: "no_remote_configured" });
-  });
-
-  await t.step("auto-sync: returns error when no branch configured", async () => {
-    const vcs = createMockVersionControlService();
-    const stateRepo = createMockStateRepository();
-
-    const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
-      workspaceRoot: "/test",
-      summary: "create new task",
-      syncEnabled: true,
-      syncMode: "auto-sync",
-      remote: "https://github.com/user/repo.git",
-      branch: undefined,
-    }, { stateRepository: stateRepo });
-
-    assertEquals(result.committed, true);
-    assertEquals(result.pushed, false);
-    assertEquals(result.error, { type: "no_branch_configured" });
+    assertEquals(stagedFiles, ["items", "tags", "workspace.json"]);
   });
 
   await t.step("handles stage failure gracefully", async () => {
@@ -474,17 +308,12 @@ Deno.test("SyncService.autoCommit", async (t) => {
       stage: () =>
         Promise.resolve(Result.error(createVersionControlCommandFailedError("Permission denied"))),
     });
-    const stateRepo = createMockStateRepository();
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
+    const result = await syncService.commit({
       workspaceRoot: "/test",
       summary: "create new note",
-      syncEnabled: true,
-      syncMode: "auto-commit",
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
-    }, { stateRepository: stateRepo });
+    });
 
     assertEquals(result.committed, false);
     assertEquals(result.error, {
@@ -498,17 +327,12 @@ Deno.test("SyncService.autoCommit", async (t) => {
       commit: () =>
         Promise.resolve(Result.error(createVersionControlCommandFailedError("Git not found"))),
     });
-    const stateRepo = createMockStateRepository();
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
+    const result = await syncService.commit({
       workspaceRoot: "/test",
       summary: "create new note",
-      syncEnabled: true,
-      syncMode: "auto-commit",
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
-    }, { stateRepository: stateRepo });
+    });
 
     assertEquals(result.committed, false);
     assertEquals(result.error, {
@@ -526,221 +350,201 @@ Deno.test("SyncService.autoCommit", async (t) => {
           ),
         ),
     });
-    const stateRepo = createMockStateRepository();
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
+    const result = await syncService.commit({
       workspaceRoot: "/test",
       summary: "create new note",
-      syncEnabled: true,
-      syncMode: "auto-commit",
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
-    }, { stateRepository: stateRepo });
+    });
 
     assertEquals(result.committed, false);
     assertEquals(result.error, undefined);
   });
 
-  await t.step("lazy-sync: increments commit count when below threshold", async () => {
-    let savedCommitCount = -1;
-
-    const vcs = createMockVersionControlService();
-    const stateRepo = createMockStateRepository({
-      loadSyncState: () =>
+  await t.step("handles 'clean' working tree gracefully", async () => {
+    const vcs = createMockVersionControlService({
+      commit: () =>
         Promise.resolve(
-          Result.ok({
-            commitsSinceLastSync: 3,
-            lastSyncTimestamp: Date.now(),
-          } as SyncState),
+          Result.error(
+            createVersionControlCommandFailedError(
+              "On branch main, nothing to commit, working tree clean",
+            ),
+          ),
         ),
-      saveSyncState: (state) => {
-        savedCommitCount = state.commitsSinceLastSync;
-        return Promise.resolve(Result.ok(undefined));
-      },
     });
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
+    const result = await syncService.commit({
       workspaceRoot: "/test",
       summary: "create new note",
-      syncEnabled: true,
-      syncMode: "lazy-sync",
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
-      lazy: { commits: 10, minutes: 10 },
-    }, { stateRepository: stateRepo });
-
-    assertEquals(result.committed, true);
-    assertEquals(result.pushed, false);
-    assertEquals(result.syncTriggered, undefined);
-    assertEquals(savedCommitCount, 4);
-  });
-
-  await t.step("lazy-sync: triggers sync when commit threshold met", async () => {
-    let savedCommitCount = -1;
-
-    const vcs = createMockVersionControlService();
-    const stateRepo = createMockStateRepository({
-      loadSyncState: () =>
-        Promise.resolve(
-          Result.ok({
-            commitsSinceLastSync: 4,
-            lastSyncTimestamp: Date.now(),
-          } as SyncState),
-        ),
-      saveSyncState: (state) => {
-        savedCommitCount = state.commitsSinceLastSync;
-        return Promise.resolve(Result.ok(undefined));
-      },
     });
 
-    const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
-      workspaceRoot: "/test",
-      summary: "create new note",
-      syncEnabled: true,
-      syncMode: "lazy-sync",
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
-      lazy: { commits: 5, minutes: 10 },
-    }, { stateRepository: stateRepo });
-
-    assertEquals(result.committed, true);
-    assertEquals(result.pushed, true);
-    assertEquals(result.syncTriggered, true);
-    assertEquals(savedCommitCount, 0);
+    assertEquals(result.committed, false);
+    assertEquals(result.error, undefined);
   });
+});
 
-  await t.step("lazy-sync: triggers sync when time threshold met", async () => {
-    let savedCommitCount = -1;
-
-    const vcs = createMockVersionControlService();
-    const stateRepo = createMockStateRepository({
-      loadSyncState: () =>
-        Promise.resolve(
-          Result.ok({
-            commitsSinceLastSync: 1,
-            lastSyncTimestamp: Date.now() - 2 * 60 * 1000, // 2 minutes ago
-          } as SyncState),
-        ),
-      saveSyncState: (state) => {
-        savedCommitCount = state.commitsSinceLastSync;
-        return Promise.resolve(Result.ok(undefined));
-      },
-    });
-
-    const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
-      workspaceRoot: "/test",
-      summary: "create new note",
-      syncEnabled: true,
-      syncMode: "lazy-sync",
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
-      lazy: { commits: 100, minutes: 1 },
-    }, { stateRepository: stateRepo });
-
-    assertEquals(result.committed, true);
-    assertEquals(result.pushed, true);
-    assertEquals(result.syncTriggered, true);
-    assertEquals(savedCommitCount, 0);
-  });
-
-  await t.step("lazy-sync: does not reset count on sync failure", async () => {
-    let savedCommitCount = -1;
+Deno.test("SyncService.push", async (t) => {
+  await t.step("pushes successfully", async () => {
+    let pushCalled = false;
+    let pushRemote = "";
+    let pushBranch = "";
 
     const vcs = createMockVersionControlService({
-      push: () =>
-        Promise.resolve(Result.error(createVersionControlCommandFailedError("push failed"))),
-    });
-    const stateRepo = createMockStateRepository({
-      loadSyncState: () =>
-        Promise.resolve(
-          Result.ok({
-            commitsSinceLastSync: 4,
-            lastSyncTimestamp: Date.now(),
-          } as SyncState),
-        ),
-      saveSyncState: (state) => {
-        savedCommitCount = state.commitsSinceLastSync;
-        return Promise.resolve(Result.ok(undefined));
+      getCurrentBranch: () => Promise.resolve(Result.ok("main")),
+      push: (_cwd, remote, branch) => {
+        pushCalled = true;
+        pushRemote = remote;
+        pushBranch = branch;
+        return Promise.resolve(Result.ok(""));
       },
     });
 
     const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
+    const result = await syncService.push({
       workspaceRoot: "/test",
-      summary: "create new note",
-      syncEnabled: true,
-      syncMode: "lazy-sync",
       remote: "https://github.com/user/repo.git",
       branch: "main",
-      lazy: { commits: 5, minutes: 10 },
-    }, { stateRepository: stateRepo });
-
-    assertEquals(result.committed, true);
-    assertEquals(result.pushed, false);
-    assertEquals(result.syncTriggered, true);
-    assertEquals(result.error?.type, "push_failed");
-    assertEquals(savedCommitCount, 5);
-  });
-
-  await t.step("lazy-sync: uses default thresholds when not configured", async () => {
-    let savedCommitCount = -1;
-
-    const vcs = createMockVersionControlService();
-    const stateRepo = createMockStateRepository({
-      loadSyncState: () =>
-        Promise.resolve(
-          Result.ok({
-            commitsSinceLastSync: 9,
-            lastSyncTimestamp: Date.now(),
-          } as SyncState),
-        ),
-      saveSyncState: (state) => {
-        savedCommitCount = state.commitsSinceLastSync;
-        return Promise.resolve(Result.ok(undefined));
-      },
     });
 
-    const syncService = createSyncService({ versionControlService: vcs });
-    const result = await syncService.autoCommit({
-      workspaceRoot: "/test",
-      summary: "create new note",
-      syncEnabled: true,
-      syncMode: "lazy-sync",
-      remote: "https://github.com/user/repo.git",
-      branch: "main",
-      // lazy not set - should use defaults (10 commits, 10 minutes)
-    }, { stateRepository: stateRepo });
-
-    assertEquals(result.committed, true);
     assertEquals(result.pushed, true);
-    assertEquals(result.syncTriggered, true);
-    assertEquals(savedCommitCount, 0);
+    assertEquals(result.error, undefined);
+    assertEquals(pushCalled, true);
+    assertEquals(pushRemote, "https://github.com/user/repo.git");
+    assertEquals(pushBranch, "main");
   });
 
-  await t.step("calls onSync wrapper for sync operations", async () => {
-    let onSyncCalled = false;
-
+  await t.step("returns error when no remote configured", async () => {
     const vcs = createMockVersionControlService();
-    const stateRepo = createMockStateRepository();
 
     const syncService = createSyncService({ versionControlService: vcs });
-    await syncService.autoCommit({
+    const result = await syncService.push({
       workspaceRoot: "/test",
-      summary: "create new task",
-      syncEnabled: true,
-      syncMode: "auto-sync",
+      remote: undefined,
+      branch: "main",
+    });
+
+    assertEquals(result.pushed, false);
+    assertEquals(result.error, { type: "no_remote_configured" });
+  });
+
+  await t.step("returns error when no branch configured", async () => {
+    const vcs = createMockVersionControlService();
+
+    const syncService = createSyncService({ versionControlService: vcs });
+    const result = await syncService.push({
+      workspaceRoot: "/test",
+      remote: "https://github.com/user/repo.git",
+      branch: undefined,
+    });
+
+    assertEquals(result.pushed, false);
+    assertEquals(result.error, { type: "no_branch_configured" });
+  });
+
+  await t.step("returns error when getCurrentBranch fails", async () => {
+    const vcs = createMockVersionControlService({
+      getCurrentBranch: () =>
+        Promise.resolve(
+          Result.error(createVersionControlCommandFailedError("Not a git repository")),
+        ),
+    });
+
+    const syncService = createSyncService({ versionControlService: vcs });
+    const result = await syncService.push({
+      workspaceRoot: "/test",
       remote: "https://github.com/user/repo.git",
       branch: "main",
-      onSync: async (operation) => {
-        onSyncCalled = true;
-        return await operation();
-      },
-    }, { stateRepository: stateRepo });
+    });
 
-    assertEquals(onSyncCalled, true);
+    assertEquals(result.pushed, false);
+    assertEquals(result.error, {
+      type: "get_current_branch_failed",
+      details: "Not a git repository",
+    });
+  });
+
+  await t.step("handles push failure gracefully", async () => {
+    const vcs = createMockVersionControlService({
+      push: () =>
+        Promise.resolve(Result.error(createVersionControlCommandFailedError("push rejected"))),
+    });
+
+    const syncService = createSyncService({ versionControlService: vcs });
+    const result = await syncService.push({
+      workspaceRoot: "/test",
+      remote: "https://github.com/user/repo.git",
+      branch: "main",
+    });
+
+    assertEquals(result.pushed, false);
+    assertEquals(result.error, {
+      type: "push_failed",
+      details: "push rejected",
+    });
+  });
+
+  await t.step("handles network error gracefully", async () => {
+    const vcs = createMockVersionControlService({
+      push: () =>
+        Promise.resolve(
+          Result.error(
+            createVersionControlCommandFailedError(
+              "ssh: connect to host github.com port 22: Connection refused",
+            ),
+          ),
+        ),
+    });
+
+    const syncService = createSyncService({ versionControlService: vcs });
+    const result = await syncService.push({
+      workspaceRoot: "/test",
+      remote: "https://github.com/user/repo.git",
+      branch: "main",
+    });
+
+    assertEquals(result.pushed, false);
+    assertEquals(result.error, { type: "network_error" });
+  });
+
+  await t.step("does not call pull before push", async () => {
+    let pullCalled = false;
+
+    const vcs = createMockVersionControlService({
+      pull: () => {
+        pullCalled = true;
+        return Promise.resolve(Result.ok(""));
+      },
+    });
+
+    const syncService = createSyncService({ versionControlService: vcs });
+    await syncService.push({
+      workspaceRoot: "/test",
+      remote: "https://github.com/user/repo.git",
+      branch: "main",
+    });
+
+    assertEquals(pullCalled, false);
+  });
+
+  await t.step("uses current branch for push", async () => {
+    let pushBranch = "";
+
+    const vcs = createMockVersionControlService({
+      getCurrentBranch: () => Promise.resolve(Result.ok("feature-branch")),
+      push: (_cwd, _remote, branch) => {
+        pushBranch = branch;
+        return Promise.resolve(Result.ok(""));
+      },
+    });
+
+    const syncService = createSyncService({ versionControlService: vcs });
+    await syncService.push({
+      workspaceRoot: "/test",
+      remote: "https://github.com/user/repo.git",
+      branch: "main",
+    });
+
+    assertEquals(pushBranch, "feature-branch");
   });
 });

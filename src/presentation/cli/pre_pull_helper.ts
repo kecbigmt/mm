@@ -1,4 +1,4 @@
-import { createSyncService, PrePullWarning } from "../../infrastructure/git/sync_service.ts";
+import { createSyncService, PullWarning } from "../../infrastructure/git/sync_service.ts";
 import { VersionControlService } from "../../domain/services/version_control_service.ts";
 import { WorkspaceRepository } from "../../domain/repositories/workspace_repository.ts";
 import { withLoadingIndicator } from "./utils/loading_indicator.ts";
@@ -9,7 +9,7 @@ export type PrePullHelperDeps = {
   workspaceRepository: WorkspaceRepository;
 };
 
-function formatPrePullWarning(warning: PrePullWarning): string {
+function formatPullWarning(warning: PullWarning): string {
   switch (warning.type) {
     case "network_error":
       return "Warning: Pre-sync pull failed - cannot connect to remote repository.\nProceeding with local data.";
@@ -19,11 +19,11 @@ function formatPrePullWarning(warning: PrePullWarning): string {
 }
 
 /**
- * Helper function to execute pre-pull before a state-changing command
+ * Helper function to execute pull before a state-changing command
  *
- * This function orchestrates the pre-pull operation in the Imperative Shell (CLI):
+ * This function orchestrates the pull operation in the Imperative Shell (CLI):
  * 1. Loads workspace settings to determine sync configuration
- * 2. Calls SyncService.prePull() with the appropriate parameters
+ * 2. Calls SyncService.pull() with the appropriate parameters
  * 3. Displays warnings if pull fails (but doesn't block the operation)
  *
  * Usage:
@@ -37,26 +37,26 @@ function formatPrePullWarning(warning: PrePullWarning): string {
  * ```
  *
  * This function is failure-tolerant and will not throw errors.
- * Pre-pull runs silently on success.
- * If pre-pull fails, it logs a warning but does not block the command.
+ * Pull runs silently on success.
+ * If pull fails, it logs a warning but does not block the command.
  */
 export async function executePrePull(deps: PrePullHelperDeps): Promise<void> {
   // 1. Load workspace settings
   const settingsResult = await deps.workspaceRepository.load(deps.workspaceRoot);
   if (settingsResult.type === "error") {
-    // Cannot load settings - skip pre-pull silently
+    // Cannot load settings - skip pull silently
     return;
   }
 
   const settings = settingsResult.value;
 
-  // 2. Create SyncService and execute pre-pull
+  // 2. Create SyncService and execute pull
   const syncService = createSyncService({
     versionControlService: deps.versionControlService,
   });
 
-  const prePullResult = await withLoadingIndicator("Syncing...", () =>
-    syncService.prePull({
+  const pullResult = await withLoadingIndicator("Syncing...", () =>
+    syncService.pull({
       workspaceRoot: deps.workspaceRoot,
       syncEnabled: settings.data.sync.enabled,
       syncMode: settings.data.sync.mode,
@@ -65,7 +65,7 @@ export async function executePrePull(deps: PrePullHelperDeps): Promise<void> {
     }));
 
   // 3. Display warning messages for errors
-  if (prePullResult.warning) {
-    console.warn(formatPrePullWarning(prePullResult.warning));
+  if (pullResult.warning) {
+    console.warn(formatPullWarning(pullResult.warning));
   }
 }
