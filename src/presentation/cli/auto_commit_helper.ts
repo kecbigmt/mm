@@ -1,11 +1,11 @@
 import {
-  AutoCommitError,
+  AutoSyncError,
   createSyncService,
   SyncService,
 } from "../../infrastructure/git/sync_service.ts";
 import { VersionControlService } from "../../domain/services/version_control_service.ts";
 import { WorkspaceRepository } from "../../domain/repositories/workspace_repository.ts";
-import { StateRepository } from "../../domain/repositories/state_repository.ts";
+import { StateRepository, SyncState } from "../../domain/repositories/state_repository.ts";
 import { withLoadingIndicator } from "./utils/loading_indicator.ts";
 
 export type AutoCommitHelperDeps = {
@@ -16,7 +16,7 @@ export type AutoCommitHelperDeps = {
   syncService?: SyncService;
 };
 
-function formatAutoCommitError(error: AutoCommitError): string {
+function formatAutoCommitError(error: AutoSyncError): string {
   switch (error.type) {
     case "network_error":
       return "Warning: Auto-sync failed - cannot connect to remote repository.\nChanges are saved locally. Sync again when online with 'mm sync'.";
@@ -24,8 +24,6 @@ function formatAutoCommitError(error: AutoCommitError): string {
       return "Warning: Auto-sync skipped - no remote configured. Run 'mm sync init <remote-url>' first.";
     case "no_branch_configured":
       return "Warning: Auto-sync skipped - no branch configured.";
-    case "pull_failed":
-      return `Warning: Auto-sync pull failed: ${error.details}`;
     case "push_failed":
       return `Warning: Auto-sync push failed: ${error.details}`;
     case "stage_failed":
@@ -37,6 +35,37 @@ function formatAutoCommitError(error: AutoCommitError): string {
     case "state_save_failed":
       return `Warning: Failed to save sync state: ${error.details}`;
   }
+}
+
+// Default lazy-sync thresholds
+const DEFAULT_LAZY_COMMITS = 10;
+const DEFAULT_LAZY_MINUTES = 10;
+
+/**
+ * Determines if a sync should be triggered based on lazy-sync thresholds.
+ */
+function shouldTriggerLazySync(
+  syncState: SyncState,
+  lazyConfig: { commits?: number; minutes?: number } | undefined,
+): boolean {
+  const commitThreshold = lazyConfig?.commits ?? DEFAULT_LAZY_COMMITS;
+  const minuteThreshold = lazyConfig?.minutes ?? DEFAULT_LAZY_MINUTES;
+
+  // Check commit count threshold (after incrementing)
+  const newCommitCount = syncState.commitsSinceLastSync + 1;
+  if (newCommitCount >= commitThreshold) {
+    return true;
+  }
+
+  // Check time threshold
+  if (syncState.lastSyncTimestamp !== null) {
+    const minutesSinceLastSync = (Date.now() - syncState.lastSyncTimestamp) / (60 * 1000);
+    if (minutesSinceLastSync >= minuteThreshold) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -77,22 +106,104 @@ export async function executeAutoCommit(
   const syncService = deps.syncService ??
     createSyncService({ versionControlService: deps.versionControlService });
 
-  const result = await syncService.autoCommit(
-    {
-      workspaceRoot: deps.workspaceRoot,
-      summary,
-      syncEnabled: settings.data.sync.enabled,
-      syncMode: settings.data.sync.mode,
-      remote: settings.data.sync.git?.remote ?? undefined,
-      branch: settings.data.sync.git?.branch ?? undefined,
-      lazy: settings.data.sync.lazy ?? undefined,
-      onSync: (operation) => withLoadingIndicator("Syncing...", operation),
-    },
-    { stateRepository: deps.stateRepository },
-  );
+  const syncMode = settings.data.sync.mode;
+  const remote = settings.data.sync.git?.remote ?? undefined;
+  const branch = settings.data.sync.git?.branch ?? undefined;
+  const lazyConfig = settings.data.sync.lazy ?? undefined;
 
-  // Display warning messages for errors
-  if (result.error) {
-    console.warn(formatAutoCommitError(result.error));
+  // Step 1: Commit
+  const commitResult = await syncService.commit({
+    workspaceRoot: deps.workspaceRoot,
+    summary,
+  });
+
+  if (commitResult.error) {
+    console.warn(formatAutoCommitError(commitResult.error));
+    return;
+  }
+
+  // If nothing was committed, no need to push
+  if (!commitResult.committed) {
+    return;
+  }
+
+  // Step 2: Determine if push is needed based on sync mode
+  if (syncMode === "auto-commit") {
+    // auto-commit mode: only commit, no push
+    return;
+  }
+
+  if (syncMode === "auto-sync") {
+    // auto-sync mode: always push after commit
+    const pushResult = await withLoadingIndicator("Syncing...", () =>
+      syncService.push({
+        workspaceRoot: deps.workspaceRoot,
+        remote,
+        branch,
+      }));
+
+    if (pushResult.error) {
+      console.warn(formatAutoCommitError(pushResult.error));
+    }
+    return;
+  }
+
+  if (syncMode === "lazy-sync") {
+    // lazy-sync mode: push based on thresholds
+    const syncStateResult = await deps.stateRepository.loadSyncState();
+    const syncState: SyncState = syncStateResult.type === "ok"
+      ? syncStateResult.value
+      : { commitsSinceLastSync: 0, lastSyncTimestamp: null };
+
+    const shouldSync = shouldTriggerLazySync(syncState, lazyConfig);
+
+    if (shouldSync) {
+      // Trigger sync
+      const pushResult = await withLoadingIndicator("Syncing...", () =>
+        syncService.push({
+          workspaceRoot: deps.workspaceRoot,
+          remote,
+          branch,
+        }));
+
+      if (pushResult.error) {
+        // Sync failed - increment commit count but don't reset
+        const newState: SyncState = {
+          commitsSinceLastSync: syncState.commitsSinceLastSync + 1,
+          lastSyncTimestamp: syncState.lastSyncTimestamp,
+        };
+        const saveResult = await deps.stateRepository.saveSyncState(newState);
+        if (saveResult.type === "error") {
+          console.warn(
+            formatAutoCommitError({ type: "state_save_failed", details: saveResult.error.message }),
+          );
+        }
+        console.warn(formatAutoCommitError(pushResult.error));
+      } else {
+        // Sync succeeded - reset commit count and update timestamp
+        const newState: SyncState = {
+          commitsSinceLastSync: 0,
+          lastSyncTimestamp: Date.now(),
+        };
+        const saveResult = await deps.stateRepository.saveSyncState(newState);
+        if (saveResult.type === "error") {
+          console.warn(
+            formatAutoCommitError({ type: "state_save_failed", details: saveResult.error.message }),
+          );
+        }
+      }
+    } else {
+      // Threshold not met - just increment commit count
+      const newState: SyncState = {
+        commitsSinceLastSync: syncState.commitsSinceLastSync + 1,
+        lastSyncTimestamp: syncState.lastSyncTimestamp,
+      };
+      const saveResult = await deps.stateRepository.saveSyncState(newState);
+      if (saveResult.type === "error") {
+        console.warn(
+          formatAutoCommitError({ type: "state_save_failed", details: saveResult.error.message }),
+        );
+      }
+    }
   }
 }
