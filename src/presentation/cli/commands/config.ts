@@ -4,6 +4,7 @@ import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import {
   createWorkspaceSettings,
+  DEFAULT_AUTO_SYNC_SETTINGS,
   DEFAULT_LAZY_SYNC_SETTINGS,
   VersionControlSyncMode,
   WorkspaceSettings,
@@ -40,6 +41,8 @@ function getValueByKey(
   key: ConfigKey,
 ): string | boolean | number | null | undefined {
   const data = settings.data;
+  // Use auto-sync defaults for auto-sync mode, lazy-sync defaults for explicit lazy settings
+  const defaultSettings = data.sync.lazy ? DEFAULT_LAZY_SYNC_SETTINGS : DEFAULT_AUTO_SYNC_SETTINGS;
   switch (key) {
     case "timezone":
       return data.timezone.toString();
@@ -52,9 +55,9 @@ function getValueByKey(
     case "sync.git.branch":
       return data.sync.git?.branch;
     case "sync.lazy.commits":
-      return data.sync.lazy?.commits ?? DEFAULT_LAZY_SYNC_SETTINGS.commits;
+      return data.sync.lazy?.commits ?? defaultSettings.commits;
     case "sync.lazy.minutes":
-      return data.sync.lazy?.minutes ?? DEFAULT_LAZY_SYNC_SETTINGS.minutes;
+      return data.sync.lazy?.minutes ?? defaultSettings.minutes;
   }
 }
 
@@ -203,15 +206,23 @@ export const createConfigCommand = () => {
           case "sync.mode": {
             if (value !== "auto-commit" && value !== "auto-sync" && value !== "lazy-sync") {
               console.error(
-                `Invalid value for sync.mode: must be 'auto-commit', 'auto-sync', or 'lazy-sync'`,
+                `Invalid value for sync.mode: must be 'auto-commit' or 'auto-sync'`,
               );
               Deno.exit(1);
+            }
+            // lazy-sync is now an alias for auto-sync (backward compatibility)
+            const mode: VersionControlSyncMode = value === "lazy-sync" ? "auto-sync" : value;
+            // When setting lazy-sync, also set default lazy settings if not already configured
+            let lazy = currentData.sync.lazy;
+            if (value === "lazy-sync" && !lazy) {
+              lazy = DEFAULT_LAZY_SYNC_SETTINGS;
             }
             newSettings = createWorkspaceSettings({
               timezone: currentData.timezone,
               sync: {
                 ...currentData.sync,
-                mode: value as VersionControlSyncMode,
+                mode,
+                lazy,
               },
             });
             break;
@@ -298,8 +309,10 @@ export const createConfigCommand = () => {
 
           case "sync.lazy.minutes": {
             const minutes = parseInt(value, 10);
-            if (isNaN(minutes) || minutes < 1) {
-              console.error(`Invalid value for sync.lazy.minutes: must be a positive integer`);
+            if (isNaN(minutes) || minutes < 0) {
+              console.error(
+                `Invalid value for sync.lazy.minutes: must be a non-negative integer (0 disables time threshold)`,
+              );
               Deno.exit(1);
             }
             const currentLazy = currentData.sync.lazy ?? DEFAULT_LAZY_SYNC_SETTINGS;

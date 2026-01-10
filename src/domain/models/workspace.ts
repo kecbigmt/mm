@@ -13,7 +13,7 @@ import {
 
 const WORKSPACE_SETTINGS_KIND = "WorkspaceSettings" as const;
 
-export type VersionControlSyncMode = "auto-commit" | "auto-sync" | "lazy-sync";
+export type VersionControlSyncMode = "auto-commit" | "auto-sync";
 
 export type LazySyncSettings = Readonly<{
   commits: number;
@@ -23,6 +23,11 @@ export type LazySyncSettings = Readonly<{
 export const DEFAULT_LAZY_SYNC_SETTINGS: LazySyncSettings = {
   commits: 10,
   minutes: 10,
+};
+
+export const DEFAULT_AUTO_SYNC_SETTINGS: LazySyncSettings = {
+  commits: 1,
+  minutes: 0,
 };
 
 export type VcsType = "git";
@@ -155,10 +160,9 @@ export const parseWorkspaceSettings = (
   let syncSettings = DEFAULT_SYNC_SETTINGS;
   if (snapshot.sync) {
     let mode: VersionControlSyncMode;
-    if (snapshot.sync.mode === "auto-sync") {
+    if (snapshot.sync.mode === "auto-sync" || snapshot.sync.mode === "lazy-sync") {
+      // lazy-sync is now unified into auto-sync (backward compatibility)
       mode = "auto-sync";
-    } else if (snapshot.sync.mode === "lazy-sync") {
-      mode = "lazy-sync";
     } else {
       mode = "auto-commit";
     }
