@@ -18,6 +18,7 @@ type ConfigKey =
   | "sync.mode"
   | "sync.git.remote"
   | "sync.git.branch"
+  | "sync.git.sign"
   | "sync.lazy.commits"
   | "sync.lazy.minutes";
 
@@ -27,6 +28,7 @@ const VALID_KEYS: ConfigKey[] = [
   "sync.mode",
   "sync.git.remote",
   "sync.git.branch",
+  "sync.git.sign",
   "sync.lazy.commits",
   "sync.lazy.minutes",
 ];
@@ -51,6 +53,9 @@ function getValueByKey(
       return data.sync.git?.remote ?? null;
     case "sync.git.branch":
       return data.sync.git?.branch;
+    case "sync.git.sign":
+      // Default to true (use Git's default signing behavior)
+      return data.sync.git?.sign ?? true;
     case "sync.lazy.commits":
       return data.sync.lazy?.commits ?? DEFAULT_LAZY_SYNC_SETTINGS.commits;
     case "sync.lazy.minutes":
@@ -270,6 +275,26 @@ export const createConfigCommand = () => {
                   ...(currentData.sync.git ?? {}),
                   remote: currentData.sync.git?.remote ?? null,
                   branch: value,
+                },
+              },
+            });
+            break;
+          }
+
+          case "sync.git.sign": {
+            const sign = value.toLowerCase() === "true";
+            if (value.toLowerCase() !== "true" && value.toLowerCase() !== "false") {
+              console.error(`Invalid value for sync.git.sign: must be 'true' or 'false'`);
+              Deno.exit(1);
+            }
+            newSettings = createWorkspaceSettings({
+              timezone: currentData.timezone,
+              sync: {
+                ...currentData.sync,
+                git: {
+                  ...(currentData.sync.git ?? {}),
+                  remote: currentData.sync.git?.remote ?? null,
+                  sign,
                 },
               },
             });

@@ -30,11 +30,13 @@ export type VcsType = "git";
 export type GitSyncSettings = Readonly<{
   remote: string | null;
   branch?: string;
+  sign?: boolean;
 }>;
 
 export type GitSyncSettingsSnapshot = Readonly<{
   remote: string | null;
   branch?: string;
+  sign?: boolean;
 }>;
 
 export type SyncSettings = Readonly<{
@@ -96,16 +98,16 @@ const instantiate = (data: WorkspaceSettingsData): WorkspaceSettings => {
     kind: WORKSPACE_SETTINGS_KIND,
     data: frozen,
     toJSON() {
-      const gitSnapshot: GitSyncSettingsSnapshot | null = frozen.sync.git
-        ? (frozen.sync.git.branch !== undefined
-          ? {
-            remote: frozen.sync.git.remote,
-            branch: frozen.sync.git.branch,
-          }
-          : {
-            remote: frozen.sync.git.remote,
-          })
-        : null;
+      let gitSnapshot: GitSyncSettingsSnapshot | null = null;
+      if (frozen.sync.git) {
+        gitSnapshot = { remote: frozen.sync.git.remote };
+        if (frozen.sync.git.branch !== undefined) {
+          gitSnapshot = { ...gitSnapshot, branch: frozen.sync.git.branch };
+        }
+        if (frozen.sync.git.sign !== undefined) {
+          gitSnapshot = { ...gitSnapshot, sign: frozen.sync.git.sign };
+        }
+      }
 
       const syncSnapshot: SyncSettingsSnapshot = {
         vcs: frozen.sync.vcs,
@@ -170,6 +172,7 @@ export const parseWorkspaceSettings = (
         branch: typeof snapshot.sync.git.branch === "string" && snapshot.sync.git.branch !== ""
           ? snapshot.sync.git.branch
           : undefined,
+        sign: typeof snapshot.sync.git.sign === "boolean" ? snapshot.sync.git.sign : undefined,
       };
     }
 
