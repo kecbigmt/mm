@@ -20,10 +20,10 @@ async function cleanupWorkspace(workspaceDir: string) {
   }
 }
 
-const mockItem = (alias?: string, context?: string) => ({
+const mockItem = (alias?: string, contexts?: string[]) => ({
   data: {
     alias: alias ? { toString: () => alias } : undefined,
-    context: context ? { toString: () => context } : undefined,
+    contexts: contexts ? contexts.map((c) => ({ toString: () => c })) : undefined,
   },
 });
 
@@ -45,7 +45,7 @@ Deno.test("CacheUpdateService - updateFromItem adds alias and tag", async () => 
   const manager = new CacheManager(workspaceDir, { maxEntries: 1000 });
   const service = new CacheUpdateService(manager);
 
-  const item = mockItem("todo", "work");
+  const item = mockItem("todo", ["work"]);
   await service.updateFromItem(item);
 
   const aliases = await manager.getAliases();
@@ -63,8 +63,8 @@ Deno.test("CacheUpdateService - updateFromItems adds multiple entries", async ()
   const service = new CacheUpdateService(manager);
 
   const items = [
-    mockItem("todo", "work"),
-    mockItem("notes", "personal"),
+    mockItem("todo", ["work"]),
+    mockItem("notes", ["personal"]),
   ];
 
   await service.updateFromItems(items);

@@ -34,7 +34,8 @@ export type EditItemInput = Readonly<{
     duration?: string;
     dueAt?: string;
     alias?: string;
-    context?: string;
+    project?: string;
+    contexts?: readonly string[];
   }>;
   updatedAt: DateTime;
   timezone: TimezoneIdentifier;
@@ -154,21 +155,46 @@ export const EditItemWorkflow = {
       }
     }
 
-    if (input.updates.context !== undefined) {
-      let contextValue: TagSlug | undefined;
-      if (input.updates.context.trim().length > 0) {
-        const contextResult = parseTagSlug(input.updates.context);
-        if (contextResult.type === "error") {
+    if (input.updates.project !== undefined) {
+      let projectValue: AliasSlug | undefined;
+      if (input.updates.project.trim().length > 0) {
+        const projectResult = parseAliasSlug(input.updates.project);
+        if (projectResult.type === "error") {
           issues.push({
-            field: "context",
-            message: contextResult.error.issues[0]?.message ?? "Invalid context",
+            field: "project",
+            message: projectResult.error.issues[0]?.message ?? "Invalid project",
           });
         } else {
-          contextValue = contextResult.value;
+          projectValue = projectResult.value;
         }
       }
-      if (issues.length === 0 || !issues.some((i) => i.field === "context")) {
-        updatedItem = updatedItem.setContext(contextValue, input.updatedAt);
+      if (issues.length === 0 || !issues.some((i) => i.field === "project")) {
+        updatedItem = updatedItem.setProject(projectValue, input.updatedAt);
+      }
+    }
+
+    if (input.updates.contexts !== undefined) {
+      const contextValues: TagSlug[] = [];
+      let hasContextErrors = false;
+      for (const [index, contextStr] of input.updates.contexts.entries()) {
+        if (contextStr.trim().length > 0) {
+          const contextResult = parseTagSlug(contextStr);
+          if (contextResult.type === "error") {
+            issues.push({
+              field: `contexts[${index}]`,
+              message: contextResult.error.issues[0]?.message ?? "Invalid context",
+            });
+            hasContextErrors = true;
+          } else {
+            contextValues.push(contextResult.value);
+          }
+        }
+      }
+      if (!hasContextErrors) {
+        updatedItem = updatedItem.setContexts(
+          contextValues.length > 0 ? Object.freeze(contextValues) : undefined,
+          input.updatedAt,
+        );
       }
     }
 

@@ -31,7 +31,8 @@ export function createEventCommand() {
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .option("-b, --body <body:string>", "Body text")
     .option("-p, --parent <parent:string>", "Parent locator (e.g., /2025-11-03, /alias, ./1)")
-    .option("-c, --context <context:string>", "Context tag")
+    .option("--project <project:string>", "Project reference (alias)")
+    .option("-c, --context <context:string>", "Context tag (repeatable)", { collect: true })
     .option("-a, --alias <alias:string>", "Alias for the item")
     .option("-s, --start-at <startAt:string>", "Start date/time (ISO 8601 format)")
     .option("-d, --duration <duration:string>", "Duration (e.g., 30m, 2h, 1h30m)")
@@ -112,7 +113,8 @@ export function createEventCommand() {
       }
 
       const bodyOption = typeof options.body === "string" ? options.body : undefined;
-      const contextOption = typeof options.context === "string" ? options.context : undefined;
+      const projectOption = typeof options.project === "string" ? options.project : undefined;
+      const contextOption = Array.isArray(options.context) ? options.context as string[] : undefined;
       const aliasOption = typeof options.alias === "string" ? options.alias : undefined;
 
       // Parse startAt if provided
@@ -156,7 +158,8 @@ export function createEventCommand() {
         title: resolvedTitle,
         itemType: "event",
         body: bodyOption,
-        context: contextOption,
+        project: projectOption,
+        contexts: contextOption,
         alias: aliasOption,
         startAt,
         duration,

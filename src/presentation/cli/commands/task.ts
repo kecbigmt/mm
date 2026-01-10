@@ -35,7 +35,8 @@ export function createTaskCommand() {
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .option("-b, --body <body:string>", "Body text")
     .option("-p, --parent <parent:string>", "Parent locator (e.g., /2025-11-03, /alias, ./1)")
-    .option("-c, --context <context:string>", "Context tag")
+    .option("--project <project:string>", "Project reference (alias)")
+    .option("-c, --context <context:string>", "Context tag (repeatable)", { collect: true })
     .option("-a, --alias <alias:string>", "Alias for the item")
     .option("-d, --due-at <dueAt:string>", "Due date/time (ISO 8601 format)")
     .option("-e, --edit", "Open editor after creation")
@@ -115,7 +116,8 @@ export function createTaskCommand() {
       }
 
       const bodyOption = typeof options.body === "string" ? options.body : undefined;
-      const contextOption = typeof options.context === "string" ? options.context : undefined;
+      const projectOption = typeof options.project === "string" ? options.project : undefined;
+      const contextOption = Array.isArray(options.context) ? options.context as string[] : undefined;
       const aliasOption = typeof options.alias === "string" ? options.alias : undefined;
 
       // Parse dueAt if provided
@@ -155,7 +157,8 @@ export function createTaskCommand() {
         title: resolvedTitle,
         itemType: "task",
         body: bodyOption,
-        context: contextOption,
+        project: projectOption,
+        contexts: contextOption,
         alias: aliasOption,
         dueAt,
         parentPlacement: parentPlacement,

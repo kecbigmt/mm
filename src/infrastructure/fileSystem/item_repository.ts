@@ -40,7 +40,9 @@ type ItemFrontmatter = Readonly<{
   due_at?: string;
   snooze_until?: string;
   alias?: string;
-  context?: string;
+  project?: string;
+  contexts?: readonly string[];
+  context?: string; // deprecated: for migration from singular context
   tags?: string[];
   schema?: string;
 }>;
@@ -182,7 +184,8 @@ const writeItemFile = async (
     due_at: snapshot.dueAt,
     snooze_until: snapshot.snoozeUntil,
     alias: snapshot.alias,
-    context: snapshot.context,
+    project: snapshot.project,
+    contexts: snapshot.contexts,
     schema: "mm.item.frontmatter/2",
   };
 
@@ -302,7 +305,9 @@ const loadItemFromFile = async (
     dueAt: frontmatter.due_at,
     snoozeUntil: frontmatter.snooze_until,
     alias: frontmatter.alias,
-    context: frontmatter.context,
+    project: frontmatter.project,
+    contexts: frontmatter.contexts,
+    context: frontmatter.context, // deprecated: for migration
     title,
     body: bodyContent,
     edges: edgesResult.value.edges.length > 0 ? edgesResult.value.edges : undefined,

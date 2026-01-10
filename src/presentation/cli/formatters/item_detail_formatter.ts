@@ -7,7 +7,7 @@ import { formatItemIcon } from "./list_formatter.ts";
  *
  * Output format:
  * ```
- * {alias} {icon} {title} @{context} on:{date}
+ * {alias} {icon} {title} +{project} @{context}... on:{date}
  *
  * {body}
  *
@@ -26,7 +26,8 @@ export const formatItemDetail = (item: Item): string => {
     icon,
     status,
     alias,
-    context,
+    project,
+    contexts,
     body,
     createdAt,
     updatedAt,
@@ -51,9 +52,16 @@ export const formatItemDetail = (item: Item): string => {
   // Title
   headerParts.push(bold(title.toString()));
 
-  // Context
-  if (context) {
-    headerParts.push(dim(`@${context.toString()}`));
+  // Project (todo.txt convention: +project)
+  if (project) {
+    headerParts.push(dim(`+${project.toString()}`));
+  }
+
+  // Contexts (todo.txt convention: @context)
+  if (contexts && contexts.length > 0) {
+    for (const context of contexts) {
+      headerParts.push(dim(`@${context.toString()}`));
+    }
   }
 
   // Date (from placement)
