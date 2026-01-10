@@ -2,7 +2,7 @@ import { Result } from "../../shared/result.ts";
 import { VersionControlService } from "../services/version_control_service.ts";
 import { WorkspaceRepository } from "../repositories/workspace_repository.ts";
 import { StateRepository } from "../repositories/state_repository.ts";
-import { DEFAULT_LAZY_SYNC_SETTINGS } from "../models/workspace.ts";
+import { DEFAULT_AUTO_SYNC_SETTINGS } from "../models/workspace.ts";
 
 export type AutoCommitInput = {
   workspaceRoot: string;
@@ -55,19 +55,20 @@ function isNetworkConnectivityError(errorMessage: string): boolean {
 /**
  * Auto-commit workflow
  *
- * Automatically commits changes when sync.mode is "auto-commit", "auto-sync", or "lazy-sync".
+ * Automatically commits changes when sync.mode is "auto-commit" or "auto-sync".
  *
- * For "auto-sync" mode, follows commit→pull(rebase)→push pattern:
- * - Commits are always created first (offline resilience)
- * - Pull with rebase integrates remote changes
- * - Push completes synchronization
+ * For "auto-commit" mode:
+ * - Creates local commits only (no push)
  *
- * For "lazy-sync" mode:
- * - Commits are created immediately (like auto-commit)
- * - Sync is triggered when either threshold is met:
- *   - Commit count threshold (default: 10)
- *   - Time threshold (default: 600 seconds)
- * - When triggered, follows same commit→pull(rebase)→push pattern
+ * For "auto-sync" mode:
+ * - Commits are created immediately
+ * - Sync is triggered when thresholds are met:
+ *   - Commit count threshold (default: 1 for immediate sync)
+ *   - Time threshold (default: 0, meaning disabled)
+ * - Thresholds can be configured via sync.lazy.commits and sync.lazy.minutes
+ * - Setting commits=1 provides immediate sync (legacy auto-sync behavior)
+ * - Setting commits>1 provides batched sync (legacy lazy-sync behavior)
+ * - When triggered, follows commit→pull(rebase)→push pattern
  *
  * This workflow is designed to be failure-tolerant:
  * - If Git is not configured or disabled, it silently skips
@@ -94,9 +95,9 @@ export const AutoCommitWorkflow = {
       return Result.ok({ committed: false });
     }
 
-    // 3. Check sync mode (auto-commit, auto-sync, or lazy-sync)
+    // 3. Check sync mode (auto-commit or auto-sync)
     const mode = settings.data.sync.mode;
-    if (mode !== "auto-commit" && mode !== "auto-sync" && mode !== "lazy-sync") {
+    if (mode !== "auto-commit" && mode !== "auto-sync") {
       // Not in a recognized auto-commit mode - skip
       return Result.ok({ committed: false });
     }
@@ -233,13 +234,9 @@ export const AutoCommitWorkflow = {
 
     // 6. Handle sync based on mode
     if (mode === "auto-sync") {
-      // Auto-sync: always sync after commit
-      return Result.ok(await executeSync());
-    }
-
-    if (mode === "lazy-sync") {
-      // Lazy-sync: sync only when thresholds are met
-      const lazySettings = settings.data.sync.lazy ?? DEFAULT_LAZY_SYNC_SETTINGS;
+      // Auto-sync: sync when thresholds are met (default: commits=1 for immediate sync)
+      // Use explicit lazy settings if provided, otherwise use auto-sync defaults
+      const syncSettings = settings.data.sync.lazy ?? DEFAULT_AUTO_SYNC_SETTINGS;
 
       // Load current sync state
       const syncStateResult = await deps.stateRepository.loadSyncState();
@@ -253,9 +250,10 @@ export const AutoCommitWorkflow = {
       const now = Date.now();
 
       // Check thresholds (OR condition)
-      const commitThresholdMet = newCommitCount >= lazySettings.commits;
-      const timeThresholdMet = syncState.lastSyncTimestamp !== null &&
-        (now - syncState.lastSyncTimestamp) >= lazySettings.minutes * 60 * 1000;
+      const commitThresholdMet = newCommitCount >= syncSettings.commits;
+      const timeThresholdMet = syncSettings.minutes > 0 &&
+        syncState.lastSyncTimestamp !== null &&
+        (now - syncState.lastSyncTimestamp) >= syncSettings.minutes * 60 * 1000;
 
       const shouldSync = commitThresholdMet || timeThresholdMet;
 

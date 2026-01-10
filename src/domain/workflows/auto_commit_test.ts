@@ -527,9 +527,9 @@ Deno.test("AutoCommitWorkflow - handles 'nothing to commit' gracefully", async (
   }
 });
 
-// ===== Lazy-sync mode tests =====
+// ===== Auto-sync with threshold settings tests =====
 
-Deno.test("AutoCommitWorkflow - lazy-sync: increments commit count when below threshold", async () => {
+Deno.test("AutoCommitWorkflow - auto-sync with thresholds: increments commit count when below threshold", async () => {
   const timezoneResult = parseTimezoneIdentifier("UTC");
   if (timezoneResult.type === "error") throw new Error("Invalid timezone");
 
@@ -538,7 +538,7 @@ Deno.test("AutoCommitWorkflow - lazy-sync: increments commit count when below th
     sync: {
       vcs: "git",
       enabled: true,
-      mode: "lazy-sync",
+      mode: "auto-sync",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "main",
@@ -584,7 +584,7 @@ Deno.test("AutoCommitWorkflow - lazy-sync: increments commit count when below th
   assertEquals(savedCommitCount, 4);
 });
 
-Deno.test("AutoCommitWorkflow - lazy-sync: triggers sync when commit threshold met", async () => {
+Deno.test("AutoCommitWorkflow - auto-sync with thresholds: triggers sync when commit threshold met", async () => {
   const timezoneResult = parseTimezoneIdentifier("UTC");
   if (timezoneResult.type === "error") throw new Error("Invalid timezone");
 
@@ -593,7 +593,7 @@ Deno.test("AutoCommitWorkflow - lazy-sync: triggers sync when commit threshold m
     sync: {
       vcs: "git",
       enabled: true,
-      mode: "lazy-sync",
+      mode: "auto-sync",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "main",
@@ -640,7 +640,7 @@ Deno.test("AutoCommitWorkflow - lazy-sync: triggers sync when commit threshold m
   assertEquals(savedCommitCount, 0);
 });
 
-Deno.test("AutoCommitWorkflow - lazy-sync: triggers sync when time threshold met", async () => {
+Deno.test("AutoCommitWorkflow - auto-sync with thresholds: triggers sync when time threshold met", async () => {
   const timezoneResult = parseTimezoneIdentifier("UTC");
   if (timezoneResult.type === "error") throw new Error("Invalid timezone");
 
@@ -649,7 +649,7 @@ Deno.test("AutoCommitWorkflow - lazy-sync: triggers sync when time threshold met
     sync: {
       vcs: "git",
       enabled: true,
-      mode: "lazy-sync",
+      mode: "auto-sync",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "main",
@@ -695,7 +695,7 @@ Deno.test("AutoCommitWorkflow - lazy-sync: triggers sync when time threshold met
   assertEquals(savedCommitCount, 0);
 });
 
-Deno.test("AutoCommitWorkflow - lazy-sync: does not reset count on sync failure", async () => {
+Deno.test("AutoCommitWorkflow - auto-sync with thresholds: does not reset count on sync failure", async () => {
   const timezoneResult = parseTimezoneIdentifier("UTC");
   if (timezoneResult.type === "error") throw new Error("Invalid timezone");
 
@@ -704,7 +704,7 @@ Deno.test("AutoCommitWorkflow - lazy-sync: does not reset count on sync failure"
     sync: {
       vcs: "git",
       enabled: true,
-      mode: "lazy-sync",
+      mode: "auto-sync",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "main",
@@ -755,22 +755,22 @@ Deno.test("AutoCommitWorkflow - lazy-sync: does not reset count on sync failure"
   assertEquals(savedCommitCount, 5);
 });
 
-Deno.test("AutoCommitWorkflow - lazy-sync: uses default thresholds when not configured", async () => {
+Deno.test("AutoCommitWorkflow - auto-sync without lazy settings: uses default (commits=1, immediate sync)", async () => {
   const timezoneResult = parseTimezoneIdentifier("UTC");
   if (timezoneResult.type === "error") throw new Error("Invalid timezone");
 
-  // Settings without explicit lazy settings
+  // Settings without explicit lazy settings - should use auto-sync defaults (1 commit)
   const settings = createWorkspaceSettings({
     timezone: timezoneResult.value,
     sync: {
       vcs: "git",
       enabled: true,
-      mode: "lazy-sync",
+      mode: "auto-sync",
       git: {
         remote: "https://github.com/user/repo.git",
         branch: "main",
       },
-      // No lazy settings - should use defaults (10 commits, 600 seconds)
+      // No lazy settings - should use auto-sync defaults (1 commit for immediate sync)
     },
   });
 
@@ -781,7 +781,7 @@ Deno.test("AutoCommitWorkflow - lazy-sync: uses default thresholds when not conf
     loadSyncState: () =>
       Promise.resolve(
         Result.ok({
-          commitsSinceLastSync: 9, // One more will meet default threshold of 10
+          commitsSinceLastSync: 0, // First commit will trigger sync (default threshold is 1)
           lastSyncTimestamp: Date.now(),
         } as SyncState),
       ),
@@ -805,5 +805,6 @@ Deno.test("AutoCommitWorkflow - lazy-sync: uses default thresholds when not conf
     assertEquals(result.value.pushed, true);
     assertEquals(result.value.syncTriggered, true);
   }
+  // Count should be reset after successful sync
   assertEquals(savedCommitCount, 0);
 });
