@@ -114,9 +114,12 @@ export const AutoCommitWorkflow = {
 
     // 5. Create commit
     const commitMessage = `mm: ${input.summary}`;
+    // Use the sign setting from git config (defaults to undefined = use Git's default)
+    const signOption = settings.data.sync.git?.sign;
     const commitResult = await deps.versionControlService.commit(
       input.workspaceRoot,
       commitMessage,
+      { sign: signOption },
     );
     if (commitResult.type === "error") {
       const errorMsg = commitResult.error.message.toLowerCase();
