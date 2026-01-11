@@ -132,7 +132,9 @@ export function createNoteCommand() {
 
       const bodyOption = typeof options.body === "string" ? options.body : undefined;
       const projectOption = typeof options.project === "string" ? options.project : undefined;
-      const contextOption = Array.isArray(options.context) ? options.context as string[] : undefined;
+      const contextOption = Array.isArray(options.context)
+        ? options.context as string[]
+        : undefined;
       const aliasOption = typeof options.alias === "string" ? options.alias : undefined;
 
       const workflowResult = await CreateItemWorkflow.execute({

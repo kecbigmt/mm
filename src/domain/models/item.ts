@@ -361,9 +361,7 @@ const instantiate = (
       snoozeUntil: this.data.snoozeUntil?.toString(),
       alias: this.data.alias?.toString(),
       project: this.data.project?.toString(),
-      contexts: contextsSnapshot && contextsSnapshot.length > 0
-        ? contextsSnapshot
-        : undefined,
+      contexts: contextsSnapshot && contextsSnapshot.length > 0 ? contextsSnapshot : undefined,
       body: this.data.body,
       edges: edgesSnapshot.length > 0 ? edgesSnapshot : undefined,
     };
