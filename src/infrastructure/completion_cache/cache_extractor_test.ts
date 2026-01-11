@@ -1,15 +1,15 @@
 import { assertEquals } from "@std/assert";
 import { extractFromArgs, extractFromItem, extractFromItems } from "./cache_extractor.ts";
 
-const mockItem = (alias?: string, context?: string) => ({
+const mockItem = (alias?: string, contexts?: string[]) => ({
   data: {
     alias: alias ? { toString: () => alias } : undefined,
-    context: context ? { toString: () => context } : undefined,
+    contexts: contexts ? contexts.map((c) => ({ toString: () => c })) : undefined,
   },
 });
 
 Deno.test("extractFromItem - extracts alias and context tag", () => {
-  const item = mockItem("todo", "work");
+  const item = mockItem("todo", ["work"]);
   const result = extractFromItem(item);
 
   assertEquals(result.aliases, ["todo"]);
@@ -25,7 +25,7 @@ Deno.test("extractFromItem - handles item with only alias", () => {
 });
 
 Deno.test("extractFromItem - handles item with only context tag", () => {
-  const item = mockItem(undefined, "work");
+  const item = mockItem(undefined, ["work"]);
   const result = extractFromItem(item);
 
   assertEquals(result.aliases, []);
@@ -40,11 +40,19 @@ Deno.test("extractFromItem - handles item with no alias or context", () => {
   assertEquals(result.contextTags, []);
 });
 
+Deno.test("extractFromItem - handles item with multiple contexts", () => {
+  const item = mockItem("task", ["work", "urgent"]);
+  const result = extractFromItem(item);
+
+  assertEquals(result.aliases, ["task"]);
+  assertEquals(result.contextTags, ["work", "urgent"]);
+});
+
 Deno.test("extractFromItems - extracts from multiple items", () => {
   const items = [
-    mockItem("todo", "work"),
-    mockItem("notes", "personal"),
-    mockItem(undefined, "urgent"),
+    mockItem("todo", ["work"]),
+    mockItem("notes", ["personal"]),
+    mockItem(undefined, ["urgent"]),
   ];
 
   const result = extractFromItems(items);

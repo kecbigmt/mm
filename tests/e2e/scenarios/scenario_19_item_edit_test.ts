@@ -221,16 +221,20 @@ describe("Scenario 19: Item edit", () => {
     ]);
     assertEquals(editResult.success, true, `edit failed: ${editResult.stderr}`);
 
-    // Verify context in frontmatter
+    // Verify contexts in frontmatter
     const itemFile = await findItemFileById(ctx.testHome, "test-workspace", itemId);
     assertExists(itemFile, "Item file should exist");
     const fileContent = await Deno.readTextFile(itemFile!);
     const parseResult = parseFrontmatter(fileContent);
     assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
     if (parseResult.type === "error") throw new Error("Failed to parse frontmatter");
-    const meta = parseResult.value.frontmatter as Record<string, unknown>;
+    const meta = parseResult.value.frontmatter as Record<string, string[] | unknown>;
 
-    assertEquals(meta.context, "work", "Context should be updated in frontmatter");
+    assertEquals(
+      (meta.contexts as string[])?.[0],
+      "work",
+      "Contexts should be updated in frontmatter",
+    );
   });
 
   it("returns error for non-existent item", async () => {

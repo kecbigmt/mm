@@ -37,7 +37,8 @@ const makeItem = (
     status: "open" | "closed";
     placement: string;
     alias: string;
-    context: string;
+    project: string;
+    contexts: string[];
     startAt: string;
     duration: string;
     dueAt: string;
@@ -52,7 +53,10 @@ const makeItem = (
   const createdAt = Result.unwrap(parseDateTime("2025-02-10T09:00:00Z"));
   const updatedAt = Result.unwrap(parseDateTime("2025-02-10T09:00:00Z"));
   const alias = overrides.alias ? Result.unwrap(parseAliasSlug(overrides.alias)) : undefined;
-  const context = overrides.context ? Result.unwrap(parseTagSlug(overrides.context)) : undefined;
+  const project = overrides.project ? Result.unwrap(parseAliasSlug(overrides.project)) : undefined;
+  const contexts = overrides.contexts
+    ? Object.freeze(overrides.contexts.map((c) => Result.unwrap(parseTagSlug(c))))
+    : undefined;
   const startAt = overrides.startAt ? Result.unwrap(parseDateTime(overrides.startAt)) : undefined;
   const duration = overrides.duration
     ? Result.unwrap(parseDuration(overrides.duration))
@@ -69,7 +73,8 @@ const makeItem = (
     createdAt,
     updatedAt,
     alias,
-    context,
+    project,
+    contexts,
     startAt,
     duration,
     dueAt,
@@ -151,7 +156,7 @@ Deno.test("formatItemLine - includes title", () => {
 });
 
 Deno.test("formatItemLine - includes context when present", () => {
-  const item = makeItem({ context: "project-novel" });
+  const item = makeItem({ contexts: ["project-novel"] });
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
@@ -477,7 +482,7 @@ Deno.test("formatItemLine - print mode uses plain text icon for closed task", ()
 });
 
 Deno.test("formatItemLine - print mode produces no ANSI escape codes", () => {
-  const item = makeItem({ alias: "test-alias", context: "ctx" });
+  const item = makeItem({ alias: "test-alias", contexts: ["ctx"] });
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),

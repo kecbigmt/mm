@@ -31,7 +31,8 @@ export type CreateItemInput = Readonly<{
   title: string;
   itemType: "note" | "task" | "event";
   body?: string;
-  context?: string;
+  project?: string;
+  contexts?: readonly string[];
   alias?: string;
   parentPlacement: Placement;
   createdAt: DateTime;
@@ -195,20 +196,39 @@ export const CreateItemWorkflow = {
       );
     }
 
-    let context: TagSlug | undefined;
-    if (typeof input.context === "string") {
-      const contextResult = tagSlugFromString(input.context);
-      if (contextResult.type === "error") {
+    let project: AliasSlug | undefined;
+    if (typeof input.project === "string") {
+      const projectResult = parseAliasSlug(input.project);
+      if (projectResult.type === "error") {
         issues.push(
-          ...contextResult.error.issues.map((issue) =>
+          ...projectResult.error.issues.map((issue) =>
             createValidationIssue(issue.message, {
               code: issue.code,
-              path: ["context", ...issue.path],
+              path: ["project", ...issue.path],
             })
           ),
         );
       } else {
-        context = contextResult.value;
+        project = projectResult.value;
+      }
+    }
+
+    const contexts: TagSlug[] = [];
+    if (input.contexts && input.contexts.length > 0) {
+      for (const [index, contextStr] of input.contexts.entries()) {
+        const contextResult = tagSlugFromString(contextStr);
+        if (contextResult.type === "error") {
+          issues.push(
+            ...contextResult.error.issues.map((issue) =>
+              createValidationIssue(issue.message, {
+                code: issue.code,
+                path: ["contexts", index, ...issue.path],
+              })
+            ),
+          );
+        } else {
+          contexts.push(contextResult.value);
+        }
       }
     }
 
@@ -342,7 +362,8 @@ export const CreateItemWorkflow = {
       createdAt: input.createdAt,
       updatedAt: input.createdAt,
       body,
-      context,
+      project,
+      contexts: contexts.length > 0 ? Object.freeze(contexts) : undefined,
       alias,
     });
 
