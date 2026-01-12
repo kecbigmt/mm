@@ -21,6 +21,7 @@ import {
   ItemStatus,
   itemStatusClosed,
   itemStatusOpen,
+  itemStatusSnoozing,
   ItemStatusValidationError,
   ItemTitle,
   ItemTitleValidationError,
@@ -267,8 +268,10 @@ const instantiate = (
     snoozeUntil: DateTime | undefined,
     occurredAt: DateTime,
   ): Item {
+    const status = snoozeUntil ? itemStatusSnoozing() : itemStatusOpen();
     const next = {
       ...this.data,
+      status,
       snoozeUntil,
       updatedAt: occurredAt,
     } as ItemData;
