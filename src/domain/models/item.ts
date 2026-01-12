@@ -529,19 +529,28 @@ export const parseItem = (
   const contexts: TagSlug[] = [];
   // Parse new contexts array field
   if (snapshot.contexts !== undefined) {
-    for (const [index, contextStr] of snapshot.contexts.entries()) {
-      const result = parseTagSlug(contextStr);
-      if (result.type === "error") {
-        issues.push(
-          ...result.error.issues.map((issue) =>
-            createValidationIssue(issue.message, {
-              code: issue.code,
-              path: ["contexts", index, ...issue.path],
-            })
-          ),
-        );
-      } else {
-        contexts.push(result.value);
+    if (!Array.isArray(snapshot.contexts)) {
+      issues.push(
+        createValidationIssue("contexts must be an array", {
+          code: "invalid_type",
+          path: ["contexts"],
+        }),
+      );
+    } else {
+      for (const [index, contextStr] of snapshot.contexts.entries()) {
+        const result = parseTagSlug(contextStr);
+        if (result.type === "error") {
+          issues.push(
+            ...result.error.issues.map((issue) =>
+              createValidationIssue(issue.message, {
+                code: issue.code,
+                path: ["contexts", index, ...issue.path],
+              })
+            ),
+          );
+        } else {
+          contexts.push(result.value);
+        }
       }
     }
   }
