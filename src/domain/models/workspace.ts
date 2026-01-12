@@ -176,7 +176,9 @@ export const parseWorkspaceSettings = (
         branch: typeof snapshot.sync.git.branch === "string" && snapshot.sync.git.branch !== ""
           ? snapshot.sync.git.branch
           : undefined,
-        noSign: typeof snapshot.sync.git.noSign === "boolean" ? snapshot.sync.git.noSign : undefined,
+        noSign: typeof snapshot.sync.git.noSign === "boolean"
+          ? snapshot.sync.git.noSign
+          : undefined,
       };
     }
 
