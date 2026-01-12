@@ -20,11 +20,6 @@ export type LazySyncSettings = Readonly<{
   minutes: number;
 }>;
 
-export const DEFAULT_LAZY_SYNC_SETTINGS: LazySyncSettings = {
-  commits: 10,
-  minutes: 10,
-};
-
 export const DEFAULT_AUTO_SYNC_SETTINGS: LazySyncSettings = {
   commits: 1,
   minutes: 0,
@@ -160,8 +155,7 @@ export const parseWorkspaceSettings = (
   let syncSettings = DEFAULT_SYNC_SETTINGS;
   if (snapshot.sync) {
     let mode: VersionControlSyncMode;
-    if (snapshot.sync.mode === "auto-sync" || snapshot.sync.mode === "lazy-sync") {
-      // lazy-sync is now unified into auto-sync (backward compatibility)
+    if (snapshot.sync.mode === "auto-sync") {
       mode = "auto-sync";
     } else {
       mode = "auto-commit";
@@ -182,10 +176,10 @@ export const parseWorkspaceSettings = (
       lazySyncSettings = {
         commits: typeof snapshot.sync.lazy.commits === "number"
           ? snapshot.sync.lazy.commits
-          : DEFAULT_LAZY_SYNC_SETTINGS.commits,
+          : DEFAULT_AUTO_SYNC_SETTINGS.commits,
         minutes: typeof snapshot.sync.lazy.minutes === "number"
           ? snapshot.sync.lazy.minutes
-          : DEFAULT_LAZY_SYNC_SETTINGS.minutes,
+          : DEFAULT_AUTO_SYNC_SETTINGS.minutes,
       };
     }
 

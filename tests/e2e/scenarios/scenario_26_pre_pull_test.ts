@@ -2,7 +2,7 @@
  * E2E Test Scenario 26: Pre-pull Before File Operations
  *
  * Purpose:
- *   Verify that auto-sync and lazy-sync modes pull remote changes
+ *   Verify that auto-sync mode pulls remote changes
  *   BEFORE performing file operations, reducing conflicts.
  *
  * Overview:
@@ -202,74 +202,5 @@ describe("Scenario 26: Pre-pull Before File Operations", () => {
       fileExists = false;
     }
     assertEquals(fileExists, false, "Remote file should NOT be pulled in auto-commit mode");
-  });
-
-  it("pre-pulls in lazy-sync mode", async () => {
-    // Change to lazy-sync mode
-    const workspaceJsonPath = join(workspaceDir, "workspace.json");
-    const content = await Deno.readTextFile(workspaceJsonPath);
-    const config = JSON.parse(content);
-    config.sync.mode = "lazy-sync";
-    config.sync.lazy = { commits: 10, minutes: 10 };
-    await Deno.writeTextFile(workspaceJsonPath, JSON.stringify(config, null, 2));
-
-    // Commit the config change so pull doesn't fail due to uncommitted changes
-    const addCmd = new Deno.Command("git", {
-      args: ["add", "workspace.json"],
-      cwd: workspaceDir,
-    });
-    await addCmd.output();
-    const commitCmd = new Deno.Command("git", {
-      args: ["commit", "-m", "switch to lazy-sync mode"],
-      cwd: workspaceDir,
-    });
-    await commitCmd.output();
-    const pushCmd = new Deno.Command("git", {
-      args: ["push", "origin", "main"],
-      cwd: workspaceDir,
-    });
-    await pushCmd.output();
-
-    // Pull in other device to get the config change
-    const pullOtherCmd = new Deno.Command("git", {
-      args: ["pull", "origin", "main"],
-      cwd: otherDeviceDir,
-    });
-    await pullOtherCmd.output();
-
-    // Simulate changes from another device
-    const remoteFilePath = join(otherDeviceDir, "remote-file-lazy.txt");
-    await Deno.writeTextFile(remoteFilePath, "Pulled in lazy-sync mode");
-
-    const addRemoteCmd = new Deno.Command("git", {
-      args: ["add", "."],
-      cwd: otherDeviceDir,
-    });
-    await addRemoteCmd.output();
-
-    const commitRemoteCmd = new Deno.Command("git", {
-      args: ["commit", "-m", "lazy sync remote change"],
-      cwd: otherDeviceDir,
-    });
-    await commitRemoteCmd.output();
-
-    const pushRemoteCmd = new Deno.Command("git", {
-      args: ["push", "origin", "main"],
-      cwd: otherDeviceDir,
-    });
-    await pushRemoteCmd.output();
-
-    // Run command - lazy-sync should also pre-pull
-    const result = await runCommand(ctx.testHome, ["note", "note in lazy-sync mode"]);
-    assertEquals(result.success, true);
-
-    // Verify remote file was pulled
-    const localFilePath = join(workspaceDir, "remote-file-lazy.txt");
-    try {
-      const fileContent = await Deno.readTextFile(localFilePath);
-      assertEquals(fileContent, "Pulled in lazy-sync mode");
-    } catch {
-      throw new Error("Remote file was not pulled in lazy-sync mode");
-    }
   });
 });

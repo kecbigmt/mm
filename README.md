@@ -428,12 +428,11 @@ Supported keys: `timezone`, `sync.enabled`, `sync.mode`, `sync.git.remote`, `syn
 
 ### Git Synchronization
 
-mm supports Git-based synchronization to backup and sync workspaces across devices. Three sync modes
+mm supports Git-based synchronization to backup and sync workspaces across devices. Two sync modes
 are available:
 
 - **auto-commit**: Automatically commits changes after each operation (manual push required)
-- **auto-sync**: Automatically commits and pushes changes after each operation
-- **lazy-sync**: Automatically commits changes immediately, syncs periodically based on thresholds
+- **auto-sync**: Automatically commits and pushes changes (configurable thresholds for batched sync)
 
 #### `sync init <remote-url>`
 
@@ -498,15 +497,15 @@ automatically committed and pushed after each operation.
 **Sync Mode Configuration**: The sync mode defaults to `auto-commit`. To change it:
 
 ```sh
-mm config set sync.mode auto-sync      # Sync after every operation
-mm config set sync.mode lazy-sync      # Sync periodically based on thresholds
+mm config set sync.mode auto-sync      # Sync after every operation (default: immediate)
 ```
 
-**Lazy-sync Configuration**: In lazy-sync mode, sync is triggered when either threshold is reached:
+**Auto-sync Threshold Configuration**: By default, auto-sync pushes immediately after each commit.
+You can configure thresholds for batched sync:
 
 ```sh
-mm config set sync.lazy.commits 10     # Sync after 10 commits (default: 10)
-mm config set sync.lazy.minutes 10     # Sync after 10 minutes (default: 10)
+mm config set sync.lazy.commits 10     # Sync after 10 commits (default: 1)
+mm config set sync.lazy.minutes 10     # Sync after 10 minutes (default: 0, disabled)
 ```
 
 ### Maintenance
