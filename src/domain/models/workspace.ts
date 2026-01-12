@@ -35,13 +35,13 @@ export type VcsType = "git";
 export type GitSyncSettings = Readonly<{
   remote: string | null;
   branch?: string;
-  sign?: boolean;
+  noSign?: boolean;
 }>;
 
 export type GitSyncSettingsSnapshot = Readonly<{
   remote: string | null;
   branch?: string;
-  sign?: boolean;
+  noSign?: boolean;
 }>;
 
 export type SyncSettings = Readonly<{
@@ -109,8 +109,8 @@ const instantiate = (data: WorkspaceSettingsData): WorkspaceSettings => {
         if (frozen.sync.git.branch !== undefined) {
           gitSnapshot = { ...gitSnapshot, branch: frozen.sync.git.branch };
         }
-        if (frozen.sync.git.sign !== undefined) {
-          gitSnapshot = { ...gitSnapshot, sign: frozen.sync.git.sign };
+        if (frozen.sync.git.noSign !== undefined) {
+          gitSnapshot = { ...gitSnapshot, noSign: frozen.sync.git.noSign };
         }
       }
 
@@ -176,7 +176,7 @@ export const parseWorkspaceSettings = (
         branch: typeof snapshot.sync.git.branch === "string" && snapshot.sync.git.branch !== ""
           ? snapshot.sync.git.branch
           : undefined,
-        sign: typeof snapshot.sync.git.sign === "boolean" ? snapshot.sync.git.sign : undefined,
+        noSign: typeof snapshot.sync.git.noSign === "boolean" ? snapshot.sync.git.noSign : undefined,
       };
     }
 

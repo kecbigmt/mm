@@ -187,11 +187,11 @@ export const createGitVersionControlService = (): VersionControlService => {
     return safeExecute("git", ["add", ...existingPaths], cwd, "git add failed");
   };
 
-  const commit = (cwd: string, message: string, options?: { sign?: boolean }) => {
+  const commit = (cwd: string, message: string, options?: { noSign?: boolean }) => {
     const args = ["commit", "-m", message];
-    // When sign is explicitly false, skip GPG signing
-    // When sign is true or undefined, use default Git behavior (respects user's config)
-    if (options?.sign === false) {
+    // When noSign is true, skip GPG signing with --no-gpg-sign flag
+    // When noSign is false or undefined, use default Git behavior (respects user's config)
+    if (options?.noSign === true) {
       args.push("--no-gpg-sign");
     }
     return safeExecute("git", args, cwd, "git commit failed");

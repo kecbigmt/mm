@@ -113,13 +113,13 @@ export async function executeAutoCommit(
   const remote = settings.data.sync.git?.remote ?? undefined;
   const branch = settings.data.sync.git?.branch ?? undefined;
   const lazyConfig = settings.data.sync.lazy ?? undefined;
-  const signOption = settings.data.sync.git?.sign;
+  const noSignOption = settings.data.sync.git?.noSign;
 
   // Step 1: Commit
   const commitResult = await syncService.commit({
     workspaceRoot: deps.workspaceRoot,
     summary,
-    sign: signOption,
+    noSign: noSignOption,
   });
 
   if (commitResult.error) {

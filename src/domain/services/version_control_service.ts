@@ -53,7 +53,7 @@ export interface VersionControlService {
   commit(
     cwd: string,
     message: string,
-    options?: { sign?: boolean },
+    options?: { noSign?: boolean },
   ): Promise<Result<void, VersionControlError>>;
   validateBranchName(cwd: string, branch: string): Promise<Result<void, VersionControlError>>;
   push(

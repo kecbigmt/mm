@@ -19,7 +19,7 @@ type ConfigKey =
   | "sync.mode"
   | "sync.git.remote"
   | "sync.git.branch"
-  | "sync.git.sign"
+  | "sync.git.noSign"
   | "sync.lazy.commits"
   | "sync.lazy.minutes";
 
@@ -29,7 +29,7 @@ const VALID_KEYS: ConfigKey[] = [
   "sync.mode",
   "sync.git.remote",
   "sync.git.branch",
-  "sync.git.sign",
+  "sync.git.noSign",
   "sync.lazy.commits",
   "sync.lazy.minutes",
 ];
@@ -56,9 +56,9 @@ function getValueByKey(
       return data.sync.git?.remote ?? null;
     case "sync.git.branch":
       return data.sync.git?.branch;
-    case "sync.git.sign":
-      // Default to true (use Git's default signing behavior)
-      return data.sync.git?.sign ?? true;
+    case "sync.git.noSign":
+      // Default to false (use Git's default signing behavior)
+      return data.sync.git?.noSign ?? false;
     case "sync.lazy.commits":
       return data.sync.lazy?.commits ?? defaultSettings.commits;
     case "sync.lazy.minutes":
@@ -292,10 +292,10 @@ export const createConfigCommand = () => {
             break;
           }
 
-          case "sync.git.sign": {
-            const sign = value.toLowerCase() === "true";
+          case "sync.git.noSign": {
+            const noSign = value.toLowerCase() === "true";
             if (value.toLowerCase() !== "true" && value.toLowerCase() !== "false") {
-              console.error(`Invalid value for sync.git.sign: must be 'true' or 'false'`);
+              console.error(`Invalid value for sync.git.noSign: must be 'true' or 'false'`);
               Deno.exit(1);
             }
             newSettings = createWorkspaceSettings({
@@ -305,7 +305,7 @@ export const createConfigCommand = () => {
                 git: {
                   ...(currentData.sync.git ?? {}),
                   remote: currentData.sync.git?.remote ?? null,
-                  sign,
+                  noSign,
                 },
               },
             });
