@@ -1,6 +1,6 @@
 # Story: Execute sync pull before file operations instead of after
 
-**Status:** Implementation Complete
+**Status:** Accepted
 **Created:** 2026-01-03T03:12:40
 **Reference:** mm task yoni-0h6
 
@@ -32,28 +32,28 @@ By pulling first, remote changes are incorporated before local file operations, 
 
 ### 1. Pull Before File Operations
 
-- [ ] **Given** sync mode is `auto-sync` and remote is configured, **When** you run a state-changing command (e.g., `mm edit`), **Then** mm pulls from remote before performing the file operation
-- [ ] **Given** sync mode is `lazy-sync` and remote is configured, **When** you run a state-changing command, **Then** mm pulls from remote before performing the file operation
-- [ ] **Given** sync mode is `auto-commit`, **When** you run a state-changing command, **Then** mm does NOT pull before the file operation (no sync behavior)
+- [x] **Given** sync mode is `auto-sync` and remote is configured, **When** you run a state-changing command (e.g., `mm edit`), **Then** mm pulls from remote before performing the file operation
+- [x] **Given** sync mode is `lazy-sync` and remote is configured, **When** you run a state-changing command, **Then** mm pulls from remote before performing the file operation
+- [x] **Given** sync mode is `auto-commit`, **When** you run a state-changing command, **Then** mm does NOT pull before the file operation (no sync behavior)
 
 ### 2. Commit and Push After File Operations
 
-- [ ] **Given** pull succeeded before file operation, **When** the file operation completes, **Then** mm commits and pushes as before
-- [ ] **Given** pull succeeded and file operation completes, **When** push is performed, **Then** conflicts are less likely because local files are up-to-date
+- [x] **Given** pull succeeded before file operation, **When** the file operation completes, **Then** mm commits and pushes as before
+- [x] **Given** pull succeeded and file operation completes, **When** push is performed, **Then** conflicts are less likely because local files are up-to-date
 
 ### 3. Error Handling
 
-- [ ] **Given** pull fails due to network error, **When** running a state-changing command, **Then** the file operation proceeds with a warning
-- [ ] **Given** pull fails due to rebase conflict, **When** running a state-changing command, **Then** the file operation proceeds with a warning (not blocked)
-- [ ] **Given** remote is not configured, **When** running a state-changing command, **Then** the file operation proceeds without pull
+- [x] **Given** pull fails due to network error, **When** running a state-changing command, **Then** the file operation proceeds with a warning
+- [x] **Given** pull fails due to rebase conflict, **When** running a state-changing command, **Then** the file operation proceeds with a warning (not blocked)
+- [x] **Given** remote is not configured, **When** running a state-changing command, **Then** the file operation proceeds without pull
 
 ### 4. Affected Commands
 
 State-changing commands that should trigger pre-pull:
-- [ ] `mm task` / `mm note` / `mm event` (create)
-- [ ] `mm edit` (update)
-- [ ] `mm close` / `mm reopen` (status change)
-- [ ] `mm remove` (delete)
+- [x] `mm task` / `mm note` / `mm event` (create)
+- [x] `mm edit` (update)
+- [x] `mm close` / `mm reopen` (status change)
+- [x] `mm remove` (delete)
 
 ## Verification Approach
 
@@ -103,7 +103,9 @@ State-changing commands that should trigger pre-pull:
 
 ### Acceptance Checks
 
-**Status: Pending Product Owner Review**
+**Status: Accepted**
+
+Manual verification completed on 2026-01-12.
 
 Developer verification completed:
 
