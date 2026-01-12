@@ -13,16 +13,16 @@ import {
 
 const WORKSPACE_SETTINGS_KIND = "WorkspaceSettings" as const;
 
-export type VersionControlSyncMode = "auto-commit" | "auto-sync" | "lazy-sync";
+export type VersionControlSyncMode = "auto-commit" | "auto-sync";
 
 export type LazySyncSettings = Readonly<{
   commits: number;
   minutes: number;
 }>;
 
-export const DEFAULT_LAZY_SYNC_SETTINGS: LazySyncSettings = {
-  commits: 10,
-  minutes: 10,
+export const DEFAULT_AUTO_SYNC_SETTINGS: LazySyncSettings = {
+  commits: 1,
+  minutes: 0,
 };
 
 export type VcsType = "git";
@@ -30,11 +30,13 @@ export type VcsType = "git";
 export type GitSyncSettings = Readonly<{
   remote: string | null;
   branch?: string;
+  noSign?: boolean;
 }>;
 
 export type GitSyncSettingsSnapshot = Readonly<{
   remote: string | null;
   branch?: string;
+  noSign?: boolean;
 }>;
 
 export type SyncSettings = Readonly<{
@@ -96,16 +98,16 @@ const instantiate = (data: WorkspaceSettingsData): WorkspaceSettings => {
     kind: WORKSPACE_SETTINGS_KIND,
     data: frozen,
     toJSON() {
-      const gitSnapshot: GitSyncSettingsSnapshot | null = frozen.sync.git
-        ? (frozen.sync.git.branch !== undefined
-          ? {
-            remote: frozen.sync.git.remote,
-            branch: frozen.sync.git.branch,
-          }
-          : {
-            remote: frozen.sync.git.remote,
-          })
-        : null;
+      let gitSnapshot: GitSyncSettingsSnapshot | null = null;
+      if (frozen.sync.git) {
+        gitSnapshot = { remote: frozen.sync.git.remote };
+        if (frozen.sync.git.branch !== undefined) {
+          gitSnapshot = { ...gitSnapshot, branch: frozen.sync.git.branch };
+        }
+        if (frozen.sync.git.noSign !== undefined) {
+          gitSnapshot = { ...gitSnapshot, noSign: frozen.sync.git.noSign };
+        }
+      }
 
       const syncSnapshot: SyncSettingsSnapshot = {
         vcs: frozen.sync.vcs,
@@ -157,8 +159,6 @@ export const parseWorkspaceSettings = (
     let mode: VersionControlSyncMode;
     if (snapshot.sync.mode === "auto-sync") {
       mode = "auto-sync";
-    } else if (snapshot.sync.mode === "lazy-sync") {
-      mode = "lazy-sync";
     } else {
       mode = "auto-commit";
     }
@@ -170,6 +170,9 @@ export const parseWorkspaceSettings = (
         branch: typeof snapshot.sync.git.branch === "string" && snapshot.sync.git.branch !== ""
           ? snapshot.sync.git.branch
           : undefined,
+        noSign: typeof snapshot.sync.git.noSign === "boolean"
+          ? snapshot.sync.git.noSign
+          : undefined,
       };
     }
 
@@ -178,10 +181,10 @@ export const parseWorkspaceSettings = (
       lazySyncSettings = {
         commits: typeof snapshot.sync.lazy.commits === "number"
           ? snapshot.sync.lazy.commits
-          : DEFAULT_LAZY_SYNC_SETTINGS.commits,
+          : DEFAULT_AUTO_SYNC_SETTINGS.commits,
         minutes: typeof snapshot.sync.lazy.minutes === "number"
           ? snapshot.sync.lazy.minutes
-          : DEFAULT_LAZY_SYNC_SETTINGS.minutes,
+          : DEFAULT_AUTO_SYNC_SETTINGS.minutes,
       };
     }
 

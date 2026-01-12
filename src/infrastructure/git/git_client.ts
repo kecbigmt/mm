@@ -187,8 +187,15 @@ export const createGitVersionControlService = (): VersionControlService => {
     return safeExecute("git", ["add", ...existingPaths], cwd, "git add failed");
   };
 
-  const commit = (cwd: string, message: string) =>
-    safeExecute("git", ["commit", "-m", message], cwd, "git commit failed");
+  const commit = (cwd: string, message: string, options?: { noSign?: boolean }) => {
+    const args = ["commit", "-m", message];
+    // When noSign is true, skip GPG signing with --no-gpg-sign flag
+    // When noSign is false or undefined, use default Git behavior (respects user's config)
+    if (options?.noSign === true) {
+      args.push("--no-gpg-sign");
+    }
+    return safeExecute("git", args, cwd, "git commit failed");
+  };
 
   const validateBranchName = async (
     cwd: string,

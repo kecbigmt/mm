@@ -4,8 +4,7 @@ import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import {
   createWorkspaceSettings,
-  DEFAULT_LAZY_SYNC_SETTINGS,
-  VersionControlSyncMode,
+  DEFAULT_AUTO_SYNC_SETTINGS,
   WorkspaceSettings,
 } from "../../../domain/models/workspace.ts";
 import { executeAutoCommit } from "../auto_commit_helper.ts";
@@ -18,6 +17,7 @@ type ConfigKey =
   | "sync.mode"
   | "sync.git.remote"
   | "sync.git.branch"
+  | "sync.git.noSign"
   | "sync.lazy.commits"
   | "sync.lazy.minutes";
 
@@ -27,6 +27,7 @@ const VALID_KEYS: ConfigKey[] = [
   "sync.mode",
   "sync.git.remote",
   "sync.git.branch",
+  "sync.git.noSign",
   "sync.lazy.commits",
   "sync.lazy.minutes",
 ];
@@ -40,6 +41,7 @@ function getValueByKey(
   key: ConfigKey,
 ): string | boolean | number | null | undefined {
   const data = settings.data;
+  const defaultSettings = DEFAULT_AUTO_SYNC_SETTINGS;
   switch (key) {
     case "timezone":
       return data.timezone.toString();
@@ -51,10 +53,13 @@ function getValueByKey(
       return data.sync.git?.remote ?? null;
     case "sync.git.branch":
       return data.sync.git?.branch;
+    case "sync.git.noSign":
+      // Default to false (use Git's default signing behavior)
+      return data.sync.git?.noSign ?? false;
     case "sync.lazy.commits":
-      return data.sync.lazy?.commits ?? DEFAULT_LAZY_SYNC_SETTINGS.commits;
+      return data.sync.lazy?.commits ?? defaultSettings.commits;
     case "sync.lazy.minutes":
-      return data.sync.lazy?.minutes ?? DEFAULT_LAZY_SYNC_SETTINGS.minutes;
+      return data.sync.lazy?.minutes ?? defaultSettings.minutes;
   }
 }
 
@@ -201,9 +206,9 @@ export const createConfigCommand = () => {
           }
 
           case "sync.mode": {
-            if (value !== "auto-commit" && value !== "auto-sync" && value !== "lazy-sync") {
+            if (value !== "auto-commit" && value !== "auto-sync") {
               console.error(
-                `Invalid value for sync.mode: must be 'auto-commit', 'auto-sync', or 'lazy-sync'`,
+                `Invalid value for sync.mode: must be 'auto-commit' or 'auto-sync'`,
               );
               Deno.exit(1);
             }
@@ -211,7 +216,7 @@ export const createConfigCommand = () => {
               timezone: currentData.timezone,
               sync: {
                 ...currentData.sync,
-                mode: value as VersionControlSyncMode,
+                mode: value,
               },
             });
             break;
@@ -276,13 +281,33 @@ export const createConfigCommand = () => {
             break;
           }
 
+          case "sync.git.noSign": {
+            const noSign = value.toLowerCase() === "true";
+            if (value.toLowerCase() !== "true" && value.toLowerCase() !== "false") {
+              console.error(`Invalid value for sync.git.noSign: must be 'true' or 'false'`);
+              Deno.exit(1);
+            }
+            newSettings = createWorkspaceSettings({
+              timezone: currentData.timezone,
+              sync: {
+                ...currentData.sync,
+                git: {
+                  ...(currentData.sync.git ?? {}),
+                  remote: currentData.sync.git?.remote ?? null,
+                  noSign,
+                },
+              },
+            });
+            break;
+          }
+
           case "sync.lazy.commits": {
             const commits = parseInt(value, 10);
             if (isNaN(commits) || commits < 1) {
               console.error(`Invalid value for sync.lazy.commits: must be a positive integer`);
               Deno.exit(1);
             }
-            const currentLazy = currentData.sync.lazy ?? DEFAULT_LAZY_SYNC_SETTINGS;
+            const currentLazy = currentData.sync.lazy ?? DEFAULT_AUTO_SYNC_SETTINGS;
             newSettings = createWorkspaceSettings({
               timezone: currentData.timezone,
               sync: {
@@ -298,11 +323,13 @@ export const createConfigCommand = () => {
 
           case "sync.lazy.minutes": {
             const minutes = parseInt(value, 10);
-            if (isNaN(minutes) || minutes < 1) {
-              console.error(`Invalid value for sync.lazy.minutes: must be a positive integer`);
+            if (isNaN(minutes) || minutes < 0) {
+              console.error(
+                `Invalid value for sync.lazy.minutes: must be a non-negative integer (0 disables time threshold)`,
+              );
               Deno.exit(1);
             }
-            const currentLazy = currentData.sync.lazy ?? DEFAULT_LAZY_SYNC_SETTINGS;
+            const currentLazy = currentData.sync.lazy ?? DEFAULT_AUTO_SYNC_SETTINGS;
             newSettings = createWorkspaceSettings({
               timezone: currentData.timezone,
               sync: {
