@@ -25,9 +25,9 @@ Deno.test("formatItemDetail - note with alias, context, and body", () => {
 
   const result = formatItemDetail(item);
 
-  // Header line with alias, icon, title, context, date
+  // Header lines: alias + title, then type:status + metadata
   assertEquals(result.includes("kene-abc"), true);
-  assertEquals(result.includes("📝"), true);
+  assertEquals(result.includes("note:open"), true);
   assertEquals(result.includes("Planning document"), true);
   assertEquals(result.includes("@planning"), true);
   assertEquals(result.includes("on:2025-08-30"), true);
@@ -64,9 +64,9 @@ Deno.test("formatItemDetail - task (closed) without body", () => {
 
   const result = formatItemDetail(item);
 
-  // Header with closed task icon
+  // Header with closed task
   assertEquals(result.includes("task-xyz"), true);
-  assertEquals(result.includes("✅"), true);
+  assertEquals(result.includes("task:closed"), true);
   assertEquals(result.includes("Complete report"), true);
   assertEquals(result.includes("on:2025-08-29"), true);
 
@@ -101,8 +101,8 @@ Deno.test("formatItemDetail - event with startAt and duration", () => {
 
   const result = formatItemDetail(item);
 
-  // Header with event icon
-  assertEquals(result.includes("🕒"), true);
+  // Header with event
+  assertEquals(result.includes("event:open"), true);
   assertEquals(result.includes("Team meeting"), true);
   assertEquals(result.includes("on:2025-08-31"), true);
 
