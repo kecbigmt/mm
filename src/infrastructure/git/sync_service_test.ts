@@ -100,10 +100,6 @@ Deno.test("SyncService.pull", async (t) => {
     assertEquals(pullBranch, "main");
   });
 
-  // Note: lazy-sync mode is now unified into auto-sync at the parser level (workspace.ts).
-  // The SyncService only receives "auto-sync" mode; lazy-sync thresholds are handled by
-  // auto_commit_helper.ts using sync.lazy config settings.
-
   await t.step("skips pull when no remote configured", async () => {
     let pullCalled = false;
     const vcs = createMockVersionControlService({
