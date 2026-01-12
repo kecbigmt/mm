@@ -5,6 +5,7 @@ import { Item } from "../../../domain/models/item.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import { executeAutoCommit } from "../auto_commit_helper.ts";
+import { executePrePull } from "../pre_pull_helper.ts";
 
 const formatItemLabel = (item: Item): string =>
   item.data.alias ? item.data.alias.toString() : item.data.id.toString();
@@ -28,6 +29,13 @@ export function createRemoveCommand() {
       }
 
       const deps = depsResult.value;
+
+      // Pre-pull to get latest changes before file operation
+      await executePrePull({
+        workspaceRoot: deps.root,
+        versionControlService: deps.versionControlService,
+        workspaceRepository: deps.workspaceRepository,
+      });
 
       const workflowResult = await RemoveItemWorkflow.execute({
         itemIds: ids,

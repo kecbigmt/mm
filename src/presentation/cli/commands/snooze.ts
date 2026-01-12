@@ -7,6 +7,7 @@ import { parsePathExpression } from "../path_parser.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import { parseFutureDateTime } from "../utils/future_date_time.ts";
 import { executeAutoCommit } from "../auto_commit_helper.ts";
+import { executePrePull } from "../pre_pull_helper.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -53,6 +54,14 @@ export function createSnoozeCommand() {
       }
 
       const deps = depsResult.value;
+
+      // Pre-pull to get latest changes before file operation
+      await executePrePull({
+        workspaceRoot: deps.root,
+        versionControlService: deps.versionControlService,
+        workspaceRepository: deps.workspaceRepository,
+      });
+
       const now = new Date();
 
       const cwdResult = await CwdResolutionService.getCwd(
