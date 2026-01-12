@@ -186,7 +186,7 @@ const writeItemFile = async (
     alias: snapshot.alias,
     project: snapshot.project,
     contexts: snapshot.contexts,
-    schema: "mm.item.frontmatter/2",
+    schema: "mm.item.frontmatter/3",
   };
 
   // Build body (title + content)

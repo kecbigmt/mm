@@ -90,7 +90,7 @@ describe("E2E: Item creation", () => {
 
       const { frontmatter, body } = parseResult.value;
 
-      assertEquals(frontmatter.schema, "mm.item.frontmatter/2");
+      assertEquals(frontmatter.schema, "mm.item.frontmatter/3");
       assertEquals(typeof frontmatter.id, "string");
       assertEquals(frontmatter.status, "open");
       assertEquals(typeof frontmatter.created_at, "string");

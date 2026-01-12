@@ -15,39 +15,39 @@ organize my work using GTD-style project and context references.**
 ### Acceptance Criteria
 
 #### 1. Creating Items with Project/Contexts
-- [ ] **Given** mm is initialized, **When** you run `mm note "Meeting notes" --project work-project`,
+- [x] **Given** mm is initialized, **When** you run `mm note "Meeting notes" --project work-project`,
       **Then** a note is created with `project: work-project` in frontmatter
-- [ ] **Given** mm is initialized, **When** you run `mm task "Call John" --context phone`,
+- [x] **Given** mm is initialized, **When** you run `mm task "Call John" --context phone`,
       **Then** a task is created with `contexts: [phone]` in frontmatter (YAML block format)
-- [ ] **Given** mm is initialized, **When** you run `mm task "Buy supplies" --context errands --context shopping`,
+- [x] **Given** mm is initialized, **When** you run `mm task "Buy supplies" --context errands --context shopping`,
       **Then** a task is created with `contexts: [errands, shopping]` in frontmatter
-- [ ] **Given** mm is initialized, **When** you run `mm event "Team standup" --project team-sync --context work`,
+- [x] **Given** mm is initialized, **When** you run `mm event "Team standup" --project team-sync --context work`,
       **Then** an event is created with both project and contexts fields
 
 #### 2. Editing Project/Contexts
-- [ ] **Given** an Item exists, **When** you run `mm edit <item> --project new-project`,
+- [x] **Given** an Item exists, **When** you run `mm edit <item> --project new-project`,
       **Then** the Item's project field is updated
-- [ ] **Given** an Item exists with a project, **When** you open the editor with `mm edit <item>`,
+- [x] **Given** an Item exists with a project, **When** you open the editor with `mm edit <item>`,
       **Then** you can manually remove the project line from frontmatter to clear it
-- [ ] **Given** an Item exists, **When** you run `mm edit <item> --context office`,
+- [x] **Given** an Item exists, **When** you run `mm edit <item> --context office`,
       **Then** the Item's contexts field is set to `[office]`
-- [ ] **Given** an Item exists, **When** you run `mm edit <item> --context a --context b`,
+- [x] **Given** an Item exists, **When** you run `mm edit <item> --context a --context b`,
       **Then** the Item's contexts field is set to `[a, b]` (replaces existing)
 
 #### 3. Display Format
-- [ ] **Given** an Item has project and contexts, **When** you run `mm ls`,
+- [x] **Given** an Item has project and contexts, **When** you run `mm ls`,
       **Then** the output shows `+project` and `@context` suffixes (todo.txt format)
-- [ ] **Given** an Item has multiple contexts, **When** you run `mm show <item>`,
+- [x] **Given** an Item has multiple contexts, **When** you run `mm show <item>`,
       **Then** all contexts are displayed with `@` prefix
 
 #### 4. Migration from Singular Context
-- [ ] **Given** an Item exists with old `context: value` field, **When** you read the Item,
+- [x] **Given** an Item exists with old `context: value` field, **When** you read the Item,
       **Then** it is automatically parsed as `contexts: [value]`
 
 #### 5. Error Cases
-- [ ] **Given** an invalid alias format, **When** you run `mm note "Test" --project "has spaces"`,
+- [x] **Given** an invalid alias format, **When** you run `mm note "Test" --project "has spaces"`,
       **Then** an error is shown indicating invalid alias format
-- [ ] **Given** an invalid alias format, **When** you run `mm note "Test" --context "bad!char"`,
+- [x] **Given** an invalid alias format, **When** you run `mm note "Test" --context "bad!char"`,
       **Then** an error is shown indicating invalid alias format
 
 ### Out of Scope
@@ -84,11 +84,17 @@ Implementation completed with the following changes:
 - Added E2E test suite: `scenario_29_project_contexts_test.ts` (24 test steps)
 - Updated existing tests for `contexts` array format
 
+**Schema**:
+- Bumped schema version from `mm.item.frontmatter/2` to `mm.item.frontmatter/3`
+
 **PR**: #82 (draft)
 
 ### Acceptance Checks
 
-**Status: Pending Product Owner Review**
+**Status: Accepted**
+
+All acceptance criteria verified and passing.
+Tested on: 2026-01-12
 
 Developer verification completed:
 - All unit tests pass (439 tests)
@@ -98,17 +104,25 @@ Developer verification completed:
 - Display format verified (`+project` and `@context` suffixes in todo.txt style)
 - Migration from singular `context` to `contexts` array works correctly
 
-**Note**: Current implementation stores alias/tag strings in frontmatter. UUID storage deferred to next increment (see "Remaining" section).
+Product owner manual testing completed:
+- All 13 acceptance criteria tested and passing
+- Creating items with project/contexts works correctly
+- Editing project/contexts (set/replace semantics) works correctly
+- Display format shows `+project` and `@context` as expected
+- Migration from singular `context` field works correctly
+- Error cases properly reject invalid alias/tag formats
 
-**Awaiting product owner acceptance testing before marking this user story as complete.**
+**Note**: Current implementation stores alias/tag strings in frontmatter. UUID storage deferred to next increment (see "Remaining" section).
 
 ### Follow-ups / Open Risks
 
 #### Addressed
-- [Items that were concerns but have been resolved]
+- **Schema version bumped to /3** - Updated `mm.item.frontmatter/2` to `mm.item.frontmatter/3` in `item_repository.ts`, tests, and documentation to reflect the addition of `project` and `contexts` fields
 
 #### Remaining
 - **UUID storage for project/contexts** - Frontmatter should store UUIDs (not aliases) for stable references; requires alias→UUID resolution during save
 - Auto-creation of permanent Items for non-existent aliases (next story)
 - Self-reference validation (Item cannot be its own project/context)
+- **Add/remove context commands** - Consider `--add-context` and `--remove-context` flags for incremental context editing (current `--context` uses set/replace semantics, which is standard CLI behavior)
+- **Remove singular `context` backward compatibility** - Create a migration script (`mm migrate` or similar) to convert all `context: value` fields to `contexts: [value]` in existing Items, then remove the migration logic from `item.ts`
 

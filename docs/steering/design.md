@@ -181,7 +181,7 @@ All user-provided paths are resolved to placement before being stored in frontma
   UUIDs).
 - `rank` is valid LexoRank format.
 - `created_at`, `updated_at` are valid ISO-8601 timestamps.
-- `schema` is present (e.g., `mm.item.frontmatter/2`).
+- `schema` is present (e.g., `mm.item.frontmatter/3`).
 - `alias` (if present) follows alias rules (no reserved tokens, unique canonical_key).
 - YAML is valid and parseable; UTF-8 (NFC), LF newlines.
 

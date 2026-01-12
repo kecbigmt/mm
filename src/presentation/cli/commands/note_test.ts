@@ -130,7 +130,7 @@ Deno.test({
       );
       assert(yamlContent.includes("rank:"), "frontmatter should contain rank");
       assert(
-        yamlContent.includes("schema: mm.item.frontmatter/2"),
+        yamlContent.includes("schema: mm.item.frontmatter/3"),
         "frontmatter should contain schema",
       );
 
