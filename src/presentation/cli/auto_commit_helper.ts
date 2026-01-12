@@ -7,6 +7,7 @@ import { VersionControlService } from "../../domain/services/version_control_ser
 import { WorkspaceRepository } from "../../domain/repositories/workspace_repository.ts";
 import { StateRepository, SyncState } from "../../domain/repositories/state_repository.ts";
 import { withLoadingIndicator } from "./utils/loading_indicator.ts";
+import { DEFAULT_AUTO_SYNC_SETTINGS } from "../../domain/models/workspace.ts";
 
 export type AutoCommitHelperDeps = {
   workspaceRoot: string;
@@ -37,19 +38,21 @@ function formatAutoCommitError(error: AutoSyncError): string {
   }
 }
 
-// Default lazy-sync thresholds
-const DEFAULT_LAZY_COMMITS = 10;
-const DEFAULT_LAZY_MINUTES = 10;
-
 /**
- * Determines if a sync should be triggered based on lazy-sync thresholds.
+ * Determines if a sync should be triggered based on threshold settings.
+ *
+ * For auto-sync mode:
+ * - Uses threshold settings from sync.lazy config or DEFAULT_AUTO_SYNC_SETTINGS
+ * - Default is commits=1 (immediate sync) and minutes=0 (disabled)
+ * - When minutes=0, time threshold is disabled
  */
-function shouldTriggerLazySync(
+function shouldTriggerSync(
   syncState: SyncState,
   lazyConfig: { commits?: number; minutes?: number } | undefined,
 ): boolean {
-  const commitThreshold = lazyConfig?.commits ?? DEFAULT_LAZY_COMMITS;
-  const minuteThreshold = lazyConfig?.minutes ?? DEFAULT_LAZY_MINUTES;
+  // Use explicit lazy config if provided, otherwise use auto-sync defaults (immediate sync)
+  const commitThreshold = lazyConfig?.commits ?? DEFAULT_AUTO_SYNC_SETTINGS.commits;
+  const minuteThreshold = lazyConfig?.minutes ?? DEFAULT_AUTO_SYNC_SETTINGS.minutes;
 
   // Check commit count threshold (after incrementing)
   const newCommitCount = syncState.commitsSinceLastSync + 1;
@@ -57,8 +60,8 @@ function shouldTriggerLazySync(
     return true;
   }
 
-  // Check time threshold
-  if (syncState.lastSyncTimestamp !== null) {
+  // Check time threshold (only if minutes > 0)
+  if (minuteThreshold > 0 && syncState.lastSyncTimestamp !== null) {
     const minutesSinceLastSync = (Date.now() - syncState.lastSyncTimestamp) / (60 * 1000);
     if (minutesSinceLastSync >= minuteThreshold) {
       return true;
@@ -141,28 +144,14 @@ export async function executeAutoCommit(
   }
 
   if (syncMode === "auto-sync") {
-    // auto-sync mode: always push after commit
-    const pushResult = await withLoadingIndicator("Syncing...", () =>
-      syncService.push({
-        workspaceRoot: deps.workspaceRoot,
-        remote,
-        branch,
-      }));
-
-    if (pushResult.error) {
-      console.warn(formatAutoCommitError(pushResult.error));
-    }
-    return;
-  }
-
-  if (syncMode === "lazy-sync") {
-    // lazy-sync mode: push based on thresholds
+    // auto-sync mode: push based on thresholds
+    // Default is commits=1 (immediate sync), can be configured via sync.lazy settings
     const syncStateResult = await deps.stateRepository.loadSyncState();
     const syncState: SyncState = syncStateResult.type === "ok"
       ? syncStateResult.value
       : { commitsSinceLastSync: 0, lastSyncTimestamp: null };
 
-    const shouldSync = shouldTriggerLazySync(syncState, lazyConfig);
+    const shouldSync = shouldTriggerSync(syncState, lazyConfig);
 
     if (shouldSync) {
       // Trigger sync

@@ -30,7 +30,7 @@ export type PullResult = {
 export type PullInput = {
   workspaceRoot: string;
   syncEnabled: boolean;
-  syncMode: "auto-commit" | "auto-sync" | "lazy-sync";
+  syncMode: "auto-commit" | "auto-sync";
   remote?: string;
   branch?: string;
 };
@@ -171,8 +171,8 @@ export function createSyncService(deps: SyncServiceDeps) {
         return { pulled: false, skipped: true };
       }
 
-      // 2. Check sync mode - only auto-sync and lazy-sync need pull
-      if (input.syncMode !== "auto-sync" && input.syncMode !== "lazy-sync") {
+      // 2. Check sync mode - only auto-sync needs pull
+      if (input.syncMode !== "auto-sync") {
         return { pulled: false, skipped: true };
       }
 
