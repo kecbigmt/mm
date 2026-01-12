@@ -8,7 +8,7 @@ import { createStringPrimitiveFactory, StringPrimitive } from "./string_primitiv
 
 const ITEM_STATUS_KIND = "ItemStatus" as const;
 
-export type ItemStatusValue = "open" | "closed";
+export type ItemStatusValue = "open" | "closed" | "snoozing";
 
 const itemStatusFactory = createStringPrimitiveFactory<
   typeof ITEM_STATUS_KIND,
@@ -27,6 +27,7 @@ export type ItemStatus = StringPrimitive<
   {
     isOpen(): boolean;
     isClosed(): boolean;
+    isSnoozing(): boolean;
   }
 >;
 
@@ -38,15 +39,19 @@ const isClosed = function (this: ItemStatus): boolean {
   return this.data.value === "closed";
 };
 
+const isSnoozing = function (this: ItemStatus): boolean {
+  return this.data.value === "snoozing";
+};
+
 const instantiate = (value: ItemStatusValue): ItemStatus =>
-  itemStatusFactory.instantiate(value, { isOpen, isClosed });
+  itemStatusFactory.instantiate(value, { isOpen, isClosed, isSnoozing });
 
 export type ItemStatusValidationError = ValidationError<typeof ITEM_STATUS_KIND>;
 
 export const isItemStatus = (value: unknown): value is ItemStatus =>
-  itemStatusFactory.is<{ isOpen(): boolean; isClosed(): boolean }>(value);
+  itemStatusFactory.is<{ isOpen(): boolean; isClosed(): boolean; isSnoozing(): boolean }>(value);
 
-const ITEM_STATUS_VALUES: ReadonlyArray<ItemStatusValue> = ["open", "closed"];
+const ITEM_STATUS_VALUES: ReadonlyArray<ItemStatusValue> = ["open", "closed", "snoozing"];
 
 export const parseItemStatus = (
   input: unknown,
@@ -70,7 +75,7 @@ export const parseItemStatus = (
   if (!ITEM_STATUS_VALUES.includes(normalized as ItemStatusValue)) {
     return Result.error(
       createValidationError(ITEM_STATUS_KIND, [
-        createValidationIssue("status must be 'open' or 'closed'", {
+        createValidationIssue("status must be 'open', 'closed', or 'snoozing'", {
           path: ["value"],
           code: "invalid_value",
         }),
@@ -87,3 +92,4 @@ export const createItemStatus = (
 
 export const itemStatusOpen = (): ItemStatus => instantiate("open");
 export const itemStatusClosed = (): ItemStatus => instantiate("closed");
+export const itemStatusSnoozing = (): ItemStatus => instantiate("snoozing");

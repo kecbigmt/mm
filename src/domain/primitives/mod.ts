@@ -53,6 +53,7 @@ export {
   isItemStatus,
   itemStatusClosed,
   itemStatusOpen,
+  itemStatusSnoozing,
   parseItemStatus,
 } from "./item_status.ts";
 
