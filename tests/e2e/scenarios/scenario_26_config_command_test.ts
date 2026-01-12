@@ -131,7 +131,7 @@ describe("Scenario 26: Config Command", () => {
       assertEquals(result.success, false);
       assertEquals(
         result.stderr.includes(
-          "Invalid value for sync.mode: must be 'auto-commit', 'auto-sync', or 'lazy-sync'",
+          "Invalid value for sync.mode: must be 'auto-commit' or 'auto-sync'",
         ),
         true,
       );
@@ -213,7 +213,7 @@ describe("Scenario 26: Config Command", () => {
       );
     });
 
-    it("rejects zero for sync.lazy.minutes", async () => {
+    it("accepts zero for sync.lazy.minutes (disables time threshold)", async () => {
       const result = await runCommand(ctx.testHome, [
         "config",
         "set",
@@ -221,25 +221,27 @@ describe("Scenario 26: Config Command", () => {
         "0",
       ]);
 
-      assertEquals(result.success, false);
-      assertEquals(
-        result.stderr.includes("must be a positive integer"),
-        true,
-      );
+      assertEquals(result.success, true, `config set failed: ${result.stderr}`);
+
+      // Verify in workspace.json
+      const workspaceDir = getWorkspacePath(ctx.testHome, "test-config");
+      const content = await Deno.readTextFile(join(workspaceDir, "workspace.json"));
+      const config = JSON.parse(content);
+      assertEquals(config.sync.lazy.minutes, 0);
     });
 
     it("gets sync.lazy.commits with default value", async () => {
       const result = await runCommand(ctx.testHome, ["config", "get", "sync.lazy.commits"]);
 
       assertEquals(result.success, true);
-      assertEquals(result.stdout.trim(), "10"); // Default value
+      assertEquals(result.stdout.trim(), "1"); // Default value for auto-sync (immediate sync)
     });
 
     it("gets sync.lazy.minutes with default value", async () => {
       const result = await runCommand(ctx.testHome, ["config", "get", "sync.lazy.minutes"]);
 
       assertEquals(result.success, true);
-      assertEquals(result.stdout.trim(), "10"); // Default value
+      assertEquals(result.stdout.trim(), "0"); // Default value for auto-sync (disabled)
     });
   });
 

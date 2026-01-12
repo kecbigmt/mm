@@ -20,7 +20,7 @@ import { StateRepository } from "../../../domain/repositories/state_repository.t
 
 /**
  * Reset sync state after a successful push.
- * This ensures lazy-sync counters are reset when user manually syncs.
+ * This ensures auto-sync threshold counters are reset when user manually syncs.
  */
 async function resetSyncState(stateRepository: StateRepository): Promise<void> {
   await stateRepository.saveSyncState({
