@@ -68,8 +68,8 @@ describe("Scenario 20: List partitioning and formatting", () => {
       assertStringIncludes(output, "Today's note", "Should include today's note");
       assertStringIncludes(output, "Tomorrow's note", "Should include tomorrow's note");
 
-      // Should include note emoji icon
-      assertStringIncludes(output, "📝", "Should include note emoji icon");
+      // Should include note Bullet Journal symbol (- for open notes)
+      assertStringIncludes(output, "- ", "Should include note symbol");
     });
 
     it("shows relative date labels (today, tomorrow, yesterday)", async () => {
@@ -257,8 +257,8 @@ describe("Scenario 20: List partitioning and formatting", () => {
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "--no-pager"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
 
-      // Should show task icon (✔️)
-      assertStringIncludes(lsResult.stdout, "✔️", "Should show task icon");
+      // Should show task Bullet Journal symbol (• for open tasks)
+      assertStringIncludes(lsResult.stdout, "• ", "Should show task symbol");
     });
 
     it("shows event under date head with event icon", async () => {
@@ -268,8 +268,8 @@ describe("Scenario 20: List partitioning and formatting", () => {
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "--no-pager"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
 
-      // Should show event icon (🕒)
-      assertStringIncludes(lsResult.stdout, "🕒", "Should show event icon");
+      // Should show event Bullet Journal symbol (○ for open events)
+      assertStringIncludes(lsResult.stdout, "○ ", "Should show event symbol");
       assertStringIncludes(lsResult.stdout, "Meeting at 10am", "Should include event title");
     });
 
@@ -372,8 +372,8 @@ describe("Scenario 20: List partitioning and formatting", () => {
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "--all", "--no-pager"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
 
-      // Closed note should have different icon (🗞️)
-      assertStringIncludes(lsResult.stdout, "🗞️", "Should show closed note icon");
+      // Closed note should show × symbol (Bullet Journal style)
+      assertStringIncludes(lsResult.stdout, "× ", "Should show closed symbol");
     });
   });
 });

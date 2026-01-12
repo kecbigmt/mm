@@ -71,9 +71,9 @@ describe("Scenario: Show command", () => {
     // Verify output contains expected elements
     const output = showResult.stdout;
 
-    // Header line: alias, icon, title, context, date
+    // Header lines: alias + title on first line, type:status + metadata on second
     assertEquals(output.includes("plan-doc"), true, "Should include alias");
-    assertEquals(output.includes("📝"), true, "Should include note icon");
+    assertEquals(output.includes("note:open"), true, "Should include type:status");
     assertEquals(output.includes("Planning document"), true, "Should include title");
     assertEquals(output.includes("@work"), true, "Should include context");
     assertEquals(output.includes(`on:${today}`), true, "Should include date");
@@ -136,7 +136,7 @@ describe("Scenario: Show command", () => {
     assertEquals(showResult.success, true);
 
     const output = showResult.stdout;
-    assertEquals(output.includes("✅"), true, "Should include closed task icon");
+    assertEquals(output.includes("task:closed"), true, "Should include closed task type:status");
     assertEquals(output.includes("Closed:"), true, "Should include Closed timestamp");
   });
 
@@ -164,7 +164,7 @@ describe("Scenario: Show command", () => {
     assertEquals(showResult.success, true);
 
     const output = showResult.stdout;
-    assertEquals(output.includes("🕒"), true, "Should include event icon");
+    assertEquals(output.includes("event:open"), true, "Should include event type:status");
     assertEquals(output.includes("Team meeting"), true);
     assertEquals(output.includes("Start:"), true, "Should include Start timestamp");
     assertEquals(output.includes("Duration:"), true, "Should include Duration");
