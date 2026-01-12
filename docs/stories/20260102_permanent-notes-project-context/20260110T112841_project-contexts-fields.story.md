@@ -51,6 +51,7 @@ organize my work using GTD-style project and context references.**
       **Then** an error is shown indicating invalid alias format
 
 ### Out of Scope
+- **UUID storage in frontmatter** - Currently stores alias/tag strings; next story will store UUIDs for stable references
 - Auto-creation of permanent Items when referencing non-existent aliases (next story)
 - ItemIcon `topic` (📌) - part of auto-creation story
 - Validation that project/context references exist (part of auto-creation story)
@@ -60,15 +61,44 @@ organize my work using GTD-style project and context references.**
 ---
 
 ### Completed Work Summary
-Not yet started.
+Implementation completed with the following changes:
+
+**Domain Model (`src/domain/models/item.ts`)**:
+- Added `project?: AliasSlug` and `contexts?: ReadonlyArray<TagSlug>` fields to ItemData
+- Added `setProject()` and `setContexts()` methods
+- Migration logic for deprecated singular `context` field → `contexts` array
+
+**Workflows**:
+- Updated `create_item.ts` and `edit_item.ts` to handle project/contexts
+
+**CLI Commands**:
+- Added `--project <project>` option to note, task, event commands
+- Added `-c, --context <context>` repeatable option (with `{ collect: true }`)
+- Added same options to edit command
+
+**Display Formatters**:
+- Updated `list_formatter.ts` to show `+project` and `@context` suffixes
+- Updated `item_detail_formatter.ts` for show command
+
+**Tests**:
+- Added E2E test suite: `scenario_29_project_contexts_test.ts` (24 test steps)
+- Updated existing tests for `contexts` array format
+
+**PR**: #82 (draft)
 
 ### Acceptance Checks
 
 **Status: Pending Product Owner Review**
 
 Developer verification completed:
-- [List what the developer manually verified]
-- [Note any observations or findings]
+- All unit tests pass (439 tests)
+- All E2E tests pass (scenario_29_project_contexts_test.ts covers all acceptance criteria)
+- CI quality checks pass
+- Frontmatter serialization verified (project as string, contexts as YAML array)
+- Display format verified (`+project` and `@context` suffixes in todo.txt style)
+- Migration from singular `context` to `contexts` array works correctly
+
+**Note**: Current implementation stores alias/tag strings in frontmatter. UUID storage deferred to next increment (see "Remaining" section).
 
 **Awaiting product owner acceptance testing before marking this user story as complete.**
 
@@ -78,6 +108,7 @@ Developer verification completed:
 - [Items that were concerns but have been resolved]
 
 #### Remaining
+- **UUID storage for project/contexts** - Frontmatter should store UUIDs (not aliases) for stable references; requires alias→UUID resolution during save
 - Auto-creation of permanent Items for non-existent aliases (next story)
 - Self-reference validation (Item cannot be its own project/context)
 
