@@ -14,7 +14,7 @@ const hasMetadataOptions = (options: Record<string, unknown>): boolean => {
     options.title !== undefined || options.icon !== undefined || options.body !== undefined ||
     options.startAt !== undefined || options.duration !== undefined ||
     options.dueAt !== undefined ||
-    options.alias !== undefined || options.context !== undefined
+    options.alias !== undefined || options.project !== undefined || options.context !== undefined
   );
 };
 
@@ -42,7 +42,8 @@ export function createEditCommand() {
     .option("--duration <duration:string>", "Update duration (e.g., 30m, 2h)")
     .option("--due-at <dueAt:string>", "Update due date (ISO8601 format)")
     .option("--alias <alias:string>", "Update alias")
-    .option("-c, --context <context:string>", "Update context tag")
+    .option("--project <project:string>", "Update project reference (alias)")
+    .option("-c, --context <context:string>", "Update context tags (repeatable)", { collect: true })
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .action(async (options: Record<string, unknown>, itemRef: string) => {
       const debug = isDebugMode();
@@ -152,7 +153,8 @@ export function createEditCommand() {
         duration?: string;
         dueAt?: string;
         alias?: string;
-        context?: string;
+        project?: string;
+        contexts?: readonly string[];
       } = {};
 
       if (typeof options.title === "string") updates.title = options.title;
@@ -162,7 +164,8 @@ export function createEditCommand() {
       if (typeof options.duration === "string") updates.duration = options.duration;
       if (typeof options.dueAt === "string") updates.dueAt = options.dueAt;
       if (typeof options.alias === "string") updates.alias = options.alias;
-      if (typeof options.context === "string") updates.context = options.context;
+      if (typeof options.project === "string") updates.project = options.project;
+      if (Array.isArray(options.context)) updates.contexts = options.context as string[];
 
       const result = await EditItemWorkflow.execute(
         {

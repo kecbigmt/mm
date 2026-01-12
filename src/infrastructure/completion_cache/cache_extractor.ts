@@ -5,7 +5,7 @@
 export interface ExtractableItem {
   readonly data: {
     readonly alias?: { toString(): string };
-    readonly context?: { toString(): string };
+    readonly contexts?: ReadonlyArray<{ toString(): string }>;
   };
 }
 
@@ -29,8 +29,10 @@ export function extractFromItem(item: ExtractableItem): ExtractedEntries {
     aliases.push(item.data.alias.toString());
   }
 
-  if (item.data.context) {
-    contextTags.push(item.data.context.toString());
+  if (item.data.contexts) {
+    for (const context of item.data.contexts) {
+      contextTags.push(context.toString());
+    }
   }
 
   return { aliases, contextTags };

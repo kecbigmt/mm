@@ -90,7 +90,7 @@ describe("E2E: Item creation", () => {
 
       const { frontmatter, body } = parseResult.value;
 
-      assertEquals(frontmatter.schema, "mm.item.frontmatter/2");
+      assertEquals(frontmatter.schema, "mm.item.frontmatter/3");
       assertEquals(typeof frontmatter.id, "string");
       assertEquals(frontmatter.status, "open");
       assertEquals(typeof frontmatter.created_at, "string");
@@ -166,7 +166,7 @@ describe("E2E: Item creation", () => {
       const itemFilePath = join(itemsBaseDir, itemFiles[0]);
       const fileContent = await Deno.readTextFile(itemFilePath);
       const parseResult = parseFrontmatter<{
-        context?: string;
+        contexts?: string[];
         alias?: string;
       }>(fileContent);
 
@@ -174,7 +174,7 @@ describe("E2E: Item creation", () => {
       if (parseResult.type === "error") return;
 
       const { frontmatter, body } = parseResult.value;
-      assertEquals(frontmatter.context, "work");
+      assertEquals(frontmatter.contexts?.[0], "work");
       assertEquals(frontmatter.alias, "full-meta");
       assertEquals(body.includes("Item body content"), true);
     });

@@ -73,8 +73,12 @@ Deno.test("Edit command - should have metadata options", () => {
   assertEquals(aliasOption?.flags.includes("--alias"), true);
   assertEquals(aliasOption?.description, "Update alias");
 
+  const projectOption = options.find((opt) => opt.flags.includes("--project"));
+  assertEquals(projectOption?.flags.includes("--project"), true);
+  assertEquals(projectOption?.description, "Update project reference (alias)");
+
   const contextOption = options.find((opt) => opt.flags.includes("--context"));
   assertEquals(contextOption?.flags.includes("--context"), true);
   assertEquals(contextOption?.flags.includes("-c"), true);
-  assertEquals(contextOption?.description, "Update context tag");
+  assertEquals(contextOption?.description, "Update context tags (repeatable)");
 });

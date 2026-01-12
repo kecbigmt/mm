@@ -54,7 +54,7 @@ export function createItemContent(
     `rank: "${rank}"`,
     `created_at: "${createdAt}"`,
     `updated_at: "${updatedAt}"`,
-    'schema: "mm.item.frontmatter/2"',
+    'schema: "mm.item.frontmatter/3"',
   ];
 
   if (options.alias) {

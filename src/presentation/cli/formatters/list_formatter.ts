@@ -128,13 +128,14 @@ const formatEventTimePlain = (item: Item, timezone: TimezoneIdentifier): string 
 /**
  * Formats a single item line.
  *
- * Colored mode template: <icon> <alias-or-id> <title> <context?> <due?>
- * Print mode template: <date> <icon> <alias-or-id> <title> <context?> <due?>
+ * Colored mode template: <icon> <alias-or-id> <title> <project?> <contexts?> <due?>
+ * Print mode template: <date> <icon> <alias-or-id> <title> <project?> <contexts?> <due?>
  *
  * - date: YYYY-MM-DD (print mode only, derived from placement)
  * - icon: emoji (colored) or plain text token (print)
  * - alias-or-id: alias if present, else full UUID (cyan in colored mode)
- * - context: dim @tag format if present
+ * - project: dim +project format if present (todo.txt convention)
+ * - contexts: dim @tag format if present (todo.txt convention)
  * - due: dim →YYYY-MM-DD format if dueAt exists
  */
 export const formatItemLine = (
@@ -143,7 +144,7 @@ export const formatItemLine = (
   dateStr?: string,
 ): string => {
   const { printMode, timezone } = options;
-  const { icon, status, alias, title, context, dueAt } = item.data;
+  const { icon, status, alias, title, project, contexts, dueAt } = item.data;
 
   const parts: string[] = [];
 
@@ -174,10 +175,18 @@ export const formatItemLine = (
   // Title
   parts.push(title.toString());
 
-  // Context
-  if (context) {
-    const contextStr = `@${context.toString()}`;
-    parts.push(printMode ? contextStr : dim(contextStr));
+  // Project (todo.txt convention: +project)
+  if (project) {
+    const projectStr = `+${project.toString()}`;
+    parts.push(printMode ? projectStr : dim(projectStr));
+  }
+
+  // Contexts (todo.txt convention: @context)
+  if (contexts && contexts.length > 0) {
+    for (const context of contexts) {
+      const contextStr = `@${context.toString()}`;
+      parts.push(printMode ? contextStr : dim(contextStr));
+    }
   }
 
   // Due date

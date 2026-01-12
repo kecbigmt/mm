@@ -56,7 +56,8 @@ export type ItemData = Readonly<{
   readonly dueAt?: DateTime;
   readonly snoozeUntil?: DateTime;
   readonly alias?: AliasSlug;
-  readonly context?: TagSlug;
+  readonly project?: AliasSlug;
+  readonly contexts?: ReadonlyArray<TagSlug>;
   readonly body?: string;
 }>;
 
@@ -82,7 +83,8 @@ export type Item = Readonly<{
   snooze(snoozeUntil: DateTime | undefined, occurredAt: DateTime): Item;
   isSnoozing(now: DateTime): boolean;
   setAlias(alias: AliasSlug | undefined, updatedAt: DateTime): Item;
-  setContext(context: TagSlug | undefined, updatedAt: DateTime): Item;
+  setProject(project: AliasSlug | undefined, updatedAt: DateTime): Item;
+  setContexts(contexts: ReadonlyArray<TagSlug> | undefined, updatedAt: DateTime): Item;
   toJSON(): ItemSnapshot;
 }>;
 
@@ -101,7 +103,9 @@ export type ItemSnapshot = Readonly<{
   readonly dueAt?: string;
   readonly snoozeUntil?: string;
   readonly alias?: string;
-  readonly context?: string;
+  readonly project?: string;
+  readonly contexts?: ReadonlyArray<string>;
+  readonly context?: string; // deprecated: for migration from singular context
   readonly body?: string;
   readonly edges?: ReadonlyArray<EdgeSnapshot>;
 }>;
@@ -298,20 +302,40 @@ const instantiate = (
     );
   };
 
-  const setContext = function (
+  const setProject = function (
     this: Item,
-    context: TagSlug | undefined,
+    project: AliasSlug | undefined,
     updatedAt: DateTime,
   ): Item {
-    const current = this.data.context?.toString();
-    const next = context?.toString();
+    const current = this.data.project?.toString();
+    const next = project?.toString();
     if (current === next) {
       return this;
     }
     return instantiate(
       {
         ...this.data,
-        context,
+        project,
+        updatedAt,
+      },
+      this.edges,
+    );
+  };
+
+  const setContexts = function (
+    this: Item,
+    contexts: ReadonlyArray<TagSlug> | undefined,
+    updatedAt: DateTime,
+  ): Item {
+    const current = this.data.contexts?.map((c) => c.toString()).join(",");
+    const next = contexts?.map((c) => c.toString()).join(",");
+    if (current === next) {
+      return this;
+    }
+    return instantiate(
+      {
+        ...this.data,
+        contexts: contexts && contexts.length > 0 ? contexts : undefined,
         updatedAt,
       },
       this.edges,
@@ -320,6 +344,7 @@ const instantiate = (
 
   const toJSON = function (this: Item): ItemSnapshot {
     const edgesSnapshot = this.edges.map((edge) => edge.toJSON());
+    const contextsSnapshot = this.data.contexts?.map((c) => c.toString());
     return {
       id: this.data.id.toString(),
       title: this.data.title.toString(),
@@ -335,7 +360,8 @@ const instantiate = (
       dueAt: this.data.dueAt?.toString(),
       snoozeUntil: this.data.snoozeUntil?.toString(),
       alias: this.data.alias?.toString(),
-      context: this.data.context?.toString(),
+      project: this.data.project?.toString(),
+      contexts: contextsSnapshot && contextsSnapshot.length > 0 ? contextsSnapshot : undefined,
       body: this.data.body,
       edges: edgesSnapshot.length > 0 ? edgesSnapshot : undefined,
     };
@@ -356,7 +382,8 @@ const instantiate = (
     snooze,
     isSnoozing,
     setAlias,
-    setContext,
+    setProject,
+    setContexts,
     toJSON,
   });
 };
@@ -489,13 +516,51 @@ export const parseItem = (
     }
   }
 
-  let context: TagSlug | undefined;
-  if (snapshot.context !== undefined) {
+  let project: AliasSlug | undefined;
+  if (snapshot.project !== undefined) {
+    const result = parseAliasSlug(snapshot.project);
+    if (result.type === "error") {
+      issues.push(...prefixIssues("project", result.error));
+    } else {
+      project = result.value;
+    }
+  }
+
+  const contexts: TagSlug[] = [];
+  // Parse new contexts array field
+  if (snapshot.contexts !== undefined) {
+    if (!Array.isArray(snapshot.contexts)) {
+      issues.push(
+        createValidationIssue("contexts must be an array", {
+          code: "invalid_type",
+          path: ["contexts"],
+        }),
+      );
+    } else {
+      for (const [index, contextStr] of snapshot.contexts.entries()) {
+        const result = parseTagSlug(contextStr);
+        if (result.type === "error") {
+          issues.push(
+            ...result.error.issues.map((issue) =>
+              createValidationIssue(issue.message, {
+                code: issue.code,
+                path: ["contexts", index, ...issue.path],
+              })
+            ),
+          );
+        } else {
+          contexts.push(result.value);
+        }
+      }
+    }
+  }
+  // Migration: parse deprecated singular context field into contexts array
+  if (snapshot.context !== undefined && snapshot.contexts === undefined) {
     const result = parseTagSlug(snapshot.context);
     if (result.type === "error") {
       issues.push(...prefixIssues("context", result.error));
     } else {
-      context = result.value;
+      contexts.push(result.value);
     }
   }
 
@@ -545,7 +610,8 @@ export const parseItem = (
     dueAt,
     snoozeUntil,
     alias,
-    context,
+    project,
+    contexts: contexts.length > 0 ? Object.freeze(contexts) : undefined,
     body: snapshot.body?.trim() ?? undefined,
   };
 

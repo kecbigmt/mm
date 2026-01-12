@@ -13,7 +13,7 @@ Deno.test("formatItemDetail - note with alias, context, and body", () => {
     createdAt: "2025-08-30T14:23:45.123Z",
     updatedAt: "2025-08-30T14:23:45.123Z",
     alias: "kene-abc",
-    context: "planning",
+    contexts: ["planning"],
     body: "Here's the planning document content.\nIt includes several important notes.",
   });
 
