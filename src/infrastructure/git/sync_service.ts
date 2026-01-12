@@ -268,7 +268,8 @@ export function createSyncService(deps: SyncServiceDeps) {
      *
      * This is a failure-tolerant operation:
      * - Returns error details in result, but never throws
-     * - Does NOT pull before push (pull should have been called earlier)
+     * - Does NOT pull before push (intentional design choice - see auto_commit_helper.ts)
+     * - If push fails due to non-fast-forward, caller should handle gracefully
      */
     push: async (input: PushInput): Promise<PushResult> => {
       const { remote, branch } = input;

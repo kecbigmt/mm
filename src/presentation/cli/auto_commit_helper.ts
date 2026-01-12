@@ -128,6 +128,13 @@ export async function executeAutoCommit(
   }
 
   // Step 2: Determine if push is needed based on sync mode
+  //
+  // Note: We intentionally do NOT pull before push here.
+  // - Pre-pull already happened before the file operation (in executePrePull)
+  // - Adding another pull here would double the network latency for every operation
+  // - This tool targets single-user multi-device sync, where concurrent edits are rare
+  // - If push fails due to non-fast-forward, user can run `mm sync` manually
+  //
   if (syncMode === "auto-commit") {
     // auto-commit mode: only commit, no push
     return;
