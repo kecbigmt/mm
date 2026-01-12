@@ -109,6 +109,8 @@ export const SyncInitWorkflow = {
       return Result.error(settingsResult.error);
     }
     const currentSettings = settingsResult.value;
+    // Preserve existing noSign setting if present
+    const existingNoSign = currentSettings.data.sync.git?.noSign;
     const newSettings = createWorkspaceSettings({
       timezone: currentSettings.data.timezone,
       sync: {
@@ -118,6 +120,7 @@ export const SyncInitWorkflow = {
         git: {
           remote: input.remoteUrl,
           branch: actualBranch,
+          noSign: existingNoSign,
         },
       },
     });
@@ -176,6 +179,7 @@ export const SyncInitWorkflow = {
     const commitResult = await deps.gitService.commit(
       input.workspaceRoot,
       "mm: initialize workspace git repository",
+      { noSign: existingNoSign },
     );
     if (commitResult.type === "error") {
       const msg = commitResult.error.message.toLowerCase();

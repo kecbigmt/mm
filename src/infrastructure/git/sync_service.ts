@@ -51,6 +51,7 @@ export type CommitResult = {
 export type CommitInput = {
   workspaceRoot: string;
   summary: string;
+  noSign?: boolean;
 };
 
 // ============================================================================
@@ -247,6 +248,7 @@ export function createSyncService(deps: SyncServiceDeps) {
       const commitResult = await deps.versionControlService.commit(
         input.workspaceRoot,
         commitMessage,
+        { noSign: input.noSign },
       );
       if (commitResult.type === "error") {
         const errorMsg = commitResult.error.message.toLowerCase();

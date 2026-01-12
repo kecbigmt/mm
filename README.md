@@ -424,7 +424,7 @@ mm config set sync.mode auto-sync      # Set a value
 ```
 
 Supported keys: `timezone`, `sync.enabled`, `sync.mode`, `sync.git.remote`, `sync.git.branch`,
-`sync.lazy.commits`, `sync.lazy.minutes`
+`sync.git.noSign`, `sync.lazy.commits`, `sync.lazy.minutes`
 
 ### Git Synchronization
 
@@ -506,6 +506,13 @@ You can configure thresholds for batched sync:
 ```sh
 mm config set sync.lazy.commits 10     # Sync after 10 commits (default: 1)
 mm config set sync.lazy.minutes 10     # Sync after 10 minutes (default: 0, disabled)
+```
+
+**Commit Signing**: By default, mm respects your Git signing configuration. To skip GPG/SSH signing
+for mm's automated commits (useful when signing requires passphrase interaction):
+
+```sh
+mm config set sync.git.noSign true
 ```
 
 ### Maintenance
