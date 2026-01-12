@@ -85,39 +85,46 @@ const makeItem = (
 // formatItemIcon tests
 // =============================================================================
 
-Deno.test("formatItemIcon - note open returns 📝", () => {
+Deno.test("formatItemIcon - note open returns -", () => {
   const icon = createItemIcon("note");
   const status = itemStatusOpen();
   const result = formatItemIcon(icon, status);
-  assertEquals(result, "📝");
+  assertEquals(result, "-");
 });
 
-Deno.test("formatItemIcon - note closed returns 🗞️", () => {
+Deno.test("formatItemIcon - note closed returns ×", () => {
   const icon = createItemIcon("note");
   const status = itemStatusClosed();
   const result = formatItemIcon(icon, status);
-  assertEquals(result, "🗞️");
+  assertEquals(result, "×");
 });
 
-Deno.test("formatItemIcon - task open returns ✔️", () => {
+Deno.test("formatItemIcon - task open returns •", () => {
   const icon = createItemIcon("task");
   const status = itemStatusOpen();
   const result = formatItemIcon(icon, status);
-  assertEquals(result, "✔️");
+  assertEquals(result, "•");
 });
 
-Deno.test("formatItemIcon - task closed returns ✅", () => {
+Deno.test("formatItemIcon - task closed returns ×", () => {
   const icon = createItemIcon("task");
   const status = itemStatusClosed();
   const result = formatItemIcon(icon, status);
-  assertEquals(result, "✅");
+  assertEquals(result, "×");
 });
 
-Deno.test("formatItemIcon - event returns 🕒", () => {
+Deno.test("formatItemIcon - event open returns ○", () => {
   const icon = createItemIcon("event");
   const status = itemStatusOpen();
   const result = formatItemIcon(icon, status);
-  assertEquals(result, "🕒");
+  assertEquals(result, "○");
+});
+
+Deno.test("formatItemIcon - event closed returns ×", () => {
+  const icon = createItemIcon("event");
+  const status = itemStatusClosed();
+  const result = formatItemIcon(icon, status);
+  assertEquals(result, "×");
 });
 
 // =============================================================================
@@ -189,7 +196,7 @@ Deno.test("formatItemLine - event with startAt shows time in timezone (colored m
     timezone: makeTimezone(),
   };
   const result = formatItemLine(item, options);
-  assertEquals(result.includes("🕒(09:30)"), true);
+  assertEquals(result.includes("○ (09:30)"), true);
 });
 
 Deno.test("formatItemLine - event with startAt shows time in timezone (print mode)", () => {
@@ -216,7 +223,7 @@ Deno.test("formatItemLine - event with startAt and duration shows time range (co
     timezone: makeTimezone(),
   };
   const result = formatItemLine(item, options);
-  assertEquals(result.includes("🕒(09:30-10:00)"), true);
+  assertEquals(result.includes("○ (09:30-10:00)"), true);
 });
 
 Deno.test("formatItemLine - event with startAt and duration shows time range (print mode)", () => {
@@ -233,15 +240,15 @@ Deno.test("formatItemLine - event with startAt and duration shows time range (pr
   assertEquals(result.includes("[event](09:30-10:00)"), true);
 });
 
-Deno.test("formatItemLine - event without startAt shows plain clock icon (colored mode)", () => {
+Deno.test("formatItemLine - event without startAt shows plain circle (colored mode)", () => {
   const item = makeItem({ icon: "event" });
   const options: ListFormatterOptions = {
     printMode: false,
     timezone: makeTimezone(),
   };
   const result = formatItemLine(item, options);
-  assertEquals(result.includes("🕒 "), true);
-  assertEquals(result.includes("🕒("), false);
+  assertEquals(result.includes("○ "), true);
+  assertEquals(result.includes("○ ("), false);
 });
 
 Deno.test("formatItemLine - event without startAt shows plain text token (print mode)", () => {
@@ -456,7 +463,6 @@ Deno.test("formatItemLine - print mode uses plain text icon for note", () => {
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("[note]"), true);
-  assertEquals(result.includes("📝"), false);
 });
 
 Deno.test("formatItemLine - print mode uses plain text icon for task", () => {
@@ -467,7 +473,7 @@ Deno.test("formatItemLine - print mode uses plain text icon for task", () => {
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("[task]"), true);
-  assertEquals(result.includes("✔️"), false);
+  assertEquals(result.includes("•"), false);
 });
 
 Deno.test("formatItemLine - print mode uses plain text icon for closed task", () => {
@@ -478,7 +484,7 @@ Deno.test("formatItemLine - print mode uses plain text icon for closed task", ()
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("[task:done]"), true);
-  assertEquals(result.includes("✅"), false);
+  assertEquals(result.includes("×"), false);
 });
 
 Deno.test("formatItemLine - print mode produces no ANSI escape codes", () => {

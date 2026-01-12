@@ -17,46 +17,61 @@ export type ListFormatterOptions = Readonly<{
 }>;
 
 /**
- * Returns the emoji icon for an item based on its type and status.
+ * Returns the Bullet Journal-style symbol for an item based on its type and status.
  *
- * - note: 📝 (open) / 🗞️ (closed)
- * - task: ✔️ (open) / ✅ (closed)
- * - event: 🕒
+ * Type symbols (when open):
+ * - note: -
+ * - task: •
+ * - event: ○
+ *
+ * Status symbols (replace type when not open):
+ * - closed: ×
+ * - snoozed: ~
  */
 export const formatItemIcon = (icon: ItemIcon, status: ItemStatus): string => {
-  const iconValue = icon.toString();
-  const isClosed = status.isClosed();
+  if (status.isClosed()) {
+    return "×";
+  }
+  if (status.isSnoozing()) {
+    return "~";
+  }
 
+  // Open items show type symbol
+  const iconValue = icon.toString();
   switch (iconValue) {
     case "note":
-      return isClosed ? "🗞️" : "📝";
+      return "-";
     case "task":
-      return isClosed ? "✅" : "✔️";
+      return "•";
     case "event":
-      return "🕒";
+      return "○";
     default:
-      return "📝";
+      return "-";
   }
 };
 
 /**
  * Returns a plain text token for an item icon (for print mode).
  *
- * - note: [note] / [note:closed]
- * - task: [task] / [task:done]
- * - event: [event]
+ * - note: [note] / [note:closed] / [note:snoozing]
+ * - task: [task] / [task:done] / [task:snoozing]
+ * - event: [event] / [event:closed] / [event:snoozing]
  */
 const formatItemIconPlain = (icon: ItemIcon, status: ItemStatus): string => {
   const iconValue = icon.toString();
-  const isClosed = status.isClosed();
+  const statusSuffix = status.isClosed() ? ":done" : status.isSnoozing() ? ":snoozing" : "";
 
   switch (iconValue) {
     case "note":
-      return isClosed ? "[note:closed]" : "[note]";
+      return status.isClosed()
+        ? "[note:closed]"
+        : status.isSnoozing()
+        ? "[note:snoozing]"
+        : "[note]";
     case "task":
-      return isClosed ? "[task:done]" : "[task]";
+      return `[task${statusSuffix}]`;
     case "event":
-      return "[event]";
+      return `[event${statusSuffix}]`;
     default:
       return "[note]";
   }
@@ -76,17 +91,20 @@ const formatTimeInTimezone = (date: Date, timezone: TimezoneIdentifier): string 
 };
 
 /**
- * Formats the event time portion of an item line (colored mode with emoji).
+ * Formats the event time portion of an item line (colored mode).
  *
- * - With startAt only: 🕒(HH:MM)
- * - With startAt and duration: 🕒(HH:MM-HH:MM)
- * - Without startAt: 🕒
+ * - With startAt only: ○ (HH:MM)
+ * - With startAt and duration: ○ (HH:MM-HH:MM)
+ * - Without startAt: ○
  */
 const formatEventTime = (item: Item, timezone: TimezoneIdentifier): string => {
-  const { startAt, duration } = item.data;
+  const { startAt, duration, status } = item.data;
+
+  // Closed/snoozed events show status symbol instead of ○
+  const symbol = status.isClosed() ? "×" : status.isSnoozing() ? "~" : "○";
 
   if (!startAt) {
-    return "🕒";
+    return symbol;
   }
 
   const startTime = formatTimeInTimezone(startAt.toDate(), timezone);
@@ -94,10 +112,10 @@ const formatEventTime = (item: Item, timezone: TimezoneIdentifier): string => {
   if (duration) {
     const endDate = startAt.addDuration(duration);
     const endTime = formatTimeInTimezone(endDate.toDate(), timezone);
-    return `🕒(${startTime}-${endTime})`;
+    return `${symbol} (${startTime}-${endTime})`;
   }
 
-  return `🕒(${startTime})`;
+  return `${symbol} (${startTime})`;
 };
 
 /**
