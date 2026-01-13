@@ -167,10 +167,11 @@ describe("Scenario: Show command", () => {
     assertEquals(showResult.success, true);
 
     const output = showResult.stdout;
+    // Snoozing is a derived state, not stored in status. The show command displays raw data.
     assertEquals(
-      output.includes("task:snoozing"),
+      output.includes("task:open"),
       true,
-      "Should include snoozing task type:status",
+      "Should include task:open (snoozing is derived state, not stored in status)",
     );
     assertEquals(output.includes("SnoozeUntil:"), true, "Should include SnoozeUntil timestamp");
   });

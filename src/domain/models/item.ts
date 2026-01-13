@@ -21,7 +21,6 @@ import {
   ItemStatus,
   itemStatusClosed,
   itemStatusOpen,
-  itemStatusSnoozing,
   ItemStatusValidationError,
   ItemTitle,
   ItemTitleValidationError,
@@ -268,10 +267,10 @@ const instantiate = (
     snoozeUntil: DateTime | undefined,
     occurredAt: DateTime,
   ): Item {
-    const status = snoozeUntil ? itemStatusSnoozing() : itemStatusOpen();
+    // Snoozing does not change status - status remains open/closed
+    // isSnoozing() derives state from snoozeUntil and current time
     const next = {
       ...this.data,
-      status,
       snoozeUntil,
       updatedAt: occurredAt,
     } as ItemData;

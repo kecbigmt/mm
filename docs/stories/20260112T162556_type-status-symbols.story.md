@@ -73,20 +73,26 @@ Solution: Use Bullet Journal-style symbols where open items show type (`•` `-`
 ### Completed Work Summary
 
 **Changed files:**
-- `src/domain/primitives/item_status.ts` - Added `snoozing` status with `isSnoozing()` method
-- `src/domain/primitives/mod.ts` - Export `itemStatusSnoozing`
-- `src/domain/models/item.ts` - `snooze()` now sets status to `snoozing`/`open`
-- `src/presentation/cli/formatters/list_formatter.ts` - Bullet Journal symbols (`•` `-` `○` `×` `~`)
-- `src/presentation/cli/formatters/list_formatter_test.ts` - Updated tests
+- `src/domain/primitives/item_status.ts` - Status is `open` | `closed` only (snoozing is derived)
+- `src/domain/models/item.ts` - `snooze()` sets `snoozeUntil`, `isSnoozing(now)` computes state
+- `src/presentation/cli/formatters/list_formatter.ts` - Bullet Journal symbols, `now` in options
+- `src/presentation/cli/formatters/list_formatter_test.ts` - Updated tests with snoozing via `snoozeUntil`
 - `src/presentation/cli/formatters/item_detail_formatter.ts` - Two-line header with `type:status`
 - `src/presentation/cli/formatters/item_detail_formatter_test.ts` - Updated tests
+- `src/presentation/cli/commands/list.ts` - Pass `now` to formatter options
+- `tests/e2e/scenarios/scenario_show_command_test.ts` - Updated for derived snoozing
+
+**Design decision: Snoozing as derived state**
+- `status` field: Only `"open" | "closed"` (lifecycle states)
+- Snoozing: Computed as `snoozeUntil > now` via `item.isSnoozing(now: DateTime)`
+- Rationale: Snoozing is temporal (expires automatically), not a persistent lifecycle state
 
 **Implementation:**
 - `formatItemIcon`: Returns type symbol (`•` `-` `○`) when open, `×` when closed, `~` when snoozing
-- `formatEventTime`: Uses `○` with time instead of `🕒`
+- `formatEventTime`: Uses `○` with time instead of emoji
+- `formatItemLine`: Computes `isSnoozing` internally from `options.now`
 - `formatItemDetail`: Two-line header (`alias title` + `type:status metadata`)
-- `ItemStatus`: Added `"snoozing"` value and `isSnoozing()` method
-- `Item.snooze()`: Sets status to `snoozing` when snoozeUntil is set, `open` when cleared
+- `ListFormatterOptions`: Added `now: DateTime` for snoozing computation
 
 ### Acceptance Checks
 
@@ -94,9 +100,10 @@ Solution: Use Bullet Journal-style symbols where open items show type (`•` `-`
 
 Developer verification completed:
 - `mm ls`: open task `•`, open note `-`, closed `×`, snoozing `~`
-- `mm show <id>`: two-line header with `task:open`, `task:closed`, `task:snoozing`
+- `mm show <id>`: two-line header with `task:open`, `task:closed` (snoozing shows `task:open` + `SnoozeUntil`)
 - `mm ls --print`: `[task]`, `[task:done]`, `[task:snoozing]`
-- Unit tests: 549 passed
+- Unit tests: 555 passed
+- E2E tests: All pass (except unrelated shell completion tests)
 - Lint/format: passed
 
 **Awaiting product owner acceptance testing before marking this user story as complete.**
@@ -106,7 +113,7 @@ Developer verification completed:
 ### Follow-ups / Open Risks
 
 #### Addressed
-- Snoozed status implemented (originally planned as future work)
+- Snoozing display implemented as derived state from `snoozeUntil > now`
 
 #### Remaining
 - (none)

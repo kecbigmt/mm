@@ -113,12 +113,14 @@ Deno.test("formatItemDetail - event with startAt and duration", () => {
   assertEquals(result.includes("Duration: 1h30m"), true);
 });
 
-Deno.test("formatItemDetail - snoozing task with snoozeUntil", () => {
+Deno.test("formatItemDetail - task with snoozeUntil", () => {
+  // Snoozing is a derived state (snoozeUntil > now), not a status value.
+  // The detail formatter shows raw data: status is "open", and SnoozeUntil shows the snooze timestamp.
   const itemResult = parseItem({
     id: "019965a7-2789-740a-b8c1-1415904fd104",
     title: "Snoozed task",
     icon: "task",
-    status: "snoozing",
+    status: "open", // Snoozing is derived, not stored in status
     placement: "2025-08-30",
     rank: "a0",
     createdAt: "2025-08-30T10:00:00.000Z",
@@ -135,9 +137,9 @@ Deno.test("formatItemDetail - snoozing task with snoozeUntil", () => {
 
   const result = formatItemDetail(item);
 
-  // Header with snoozing task
+  // Header with task (status is "open" - snoozing is derived state)
   assertEquals(result.includes("task-snz"), true);
-  assertEquals(result.includes("task:snoozing"), true);
+  assertEquals(result.includes("task:open"), true);
   assertEquals(result.includes("Snoozed task"), true);
   assertEquals(result.includes("on:2025-08-30"), true);
 
