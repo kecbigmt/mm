@@ -113,6 +113,40 @@ Deno.test("formatItemDetail - event with startAt and duration", () => {
   assertEquals(result.includes("Duration: 1h30m"), true);
 });
 
+Deno.test("formatItemDetail - snoozing task with snoozeUntil", () => {
+  const itemResult = parseItem({
+    id: "019965a7-2789-740a-b8c1-1415904fd104",
+    title: "Snoozed task",
+    icon: "task",
+    status: "snoozing",
+    placement: "2025-08-30",
+    rank: "a0",
+    createdAt: "2025-08-30T10:00:00.000Z",
+    updatedAt: "2025-08-30T10:00:00.000Z",
+    snoozeUntil: "2025-08-31T08:00:00.000Z",
+    alias: "task-snz",
+  });
+
+  if (itemResult.type === "error") {
+    throw new Error(`Failed to parse test data: ${itemResult.error.toString()}`);
+  }
+
+  const item = itemResult.value;
+
+  const result = formatItemDetail(item);
+
+  // Header with snoozing task
+  assertEquals(result.includes("task-snz"), true);
+  assertEquals(result.includes("task:snoozing"), true);
+  assertEquals(result.includes("Snoozed task"), true);
+  assertEquals(result.includes("on:2025-08-30"), true);
+
+  // Metadata with SnoozeUntil timestamp
+  assertEquals(result.includes("UUID: 019965a7-2789-740a-b8c1-1415904fd104"), true);
+  assertEquals(result.includes("Created: 2025-08-30T10:00:00.000Z"), true);
+  assertEquals(result.includes("SnoozeUntil: 2025-08-31T08:00:00.000Z"), true);
+});
+
 Deno.test("formatItemDetail - item without alias uses UUID", () => {
   const itemResult = parseItem({
     id: "019965a7-2789-740a-b8c1-1415904fd103",

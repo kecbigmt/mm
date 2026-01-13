@@ -2,7 +2,11 @@ import { assertEquals } from "@std/assert";
 import { Result } from "../../../shared/result.ts";
 import { createItem, Item } from "../../../domain/models/item.ts";
 import { createItemIcon } from "../../../domain/primitives/item_icon.ts";
-import { itemStatusClosed, itemStatusOpen } from "../../../domain/primitives/item_status.ts";
+import {
+  itemStatusClosed,
+  itemStatusOpen,
+  itemStatusSnoozing,
+} from "../../../domain/primitives/item_status.ts";
 import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import { parseItemTitle } from "../../../domain/primitives/item_title.ts";
 import { parseItemRank } from "../../../domain/primitives/item_rank.ts";
@@ -34,7 +38,7 @@ const makeItem = (
     id: string;
     title: string;
     icon: "note" | "task" | "event";
-    status: "open" | "closed";
+    status: "open" | "closed" | "snoozing";
     placement: string;
     alias: string;
     project: string;
@@ -47,7 +51,11 @@ const makeItem = (
   const id = Result.unwrap(parseItemId(overrides.id ?? "019a85fc-67c4-7a54-be8e-305bae009f9e"));
   const title = Result.unwrap(parseItemTitle(overrides.title ?? "Test item"));
   const icon = createItemIcon(overrides.icon ?? "note");
-  const status = overrides.status === "closed" ? itemStatusClosed() : itemStatusOpen();
+  const status = overrides.status === "closed"
+    ? itemStatusClosed()
+    : overrides.status === "snoozing"
+    ? itemStatusSnoozing()
+    : itemStatusOpen();
   const placement = Result.unwrap(parsePlacement(overrides.placement ?? "2025-02-10"));
   const rank = Result.unwrap(parseItemRank("0|aaaaaa:"));
   const createdAt = Result.unwrap(parseDateTime("2025-02-10T09:00:00Z"));
@@ -125,6 +133,27 @@ Deno.test("formatItemIcon - event closed returns ×", () => {
   const status = itemStatusClosed();
   const result = formatItemIcon(icon, status);
   assertEquals(result, "×");
+});
+
+Deno.test("formatItemIcon - note snoozing returns ~", () => {
+  const icon = createItemIcon("note");
+  const status = itemStatusSnoozing();
+  const result = formatItemIcon(icon, status);
+  assertEquals(result, "~");
+});
+
+Deno.test("formatItemIcon - task snoozing returns ~", () => {
+  const icon = createItemIcon("task");
+  const status = itemStatusSnoozing();
+  const result = formatItemIcon(icon, status);
+  assertEquals(result, "~");
+});
+
+Deno.test("formatItemIcon - event snoozing returns ~", () => {
+  const icon = createItemIcon("event");
+  const status = itemStatusSnoozing();
+  const result = formatItemIcon(icon, status);
+  assertEquals(result, "~");
 });
 
 // =============================================================================
@@ -485,6 +514,28 @@ Deno.test("formatItemLine - print mode uses plain text icon for closed task", ()
   const result = formatItemLine(item, options);
   assertEquals(result.includes("[task:done]"), true);
   assertEquals(result.includes("×"), false);
+});
+
+Deno.test("formatItemLine - print mode uses plain text icon for snoozing task", () => {
+  const item = makeItem({ icon: "task", status: "snoozing" });
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+  };
+  const result = formatItemLine(item, options);
+  assertEquals(result.includes("[task:snoozing]"), true);
+  assertEquals(result.includes("~"), false);
+});
+
+Deno.test("formatItemLine - print mode uses plain text icon for snoozing note", () => {
+  const item = makeItem({ icon: "note", status: "snoozing" });
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+  };
+  const result = formatItemLine(item, options);
+  assertEquals(result.includes("[note:snoozing]"), true);
+  assertEquals(result.includes("~"), false);
 });
 
 Deno.test("formatItemLine - print mode produces no ANSI escape codes", () => {

@@ -14,9 +14,10 @@ import { Item } from "../../../domain/models/item.ts";
  * UUID: {uuid}
  * Created: {createdAt}
  * Updated: {updatedAt}
- * Closed: {closedAt}  # if closed
- * Start: {startAt}    # if event
- * Duration: {duration} # if event
+ * Closed: {closedAt}       # if closed
+ * SnoozeUntil: {snoozeUntil} # if snoozing
+ * Start: {startAt}         # if event
+ * Duration: {duration}     # if event
  * ```
  */
 export const formatItemDetail = (item: Item): string => {
@@ -32,6 +33,7 @@ export const formatItemDetail = (item: Item): string => {
     createdAt,
     updatedAt,
     closedAt,
+    snoozeUntil,
     startAt,
     duration,
   } = item.data;
@@ -85,6 +87,10 @@ export const formatItemDetail = (item: Item): string => {
 
   if (closedAt) {
     parts.push(dim(`Closed: ${closedAt.toString()}`));
+  }
+
+  if (snoozeUntil) {
+    parts.push(dim(`SnoozeUntil: ${snoozeUntil.toString()}`));
   }
 
   if (startAt) {

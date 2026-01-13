@@ -140,6 +140,41 @@ describe("Scenario: Show command", () => {
     assertEquals(output.includes("Closed:"), true, "Should include Closed timestamp");
   });
 
+  it("displays snoozing task with Snooze timestamp", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "task",
+      "Snoozed task",
+      "--alias",
+      "task-snooze",
+    ]);
+    assertEquals(createResult.success, true);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    // Snooze the task to tomorrow
+    const snoozeResult = await runCommand(ctx.testHome, ["snooze", itemId, "tomorrow"]);
+    assertEquals(snoozeResult.success, true);
+
+    // Show snoozed task
+    const showResult = await runCommand(ctx.testHome, [
+      "show",
+      itemId,
+      "--print",
+    ]);
+    assertEquals(showResult.success, true);
+
+    const output = showResult.stdout;
+    assertEquals(
+      output.includes("task:snoozing"),
+      true,
+      "Should include snoozing task type:status",
+    );
+    assertEquals(output.includes("SnoozeUntil:"), true, "Should include SnoozeUntil timestamp");
+  });
+
   it("displays event with start time and duration", async () => {
     const today = await getCurrentDateFromCli(ctx.testHome);
 
