@@ -25,9 +25,9 @@ Deno.test("formatItemDetail - note with alias, context, and body", () => {
 
   const result = formatItemDetail(item);
 
-  // Header line with alias, icon, title, context, date
+  // Header lines: alias + title, then type:status + metadata
   assertEquals(result.includes("kene-abc"), true);
-  assertEquals(result.includes("📝"), true);
+  assertEquals(result.includes("note:open"), true);
   assertEquals(result.includes("Planning document"), true);
   assertEquals(result.includes("@planning"), true);
   assertEquals(result.includes("on:2025-08-30"), true);
@@ -64,9 +64,9 @@ Deno.test("formatItemDetail - task (closed) without body", () => {
 
   const result = formatItemDetail(item);
 
-  // Header with closed task icon
+  // Header with closed task
   assertEquals(result.includes("task-xyz"), true);
-  assertEquals(result.includes("✅"), true);
+  assertEquals(result.includes("task:closed"), true);
   assertEquals(result.includes("Complete report"), true);
   assertEquals(result.includes("on:2025-08-29"), true);
 
@@ -101,8 +101,8 @@ Deno.test("formatItemDetail - event with startAt and duration", () => {
 
   const result = formatItemDetail(item);
 
-  // Header with event icon
-  assertEquals(result.includes("🕒"), true);
+  // Header with event
+  assertEquals(result.includes("event:open"), true);
   assertEquals(result.includes("Team meeting"), true);
   assertEquals(result.includes("on:2025-08-31"), true);
 
@@ -111,6 +111,42 @@ Deno.test("formatItemDetail - event with startAt and duration", () => {
   assertEquals(result.includes("Created: 2025-08-28T08:00:00.000Z"), true);
   assertEquals(result.includes("Start: 2025-08-31T14:00:00.000Z"), true);
   assertEquals(result.includes("Duration: 1h30m"), true);
+});
+
+Deno.test("formatItemDetail - task with snoozeUntil", () => {
+  // Snoozing is a derived state (snoozeUntil > now), not a status value.
+  // The detail formatter shows raw data: status is "open", and SnoozeUntil shows the snooze timestamp.
+  const itemResult = parseItem({
+    id: "019965a7-2789-740a-b8c1-1415904fd104",
+    title: "Snoozed task",
+    icon: "task",
+    status: "open", // Snoozing is derived, not stored in status
+    placement: "2025-08-30",
+    rank: "a0",
+    createdAt: "2025-08-30T10:00:00.000Z",
+    updatedAt: "2025-08-30T10:00:00.000Z",
+    snoozeUntil: "2025-08-31T08:00:00.000Z",
+    alias: "task-snz",
+  });
+
+  if (itemResult.type === "error") {
+    throw new Error(`Failed to parse test data: ${itemResult.error.toString()}`);
+  }
+
+  const item = itemResult.value;
+
+  const result = formatItemDetail(item);
+
+  // Header with task (status is "open" - snoozing is derived state)
+  assertEquals(result.includes("task-snz"), true);
+  assertEquals(result.includes("task:open"), true);
+  assertEquals(result.includes("Snoozed task"), true);
+  assertEquals(result.includes("on:2025-08-30"), true);
+
+  // Metadata with SnoozeUntil timestamp
+  assertEquals(result.includes("UUID: 019965a7-2789-740a-b8c1-1415904fd104"), true);
+  assertEquals(result.includes("Created: 2025-08-30T10:00:00.000Z"), true);
+  assertEquals(result.includes("SnoozeUntil: 2025-08-31T08:00:00.000Z"), true);
 });
 
 Deno.test("formatItemDetail - item without alias uses UUID", () => {

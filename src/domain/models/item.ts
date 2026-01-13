@@ -267,6 +267,8 @@ const instantiate = (
     snoozeUntil: DateTime | undefined,
     occurredAt: DateTime,
   ): Item {
+    // Snoozing does not change status - status remains open/closed
+    // isSnoozing() derives state from snoozeUntil and current time
     const next = {
       ...this.data,
       snoozeUntil,

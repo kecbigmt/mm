@@ -1,22 +1,23 @@
 import { bold, cyan, dim } from "@std/fmt/colors";
 import { Item } from "../../../domain/models/item.ts";
-import { formatItemIcon } from "./list_formatter.ts";
 
 /**
  * Format an item's full details for display in show command.
  *
  * Output format:
  * ```
- * {alias} {icon} {title} +{project} @{context}... on:{date}
+ * {alias} {title}
+ * {type}:{status} +{project} @{context}... on:{date}
  *
  * {body}
  *
  * UUID: {uuid}
  * Created: {createdAt}
  * Updated: {updatedAt}
- * Closed: {closedAt}  # if closed
- * Start: {startAt}    # if event
- * Duration: {duration} # if event
+ * Closed: {closedAt}       # if closed
+ * SnoozeUntil: {snoozeUntil} # if snoozing
+ * Start: {startAt}         # if event
+ * Duration: {duration}     # if event
  * ```
  */
 export const formatItemDetail = (item: Item): string => {
@@ -32,35 +33,34 @@ export const formatItemDetail = (item: Item): string => {
     createdAt,
     updatedAt,
     closedAt,
+    snoozeUntil,
     startAt,
     duration,
   } = item.data;
 
   const parts: string[] = [];
 
-  // === HEADER LINE ===
-  const headerParts: string[] = [];
-
-  // Alias or UUID
+  // === HEADER LINE 1: alias + title ===
   const identifier = alias?.toString() ?? id.toString();
-  headerParts.push(cyan(identifier));
+  parts.push(`${cyan(identifier)} ${bold(title.toString())}`);
 
-  // Icon
-  const iconStr = formatItemIcon(icon, status);
-  headerParts.push(iconStr);
+  // === HEADER LINE 2: type:status + metadata ===
+  const metaParts: string[] = [];
 
-  // Title
-  headerParts.push(bold(title.toString()));
+  // Type and status
+  const typeStr = icon.toString();
+  const statusStr = status.toString();
+  metaParts.push(dim(`${typeStr}:${statusStr}`));
 
   // Project (todo.txt convention: +project)
   if (project) {
-    headerParts.push(dim(`+${project.toString()}`));
+    metaParts.push(dim(`+${project.toString()}`));
   }
 
   // Contexts (todo.txt convention: @context)
   if (contexts && contexts.length > 0) {
     for (const context of contexts) {
-      headerParts.push(dim(`@${context.toString()}`));
+      metaParts.push(dim(`@${context.toString()}`));
     }
   }
 
@@ -68,10 +68,10 @@ export const formatItemDetail = (item: Item): string => {
   const placement = item.data.placement;
   if (placement.head.kind === "date") {
     const dateStr = placement.head.date.toString();
-    headerParts.push(dim(`on:${dateStr}`));
+    metaParts.push(dim(`on:${dateStr}`));
   }
 
-  parts.push(headerParts.join(" "));
+  parts.push(metaParts.join(" "));
 
   // === BODY SECTION ===
   if (body && body.trim().length > 0) {
@@ -87,6 +87,10 @@ export const formatItemDetail = (item: Item): string => {
 
   if (closedAt) {
     parts.push(dim(`Closed: ${closedAt.toString()}`));
+  }
+
+  if (snoozeUntil) {
+    parts.push(dim(`SnoozeUntil: ${snoozeUntil.toString()}`));
   }
 
   if (startAt) {
