@@ -10,8 +10,6 @@ The current design has two problems:
 
 Solution: Use Bullet Journal-style symbols where open items show type (`•` `-` `○`) and closed/snoozing items show status (`×` `~`). This keeps lists scannable and aligned.
 
-Related issue: `tiri-qrk` - "task emojiがAIに完了済みと誤解させてしまう"
-
 ### User Story
 **As a user (human or AI) of mm CLI, I want items to display with clear Bullet Journal-style symbols, so that I can quickly scan and understand what needs attention.**
 
