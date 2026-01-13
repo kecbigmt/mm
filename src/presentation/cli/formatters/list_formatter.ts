@@ -28,7 +28,7 @@ export type ListFormatterOptions = Readonly<{
  * - event: ○
  *
  * Status/state symbols:
- * - closed: ×
+ * - closed: ✓
  * - snoozing: ~
  */
 export const formatItemIcon = (
@@ -37,7 +37,7 @@ export const formatItemIcon = (
   isSnoozing: boolean,
 ): string => {
   if (status.isClosed()) {
-    return "×";
+    return "✓";
   }
   if (isSnoozing) {
     return "~";
@@ -112,7 +112,7 @@ const formatEventTime = (
   const { startAt, duration, status } = item.data;
 
   // Closed/snoozed events show status symbol instead of ○
-  const symbol = status.isClosed() ? "×" : isSnoozing ? "~" : "○";
+  const symbol = status.isClosed() ? "✓" : isSnoozing ? "~" : "○";
 
   if (!startAt) {
     return symbol;

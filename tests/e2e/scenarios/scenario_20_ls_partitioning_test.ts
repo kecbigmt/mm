@@ -372,8 +372,8 @@ describe("Scenario 20: List partitioning and formatting", () => {
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "--all", "--no-pager"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
 
-      // Closed note should show × symbol (Bullet Journal style)
-      assertStringIncludes(lsResult.stdout, "× ", "Should show closed symbol");
+      // Closed note should show ✓ symbol (completed)
+      assertStringIncludes(lsResult.stdout, "✓ ", "Should show completed symbol");
     });
   });
 });

@@ -99,11 +99,11 @@ Deno.test("formatItemIcon - note open returns -", () => {
   assertEquals(result, "-");
 });
 
-Deno.test("formatItemIcon - note closed returns ×", () => {
+Deno.test("formatItemIcon - note closed returns ✓", () => {
   const icon = createItemIcon("note");
   const status = itemStatusClosed();
   const result = formatItemIcon(icon, status, false);
-  assertEquals(result, "×");
+  assertEquals(result, "✓");
 });
 
 Deno.test("formatItemIcon - task open returns •", () => {
@@ -113,11 +113,11 @@ Deno.test("formatItemIcon - task open returns •", () => {
   assertEquals(result, "•");
 });
 
-Deno.test("formatItemIcon - task closed returns ×", () => {
+Deno.test("formatItemIcon - task closed returns ✓", () => {
   const icon = createItemIcon("task");
   const status = itemStatusClosed();
   const result = formatItemIcon(icon, status, false);
-  assertEquals(result, "×");
+  assertEquals(result, "✓");
 });
 
 Deno.test("formatItemIcon - event open returns ○", () => {
@@ -127,11 +127,11 @@ Deno.test("formatItemIcon - event open returns ○", () => {
   assertEquals(result, "○");
 });
 
-Deno.test("formatItemIcon - event closed returns ×", () => {
+Deno.test("formatItemIcon - event closed returns ✓", () => {
   const icon = createItemIcon("event");
   const status = itemStatusClosed();
   const result = formatItemIcon(icon, status, false);
-  assertEquals(result, "×");
+  assertEquals(result, "✓");
 });
 
 Deno.test("formatItemIcon - note snoozing returns ~", () => {
@@ -544,7 +544,7 @@ Deno.test("formatItemLine - print mode uses plain text icon for closed task", ()
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("[task:done]"), true);
-  assertEquals(result.includes("×"), false);
+  assertEquals(result.includes("✓"), false);
 });
 
 Deno.test("formatItemLine - print mode uses plain text icon for snoozing task", () => {

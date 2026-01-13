@@ -26,7 +26,7 @@ Solution: Use Bullet Journal-style symbols where open items show type (`•` `-`
 | Status | Symbol |
 |--------|--------|
 | open | (type symbol) |
-| closed | `×` |
+| closed | `✓` |
 | snoozing | `~` |
 
 **ls format:** `<symbol> [time?] <id> <title> ...`
@@ -41,18 +41,18 @@ Solution: Use Bullet Journal-style symbols where open items show type (`•` `-`
 
 #### 1. Task Display
 - [ ] **Given** an open task, **When** I run `mm ls`, **Then** it displays as `• <id> <title> ...`
-- [ ] **Given** a closed task, **When** I run `mm ls`, **Then** it displays as `× <id> <title> ...`
+- [ ] **Given** a closed task, **When** I run `mm ls`, **Then** it displays as `✓ <id> <title> ...`
 - [ ] **Given** a snoozing task, **When** I run `mm ls --all`, **Then** it displays as `~ <id> <title> ...`
 
 #### 2. Note Display
 - [ ] **Given** an open note, **When** I run `mm ls`, **Then** it displays as `- <id> <title> ...`
-- [ ] **Given** a closed note, **When** I run `mm ls`, **Then** it displays as `× <id> <title> ...`
+- [ ] **Given** a closed note, **When** I run `mm ls`, **Then** it displays as `✓ <id> <title> ...`
 
 #### 3. Event Display
 - [ ] **Given** an open event without time, **When** I run `mm ls`, **Then** it displays as `○ <id> <title> ...`
 - [ ] **Given** an open event with start time, **When** I run `mm ls`, **Then** it displays as `○ (HH:MM) <id> <title> ...`
 - [ ] **Given** an open event with duration, **When** I run `mm ls`, **Then** it displays as `○ (HH:MM-HH:MM) <id> <title> ...`
-- [ ] **Given** a closed event, **When** I run `mm ls`, **Then** it displays as `× <id> <title> ...`
+- [ ] **Given** a closed event, **When** I run `mm ls`, **Then** it displays as `✓ <id> <title> ...`
 
 #### 4. Show Command
 - [ ] **Given** any item, **When** I run `mm show <id>`, **Then** it displays two-line header with `<type>:<status>`
@@ -88,7 +88,7 @@ Solution: Use Bullet Journal-style symbols where open items show type (`•` `-`
 - Rationale: Snoozing is temporal (expires automatically), not a persistent lifecycle state
 
 **Implementation:**
-- `formatItemIcon`: Returns type symbol (`•` `-` `○`) when open, `×` when closed, `~` when snoozing
+- `formatItemIcon`: Returns type symbol (`•` `-` `○`) when open, `✓` when closed, `~` when snoozing
 - `formatEventTime`: Uses `○` with time instead of emoji
 - `formatItemLine`: Computes `isSnoozing` internally from `options.now`
 - `formatItemDetail`: Two-line header (`alias title` + `type:status metadata`)
@@ -96,10 +96,10 @@ Solution: Use Bullet Journal-style symbols where open items show type (`•` `-`
 
 ### Acceptance Checks
 
-**Status: Pending Product Owner Review**
+**Status: Implementation Updated - Pending Verification**
 
-Developer verification completed:
-- `mm ls`: open task `•`, open note `-`, closed `×`, snoozing `~`
+Symbol change (× → ✓) implemented:
+- `mm ls`: open task `•`, open note `-`, closed `✓`, snoozing `~`
 - `mm show <id>`: two-line header with `task:open`, `task:closed` (snoozing shows `task:open` + `SnoozeUntil`)
 - `mm ls --print`: `[task]`, `[task:done]`, `[task:snoozing]`
 - Unit tests: 555 passed
@@ -117,3 +117,10 @@ Developer verification completed:
 
 #### Remaining
 - (none)
+
+---
+
+### Revision History
+
+#### 2026-01-13: Closed symbol changed from × to ✓
+**Reason**: The `×` symbol gives a negative impression (like "failed" or "rejected"). Changed to `✓` which universally represents "completed" with a positive connotation.
