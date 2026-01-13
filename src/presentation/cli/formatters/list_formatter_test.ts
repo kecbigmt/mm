@@ -543,7 +543,7 @@ Deno.test("formatItemLine - print mode uses plain text icon for closed task", ()
     now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
-  assertEquals(result.includes("[task:done]"), true);
+  assertEquals(result.includes("[task:closed]"), true);
   assertEquals(result.includes("✓"), false);
 });
 

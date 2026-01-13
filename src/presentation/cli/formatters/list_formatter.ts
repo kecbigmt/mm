@@ -61,7 +61,7 @@ export const formatItemIcon = (
  * Returns a plain text token for an item icon (for print mode).
  *
  * - note: [note] / [note:closed] / [note:snoozing]
- * - task: [task] / [task:done] / [task:snoozing]
+ * - task: [task] / [task:closed] / [task:snoozing]
  * - event: [event] / [event:closed] / [event:snoozing]
  */
 const formatItemIconPlain = (
@@ -70,7 +70,7 @@ const formatItemIconPlain = (
   isSnoozing: boolean,
 ): string => {
   const iconValue = icon.toString();
-  const statusSuffix = status.isClosed() ? ":done" : isSnoozing ? ":snoozing" : "";
+  const statusSuffix = status.isClosed() ? ":closed" : isSnoozing ? ":snoozing" : "";
 
   switch (iconValue) {
     case "note":

@@ -286,8 +286,8 @@ describe("Scenario 20: List partitioning and formatting", () => {
       assertStringIncludes(lsResult.stdout, "[task]", "Should show [task] icon");
       assertStringIncludes(
         lsResult.stdout,
-        "[task:done]",
-        "Should show [task:done] icon for closed task",
+        "[task:closed]",
+        "Should show [task:closed] icon for closed task",
       );
       assertStringIncludes(lsResult.stdout, "Open task", "Should include open task");
       assertStringIncludes(lsResult.stdout, "Closed task", "Should include closed task");

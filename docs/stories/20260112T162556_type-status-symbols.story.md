@@ -40,25 +40,25 @@ Solution: Use Bullet Journal-style symbols where open items show type (`•` `-`
 ### Acceptance Criteria
 
 #### 1. Task Display
-- [ ] **Given** an open task, **When** I run `mm ls`, **Then** it displays as `• <id> <title> ...`
-- [ ] **Given** a closed task, **When** I run `mm ls`, **Then** it displays as `✓ <id> <title> ...`
-- [ ] **Given** a snoozing task, **When** I run `mm ls --all`, **Then** it displays as `~ <id> <title> ...`
+- [x] **Given** an open task, **When** I run `mm ls`, **Then** it displays as `• <id> <title> ...`
+- [x] **Given** a closed task, **When** I run `mm ls`, **Then** it displays as `✓ <id> <title> ...`
+- [x] **Given** a snoozing task, **When** I run `mm ls --all`, **Then** it displays as `~ <id> <title> ...`
 
 #### 2. Note Display
-- [ ] **Given** an open note, **When** I run `mm ls`, **Then** it displays as `- <id> <title> ...`
-- [ ] **Given** a closed note, **When** I run `mm ls`, **Then** it displays as `✓ <id> <title> ...`
+- [x] **Given** an open note, **When** I run `mm ls`, **Then** it displays as `- <id> <title> ...`
+- [x] **Given** a closed note, **When** I run `mm ls`, **Then** it displays as `✓ <id> <title> ...`
 
 #### 3. Event Display
-- [ ] **Given** an open event without time, **When** I run `mm ls`, **Then** it displays as `○ <id> <title> ...`
-- [ ] **Given** an open event with start time, **When** I run `mm ls`, **Then** it displays as `○ (HH:MM) <id> <title> ...`
-- [ ] **Given** an open event with duration, **When** I run `mm ls`, **Then** it displays as `○ (HH:MM-HH:MM) <id> <title> ...`
-- [ ] **Given** a closed event, **When** I run `mm ls`, **Then** it displays as `✓ <id> <title> ...`
+- [x] **Given** an open event without time, **When** I run `mm ls`, **Then** it displays as `○ <id> <title> ...`
+- [x] **Given** an open event with start time, **When** I run `mm ls`, **Then** it displays as `○ (HH:MM) <id> <title> ...`
+- [x] **Given** an open event with duration, **When** I run `mm ls`, **Then** it displays as `○ (HH:MM-HH:MM) <id> <title> ...`
+- [x] **Given** a closed event, **When** I run `mm ls`, **Then** it displays as `✓ <id> <title> ...`
 
 #### 4. Show Command
-- [ ] **Given** any item, **When** I run `mm show <id>`, **Then** it displays two-line header with `<type>:<status>`
+- [x] **Given** any item, **When** I run `mm show <id>`, **Then** it displays two-line header with `<type>:<status>`
 
 #### 5. Print Mode
-- [ ] **Given** any item, **When** I run `mm ls --print`, **Then** it displays plain text tokens (e.g., `[task]`, `[task:done]`, `[task:snoozing]`)
+- [x] **Given** any item, **When** I run `mm ls --print`, **Then** it displays plain text tokens (e.g., `[task]`, `[task:closed]`, `[task:snoozing]`)
 
 ### Verification Approach
 - Direct CLI execution of `mm ls` and `mm show` commands
@@ -96,17 +96,18 @@ Solution: Use Bullet Journal-style symbols where open items show type (`•` `-`
 
 ### Acceptance Checks
 
-**Status: Implementation Updated - Pending Verification**
+**Status: Accepted**
 
-Symbol change (× → ✓) implemented:
+All acceptance criteria verified and passing.
+Tested on: 2026-01-13
+
+**Verification results:**
 - `mm ls`: open task `•`, open note `-`, closed `✓`, snoozing `~`
-- `mm show <id>`: two-line header with `task:open`, `task:closed` (snoozing shows `task:open` + `SnoozeUntil`)
-- `mm ls --print`: `[task]`, `[task:done]`, `[task:snoozing]`
+- `mm show <id>`: two-line header with `task:open`, `task:closed`
+- `mm ls --print`: `[task]`, `[task:closed]`, `[task:snoozing]`
 - Unit tests: 555 passed
-- E2E tests: All pass (except unrelated shell completion tests)
+- E2E tests: 28 passed (2 unrelated shell completion tests skipped)
 - Lint/format: passed
-
-**Awaiting product owner acceptance testing before marking this user story as complete.**
 
 **Draft PR:** https://github.com/kecbigmt/mm/pull/86
 
@@ -121,6 +122,9 @@ Symbol change (× → ✓) implemented:
 ---
 
 ### Revision History
+
+#### 2026-01-13: Print mode suffix changed from :done to :closed
+**Reason**: Consistency with the status value. Print mode now shows `[task:closed]`, `[note:closed]`, `[event:closed]` instead of `:done`.
 
 #### 2026-01-13: Closed symbol changed from × to ✓
 **Reason**: The `×` symbol gives a negative impression (like "failed" or "rejected"). Changed to `✓` which universally represents "completed" with a positive connotation.
