@@ -304,6 +304,31 @@ Deno.test("formatItemLine - event without startAt shows plain text token (print 
   assertEquals(result.includes("[event]("), false);
 });
 
+Deno.test("formatItemLine - print mode uses plain text icon for closed event", () => {
+  const item = makeItem({ icon: "event", status: "closed" });
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW,
+  };
+  const result = formatItemLine(item, options);
+  assertEquals(result.includes("[event:closed]"), true);
+  assertEquals(result.includes("✓"), false);
+});
+
+Deno.test("formatItemLine - print mode uses plain text icon for snoozing event", () => {
+  // Item is snoozing when snoozeUntil > now
+  const item = makeItem({ icon: "event", snoozeUntil: "2025-02-11T00:00:00Z" });
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW, // 2025-02-10T12:00:00Z - before snoozeUntil
+  };
+  const result = formatItemLine(item, options);
+  assertEquals(result.includes("[event:snoozing]"), true);
+  assertEquals(result.includes("~"), false);
+});
+
 // =============================================================================
 // formatDateHeader tests
 // =============================================================================

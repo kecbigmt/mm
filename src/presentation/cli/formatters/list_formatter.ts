@@ -132,15 +132,22 @@ const formatEventTime = (
 /**
  * Formats the event time portion of an item line (print mode with plain text).
  *
- * - With startAt only: [event](HH:MM)
- * - With startAt and duration: [event](HH:MM-HH:MM)
- * - Without startAt: [event]
+ * - With startAt only: [event](HH:MM) or [event:closed](HH:MM) or [event:snoozing](HH:MM)
+ * - With startAt and duration: [event](HH:MM-HH:MM) or [event:closed](HH:MM-HH:MM)
+ * - Without startAt: [event] or [event:closed] or [event:snoozing]
  */
-const formatEventTimePlain = (item: Item, timezone: TimezoneIdentifier): string => {
+const formatEventTimePlain = (
+  item: Item,
+  timezone: TimezoneIdentifier,
+  status: ItemStatus,
+  isSnoozing: boolean,
+): string => {
   const { startAt, duration } = item.data;
+  const statusSuffix = status.isClosed() ? ":closed" : isSnoozing ? ":snoozing" : "";
+  const token = `[event${statusSuffix}]`;
 
   if (!startAt) {
-    return "[event]";
+    return token;
   }
 
   const startTime = formatTimeInTimezone(startAt.toDate(), timezone);
@@ -148,10 +155,10 @@ const formatEventTimePlain = (item: Item, timezone: TimezoneIdentifier): string 
   if (duration) {
     const endDate = startAt.addDuration(duration);
     const endTime = formatTimeInTimezone(endDate.toDate(), timezone);
-    return `[event](${startTime}-${endTime})`;
+    return `${token}(${startTime}-${endTime})`;
   }
 
-  return `[event](${startTime})`;
+  return `${token}(${startTime})`;
 };
 
 /**
@@ -187,7 +194,7 @@ export const formatItemLine = (
   // Icon (with event time if applicable)
   if (printMode) {
     if (icon.toString() === "event") {
-      parts.push(formatEventTimePlain(item, timezone));
+      parts.push(formatEventTimePlain(item, timezone, status, isSnoozing));
     } else {
       parts.push(formatItemIconPlain(icon, status, isSnoozing));
     }
