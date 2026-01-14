@@ -5,6 +5,7 @@ import {
   AliasSlug,
   CalendarDay,
   createItemIcon,
+  createPermanentPlacement,
   DateTime,
   Duration,
   isCalendarDay,
@@ -70,6 +71,8 @@ export type CreateItemError = CreateItemValidationError | CreateItemRepositoryEr
 
 export type CreateItemResult = Readonly<{
   item: Item;
+  /** Aliases of topics that were auto-created for project/context references */
+  createdTopics: ReadonlyArray<AliasSlug>;
 }>;
 
 const invalidInput = (
@@ -84,6 +87,98 @@ const repositoryFailure = (error: RepositoryError): CreateItemRepositoryError =>
   kind: "repository",
   error,
 });
+
+/**
+ * Creates a permanent topic item for auto-creation when a project/context alias doesn't exist.
+ * Returns the ItemId of the created topic, or an error.
+ */
+const createTopicItem = async (
+  aliasSlug: AliasSlug,
+  createdAt: DateTime,
+  deps: CreateItemDependencies,
+): Promise<Result<ItemId, CreateItemError>> => {
+  // Generate ID for the new topic
+  const idResult = deps.idGenerationService.generateId();
+  if (idResult.type === "error") {
+    return Result.error(invalidInput(
+      idResult.error.issues.map((issue) =>
+        createValidationIssue(issue.message, {
+          code: issue.code,
+          path: ["topic", "id", ...issue.path],
+        })
+      ),
+    ));
+  }
+  const topicId = idResult.value;
+
+  // Use the alias as the title
+  const titleResult = itemTitleFromString(aliasSlug.toString());
+  if (titleResult.type === "error") {
+    return Result.error(invalidInput(
+      titleResult.error.issues.map((issue) =>
+        createValidationIssue(issue.message, {
+          code: issue.code,
+          path: ["topic", "title", ...issue.path],
+        })
+      ),
+    ));
+  }
+  const title = titleResult.value;
+
+  // Get rank for permanent placement
+  const permanentPlacement = createPermanentPlacement();
+  const siblingsResult = await deps.itemRepository.listByPlacement({
+    kind: "single",
+    at: permanentPlacement,
+  });
+  if (siblingsResult.type === "error") {
+    return Result.error(repositoryFailure(siblingsResult.error));
+  }
+  const existingRanks = siblingsResult.value.map((item) => item.data.rank);
+  const rankResult = deps.rankService.tailRank(existingRanks);
+  if (rankResult.type === "error") {
+    return Result.error(invalidInput(
+      rankResult.error.issues.map((issue) =>
+        createValidationIssue(issue.message, {
+          code: issue.code,
+          path: ["topic", "rank", ...issue.path],
+        })
+      ),
+    ));
+  }
+
+  // Create the topic item
+  const topicItem = createItem({
+    id: topicId,
+    title,
+    icon: createItemIcon("topic"),
+    status: itemStatusOpen(),
+    placement: permanentPlacement,
+    rank: rankResult.value,
+    createdAt,
+    updatedAt: createdAt,
+    alias: aliasSlug,
+  });
+
+  // Save the topic item
+  const saveResult = await deps.itemRepository.save(topicItem);
+  if (saveResult.type === "error") {
+    return Result.error(repositoryFailure(saveResult.error));
+  }
+
+  // Save the alias
+  const aliasModel = createAlias({
+    slug: aliasSlug,
+    itemId: topicId,
+    createdAt,
+  });
+  const aliasSaveResult = await deps.aliasRepository.save(aliasModel);
+  if (aliasSaveResult.type === "error") {
+    return Result.error(repositoryFailure(aliasSaveResult.error));
+  }
+
+  return Result.ok(topicId);
+};
 
 /**
  * Extracts the date portion (YYYY-MM-DD) from a DateTime in the given timezone
@@ -180,6 +275,7 @@ export const CreateItemWorkflow = {
     deps: CreateItemDependencies,
   ): Promise<Result<CreateItemResult, CreateItemError>> => {
     const issues: ValidationIssue[] = [];
+    const createdTopics: AliasSlug[] = [];
 
     const titleResult = itemTitleFromString(input.title);
     const title = titleResult.type === "ok" ? titleResult.value : undefined;
@@ -194,7 +290,7 @@ export const CreateItemWorkflow = {
       );
     }
 
-    // Resolve project alias to ItemId
+    // Resolve project alias to ItemId (auto-create if not found)
     let projectId: ItemId | undefined;
     if (typeof input.project === "string") {
       const projectAliasResult = parseAliasSlug(input.project);
@@ -218,20 +314,27 @@ export const CreateItemWorkflow = {
             }),
           );
         } else if (aliasLookup.value === undefined) {
-          issues.push(
-            createValidationIssue(`Alias '${input.project}' not found`, {
-              code: "alias_not_found",
-              path: ["project"],
-            }),
+          // Auto-create topic for non-existent project alias
+          const createResult = await createTopicItem(
+            projectAliasResult.value,
+            input.createdAt,
+            deps,
           );
+          if (createResult.type === "error") {
+            return Result.error(createResult.error);
+          }
+          projectId = createResult.value;
+          createdTopics.push(projectAliasResult.value);
         } else {
           projectId = aliasLookup.value.data.itemId;
         }
       }
     }
 
-    // Resolve context aliases to ItemIds
+    // Resolve context aliases to ItemIds (auto-create if not found)
     const contextIds: ItemId[] = [];
+    // Track already processed aliases to avoid duplicate auto-creation
+    const processedAliases = new Map<string, ItemId>();
     if (input.contexts && input.contexts.length > 0) {
       for (const [index, contextStr] of input.contexts.entries()) {
         const contextAliasResult = parseAliasSlug(contextStr);
@@ -245,6 +348,14 @@ export const CreateItemWorkflow = {
             ),
           );
         } else {
+          const aliasKey = contextAliasResult.value.toString();
+          // Check if we already processed this alias in this command
+          const alreadyProcessed = processedAliases.get(aliasKey);
+          if (alreadyProcessed) {
+            contextIds.push(alreadyProcessed);
+            continue;
+          }
+
           // Look up alias to get target ItemId
           const aliasLookup = await deps.aliasRepository.load(contextAliasResult.value);
           if (aliasLookup.type === "error") {
@@ -258,14 +369,22 @@ export const CreateItemWorkflow = {
               ),
             );
           } else if (aliasLookup.value === undefined) {
-            issues.push(
-              createValidationIssue(`Alias '${contextStr}' not found`, {
-                code: "alias_not_found",
-                path: ["contexts", index],
-              }),
+            // Auto-create topic for non-existent context alias
+            const createResult = await createTopicItem(
+              contextAliasResult.value,
+              input.createdAt,
+              deps,
             );
+            if (createResult.type === "error") {
+              return Result.error(createResult.error);
+            }
+            contextIds.push(createResult.value);
+            processedAliases.set(aliasKey, createResult.value);
+            createdTopics.push(contextAliasResult.value);
           } else {
-            contextIds.push(aliasLookup.value.data.itemId);
+            const itemId = aliasLookup.value.data.itemId;
+            contextIds.push(itemId);
+            processedAliases.set(aliasKey, itemId);
           }
         }
       }
@@ -451,6 +570,9 @@ export const CreateItemWorkflow = {
       }
     }
 
-    return Result.ok({ item: itemWithSchedule });
+    return Result.ok({
+      item: itemWithSchedule,
+      createdTopics: Object.freeze(createdTopics),
+    });
   },
 };
