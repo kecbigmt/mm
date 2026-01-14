@@ -35,6 +35,42 @@ import {
 } from "../helpers.ts";
 import { parseFrontmatter } from "../../../src/infrastructure/fileSystem/frontmatter.ts";
 
+/**
+ * Helper to create a permanent item with an alias.
+ * This is required for using --project and --context options,
+ * since they now resolve aliases to ItemIds (UUIDs).
+ */
+const createPermanentItem = async (
+  testHome: string,
+  title: string,
+  aliasSlug: string,
+): Promise<{ id: string }> => {
+  const result = await runCommand(testHome, [
+    "note",
+    title,
+    "--placement",
+    "permanent",
+    "--alias",
+    aliasSlug,
+  ]);
+  if (!result.success) {
+    throw new Error(`Failed to create permanent item: ${result.stderr}`);
+  }
+
+  // Get the UUID via mm show command
+  const showResult = await runCommand(testHome, ["show", aliasSlug]);
+  if (!showResult.success) {
+    throw new Error(`Failed to show permanent item: ${showResult.stderr}`);
+  }
+
+  // Extract UUID from show output (format: "UUID: <uuid>")
+  const idMatch = showResult.stdout.match(/UUID:\s*([0-9a-f-]{36})/i);
+  if (!idMatch) {
+    throw new Error(`Could not extract UUID from show output: ${showResult.stdout}`);
+  }
+  return { id: idMatch[1] };
+};
+
 describe("Scenario 19: Item edit", () => {
   let ctx: TestContext;
 
@@ -204,6 +240,9 @@ describe("Scenario 19: Item edit", () => {
   it("edits item context tag", async () => {
     await runCommand(ctx.testHome, ["cd", "today"]);
 
+    // First create the context item that will be referenced
+    const workContext = await createPermanentItem(ctx.testHome, "Work Context", "work");
+
     const createResult = await runCommand(ctx.testHome, [
       "note",
       "Test note",
@@ -230,10 +269,11 @@ describe("Scenario 19: Item edit", () => {
     if (parseResult.type === "error") throw new Error("Failed to parse frontmatter");
     const meta = parseResult.value.frontmatter as Record<string, string[] | unknown>;
 
+    // Contexts are now stored as UUIDs, not alias strings
     assertEquals(
       (meta.contexts as string[])?.[0],
-      "work",
-      "Contexts should be updated in frontmatter",
+      workContext.id,
+      "Contexts should be updated in frontmatter with UUID",
     );
   });
 
