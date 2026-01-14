@@ -3,6 +3,7 @@ import { loadCliDependencies } from "../dependencies.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import { formatItemDetail } from "../formatters/item_detail_formatter.ts";
+import type { ItemIdResolver } from "../formatters/list_formatter.ts";
 import { outputWithPager } from "../pager.ts";
 import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import { parseAliasSlug } from "../../../domain/primitives/alias_slug.ts";
@@ -66,8 +67,39 @@ export function createShowCommand() {
         Deno.exit(1);
       }
 
+      // Build a resolver for project/context ItemIds
+      const refItemAliasMap = new Map<string, string>();
+
+      // Collect project/context IDs
+      const projectContextIds = new Set<string>();
+      if (item.data.project) {
+        projectContextIds.add(item.data.project.toString());
+      }
+      if (item.data.contexts) {
+        for (const ctx of item.data.contexts) {
+          projectContextIds.add(ctx.toString());
+        }
+      }
+
+      // Look up referenced items
+      for (const refId of projectContextIds) {
+        const parseResult = parseItemId(refId);
+        if (parseResult.type === "ok") {
+          const loadResult = await deps.itemRepository.load(parseResult.value);
+          if (loadResult.type === "ok" && loadResult.value) {
+            const refAlias = loadResult.value.data.alias?.toString();
+            if (refAlias) {
+              refItemAliasMap.set(refId, refAlias);
+            }
+          }
+        }
+      }
+
+      const resolveItemId: ItemIdResolver = (id: string): string | undefined =>
+        refItemAliasMap.get(id);
+
       // Format item details
-      const formatted = formatItemDetail(item);
+      const formatted = formatItemDetail(item, resolveItemId);
 
       // Output with pager or directly
       if (usePrint) {

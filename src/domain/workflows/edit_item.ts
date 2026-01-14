@@ -10,14 +10,13 @@ import {
   AliasSlug,
   DateTime,
   Duration,
+  ItemId,
   parseAliasSlug,
   parseDateTime,
   parseDuration,
   parseItemIcon,
   parseItemId,
   parseItemTitle,
-  parseTagSlug,
-  TagSlug,
   TimezoneIdentifier,
 } from "../primitives/mod.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
@@ -155,44 +154,77 @@ export const EditItemWorkflow = {
       }
     }
 
+    // Resolve project alias to ItemId
     if (input.updates.project !== undefined) {
-      let projectValue: AliasSlug | undefined;
+      let projectId: ItemId | undefined;
       if (input.updates.project.trim().length > 0) {
-        const projectResult = parseAliasSlug(input.updates.project);
-        if (projectResult.type === "error") {
+        const projectAliasResult = parseAliasSlug(input.updates.project);
+        if (projectAliasResult.type === "error") {
           issues.push({
             field: "project",
-            message: projectResult.error.issues[0]?.message ?? "Invalid project",
+            message: projectAliasResult.error.issues[0]?.message ?? "Invalid project alias format",
           });
         } else {
-          projectValue = projectResult.value;
+          // Look up alias to get target ItemId
+          const aliasLookup = await deps.aliasRepository.load(projectAliasResult.value);
+          if (aliasLookup.type === "error") {
+            issues.push({
+              field: "project",
+              message: `Failed to look up project alias: ${aliasLookup.error.message}`,
+            });
+          } else if (aliasLookup.value === undefined) {
+            issues.push({
+              field: "project",
+              message: `Alias '${input.updates.project}' not found`,
+            });
+          } else {
+            projectId = aliasLookup.value.data.itemId;
+          }
         }
       }
       if (issues.length === 0 || !issues.some((i) => i.field === "project")) {
-        updatedItem = updatedItem.setProject(projectValue, input.updatedAt);
+        updatedItem = updatedItem.setProject(projectId, input.updatedAt);
       }
     }
 
+    // Resolve context aliases to ItemIds
     if (input.updates.contexts !== undefined) {
-      const contextValues: TagSlug[] = [];
+      const contextIds: ItemId[] = [];
       let hasContextErrors = false;
       for (const [index, contextStr] of input.updates.contexts.entries()) {
         if (contextStr.trim().length > 0) {
-          const contextResult = parseTagSlug(contextStr);
-          if (contextResult.type === "error") {
+          const contextAliasResult = parseAliasSlug(contextStr);
+          if (contextAliasResult.type === "error") {
             issues.push({
               field: `contexts[${index}]`,
-              message: contextResult.error.issues[0]?.message ?? "Invalid context",
+              message: contextAliasResult.error.issues[0]?.message ??
+                "Invalid context alias format",
             });
             hasContextErrors = true;
           } else {
-            contextValues.push(contextResult.value);
+            // Look up alias to get target ItemId
+            const aliasLookup = await deps.aliasRepository.load(contextAliasResult.value);
+            if (aliasLookup.type === "error") {
+              issues.push({
+                field: `contexts[${index}]`,
+                message: `Failed to look up context alias: ${aliasLookup.error.message}`,
+              });
+              hasContextErrors = true;
+            } else if (aliasLookup.value === undefined) {
+              issues.push({
+                field: `contexts[${index}]`,
+                message: `Alias '${contextStr}' not found`,
+              });
+              hasContextErrors = true;
+            } else {
+              contextIds.push(aliasLookup.value.data.itemId);
+            }
           }
         }
       }
       if (!hasContextErrors) {
         updatedItem = updatedItem.setContexts(
-          contextValues.length > 0 ? Object.freeze(contextValues) : undefined,
+          contextIds.length > 0 ? Object.freeze(contextIds) : undefined,
           input.updatedAt,
         );
       }

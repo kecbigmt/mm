@@ -9,7 +9,6 @@ import { parseItemRank } from "../../../domain/primitives/item_rank.ts";
 import { DateTime, parseDateTime } from "../../../domain/primitives/date_time.ts";
 import { parsePlacement } from "../../../domain/primitives/placement.ts";
 import { parseAliasSlug } from "../../../domain/primitives/alias_slug.ts";
-import { parseTagSlug } from "../../../domain/primitives/tag_slug.ts";
 import { parseDuration } from "../../../domain/primitives/duration.ts";
 import { CalendarDay, parseCalendarDay } from "../../../domain/primitives/calendar_day.ts";
 import {
@@ -30,6 +29,9 @@ const makeTimezone = (): TimezoneIdentifier => Result.unwrap(parseTimezoneIdenti
 const makeCalendarDay = (iso: string): CalendarDay => Result.unwrap(parseCalendarDay(iso));
 
 const makeDateTime = (iso: string): DateTime => Result.unwrap(parseDateTime(iso));
+
+// Sample UUID for testing context references
+const CONTEXT_UUID_1 = "019a85fc-0002-7000-8000-000000000002";
 
 const makeItem = (
   overrides: Partial<{
@@ -56,9 +58,10 @@ const makeItem = (
   const createdAt = Result.unwrap(parseDateTime("2025-02-10T09:00:00Z"));
   const updatedAt = Result.unwrap(parseDateTime("2025-02-10T09:00:00Z"));
   const alias = overrides.alias ? Result.unwrap(parseAliasSlug(overrides.alias)) : undefined;
-  const project = overrides.project ? Result.unwrap(parseAliasSlug(overrides.project)) : undefined;
+  // Project and contexts are now stored as ItemIds (UUIDs)
+  const project = overrides.project ? Result.unwrap(parseItemId(overrides.project)) : undefined;
   const contexts = overrides.contexts
-    ? Object.freeze(overrides.contexts.map((c) => Result.unwrap(parseTagSlug(c))))
+    ? Object.freeze(overrides.contexts.map((c) => Result.unwrap(parseItemId(c))))
     : undefined;
   const startAt = overrides.startAt ? Result.unwrap(parseDateTime(overrides.startAt)) : undefined;
   const duration = overrides.duration
@@ -196,15 +199,31 @@ Deno.test("formatItemLine - includes title", () => {
   assertEquals(result.includes("My task title"), true);
 });
 
-Deno.test("formatItemLine - includes context when present", () => {
-  const item = makeItem({ contexts: ["project-novel"] });
+Deno.test("formatItemLine - includes context when present (truncated UUID)", () => {
+  // Note: contexts are now stored as ItemIds (UUIDs)
+  // Without a resolver, UUIDs are truncated to first 8 chars + "…"
+  const item = makeItem({ contexts: [CONTEXT_UUID_1] });
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
     now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
-  assertEquals(result.includes("@project-novel"), true);
+  // Context is displayed as @<truncated-uuid>
+  assertEquals(result.includes(`@${CONTEXT_UUID_1.slice(0, 8)}…`), true);
+});
+
+Deno.test("formatItemLine - resolves context to alias when resolver provided", () => {
+  const item = makeItem({ contexts: [CONTEXT_UUID_1] });
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW,
+  };
+  const resolver = (id: string) => (id === CONTEXT_UUID_1 ? "work" : undefined);
+  const result = formatItemLine(item, options, undefined, resolver);
+  // Context is resolved to alias
+  assertEquals(result.includes("@work"), true);
 });
 
 Deno.test("formatItemLine - includes due date when present", () => {
@@ -599,7 +618,7 @@ Deno.test("formatItemLine - print mode uses plain text icon for snoozing note", 
 });
 
 Deno.test("formatItemLine - print mode produces no ANSI escape codes", () => {
-  const item = makeItem({ alias: "test-alias", contexts: ["ctx"] });
+  const item = makeItem({ alias: "test-alias", contexts: [CONTEXT_UUID_1] });
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),

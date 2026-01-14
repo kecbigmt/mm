@@ -13,6 +13,7 @@ import { parseCalendarDay } from "../../../domain/primitives/calendar_day.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/date_time.ts";
 import { Result } from "../../../shared/result.ts";
 import { createPlacement } from "../../../domain/primitives/placement.ts";
+import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import type { SectionSummary } from "../../../domain/services/section_query_service.ts";
 import { buildPartitions, formatWarning } from "../partitioning/build_partitions.ts";
 import {
@@ -20,6 +21,7 @@ import {
   formatItemHeadHeader,
   formatItemLine,
   formatSectionStub,
+  type ItemIdResolver,
   type ListFormatterOptions,
 } from "../formatters/list_formatter.ts";
 import { outputWithPager } from "../pager.ts";
@@ -290,6 +292,45 @@ export function createListCommand() {
 
       const lookupAlias = (id: string): string | undefined => aliasMap.get(id);
 
+      // Build a resolver for project/context ItemIds
+      // Collect all unique project/context IDs that need resolution
+      const projectContextIds = new Set<string>();
+      for (const item of items) {
+        if (item.data.project) {
+          projectContextIds.add(item.data.project.toString());
+        }
+        if (item.data.contexts) {
+          for (const ctx of item.data.contexts) {
+            projectContextIds.add(ctx.toString());
+          }
+        }
+      }
+
+      // Look up referenced items and build alias map for them
+      const refItemAliasMap = new Map<string, string>();
+      for (const refId of projectContextIds) {
+        // Skip if already in aliasMap (item is in current list)
+        if (aliasMap.has(refId)) {
+          refItemAliasMap.set(refId, aliasMap.get(refId)!);
+          continue;
+        }
+        // Look up the referenced item
+        const parseResult = parseItemId(refId);
+        if (parseResult.type === "ok") {
+          const loadResult = await deps.itemRepository.load(parseResult.value);
+          if (loadResult.type === "ok" && loadResult.value) {
+            const refAlias = loadResult.value.data.alias?.toString();
+            if (refAlias) {
+              refItemAliasMap.set(refId, refAlias);
+            }
+          }
+        }
+      }
+
+      // Create resolver function
+      const resolveItemId: ItemIdResolver = (id: string): string | undefined =>
+        refItemAliasMap.get(id);
+
       // Build display label function for item sections
       const getDisplayLabel = (
         parent: ReturnType<typeof createPlacement>,
@@ -363,7 +404,7 @@ export function createListCommand() {
             const dateStr = item.data.placement.head.kind === "date"
               ? item.data.placement.head.date.toString()
               : undefined;
-            outputLines.push(formatItemLine(item, formatterOptions, dateStr));
+            outputLines.push(formatItemLine(item, formatterOptions, dateStr, resolveItemId));
           }
 
           // Format stubs

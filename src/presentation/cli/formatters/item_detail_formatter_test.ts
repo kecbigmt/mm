@@ -2,6 +2,9 @@ import { assertEquals } from "@std/assert";
 import { formatItemDetail } from "./item_detail_formatter.ts";
 import { parseItem } from "../../../domain/models/item.ts";
 
+// Sample UUID for testing context references
+const CONTEXT_UUID = "019965a7-0001-7000-8000-000000000001";
+
 Deno.test("formatItemDetail - note with alias, context, and body", () => {
   const itemResult = parseItem({
     id: "019965a7-2789-740a-b8c1-1415904fd100",
@@ -13,7 +16,7 @@ Deno.test("formatItemDetail - note with alias, context, and body", () => {
     createdAt: "2025-08-30T14:23:45.123Z",
     updatedAt: "2025-08-30T14:23:45.123Z",
     alias: "kene-abc",
-    contexts: ["planning"],
+    contexts: [CONTEXT_UUID],
     body: "Here's the planning document content.\nIt includes several important notes.",
   });
 
@@ -29,7 +32,8 @@ Deno.test("formatItemDetail - note with alias, context, and body", () => {
   assertEquals(result.includes("kene-abc"), true);
   assertEquals(result.includes("note:open"), true);
   assertEquals(result.includes("Planning document"), true);
-  assertEquals(result.includes("@planning"), true);
+  // Without a resolver, context UUID is truncated to first 8 chars + "…"
+  assertEquals(result.includes(`@${CONTEXT_UUID.slice(0, 8)}…`), true);
   assertEquals(result.includes("on:2025-08-30"), true);
 
   // Body content

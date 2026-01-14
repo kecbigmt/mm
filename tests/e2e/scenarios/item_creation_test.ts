@@ -33,6 +33,42 @@ import {
 } from "../helpers.ts";
 import { parseFrontmatter } from "../../../src/infrastructure/fileSystem/frontmatter.ts";
 
+/**
+ * Helper to create a permanent item with an alias.
+ * This is required for using --project and --context options,
+ * since they now resolve aliases to ItemIds (UUIDs).
+ */
+const createPermanentItem = async (
+  testHome: string,
+  title: string,
+  aliasSlug: string,
+): Promise<{ id: string }> => {
+  const result = await runCommand(testHome, [
+    "note",
+    title,
+    "--placement",
+    "permanent",
+    "--alias",
+    aliasSlug,
+  ]);
+  if (!result.success) {
+    throw new Error(`Failed to create permanent item: ${result.stderr}`);
+  }
+
+  // Get the UUID via mm show command
+  const showResult = await runCommand(testHome, ["show", aliasSlug]);
+  if (!showResult.success) {
+    throw new Error(`Failed to show permanent item: ${showResult.stderr}`);
+  }
+
+  // Extract UUID from show output (format: "UUID: <uuid>")
+  const idMatch = showResult.stdout.match(/UUID:\s*([0-9a-f-]{36})/i);
+  if (!idMatch) {
+    throw new Error(`Could not extract UUID from show output: ${showResult.stdout}`);
+  }
+  return { id: idMatch[1] };
+};
+
 describe("E2E: Item creation", () => {
   let ctx: TestContext;
 
@@ -139,6 +175,9 @@ describe("E2E: Item creation", () => {
     });
 
     it("creates item with all common metadata options", async () => {
+      // First create the context item that will be referenced
+      await createPermanentItem(ctx.testHome, "Work Context", "work");
+
       const result = await runCommand(ctx.testHome, [
         "note",
         "Full metadata item",
@@ -151,32 +190,15 @@ describe("E2E: Item creation", () => {
       ]);
       assertEquals(result.success, true, `Failed to create note: ${result.stderr}`);
 
-      const workspaceDir = getWorkspacePath(ctx.testHome, "test-workspace");
-      const today = await getCurrentDateFromCli(ctx.testHome);
-      const [year, month, day] = today.split("-");
-      const itemsBaseDir = join(workspaceDir, "items", year, month, day);
+      // Use mm show to verify the item was created correctly
+      const showResult = await runCommand(ctx.testHome, ["show", "full-meta", "--print"]);
+      assertEquals(showResult.success, true, `show failed: ${showResult.stderr}`);
 
-      const itemFiles: string[] = [];
-      for await (const entry of Deno.readDir(itemsBaseDir)) {
-        if (entry.isFile && entry.name.endsWith(".md")) {
-          itemFiles.push(entry.name);
-        }
-      }
-
-      const itemFilePath = join(itemsBaseDir, itemFiles[0]);
-      const fileContent = await Deno.readTextFile(itemFilePath);
-      const parseResult = parseFrontmatter<{
-        contexts?: string[];
-        alias?: string;
-      }>(fileContent);
-
-      assertEquals(parseResult.type, "ok");
-      if (parseResult.type === "error") return;
-
-      const { frontmatter, body } = parseResult.value;
-      assertEquals(frontmatter.contexts?.[0], "work");
-      assertEquals(frontmatter.alias, "full-meta");
-      assertEquals(body.includes("Item body content"), true);
+      // Verify the output contains expected elements
+      assertEquals(showResult.stdout.includes("Full metadata item"), true, "Should include title");
+      assertEquals(showResult.stdout.includes("Item body content"), true, "Should include body");
+      // UUID→alias resolution is implemented, should display @work
+      assertEquals(showResult.stdout.includes("@work"), true, "Should include @work context");
     });
   });
 

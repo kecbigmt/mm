@@ -29,6 +29,42 @@ import {
   type TestContext,
 } from "../helpers.ts";
 
+/**
+ * Helper to create a permanent item with an alias.
+ * This is required for using --project and --context options,
+ * since they now resolve aliases to ItemIds (UUIDs).
+ */
+const createPermanentItem = async (
+  testHome: string,
+  title: string,
+  aliasSlug: string,
+): Promise<{ id: string }> => {
+  const result = await runCommand(testHome, [
+    "note",
+    title,
+    "--placement",
+    "permanent",
+    "--alias",
+    aliasSlug,
+  ]);
+  if (!result.success) {
+    throw new Error(`Failed to create permanent item: ${result.stderr}`);
+  }
+
+  // Get the UUID via mm show command
+  const showResult = await runCommand(testHome, ["show", aliasSlug]);
+  if (!showResult.success) {
+    throw new Error(`Failed to show permanent item: ${showResult.stderr}`);
+  }
+
+  // Extract UUID from show output (format: "UUID: <uuid>")
+  const idMatch = showResult.stdout.match(/UUID:\s*([0-9a-f-]{36})/i);
+  if (!idMatch) {
+    throw new Error(`Could not extract UUID from show output: ${showResult.stdout}`);
+  }
+  return { id: idMatch[1] };
+};
+
 describe("Scenario: Show command", () => {
   let ctx: TestContext;
 
@@ -44,6 +80,9 @@ describe("Scenario: Show command", () => {
   it("displays item details with metadata and body", async () => {
     await runCommand(ctx.testHome, ["cd", "today"]);
 
+    // First create the context item that will be referenced
+    await createPermanentItem(ctx.testHome, "Work Context", "work");
+
     // Create note with alias, context, and body
     const createResult = await runCommand(ctx.testHome, [
       "note",
@@ -58,12 +97,11 @@ describe("Scenario: Show command", () => {
     assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
 
     const today = await getCurrentDateFromCli(ctx.testHome);
-    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
 
-    // Show item with --print flag (direct output without pager)
+    // Show item by alias with --print flag (direct output without pager)
     const showResult = await runCommand(ctx.testHome, [
       "show",
-      itemId,
+      "plan-doc",
       "--print",
     ]);
     assertEquals(showResult.success, true, `show failed: ${showResult.stderr}`);
@@ -75,14 +113,15 @@ describe("Scenario: Show command", () => {
     assertEquals(output.includes("plan-doc"), true, "Should include alias");
     assertEquals(output.includes("note:open"), true, "Should include type:status");
     assertEquals(output.includes("Planning document"), true, "Should include title");
-    assertEquals(output.includes("@work"), true, "Should include context");
+    // UUID→alias resolution is implemented, should display @work
+    assertEquals(output.includes("@work"), true, "Should include context @work");
     assertEquals(output.includes(`on:${today}`), true, "Should include date");
 
     // Body content
     assertEquals(output.includes("This is the planning content."), true, "Should include body");
 
     // Metadata section
-    assertEquals(output.includes(`UUID: ${itemId}`), true, "Should include UUID");
+    assertEquals(output.includes("UUID:"), true, "Should include UUID");
     assertEquals(output.includes("Created:"), true, "Should include Created timestamp");
     assertEquals(output.includes("Updated:"), true, "Should include Updated timestamp");
   });

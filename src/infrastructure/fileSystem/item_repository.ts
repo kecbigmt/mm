@@ -1,8 +1,9 @@
 import { dirname, join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { ItemRepository } from "../../domain/repositories/item_repository.ts";
+import { AliasRepository } from "../../domain/repositories/alias_repository.ts";
 import { Item, ItemSnapshot, parseItem } from "../../domain/models/item.ts";
-import { ItemId, Placement, PlacementRange } from "../../domain/primitives/mod.ts";
+import { ItemId, parseAliasSlug, Placement, PlacementRange } from "../../domain/primitives/mod.ts";
 import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
@@ -18,6 +19,7 @@ import { queryEdgeReferences } from "./graph_index.ts";
 export type FileSystemItemRepositoryDependencies = Readonly<{
   readonly root: string;
   readonly timezone: TimezoneIdentifier;
+  readonly aliasRepository?: AliasRepository;
 }>;
 
 type LoadResult = Result<Item | undefined, RepositoryError>;
@@ -244,10 +246,29 @@ const extractTitleAndBody = (content: string): { title: string; body: string | u
   };
 };
 
+/**
+ * Check if a string looks like a UUID format (for backward compatibility detection).
+ * Returns true if the string appears to be a UUID, false if it looks like an alias.
+ */
+const looksLikeUuid = (value: string): boolean => {
+  // UUID v7 format: xxxxxxxx-xxxx-7xxx-xxxx-xxxxxxxxxxxx
+  // Simple check: contains hyphens and is 36 chars, or is 32 hex chars
+  if (value.length === 36 && value.includes("-")) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  }
+  return false;
+};
+
+/**
+ * Type for alias-to-UUID resolver function used for backward compatibility.
+ */
+type AliasResolver = (aliasStr: string) => Promise<string | undefined>;
+
 const loadItemFromFile = async (
   workspaceRoot: string,
   filePath: string,
   id: string,
+  aliasResolver?: AliasResolver,
 ): Promise<Result<Item | undefined, RepositoryError>> => {
   // Read full file content
   let fileContent: string;
@@ -290,6 +311,35 @@ const loadItemFromFile = async (
     return edgesResult;
   }
 
+  // Resolve project/contexts from alias format if needed (backward compatibility)
+  let resolvedProject = frontmatter.project;
+  let resolvedContexts = frontmatter.contexts;
+
+  if (aliasResolver) {
+    // Resolve project alias to UUID if it's not already a UUID
+    if (resolvedProject && !looksLikeUuid(resolvedProject)) {
+      const resolved = await aliasResolver(resolvedProject);
+      if (resolved) {
+        resolvedProject = resolved;
+      }
+      // If resolution fails, keep the original value and let parseItem handle the error
+    }
+
+    // Resolve context aliases to UUIDs
+    if (resolvedContexts && Array.isArray(resolvedContexts)) {
+      const resolved: string[] = [];
+      for (const ctx of resolvedContexts) {
+        if (!looksLikeUuid(ctx)) {
+          const resolvedUuid = await aliasResolver(ctx);
+          resolved.push(resolvedUuid ?? ctx); // Keep original if resolution fails
+        } else {
+          resolved.push(ctx);
+        }
+      }
+      resolvedContexts = resolved;
+    }
+  }
+
   // Combine into ItemSnapshot
   const snapshot: ItemSnapshot = {
     id: frontmatter.id,
@@ -305,8 +355,8 @@ const loadItemFromFile = async (
     dueAt: frontmatter.due_at,
     snoozeUntil: frontmatter.snooze_until,
     alias: frontmatter.alias,
-    project: frontmatter.project,
-    contexts: frontmatter.contexts,
+    project: resolvedProject,
+    contexts: resolvedContexts,
     context: frontmatter.context, // deprecated: for migration
     title,
     body: bodyContent,
@@ -380,6 +430,21 @@ const findItemFile = async (
 export const createFileSystemItemRepository = (
   dependencies: FileSystemItemRepositoryDependencies,
 ): ItemRepository => {
+  // Create alias resolver for backward compatibility (resolves alias strings to UUIDs)
+  const aliasResolver: AliasResolver | undefined = dependencies.aliasRepository
+    ? async (aliasStr: string): Promise<string | undefined> => {
+      const slugResult = parseAliasSlug(aliasStr);
+      if (slugResult.type === "error") {
+        return undefined;
+      }
+      const aliasResult = await dependencies.aliasRepository!.load(slugResult.value);
+      if (aliasResult.type === "error" || !aliasResult.value) {
+        return undefined;
+      }
+      return aliasResult.value.data.itemId.toString();
+    }
+    : undefined;
+
   const load = async (id: ItemId): Promise<LoadResult> => {
     const idStr = id.toString();
     const fileResult = await findItemFile(dependencies, idStr);
@@ -392,7 +457,7 @@ export const createFileSystemItemRepository = (
       return Result.ok(undefined);
     }
 
-    return await loadItemFromFile(dependencies.root, filePath, idStr);
+    return await loadItemFromFile(dependencies.root, filePath, idStr, aliasResolver);
   };
 
   const save = async (item: Item): Promise<SaveResult> => {
@@ -768,7 +833,7 @@ export const createFileSystemItemRepository = (
     }
 
     // Load item to get its path for top-level edge cleanup
-    const itemResult = await loadItemFromFile(dependencies.root, filePath, idStr);
+    const itemResult = await loadItemFromFile(dependencies.root, filePath, idStr, aliasResolver);
     if (itemResult.type === "error") {
       return itemResult;
     }
@@ -895,6 +960,7 @@ export const createFileSystemItemRepository = (
         dependencies.root,
         filePath,
         itemIdStr,
+        aliasResolver,
       );
       if (itemResult.type === "error") {
         return itemResult;

@@ -3,8 +3,8 @@ import {
   parseAliasSlug,
   parseDateTime,
   parseDuration,
+  parseItemId,
   parseItemRank,
-  parseTagSlug,
 } from "../primitives/mod.ts";
 
 const assert = (condition: unknown, message?: string): void => {
@@ -29,6 +29,11 @@ const unwrapOk = <T, E>(
   return result.value;
 };
 
+// Sample UUIDs for testing project/context references
+const PROJECT_UUID_1 = "019965a7-0001-7000-8000-000000000001";
+const CONTEXT_UUID_1 = "019965a7-0002-7000-8000-000000000002";
+const CONTEXT_UUID_2 = "019965a7-0003-7000-8000-000000000003";
+
 const baseSnapshot = (
   overrides: Partial<Parameters<typeof parseItem>[0]> = {},
 ): Parameters<typeof parseItem>[0] => ({
@@ -40,7 +45,7 @@ const baseSnapshot = (
   rank: "a",
   createdAt: "2024-09-20T12:00:00Z",
   updatedAt: "2024-09-20T12:00:00Z",
-  contexts: ["work"],
+  contexts: [CONTEXT_UUID_1],
   ...overrides,
 });
 
@@ -52,8 +57,8 @@ Deno.test("parseItem parses full snapshot payload", () => {
     placement: "2024-09-21",
     rank: "b1",
     alias: "focus-work",
-    project: "my-project",
-    contexts: ["deep-work", "office"],
+    project: PROJECT_UUID_1,
+    contexts: [CONTEXT_UUID_1, CONTEXT_UUID_2],
     body: "Example body",
     closedAt: "2024-09-21T06:00:00Z",
     startAt: "2024-09-22T08:00:00Z",
@@ -75,10 +80,10 @@ Deno.test("parseItem parses full snapshot payload", () => {
   assertEquals(item.data.rank.toString(), "b1");
   assertEquals(item.data.placement.toString(), "2024-09-21");
   assertEquals(item.data.alias?.toString(), "focus-work");
-  assertEquals(item.data.project?.toString(), "my-project");
+  assertEquals(item.data.project?.toString(), PROJECT_UUID_1);
   assertEquals(item.data.contexts?.length, 2);
-  assertEquals(item.data.contexts?.[0].toString(), "deep-work");
-  assertEquals(item.data.contexts?.[1].toString(), "office");
+  assertEquals(item.data.contexts?.[0].toString(), CONTEXT_UUID_1);
+  assertEquals(item.data.contexts?.[1].toString(), CONTEXT_UUID_2);
   assertEquals(item.data.body, "Example body");
   assertEquals(item.data.closedAt?.toString(), "2024-09-21T06:00:00.000Z");
   assertEquals(item.data.startAt?.toString(), "2024-09-22T08:00:00.000Z");
@@ -196,9 +201,9 @@ Deno.test("Item.toJSON reflects current data", async () => {
   const { parsePlacement } = await import("../primitives/placement.ts");
   const base = unwrapOk(parseItem(baseSnapshot({ body: "Body" })), "parse item");
   const alias = unwrapOk(parseAliasSlug("focus"), "parse alias");
-  const project = unwrapOk(parseAliasSlug("my-project"), "parse project");
-  const context1 = unwrapOk(parseTagSlug("deep-work"), "parse context1");
-  const context2 = unwrapOk(parseTagSlug("office"), "parse context2");
+  const project = unwrapOk(parseItemId(PROJECT_UUID_1), "parse project");
+  const context1 = unwrapOk(parseItemId(CONTEXT_UUID_1), "parse context1");
+  const context2 = unwrapOk(parseItemId(CONTEXT_UUID_2), "parse context2");
   const relocateAt = unwrapOk(parseDateTime("2024-09-22T10:00:00Z"), "parse relocateAt");
   const newPlacement = unwrapOk(parsePlacement("2024-09-22"), "parse placement");
   const newRank = unwrapOk(parseItemRank("b2"), "parse rank");
@@ -217,10 +222,10 @@ Deno.test("Item.toJSON reflects current data", async () => {
 
   assertEquals(snapshot.id, base.data.id.toString());
   assertEquals(snapshot.alias, "focus");
-  assertEquals(snapshot.project, "my-project");
+  assertEquals(snapshot.project, PROJECT_UUID_1);
   assertEquals(snapshot.contexts?.length, 2);
-  assertEquals(snapshot.contexts?.[0], "deep-work");
-  assertEquals(snapshot.contexts?.[1], "office");
+  assertEquals(snapshot.contexts?.[0], CONTEXT_UUID_1);
+  assertEquals(snapshot.contexts?.[1], CONTEXT_UUID_2);
   assertEquals(snapshot.status, "closed");
   assertEquals(snapshot.closedAt, relocateAt.toString());
   assertEquals(snapshot.placement, newPlacement.toString());
@@ -264,15 +269,15 @@ Deno.test("Item.setAlias updates alias", () => {
 
 Deno.test("Item.setProject updates project", () => {
   const item = unwrapOk(parseItem(baseSnapshot()), "parse item");
-  const project = unwrapOk(parseAliasSlug("my-project"), "parse project");
+  const project = unwrapOk(parseItemId(PROJECT_UUID_1), "parse project");
   const updatedAt = unwrapOk(parseDateTime("2024-09-21T14:00:00Z"), "parse updatedAt");
   const updated = item.setProject(project, updatedAt);
-  assertEquals(updated.data.project?.toString(), "my-project");
+  assertEquals(updated.data.project?.toString(), PROJECT_UUID_1);
   assert(updated.data.updatedAt.equals(updatedAt));
 });
 
 Deno.test("Item.setProject clears project when undefined", () => {
-  const item = unwrapOk(parseItem(baseSnapshot({ project: "my-project" })), "parse item");
+  const item = unwrapOk(parseItem(baseSnapshot({ project: PROJECT_UUID_1 })), "parse item");
   const updatedAt = unwrapOk(parseDateTime("2024-09-21T14:00:00Z"), "parse updatedAt");
   const updated = item.setProject(undefined, updatedAt);
   assertEquals(updated.data.project, undefined);
@@ -281,18 +286,21 @@ Deno.test("Item.setProject clears project when undefined", () => {
 
 Deno.test("Item.setContexts updates contexts", () => {
   const item = unwrapOk(parseItem(baseSnapshot()), "parse item");
-  const context1 = unwrapOk(parseTagSlug("deep-work"), "parse context1");
-  const context2 = unwrapOk(parseTagSlug("office"), "parse context2");
+  const context1 = unwrapOk(parseItemId(CONTEXT_UUID_1), "parse context1");
+  const context2 = unwrapOk(parseItemId(CONTEXT_UUID_2), "parse context2");
   const updatedAt = unwrapOk(parseDateTime("2024-09-21T14:00:00Z"), "parse updatedAt");
   const updated = item.setContexts([context1, context2], updatedAt);
   assertEquals(updated.data.contexts?.length, 2);
-  assertEquals(updated.data.contexts?.[0].toString(), "deep-work");
-  assertEquals(updated.data.contexts?.[1].toString(), "office");
+  assertEquals(updated.data.contexts?.[0].toString(), CONTEXT_UUID_1);
+  assertEquals(updated.data.contexts?.[1].toString(), CONTEXT_UUID_2);
   assert(updated.data.updatedAt.equals(updatedAt));
 });
 
 Deno.test("Item.setContexts clears contexts when empty array", () => {
-  const item = unwrapOk(parseItem(baseSnapshot({ contexts: ["work", "office"] })), "parse item");
+  const item = unwrapOk(
+    parseItem(baseSnapshot({ contexts: [CONTEXT_UUID_1, CONTEXT_UUID_2] })),
+    "parse item",
+  );
   const updatedAt = unwrapOk(parseDateTime("2024-09-21T14:00:00Z"), "parse updatedAt");
   const updated = item.setContexts([], updatedAt);
   assertEquals(updated.data.contexts, undefined);
@@ -300,32 +308,15 @@ Deno.test("Item.setContexts clears contexts when empty array", () => {
 });
 
 Deno.test("Item.setContexts clears contexts when undefined", () => {
-  const item = unwrapOk(parseItem(baseSnapshot({ contexts: ["work"] })), "parse item");
+  const item = unwrapOk(parseItem(baseSnapshot({ contexts: [CONTEXT_UUID_1] })), "parse item");
   const updatedAt = unwrapOk(parseDateTime("2024-09-21T14:00:00Z"), "parse updatedAt");
   const updated = item.setContexts(undefined, updatedAt);
   assertEquals(updated.data.contexts, undefined);
   assert(updated.data.updatedAt.equals(updatedAt));
 });
 
-Deno.test("parseItem migrates singular context to contexts array", () => {
-  const snapshot = baseSnapshot({
-    context: "legacy-context",
-    contexts: undefined,
-  });
-  const item = unwrapOk(parseItem(snapshot), "parse item");
-  assertEquals(item.data.contexts?.length, 1);
-  assertEquals(item.data.contexts?.[0].toString(), "legacy-context");
-});
-
-Deno.test("parseItem prefers contexts over deprecated context field", () => {
-  const snapshot = baseSnapshot({
-    context: "legacy-context",
-    contexts: ["new-context"],
-  });
-  const item = unwrapOk(parseItem(snapshot), "parse item");
-  assertEquals(item.data.contexts?.length, 1);
-  assertEquals(item.data.contexts?.[0].toString(), "new-context");
-});
+// Note: Legacy singular 'context' field migration is now handled at the repository layer,
+// not in the pure domain model. See item_repository.ts for backward compatibility handling.
 
 Deno.test("Item.snooze sets snoozeUntil", () => {
   const item = unwrapOk(parseItem(baseSnapshot()), "parse item");

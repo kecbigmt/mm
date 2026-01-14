@@ -20,6 +20,12 @@ export type ListFormatterOptions = Readonly<{
 }>;
 
 /**
+ * Resolver function to convert ItemId UUIDs to display strings.
+ * Returns the alias if available, or a truncated UUID, or undefined if not found.
+ */
+export type ItemIdResolver = (id: string) => string | undefined;
+
+/**
  * Returns the symbol for an item based on its type, status, and snoozing state.
  *
  * Type symbols (when open and not snoozing):
@@ -162,6 +168,11 @@ const formatEventTimePlain = (
 };
 
 /**
+ * Truncates a UUID to a short display form (first 8 characters).
+ */
+const truncateUuid = (uuid: string): string => uuid.slice(0, 8) + "…";
+
+/**
  * Formats a single item line.
  *
  * Colored mode template: <icon> <alias-or-id> <title> <project?> <contexts?> <due?>
@@ -179,6 +190,7 @@ export const formatItemLine = (
   item: Item,
   options: ListFormatterOptions,
   dateStr?: string,
+  resolveItemId?: ItemIdResolver,
 ): string => {
   const { printMode, timezone, now } = options;
   const { icon, status, alias, title, project, contexts, dueAt } = item.data;
@@ -215,14 +227,18 @@ export const formatItemLine = (
 
   // Project (todo.txt convention: +project)
   if (project) {
-    const projectStr = `+${project.toString()}`;
+    const projectId = project.toString();
+    const displayStr = resolveItemId?.(projectId) ?? truncateUuid(projectId);
+    const projectStr = `+${displayStr}`;
     parts.push(printMode ? projectStr : dim(projectStr));
   }
 
   // Contexts (todo.txt convention: @context)
   if (contexts && contexts.length > 0) {
     for (const context of contexts) {
-      const contextStr = `@${context.toString()}`;
+      const contextId = context.toString();
+      const displayStr = resolveItemId?.(contextId) ?? truncateUuid(contextId);
+      const contextStr = `@${displayStr}`;
       parts.push(printMode ? contextStr : dim(contextStr));
     }
   }

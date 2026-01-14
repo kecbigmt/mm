@@ -1,5 +1,11 @@
 import { bold, cyan, dim } from "@std/fmt/colors";
 import { Item } from "../../../domain/models/item.ts";
+import { type ItemIdResolver } from "./list_formatter.ts";
+
+/**
+ * Truncates a UUID to a short display form (first 8 characters).
+ */
+const truncateUuid = (uuid: string): string => uuid.slice(0, 8) + "…";
 
 /**
  * Format an item's full details for display in show command.
@@ -20,7 +26,7 @@ import { Item } from "../../../domain/models/item.ts";
  * Duration: {duration}     # if event
  * ```
  */
-export const formatItemDetail = (item: Item): string => {
+export const formatItemDetail = (item: Item, resolveItemId?: ItemIdResolver): string => {
   const {
     id,
     title,
@@ -54,13 +60,17 @@ export const formatItemDetail = (item: Item): string => {
 
   // Project (todo.txt convention: +project)
   if (project) {
-    metaParts.push(dim(`+${project.toString()}`));
+    const projectId = project.toString();
+    const displayStr = resolveItemId?.(projectId) ?? truncateUuid(projectId);
+    metaParts.push(dim(`+${displayStr}`));
   }
 
   // Contexts (todo.txt convention: @context)
   if (contexts && contexts.length > 0) {
     for (const context of contexts) {
-      metaParts.push(dim(`@${context.toString()}`));
+      const contextId = context.toString();
+      const displayStr = resolveItemId?.(contextId) ?? truncateUuid(contextId);
+      metaParts.push(dim(`@${displayStr}`));
     }
   }
 
