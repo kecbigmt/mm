@@ -238,14 +238,22 @@ export const loadCliDependencies = async (
     });
   }
 
+  // Create alias repository first (needed for item repository backward compatibility)
+  const hashingService = profileSync(
+    "deps:createHashingService",
+    () => createSha256HashingService(),
+  );
+  const aliasRepository = profileSync(
+    "deps:createAliasRepository",
+    () => createFileSystemAliasRepository({ root, hashingService }),
+  );
+
   const itemRepository = profileSync(
     "deps:createItemRepository",
-    () => createFileSystemItemRepository({ root, timezone }),
+    () => createFileSystemItemRepository({ root, timezone, aliasRepository }),
   );
 
   const services = profileSync("deps:createOtherServices", () => {
-    const hashingService = createSha256HashingService();
-    const aliasRepository = createFileSystemAliasRepository({ root, hashingService });
     const aliasAutoGenerator = createAliasAutoGenerator(createCryptoRandomSource());
     const stateRepository = createFileSystemStateRepository({ workspaceRoot: root });
     const sectionQueryService = createFileSystemSectionQueryService({ root });
@@ -257,7 +265,6 @@ export const loadCliDependencies = async (
     });
     const cacheUpdateService = new CacheUpdateService(cacheManager);
     return {
-      aliasRepository,
       aliasAutoGenerator,
       stateRepository,
       sectionQueryService,
@@ -273,6 +280,7 @@ export const loadCliDependencies = async (
     workspace,
     timezone,
     itemRepository,
+    aliasRepository,
     workspaceRepository,
     ...services,
   });
