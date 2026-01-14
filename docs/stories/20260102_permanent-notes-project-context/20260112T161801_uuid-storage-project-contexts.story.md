@@ -15,35 +15,35 @@ an alias doesn't break existing references.**
 ### Acceptance Criteria
 
 #### 1. Creating Items with Project/Contexts (UUID Storage)
-- [ ] **Given** a permanent Item exists with alias `work-project`, **When** you run `mm note "Test" --project work-project`,
+- [x] **Given** a permanent Item exists with alias `work-project`, **When** you run `mm note "Test" --project work-project`,
       **Then** the note's frontmatter contains `project: <uuid-of-work-project>` (not the alias string)
-- [ ] **Given** permanent Items exist with aliases `phone` and `errands`, **When** you run `mm task "Call" --context phone --context errands`,
+- [x] **Given** permanent Items exist with aliases `phone` and `errands`, **When** you run `mm task "Call" --context phone --context errands`,
       **Then** the task's frontmatter contains `contexts: [<uuid-phone>, <uuid-errands>]`
 
 #### 2. Editing Items with Project/Contexts
-- [ ] **Given** an Item exists, **When** you run `mm edit <item> --project existing-alias`,
+- [x] **Given** an Item exists, **When** you run `mm edit <item> --project existing-alias`,
       **Then** the Item's project field is updated to the UUID of the referenced Item
-- [ ] **Given** an Item exists, **When** you run `mm edit <item> --context ctx1 --context ctx2`,
+- [x] **Given** an Item exists, **When** you run `mm edit <item> --context ctx1 --context ctx2`,
       **Then** the Item's contexts field is updated to UUIDs of the referenced Items
 
 #### 3. Display (UUID → Alias Resolution)
-- [ ] **Given** an Item has `project: <uuid>` in frontmatter, **When** you run `mm ls`,
+- [x] **Given** an Item has `project: <uuid>` in frontmatter, **When** you run `mm ls`,
       **Then** the output shows `+<alias>` (resolved from UUID), not the raw UUID
-- [ ] **Given** an Item has `contexts: [<uuid1>, <uuid2>]`, **When** you run `mm show <item>`,
+- [x] **Given** an Item has `contexts: [<uuid1>, <uuid2>]`, **When** you run `mm show <item>`,
       **Then** contexts are displayed as `@alias1 @alias2` (resolved from UUIDs)
-- [ ] **Given** a referenced Item has no alias, **When** you display the referencing Item,
+- [x] **Given** a referenced Item has no alias, **When** you display the referencing Item,
       **Then** the display falls back to showing the UUID (or a truncated form like `+0193fe12...`)
 
 #### 4. Alias Not Found (Error Case)
-- [ ] **Given** no Item exists with alias `nonexistent`, **When** you run `mm note "Test" --project nonexistent`,
+- [x] **Given** no Item exists with alias `nonexistent`, **When** you run `mm note "Test" --project nonexistent`,
       **Then** an error is shown: "Alias 'nonexistent' not found"
-- [ ] **Given** no Item exists with alias `missing`, **When** you run `mm task "Test" --context missing`,
+- [x] **Given** no Item exists with alias `missing`, **When** you run `mm task "Test" --context missing`,
       **Then** an error is shown: "Alias 'missing' not found"
 
 #### 5. Backward Compatibility (Migration)
-- [ ] **Given** an existing Item has `project: old-alias` (string format), **When** you read the Item,
+- [x] **Given** an existing Item has `project: old-alias` (string format), **When** you read the Item,
       **Then** it is parsed successfully (alias string accepted for backward compatibility)
-- [ ] **Given** an existing Item has alias-format project/contexts, **When** you edit and save the Item,
+- [x] **Given** an existing Item has alias-format project/contexts, **When** you edit and save the Item,
       **Then** the fields are converted to UUID format on save
 
 ### Out of Scope
@@ -154,7 +154,10 @@ an alias doesn't break existing references.**
 
 ### Acceptance Checks
 
-**Status: 5/5 Complete**
+**Status: Accepted**
+
+All acceptance criteria verified and passing.
+Tested on: 2026-01-14
 
 | AC | Status | Notes |
 |----|--------|-------|
@@ -163,6 +166,19 @@ an alias doesn't break existing references.**
 | AC3: Display shows aliases | ✅ | Resolver pattern in formatters |
 | AC4: Alias Not Found error | ✅ | Returns "Alias 'xxx' not found" |
 | AC5: Backward compatibility | ✅ | Alias strings resolved to UUIDs at load time |
+
+**Manual Acceptance Test Results (2026-01-14):**
+- AC1.1: `mm note "Test" --project work-project` → frontmatter has `project: 019bba3e-6673-7281-b02d-81c68372c032` ✅
+- AC1.2: `mm task "Call" --context phone --context errands` → frontmatter has UUIDs array ✅
+- AC2.1: `mm edit <item> --project work-project` → project field updated to UUID ✅
+- AC2.2: `mm edit <item> --context phone --context errands` → contexts field updated to UUIDs ✅
+- AC3.1: `mm ls` shows `+work-project` (alias), not raw UUID ✅
+- AC3.2: `mm show <item>` displays `@phone @errands` (aliases) ✅
+- AC3.3: Item referencing aliasless item displays `+019bba42…` (truncated UUID) ✅
+- AC4.1: `mm note "Test" --project nonexistent` → error "Alias 'nonexistent' not found" ✅
+- AC4.2: `mm task "Test" --context missing` → error "Alias 'missing' not found" ✅
+- AC5.1: Old alias-format file (`project: work-project`) parses and displays correctly ✅
+- AC5.2: After edit, old format converted to UUIDs in file ✅
 
 **Test Status:**
 - Unit tests: 547/547 passing
