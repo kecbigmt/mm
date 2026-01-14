@@ -33,11 +33,8 @@ import {
   parseItemStatus,
   parseItemTitle,
   parsePlacement,
-  parseTagSlug,
   Placement,
   PlacementValidationError,
-  TagSlug,
-  TagSlugValidationError,
 } from "../primitives/mod.ts";
 import { Edge, EdgeSnapshot, isItemEdge, ItemEdge, parseEdge } from "./edge.ts";
 
@@ -56,8 +53,8 @@ export type ItemData = Readonly<{
   readonly dueAt?: DateTime;
   readonly snoozeUntil?: DateTime;
   readonly alias?: AliasSlug;
-  readonly project?: AliasSlug;
-  readonly contexts?: ReadonlyArray<TagSlug>;
+  readonly project?: ItemId;
+  readonly contexts?: ReadonlyArray<ItemId>;
   readonly body?: string;
 }>;
 
@@ -83,8 +80,8 @@ export type Item = Readonly<{
   snooze(snoozeUntil: DateTime | undefined, occurredAt: DateTime): Item;
   isSnoozing(now: DateTime): boolean;
   setAlias(alias: AliasSlug | undefined, updatedAt: DateTime): Item;
-  setProject(project: AliasSlug | undefined, updatedAt: DateTime): Item;
-  setContexts(contexts: ReadonlyArray<TagSlug> | undefined, updatedAt: DateTime): Item;
+  setProject(project: ItemId | undefined, updatedAt: DateTime): Item;
+  setContexts(contexts: ReadonlyArray<ItemId> | undefined, updatedAt: DateTime): Item;
   toJSON(): ItemSnapshot;
 }>;
 
@@ -304,7 +301,7 @@ const instantiate = (
 
   const setProject = function (
     this: Item,
-    project: AliasSlug | undefined,
+    project: ItemId | undefined,
     updatedAt: DateTime,
   ): Item {
     const current = this.data.project?.toString();
@@ -324,7 +321,7 @@ const instantiate = (
 
   const setContexts = function (
     this: Item,
-    contexts: ReadonlyArray<TagSlug> | undefined,
+    contexts: ReadonlyArray<ItemId> | undefined,
     updatedAt: DateTime,
   ): Item {
     const current = this.data.contexts?.map((c) => c.toString()).join(",");
@@ -398,11 +395,10 @@ const prefixIssues = (
     | ItemIdValidationError
     | DateTimeValidationError
     | DurationValidationError
-    | TagSlugValidationError
     | ItemRankValidationError
     | PlacementValidationError,
 ): ValidationIssue[] =>
-  error.issues.map((issue) =>
+  error.issues.map((issue: ValidationIssue) =>
     createValidationIssue(issue.message, {
       code: issue.code,
       path: [field, ...issue.path],
@@ -516,9 +512,9 @@ export const parseItem = (
     }
   }
 
-  let project: AliasSlug | undefined;
+  let project: ItemId | undefined;
   if (snapshot.project !== undefined) {
-    const result = parseAliasSlug(snapshot.project);
+    const result = parseItemId(snapshot.project);
     if (result.type === "error") {
       issues.push(...prefixIssues("project", result.error));
     } else {
@@ -526,8 +522,8 @@ export const parseItem = (
     }
   }
 
-  const contexts: TagSlug[] = [];
-  // Parse new contexts array field
+  const contexts: ItemId[] = [];
+  // Parse contexts array field (expects UUIDs)
   if (snapshot.contexts !== undefined) {
     if (!Array.isArray(snapshot.contexts)) {
       issues.push(
@@ -538,7 +534,7 @@ export const parseItem = (
       );
     } else {
       for (const [index, contextStr] of snapshot.contexts.entries()) {
-        const result = parseTagSlug(contextStr);
+        const result = parseItemId(contextStr);
         if (result.type === "error") {
           issues.push(
             ...result.error.issues.map((issue) =>
@@ -554,15 +550,8 @@ export const parseItem = (
       }
     }
   }
-  // Migration: parse deprecated singular context field into contexts array
-  if (snapshot.context !== undefined && snapshot.contexts === undefined) {
-    const result = parseTagSlug(snapshot.context);
-    if (result.type === "error") {
-      issues.push(...prefixIssues("context", result.error));
-    } else {
-      contexts.push(result.value);
-    }
-  }
+  // Note: Legacy singular 'context' field with alias strings is no longer supported.
+  // Migration to UUID format should be handled at the repository layer.
 
   if (snapshot.edges !== undefined) {
     for (const [index, edgeSnapshot] of snapshot.edges.entries()) {

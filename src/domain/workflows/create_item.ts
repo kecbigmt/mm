@@ -15,8 +15,6 @@ import {
   parseDateTime,
   Placement,
   PlacementRange,
-  TagSlug,
-  tagSlugFromString,
   TimezoneIdentifier,
 } from "../primitives/mod.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
@@ -196,12 +194,13 @@ export const CreateItemWorkflow = {
       );
     }
 
-    let project: AliasSlug | undefined;
+    // Resolve project alias to ItemId
+    let projectId: ItemId | undefined;
     if (typeof input.project === "string") {
-      const projectResult = parseAliasSlug(input.project);
-      if (projectResult.type === "error") {
+      const projectAliasResult = parseAliasSlug(input.project);
+      if (projectAliasResult.type === "error") {
         issues.push(
-          ...projectResult.error.issues.map((issue) =>
+          ...projectAliasResult.error.issues.map((issue) =>
             createValidationIssue(issue.message, {
               code: issue.code,
               path: ["project", ...issue.path],
@@ -209,17 +208,36 @@ export const CreateItemWorkflow = {
           ),
         );
       } else {
-        project = projectResult.value;
+        // Look up alias to get target ItemId
+        const aliasLookup = await deps.aliasRepository.load(projectAliasResult.value);
+        if (aliasLookup.type === "error") {
+          issues.push(
+            createValidationIssue(`Failed to look up project alias: ${aliasLookup.error.message}`, {
+              code: "repository_error",
+              path: ["project"],
+            }),
+          );
+        } else if (aliasLookup.value === undefined) {
+          issues.push(
+            createValidationIssue(`Alias '${input.project}' not found`, {
+              code: "alias_not_found",
+              path: ["project"],
+            }),
+          );
+        } else {
+          projectId = aliasLookup.value.data.itemId;
+        }
       }
     }
 
-    const contexts: TagSlug[] = [];
+    // Resolve context aliases to ItemIds
+    const contextIds: ItemId[] = [];
     if (input.contexts && input.contexts.length > 0) {
       for (const [index, contextStr] of input.contexts.entries()) {
-        const contextResult = tagSlugFromString(contextStr);
-        if (contextResult.type === "error") {
+        const contextAliasResult = parseAliasSlug(contextStr);
+        if (contextAliasResult.type === "error") {
           issues.push(
-            ...contextResult.error.issues.map((issue) =>
+            ...contextAliasResult.error.issues.map((issue) =>
               createValidationIssue(issue.message, {
                 code: issue.code,
                 path: ["contexts", index, ...issue.path],
@@ -227,7 +245,28 @@ export const CreateItemWorkflow = {
             ),
           );
         } else {
-          contexts.push(contextResult.value);
+          // Look up alias to get target ItemId
+          const aliasLookup = await deps.aliasRepository.load(contextAliasResult.value);
+          if (aliasLookup.type === "error") {
+            issues.push(
+              createValidationIssue(
+                `Failed to look up context alias: ${aliasLookup.error.message}`,
+                {
+                  code: "repository_error",
+                  path: ["contexts", index],
+                },
+              ),
+            );
+          } else if (aliasLookup.value === undefined) {
+            issues.push(
+              createValidationIssue(`Alias '${contextStr}' not found`, {
+                code: "alias_not_found",
+                path: ["contexts", index],
+              }),
+            );
+          } else {
+            contextIds.push(aliasLookup.value.data.itemId);
+          }
         }
       }
     }
@@ -362,8 +401,8 @@ export const CreateItemWorkflow = {
       createdAt: input.createdAt,
       updatedAt: input.createdAt,
       body,
-      project,
-      contexts: contexts.length > 0 ? Object.freeze(contexts) : undefined,
+      project: projectId,
+      contexts: contextIds.length > 0 ? Object.freeze(contextIds) : undefined,
       alias,
     });
 
