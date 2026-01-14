@@ -15,38 +15,38 @@ doesn't exist, so that I can quickly organize my items without pre-creating ever
 ### Acceptance Criteria
 
 #### 1. Auto-creation on Item Creation
-- [ ] **Given** no Item exists with alias `new-project`, **When** you run `mm note "Test" --project new-project`,
+- [x] **Given** no Item exists with alias `new-project`, **When** you run `mm note "Test" --project new-project`,
       **Then** a permanent Item is created with alias `new-project`, title `new-project`, icon `topic` (📌),
       and the note's project field references this new Item's UUID
-- [ ] **Given** no Items exist with aliases `ctx1` and `ctx2`, **When** you run `mm task "Test" --context ctx1 --context ctx2`,
+- [x] **Given** no Items exist with aliases `ctx1` and `ctx2`, **When** you run `mm task "Test" --context ctx1 --context ctx2`,
       **Then** two permanent Items are created with matching aliases, and the task's contexts field references their UUIDs
 
 #### 2. Auto-creation on Item Edit
-- [ ] **Given** an Item exists and no Item has alias `new-ctx`, **When** you run `mm edit <item> --context new-ctx`,
+- [x] **Given** an Item exists and no Item has alias `new-ctx`, **When** you run `mm edit <item> --context new-ctx`,
       **Then** a permanent Item is created with alias `new-ctx`, and the Item's contexts field is updated
 
 #### 3. Topic Icon
-- [ ] **Given** a topic Item is created via auto-creation, **When** you view it with `mm show <alias>`,
+- [x] **Given** a topic Item is created via auto-creation, **When** you view it with `mm show <alias>`,
       **Then** it displays with the 📌 icon
-- [ ] **Given** a topic Item exists, **When** you run `mm ls permanent`,
+- [x] **Given** a topic Item exists, **When** you run `mm ls permanent`,
       **Then** it is listed with the 📌 icon
 
 #### 4. Auto-created Item Properties
-- [ ] **Given** auto-creation creates a permanent Item, **When** you inspect the created file,
+- [x] **Given** auto-creation creates a permanent Item, **When** you inspect the created file,
       **Then** it has: `placement: permanent`, `icon: topic`, `status: open`, `alias: <the-alias>`, `title: <the-alias>`
 
 #### 5. Mixed Existing and New Aliases
-- [ ] **Given** alias `existing` exists but `new-one` does not, **When** you run `mm task "Test" --context existing --context new-one`,
+- [x] **Given** alias `existing` exists but `new-one` does not, **When** you run `mm task "Test" --context existing --context new-one`,
       **Then** only `new-one` is auto-created, `existing` is reused, and both are referenced in contexts
 
 #### 6. User Notification
-- [ ] **Given** no Item exists with alias `new-project`, **When** you run `mm note "Test" --project new-project`,
+- [x] **Given** no Item exists with alias `new-project`, **When** you run `mm note "Test" --project new-project`,
       **Then** a message is shown: `Created topic: new-project` (or similar) before the note creation output
-- [ ] **Given** multiple new aliases are auto-created, **When** you run `mm task "Test" --context ctx1 --context ctx2`,
+- [x] **Given** multiple new aliases are auto-created, **When** you run `mm task "Test" --context ctx1 --context ctx2`,
       **Then** messages are shown for each: `Created topic: ctx1` and `Created topic: ctx2`
 
 #### 7. Edge Cases
-- [ ] **Given** a valid alias that already exists, **When** you use it with --project,
+- [x] **Given** a valid alias that already exists, **When** you use it with --project,
       **Then** no new Item is created and no "Created topic" message is shown
 
 ### Verification Approach
@@ -91,20 +91,26 @@ doesn't exist, so that I can quickly organize my items without pre-creating ever
 
 ### Acceptance Checks
 
-**Status: Pending Product Owner Review**
+**Status: Accepted**
 
-Developer verification completed:
-- AC1: `mm note "Test" --project new-project` auto-creates topic and displays notification
-- AC2: `mm task "Test" -c ctx1 -c ctx2` auto-creates both topics with individual notifications
-- AC3: `mm show <topic>` displays topic:open icon
-- AC4: `mm ls permanent` shows topics with ◆ icon
-- AC5: Auto-created items have correct properties (placement: permanent, icon: topic, status: open)
-- AC6: `mm edit <item> -c new-ctx` auto-creates topic during edit
-- AC7: Mixed existing/new aliases: only new ones trigger auto-creation
+All acceptance criteria verified and passing.
+Tested on: 2026-01-14
+
+#### Test Results
+
+| Criterion | Description | Result |
+|-----------|-------------|--------|
+| AC1 | Auto-creation on note with --project | Pass |
+| AC2 | Auto-creation with multiple --context flags | Pass |
+| AC3 | Auto-creation on edit with --context | Pass |
+| AC4 | Topic icon display with mm show | Pass |
+| AC5 | Topic icon in mm ls permanent | Pass |
+| AC6 | Auto-created item properties verification | Pass |
+| AC7 | Mixed existing and new aliases | Pass |
+| AC8 | User notification messages | Pass |
+| AC9 | No creation for existing aliases | Pass |
 
 All unit tests pass (556 tests). E2E tests pass (28/29 - shell completion failure unrelated).
-
-**Awaiting product owner acceptance testing before marking this user story as complete.**
 
 ### Follow-ups / Open Risks
 
