@@ -205,7 +205,12 @@ export function createEventCommand() {
         return;
       }
 
-      const item = workflowResult.value.item;
+      const { item, createdTopics } = workflowResult.value;
+
+      // Display notifications for auto-created topics
+      for (const topicAlias of createdTopics) {
+        console.log(`Created topic: ${topicAlias.toString()}`);
+      }
 
       // Update cache with created item
       await deps.cacheUpdateService.updateFromItem(item);
