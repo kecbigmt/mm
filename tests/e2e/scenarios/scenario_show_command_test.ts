@@ -109,9 +109,9 @@ describe("Scenario: Show command", () => {
     // Verify output contains expected elements
     const output = showResult.stdout;
 
-    // Header line: alias, icon, title, context, date
+    // Header lines: alias + title on first line, type:status + metadata on second
     assertEquals(output.includes("plan-doc"), true, "Should include alias");
-    assertEquals(output.includes("📝"), true, "Should include note icon");
+    assertEquals(output.includes("note:open"), true, "Should include type:status");
     assertEquals(output.includes("Planning document"), true, "Should include title");
     // UUID→alias resolution is implemented, should display @work
     assertEquals(output.includes("@work"), true, "Should include context @work");
@@ -175,8 +175,44 @@ describe("Scenario: Show command", () => {
     assertEquals(showResult.success, true);
 
     const output = showResult.stdout;
-    assertEquals(output.includes("✅"), true, "Should include closed task icon");
+    assertEquals(output.includes("task:closed"), true, "Should include closed task type:status");
     assertEquals(output.includes("Closed:"), true, "Should include Closed timestamp");
+  });
+
+  it("displays snoozing task with Snooze timestamp", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "task",
+      "Snoozed task",
+      "--alias",
+      "task-snooze",
+    ]);
+    assertEquals(createResult.success, true);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    // Snooze the task to tomorrow
+    const snoozeResult = await runCommand(ctx.testHome, ["snooze", itemId, "tomorrow"]);
+    assertEquals(snoozeResult.success, true);
+
+    // Show snoozed task
+    const showResult = await runCommand(ctx.testHome, [
+      "show",
+      itemId,
+      "--print",
+    ]);
+    assertEquals(showResult.success, true);
+
+    const output = showResult.stdout;
+    // Snoozing is a derived state, not stored in status. The show command displays raw data.
+    assertEquals(
+      output.includes("task:open"),
+      true,
+      "Should include task:open (snoozing is derived state, not stored in status)",
+    );
+    assertEquals(output.includes("SnoozeUntil:"), true, "Should include SnoozeUntil timestamp");
   });
 
   it("displays event with start time and duration", async () => {
@@ -203,7 +239,7 @@ describe("Scenario: Show command", () => {
     assertEquals(showResult.success, true);
 
     const output = showResult.stdout;
-    assertEquals(output.includes("🕒"), true, "Should include event icon");
+    assertEquals(output.includes("event:open"), true, "Should include event type:status");
     assertEquals(output.includes("Team meeting"), true);
     assertEquals(output.includes("Start:"), true, "Should include Start timestamp");
     assertEquals(output.includes("Duration:"), true, "Should include Duration");

@@ -10,6 +10,8 @@ import {
   type PlacementRange,
 } from "../../../domain/primitives/placement_range.ts";
 import { parseCalendarDay } from "../../../domain/primitives/calendar_day.ts";
+import { dateTimeFromDate } from "../../../domain/primitives/date_time.ts";
+import { Result } from "../../../shared/result.ts";
 import { createPlacement } from "../../../domain/primitives/placement.ts";
 import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import type { SectionSummary } from "../../../domain/services/section_query_service.ts";
@@ -112,6 +114,7 @@ export function createListCommand() {
 
       const deps = depsResult.value;
       const now = new Date();
+      const nowDateTime = Result.unwrap(dateTimeFromDate(now));
 
       const cwdResult = await profileAsync("getCwd", () =>
         CwdResolutionService.getCwd(
@@ -377,6 +380,7 @@ export function createListCommand() {
         const formatterOptions: ListFormatterOptions = {
           printMode: isPrintMode,
           timezone: deps.timezone,
+          now: nowDateTime,
         };
 
         const outputLines: string[] = [];

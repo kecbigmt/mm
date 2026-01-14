@@ -6,7 +6,7 @@ import { itemStatusClosed, itemStatusOpen } from "../../../domain/primitives/ite
 import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import { parseItemTitle } from "../../../domain/primitives/item_title.ts";
 import { parseItemRank } from "../../../domain/primitives/item_rank.ts";
-import { parseDateTime } from "../../../domain/primitives/date_time.ts";
+import { DateTime, parseDateTime } from "../../../domain/primitives/date_time.ts";
 import { parsePlacement } from "../../../domain/primitives/placement.ts";
 import { parseAliasSlug } from "../../../domain/primitives/alias_slug.ts";
 import { parseDuration } from "../../../domain/primitives/duration.ts";
@@ -28,6 +28,8 @@ const makeTimezone = (): TimezoneIdentifier => Result.unwrap(parseTimezoneIdenti
 
 const makeCalendarDay = (iso: string): CalendarDay => Result.unwrap(parseCalendarDay(iso));
 
+const makeDateTime = (iso: string): DateTime => Result.unwrap(parseDateTime(iso));
+
 // Sample UUID for testing context references
 const CONTEXT_UUID_1 = "019a85fc-0002-7000-8000-000000000002";
 
@@ -44,6 +46,7 @@ const makeItem = (
     startAt: string;
     duration: string;
     dueAt: string;
+    snoozeUntil: string;
   }> = {},
 ): Item => {
   const id = Result.unwrap(parseItemId(overrides.id ?? "019a85fc-67c4-7a54-be8e-305bae009f9e"));
@@ -65,6 +68,9 @@ const makeItem = (
     ? Result.unwrap(parseDuration(overrides.duration))
     : undefined;
   const dueAt = overrides.dueAt ? Result.unwrap(parseDateTime(overrides.dueAt)) : undefined;
+  const snoozeUntil = overrides.snoozeUntil
+    ? Result.unwrap(parseDateTime(overrides.snoozeUntil))
+    : undefined;
 
   return createItem({
     id,
@@ -81,6 +87,7 @@ const makeItem = (
     startAt,
     duration,
     dueAt,
+    snoozeUntil,
   });
 };
 
@@ -88,40 +95,71 @@ const makeItem = (
 // formatItemIcon tests
 // =============================================================================
 
-Deno.test("formatItemIcon - note open returns 📝", () => {
+Deno.test("formatItemIcon - note open returns -", () => {
   const icon = createItemIcon("note");
   const status = itemStatusOpen();
-  const result = formatItemIcon(icon, status);
-  assertEquals(result, "📝");
+  const result = formatItemIcon(icon, status, false);
+  assertEquals(result, "-");
 });
 
-Deno.test("formatItemIcon - note closed returns 🗞️", () => {
+Deno.test("formatItemIcon - note closed returns ✓", () => {
   const icon = createItemIcon("note");
   const status = itemStatusClosed();
-  const result = formatItemIcon(icon, status);
-  assertEquals(result, "🗞️");
+  const result = formatItemIcon(icon, status, false);
+  assertEquals(result, "✓");
 });
 
-Deno.test("formatItemIcon - task open returns ✔️", () => {
+Deno.test("formatItemIcon - task open returns •", () => {
   const icon = createItemIcon("task");
   const status = itemStatusOpen();
-  const result = formatItemIcon(icon, status);
-  assertEquals(result, "✔️");
+  const result = formatItemIcon(icon, status, false);
+  assertEquals(result, "•");
 });
 
-Deno.test("formatItemIcon - task closed returns ✅", () => {
+Deno.test("formatItemIcon - task closed returns ✓", () => {
   const icon = createItemIcon("task");
   const status = itemStatusClosed();
-  const result = formatItemIcon(icon, status);
-  assertEquals(result, "✅");
+  const result = formatItemIcon(icon, status, false);
+  assertEquals(result, "✓");
 });
 
-Deno.test("formatItemIcon - event returns 🕒", () => {
+Deno.test("formatItemIcon - event open returns ○", () => {
   const icon = createItemIcon("event");
   const status = itemStatusOpen();
-  const result = formatItemIcon(icon, status);
-  assertEquals(result, "🕒");
+  const result = formatItemIcon(icon, status, false);
+  assertEquals(result, "○");
 });
+
+Deno.test("formatItemIcon - event closed returns ✓", () => {
+  const icon = createItemIcon("event");
+  const status = itemStatusClosed();
+  const result = formatItemIcon(icon, status, false);
+  assertEquals(result, "✓");
+});
+
+Deno.test("formatItemIcon - note snoozing returns ~", () => {
+  const icon = createItemIcon("note");
+  const status = itemStatusOpen();
+  const result = formatItemIcon(icon, status, true); // isSnoozing = true
+  assertEquals(result, "~");
+});
+
+Deno.test("formatItemIcon - task snoozing returns ~", () => {
+  const icon = createItemIcon("task");
+  const status = itemStatusOpen();
+  const result = formatItemIcon(icon, status, true); // isSnoozing = true
+  assertEquals(result, "~");
+});
+
+Deno.test("formatItemIcon - event snoozing returns ~", () => {
+  const icon = createItemIcon("event");
+  const status = itemStatusOpen();
+  const result = formatItemIcon(icon, status, true); // isSnoozing = true
+  assertEquals(result, "~");
+});
+
+// Default "now" for tests
+const DEFAULT_NOW = makeDateTime("2025-02-10T12:00:00Z");
 
 // =============================================================================
 // formatItemLine tests - alias/UUID fallback
@@ -132,6 +170,7 @@ Deno.test("formatItemLine - uses alias when present", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("my-alias"), true);
@@ -143,6 +182,7 @@ Deno.test("formatItemLine - uses UUID when alias is missing", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("019a85fc-67c4-7a54-be8e-305bae009f9e"), true);
@@ -153,6 +193,7 @@ Deno.test("formatItemLine - includes title", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("My task title"), true);
@@ -165,6 +206,7 @@ Deno.test("formatItemLine - includes context when present (truncated UUID)", () 
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
   // Context is displayed as @<truncated-uuid>
@@ -176,6 +218,7 @@ Deno.test("formatItemLine - resolves context to alias when resolver provided", (
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const resolver = (id: string) => (id === CONTEXT_UUID_1 ? "work" : undefined);
   const result = formatItemLine(item, options, undefined, resolver);
@@ -188,6 +231,7 @@ Deno.test("formatItemLine - includes due date when present", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("→2025-02-15"), true);
@@ -205,9 +249,10 @@ Deno.test("formatItemLine - event with startAt shows time in timezone (colored m
   const options: ListFormatterOptions = {
     printMode: false,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
-  assertEquals(result.includes("🕒(09:30)"), true);
+  assertEquals(result.includes("○ (09:30)"), true);
 });
 
 Deno.test("formatItemLine - event with startAt shows time in timezone (print mode)", () => {
@@ -218,6 +263,7 @@ Deno.test("formatItemLine - event with startAt shows time in timezone (print mod
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("[event](09:30)"), true);
@@ -232,9 +278,10 @@ Deno.test("formatItemLine - event with startAt and duration shows time range (co
   const options: ListFormatterOptions = {
     printMode: false,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
-  assertEquals(result.includes("🕒(09:30-10:00)"), true);
+  assertEquals(result.includes("○ (09:30-10:00)"), true);
 });
 
 Deno.test("formatItemLine - event with startAt and duration shows time range (print mode)", () => {
@@ -246,20 +293,22 @@ Deno.test("formatItemLine - event with startAt and duration shows time range (pr
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("[event](09:30-10:00)"), true);
 });
 
-Deno.test("formatItemLine - event without startAt shows plain clock icon (colored mode)", () => {
+Deno.test("formatItemLine - event without startAt shows plain circle (colored mode)", () => {
   const item = makeItem({ icon: "event" });
   const options: ListFormatterOptions = {
     printMode: false,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
-  assertEquals(result.includes("🕒 "), true);
-  assertEquals(result.includes("🕒("), false);
+  assertEquals(result.includes("○ "), true);
+  assertEquals(result.includes("○ ("), false);
 });
 
 Deno.test("formatItemLine - event without startAt shows plain text token (print mode)", () => {
@@ -267,10 +316,36 @@ Deno.test("formatItemLine - event without startAt shows plain text token (print 
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("[event] "), true);
   assertEquals(result.includes("[event]("), false);
+});
+
+Deno.test("formatItemLine - print mode uses plain text icon for closed event", () => {
+  const item = makeItem({ icon: "event", status: "closed" });
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW,
+  };
+  const result = formatItemLine(item, options);
+  assertEquals(result.includes("[event:closed]"), true);
+  assertEquals(result.includes("✓"), false);
+});
+
+Deno.test("formatItemLine - print mode uses plain text icon for snoozing event", () => {
+  // Item is snoozing when snoozeUntil > now
+  const item = makeItem({ icon: "event", snoozeUntil: "2025-02-11T00:00:00Z" });
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW, // 2025-02-10T12:00:00Z - before snoozeUntil
+  };
+  const result = formatItemLine(item, options);
+  assertEquals(result.includes("[event:snoozing]"), true);
+  assertEquals(result.includes("~"), false);
 });
 
 // =============================================================================
@@ -283,6 +358,7 @@ Deno.test("formatDateHeader - today shows relative label", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatDateHeader(day, referenceDate, options);
   assertEquals(result, "[2025-02-10] today");
@@ -294,6 +370,7 @@ Deno.test("formatDateHeader - tomorrow shows relative label", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatDateHeader(day, referenceDate, options);
   assertEquals(result, "[2025-02-11] tomorrow");
@@ -305,6 +382,7 @@ Deno.test("formatDateHeader - yesterday shows relative label", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatDateHeader(day, referenceDate, options);
   assertEquals(result, "[2025-02-09] yesterday");
@@ -317,6 +395,7 @@ Deno.test("formatDateHeader - +2d shows next-wednesday (weekday label)", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatDateHeader(day, referenceDate, options);
   assertEquals(result, "[2025-02-12] next-wednesday");
@@ -329,6 +408,7 @@ Deno.test("formatDateHeader - -2d shows last-saturday (weekday label)", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatDateHeader(day, referenceDate, options);
   assertEquals(result, "[2025-02-08] last-saturday");
@@ -341,6 +421,7 @@ Deno.test("formatDateHeader - +7d shows next-monday (weekday label)", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatDateHeader(day, referenceDate, options);
   assertEquals(result, "[2025-02-17] next-monday");
@@ -353,6 +434,7 @@ Deno.test("formatDateHeader - -7d shows last-monday (weekday label)", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatDateHeader(day, referenceDate, options);
   assertEquals(result, "[2025-02-03] last-monday");
@@ -365,6 +447,7 @@ Deno.test("formatDateHeader - far future shows +Xd label", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatDateHeader(day, referenceDate, options);
   assertEquals(result, "[2025-03-01] +19d");
@@ -377,6 +460,7 @@ Deno.test("formatDateHeader - far past shows ~Xd label", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatDateHeader(day, referenceDate, options);
   assertEquals(result, "[2025-01-01] ~40d");
@@ -389,6 +473,7 @@ Deno.test("formatDateHeader - +8d shows +8d label (beyond weekday range)", () =>
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatDateHeader(day, referenceDate, options);
   assertEquals(result, "[2025-02-18] +8d");
@@ -401,6 +486,7 @@ Deno.test("formatDateHeader - -8d shows ~8d label (beyond weekday range)", () =>
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatDateHeader(day, referenceDate, options);
   assertEquals(result, "[2025-02-02] ~8d");
@@ -419,6 +505,7 @@ Deno.test("formatSectionStub - formats stub with counts (colored mode)", () => {
   const options: ListFormatterOptions = {
     printMode: false,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatSectionStub(summary, "1/", options);
   assertEquals(result, "📁 1/ (items: 3, sections: 2)");
@@ -433,6 +520,7 @@ Deno.test("formatSectionStub - formats stub with counts (print mode)", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatSectionStub(summary, "1/", options);
   assertEquals(result, "[section] 1/ (items: 3, sections: 2)");
@@ -447,6 +535,7 @@ Deno.test("formatSectionStub - formats stub with zero sections", () => {
   const options: ListFormatterOptions = {
     printMode: false,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatSectionStub(summary, "2/", options);
   assertEquals(result, "📁 2/ (items: 1, sections: 0)");
@@ -461,6 +550,7 @@ Deno.test("formatItemLine - print mode includes date column when provided", () =
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options, "2025-02-10");
   assertEquals(result.startsWith("2025-02-10"), true);
@@ -471,10 +561,10 @@ Deno.test("formatItemLine - print mode uses plain text icon for note", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("[note]"), true);
-  assertEquals(result.includes("📝"), false);
 });
 
 Deno.test("formatItemLine - print mode uses plain text icon for task", () => {
@@ -482,10 +572,11 @@ Deno.test("formatItemLine - print mode uses plain text icon for task", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("[task]"), true);
-  assertEquals(result.includes("✔️"), false);
+  assertEquals(result.includes("•"), false);
 });
 
 Deno.test("formatItemLine - print mode uses plain text icon for closed task", () => {
@@ -493,10 +584,37 @@ Deno.test("formatItemLine - print mode uses plain text icon for closed task", ()
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
-  assertEquals(result.includes("[task:done]"), true);
-  assertEquals(result.includes("✅"), false);
+  assertEquals(result.includes("[task:closed]"), true);
+  assertEquals(result.includes("✓"), false);
+});
+
+Deno.test("formatItemLine - print mode uses plain text icon for snoozing task", () => {
+  // Item is snoozing when snoozeUntil > now
+  const item = makeItem({ icon: "task", snoozeUntil: "2025-02-11T00:00:00Z" });
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW, // 2025-02-10T12:00:00Z - before snoozeUntil
+  };
+  const result = formatItemLine(item, options);
+  assertEquals(result.includes("[task:snoozing]"), true);
+  assertEquals(result.includes("~"), false);
+});
+
+Deno.test("formatItemLine - print mode uses plain text icon for snoozing note", () => {
+  // Item is snoozing when snoozeUntil > now
+  const item = makeItem({ icon: "note", snoozeUntil: "2025-02-11T00:00:00Z" });
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW, // 2025-02-10T12:00:00Z - before snoozeUntil
+  };
+  const result = formatItemLine(item, options);
+  assertEquals(result.includes("[note:snoozing]"), true);
+  assertEquals(result.includes("~"), false);
 });
 
 Deno.test("formatItemLine - print mode produces no ANSI escape codes", () => {
@@ -504,6 +622,7 @@ Deno.test("formatItemLine - print mode produces no ANSI escape codes", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
   // ANSI escape codes start with ESC (0x1b or \x1b)
@@ -516,6 +635,7 @@ Deno.test("formatDateHeader - print mode produces no ANSI escape codes", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatDateHeader(day, referenceDate, options);
   assertEquals(result.includes("\x1b"), false);
@@ -530,6 +650,7 @@ Deno.test("formatSectionStub - print mode produces no ANSI escape codes", () => 
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatSectionStub(summary, "1/", options);
   assertEquals(result.includes("\x1b"), false);
@@ -544,6 +665,7 @@ Deno.test("formatItemLine - colored mode includes ANSI codes for alias", () => {
   const options: ListFormatterOptions = {
     printMode: false,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemLine(item, options);
   assertEquals(result.includes("\x1b"), true);
@@ -555,6 +677,7 @@ Deno.test("formatDateHeader - colored mode includes ANSI codes for today", () =>
   const options: ListFormatterOptions = {
     printMode: false,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatDateHeader(day, referenceDate, options);
   assertEquals(result.includes("\x1b"), true);
@@ -570,6 +693,7 @@ Deno.test("formatItemHeadHeader - formats with alias and section", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemHeadHeader("my-book", "1", options);
   assertEquals(result, "[my-book/1]");
@@ -579,6 +703,7 @@ Deno.test("formatItemHeadHeader - formats with UUID and section", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemHeadHeader("019a85fc-67c4-7a54-be8e-305bae009f9e", "2", options);
   assertEquals(result, "[019a85fc-67c4-7a54-be8e-305bae009f9e/2]");
@@ -588,6 +713,7 @@ Deno.test("formatItemHeadHeader - formats without section", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemHeadHeader("my-book", undefined, options);
   assertEquals(result, "[my-book]");
@@ -597,6 +723,7 @@ Deno.test("formatItemHeadHeader - colored mode includes ANSI codes", () => {
   const options: ListFormatterOptions = {
     printMode: false,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemHeadHeader("my-book", "1", options);
   assertEquals(result.includes("\x1b"), true);
@@ -606,6 +733,7 @@ Deno.test("formatItemHeadHeader - print mode produces no ANSI codes", () => {
   const options: ListFormatterOptions = {
     printMode: true,
     timezone: makeTimezone(),
+    now: DEFAULT_NOW,
   };
   const result = formatItemHeadHeader("my-book", "1", options);
   assertEquals(result.includes("\x1b"), false);
