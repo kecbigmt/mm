@@ -853,3 +853,89 @@ Deno.test("EditItemWorkflow - time-only dueAt uses workspace timezone (JST)", as
     assertEquals(isoString, "2025-02-10T00:00:00.000Z");
   }
 });
+
+// Test for deferred topic persistence - no orphan topics on validation failure
+Deno.test("EditItemWorkflow - does not create orphan topics when validation fails", async () => {
+  const itemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd120"));
+  const now = Result.unwrap(dateTimeFromDate(new Date("2025-02-10T12:00:00Z")));
+  const originalItem = createTestItem(itemId, "Original Title", now);
+
+  // Track what gets saved
+  const savedItems: Item[] = [];
+  const savedAliases: Alias[] = [];
+
+  // Existing alias that will cause a collision
+  const existingAliasSlug = Result.unwrap(aliasSlugFromString("taken-alias"));
+  const existingAlias = createAlias({
+    slug: existingAliasSlug,
+    itemId: Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd999")),
+    createdAt: now,
+  });
+
+  const mockItemRepository: ItemRepository = {
+    load: (id: ItemId) => {
+      if (id.equals(itemId)) {
+        return Promise.resolve(Result.ok(originalItem));
+      }
+      return Promise.resolve(
+        Result.error(createRepositoryError("item", "load", "Item not found")),
+      );
+    },
+    save: (item: Item) => {
+      savedItems.push(item);
+      return Promise.resolve(Result.ok(undefined));
+    },
+    delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
+    listByPlacement: () => Promise.resolve(Result.ok([])),
+  };
+
+  const mockAliasRepository: AliasRepository = {
+    load: (slug: AliasSlug) => {
+      // Return existing alias for "taken-alias"
+      if (slug.toString() === "taken-alias") {
+        return Promise.resolve(Result.ok(existingAlias));
+      }
+      // Return undefined for other aliases (including "new-project")
+      return Promise.resolve(Result.ok(undefined));
+    },
+    save: (alias: Alias) => {
+      savedAliases.push(alias);
+      return Promise.resolve(Result.ok(undefined));
+    },
+    delete: (_slug) => Promise.resolve(Result.ok(undefined)),
+    list: () => Promise.resolve(Result.ok([])),
+  };
+
+  // Try to edit with:
+  // - A project reference to non-existent alias (would trigger auto-creation)
+  // - An alias that already exists (will fail validation)
+  const result = await EditItemWorkflow.execute(
+    {
+      itemLocator: itemId.toString(),
+      updates: {
+        project: "new-project", // Would trigger topic auto-creation
+        alias: "taken-alias", // Conflicts with existing alias
+      },
+      updatedAt: now,
+      timezone: TEST_TIMEZONE,
+    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
+  );
+
+  // Verify the edit failed due to alias conflict
+  assertEquals(result.type, "error");
+
+  // Verify NO items were saved (no orphan topics)
+  assertEquals(
+    savedItems.length,
+    0,
+    "No items should be saved when validation fails (no orphan topics)",
+  );
+
+  // Verify NO aliases were saved
+  assertEquals(
+    savedAliases.length,
+    0,
+    "No aliases should be saved when validation fails",
+  );
+});

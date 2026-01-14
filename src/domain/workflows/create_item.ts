@@ -24,7 +24,7 @@ import { RepositoryError } from "../repositories/repository_error.ts";
 import { RankService } from "../services/rank_service.ts";
 import { IdGenerationService } from "../services/id_generation_service.ts";
 import { AliasAutoGenerator } from "../services/alias_auto_generator.ts";
-import { createAlias } from "../models/alias.ts";
+import { Alias, createAlias } from "../models/alias.ts";
 
 export type CreateItemInput = Readonly<{
   title: string;
@@ -89,14 +89,24 @@ const repositoryFailure = (error: RepositoryError): CreateItemRepositoryError =>
 });
 
 /**
- * Creates a permanent topic item for auto-creation when a project/context alias doesn't exist.
- * Returns the ItemId of the created topic, or an error.
+ * A prepared topic ready to be persisted. Contains the Item and Alias that
+ * will be saved together when the main workflow validation passes.
  */
-const createTopicItem = async (
+type PreparedTopic = Readonly<{
+  item: Item;
+  alias: Alias;
+  slug: AliasSlug;
+}>;
+
+/**
+ * Builds a topic item and alias without persisting them.
+ * Used to defer persistence until after all validation passes.
+ */
+const buildTopicItem = async (
   aliasSlug: AliasSlug,
   createdAt: DateTime,
   deps: CreateItemDependencies,
-): Promise<Result<ItemId, CreateItemError>> => {
+): Promise<Result<PreparedTopic, CreateItemError>> => {
   // Generate ID for the new topic
   const idResult = deps.idGenerationService.generateId();
   if (idResult.type === "error") {
@@ -147,7 +157,7 @@ const createTopicItem = async (
     ));
   }
 
-  // Create the topic item
+  // Create the topic item (not persisted yet)
   const topicItem = createItem({
     id: topicId,
     title,
@@ -160,24 +170,40 @@ const createTopicItem = async (
     alias: aliasSlug,
   });
 
-  // Save the topic item
-  const saveResult = await deps.itemRepository.save(topicItem);
-  if (saveResult.type === "error") {
-    return Result.error(repositoryFailure(saveResult.error));
-  }
-
-  // Save the alias
+  // Create the alias model (not persisted yet)
   const aliasModel = createAlias({
     slug: aliasSlug,
     itemId: topicId,
     createdAt,
   });
-  const aliasSaveResult = await deps.aliasRepository.save(aliasModel);
+
+  return Result.ok({
+    item: topicItem,
+    alias: aliasModel,
+    slug: aliasSlug,
+  });
+};
+
+/**
+ * Persists a prepared topic (item and alias) to the repositories.
+ */
+const persistPreparedTopic = async (
+  prepared: PreparedTopic,
+  deps: CreateItemDependencies,
+): Promise<Result<void, CreateItemError>> => {
+  // Save the topic item
+  const saveResult = await deps.itemRepository.save(prepared.item);
+  if (saveResult.type === "error") {
+    return Result.error(repositoryFailure(saveResult.error));
+  }
+
+  // Save the alias
+  const aliasSaveResult = await deps.aliasRepository.save(prepared.alias);
   if (aliasSaveResult.type === "error") {
     return Result.error(repositoryFailure(aliasSaveResult.error));
   }
 
-  return Result.ok(topicId);
+  return Result.ok(undefined);
 };
 
 /**
@@ -276,6 +302,8 @@ export const CreateItemWorkflow = {
   ): Promise<Result<CreateItemResult, CreateItemError>> => {
     const issues: ValidationIssue[] = [];
     const createdTopics: AliasSlug[] = [];
+    // Collect prepared topics during validation; persist only after all validation passes
+    const pendingTopics: PreparedTopic[] = [];
 
     const titleResult = itemTitleFromString(input.title);
     const title = titleResult.type === "ok" ? titleResult.value : undefined;
@@ -314,16 +342,17 @@ export const CreateItemWorkflow = {
             }),
           );
         } else if (aliasLookup.value === undefined) {
-          // Auto-create topic for non-existent project alias
-          const createResult = await createTopicItem(
+          // Build topic for non-existent project alias (deferred persistence)
+          const buildResult = await buildTopicItem(
             projectAliasResult.value,
             input.createdAt,
             deps,
           );
-          if (createResult.type === "error") {
-            return Result.error(createResult.error);
+          if (buildResult.type === "error") {
+            return Result.error(buildResult.error);
           }
-          projectId = createResult.value;
+          projectId = buildResult.value.item.data.id;
+          pendingTopics.push(buildResult.value);
           createdTopics.push(projectAliasResult.value);
         } else {
           projectId = aliasLookup.value.data.itemId;
@@ -369,18 +398,27 @@ export const CreateItemWorkflow = {
               ),
             );
           } else if (aliasLookup.value === undefined) {
-            // Auto-create topic for non-existent context alias
-            const createResult = await createTopicItem(
-              contextAliasResult.value,
-              input.createdAt,
-              deps,
-            );
-            if (createResult.type === "error") {
-              return Result.error(createResult.error);
+            // Check if this topic was already prepared (e.g., same alias used for project)
+            const alreadyPrepared = pendingTopics.find((t) => t.slug.toString() === aliasKey);
+            if (alreadyPrepared) {
+              const itemId = alreadyPrepared.item.data.id;
+              contextIds.push(itemId);
+              processedAliases.set(aliasKey, itemId);
+            } else {
+              // Build topic for non-existent context alias (deferred persistence)
+              const buildResult = await buildTopicItem(
+                contextAliasResult.value,
+                input.createdAt,
+                deps,
+              );
+              if (buildResult.type === "error") {
+                return Result.error(buildResult.error);
+              }
+              contextIds.push(buildResult.value.item.data.id);
+              processedAliases.set(aliasKey, buildResult.value.item.data.id);
+              pendingTopics.push(buildResult.value);
+              createdTopics.push(contextAliasResult.value);
             }
-            contextIds.push(createResult.value);
-            processedAliases.set(aliasKey, createResult.value);
-            createdTopics.push(contextAliasResult.value);
           } else {
             const itemId = aliasLookup.value.data.itemId;
             contextIds.push(itemId);
@@ -550,6 +588,14 @@ export const CreateItemWorkflow = {
         },
         input.createdAt,
       );
+    }
+
+    // Persist all prepared topics now that validation has passed
+    for (const prepared of pendingTopics) {
+      const persistResult = await persistPreparedTopic(prepared, deps);
+      if (persistResult.type === "error") {
+        return Result.error(persistResult.error);
+      }
     }
 
     const saveResult = await deps.itemRepository.save(itemWithSchedule);

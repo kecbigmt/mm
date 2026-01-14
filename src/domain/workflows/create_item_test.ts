@@ -658,3 +658,105 @@ Deno.test("CreateItemWorkflow - creates task with CalendarDay dueAt in JST timez
   assertExists(dueAt);
   assertEquals(dueAt.data.iso, "2025-01-20T14:59:59.000Z");
 });
+
+// Test for deferred topic persistence - no orphan topics on validation failure
+Deno.test("CreateItemWorkflow - does not create orphan topics when validation fails", async () => {
+  const repository = new InMemoryItemRepository();
+  const aliasRepository = new InMemoryAliasRepository();
+  const aliasAutoGenerator = createTestAliasAutoGenerator();
+  const rankService = createTestRankService();
+  const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
+
+  const parentPlacement = Result.unwrap(parsePlacement("2025-01-15"));
+  const createdAt = Result.unwrap(parseDateTime("2025-01-15T10:00:00Z"));
+
+  // Try to create an item with:
+  // - A project reference to non-existent alias (would trigger topic auto-creation)
+  // - An invalid own alias (will fail validation due to conflict after creating first item)
+
+  // First, create an item with alias "taken-alias"
+  const firstResult = await CreateItemWorkflow.execute({
+    title: "First item",
+    itemType: "note",
+    alias: "taken-alias",
+    parentPlacement,
+    createdAt,
+    timezone: TEST_TIMEZONE,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd111"),
+  });
+
+  if (firstResult.type !== "ok") {
+    throw new Error("First item creation should succeed");
+  }
+
+  // Check initial state: no items in permanent placement
+  const { createPermanentPlacement } = await import("../primitives/mod.ts");
+  const permanentPlacement = createPermanentPlacement();
+  const initialPermanentItems = await repository.listByPlacement({
+    kind: "single",
+    at: permanentPlacement,
+  });
+  if (initialPermanentItems.type !== "ok") {
+    throw new Error("Failed to list permanent items");
+  }
+  assertEquals(initialPermanentItems.value.length, 0, "No topics should exist initially");
+
+  // Now try to create an item that will fail validation
+  // - References non-existent project "new-project" (would trigger auto-creation)
+  // - Uses already-taken alias "taken-alias" (will fail validation)
+  const failingResult = await CreateItemWorkflow.execute({
+    title: "Second item",
+    itemType: "note",
+    project: "new-project",
+    alias: "taken-alias", // This conflicts with first item
+    parentPlacement,
+    createdAt,
+    timezone: TEST_TIMEZONE,
+  }, {
+    itemRepository: repository,
+    aliasRepository,
+    aliasAutoGenerator,
+    rankService,
+    idGenerationService: idService,
+  });
+
+  // Verify the creation failed due to alias conflict
+  assertEquals(failingResult.type, "error");
+  if (failingResult.type === "error" && failingResult.error.kind === "validation") {
+    assert(
+      failingResult.error.issues.some((issue) => issue.message.includes("already exists")),
+      "Should fail due to alias conflict",
+    );
+  }
+
+  // Verify NO orphan topic was created in the permanent placement
+  const finalPermanentItems = await repository.listByPlacement({
+    kind: "single",
+    at: permanentPlacement,
+  });
+  if (finalPermanentItems.type !== "ok") {
+    throw new Error("Failed to list permanent items");
+  }
+  assertEquals(
+    finalPermanentItems.value.length,
+    0,
+    "No orphan topics should be created when validation fails",
+  );
+
+  // Verify the project alias was not created in the alias repository
+  const projectAliasSlug = Result.unwrap(aliasSlugFromString("new-project"));
+  const projectAliasResult = await aliasRepository.load(projectAliasSlug);
+  if (projectAliasResult.type !== "ok") {
+    throw new Error("Failed to load project alias");
+  }
+  assertEquals(
+    projectAliasResult.value,
+    undefined,
+    "Project topic alias should not be created when validation fails",
+  );
+});
