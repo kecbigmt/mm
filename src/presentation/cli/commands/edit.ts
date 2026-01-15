@@ -85,6 +85,8 @@ export function createEditCommand() {
           {
             itemRepository: deps.itemRepository,
             aliasRepository: deps.aliasRepository,
+            rankService: deps.rankService,
+            idGenerationService: deps.idGenerationService,
           },
         );
 
@@ -99,7 +101,7 @@ export function createEditCommand() {
           Deno.exit(1);
         }
 
-        const item = loadResult.value;
+        const { item } = loadResult.value;
         const oldAlias = item.data.alias;
         const filePath = deriveFilePathFromId(
           { root: deps.root, timezone: deps.timezone },
@@ -177,6 +179,8 @@ export function createEditCommand() {
         {
           itemRepository: deps.itemRepository,
           aliasRepository: deps.aliasRepository,
+          rankService: deps.rankService,
+          idGenerationService: deps.idGenerationService,
         },
       );
 
@@ -193,10 +197,17 @@ export function createEditCommand() {
         Deno.exit(1);
       }
 
-      // Update cache with edited item
-      await deps.cacheUpdateService.updateFromItem(result.value);
+      const { item, createdTopics } = result.value;
 
-      console.log(`✅ Updated ${formatItem(result.value)}`);
+      // Display notifications for auto-created topics
+      for (const topicAlias of createdTopics) {
+        console.log(`Created topic: ${topicAlias.toString()}`);
+      }
+
+      // Update cache with edited item
+      await deps.cacheUpdateService.updateFromItem(item);
+
+      console.log(`✅ Updated ${formatItem(item)}`);
 
       // Auto-commit if enabled
       const autoCommitDeps = {

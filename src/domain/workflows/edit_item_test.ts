@@ -1,7 +1,7 @@
 import { assertEquals, assertExists } from "@std/assert";
 import { Result } from "../../shared/result.ts";
 import { Item } from "../models/item.ts";
-import { EditItemWorkflow } from "./edit_item.ts";
+import { EditItemDependencies, EditItemWorkflow } from "./edit_item.ts";
 import { createItem } from "../models/item.ts";
 import {
   AliasSlug,
@@ -22,6 +22,33 @@ import { createRepositoryError } from "../repositories/repository_error.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
 import { Alias, createAlias } from "../models/alias.ts";
+import { RankService } from "../services/rank_service.ts";
+import { IdGenerationService } from "../services/id_generation_service.ts";
+
+// Mock services for testing
+const createMockRankService = (): RankService => ({
+  headRank: () => Result.ok(Result.unwrap(itemRankFromString("a0"))),
+  tailRank: () => Result.ok(Result.unwrap(itemRankFromString("z0"))),
+  beforeRank: () => Result.ok(Result.unwrap(itemRankFromString("a0"))),
+  afterRank: () => Result.ok(Result.unwrap(itemRankFromString("z0"))),
+  compareRanks: () => 0,
+  generateEquallySpacedRanks: () => Result.ok([Result.unwrap(itemRankFromString("m0"))]),
+});
+
+const createMockIdGenerationService = (): IdGenerationService => ({
+  generateId: () =>
+    Result.ok(Result.unwrap(itemIdFromString("019965a7-9999-740a-b8c1-9999904fd120"))),
+});
+
+const createMockDeps = (
+  itemRepo: ItemRepository,
+  aliasRepo: AliasRepository,
+): EditItemDependencies => ({
+  itemRepository: itemRepo,
+  aliasRepository: aliasRepo,
+  rankService: createMockRankService(),
+  idGenerationService: createMockIdGenerationService(),
+});
 
 const TEST_TIMEZONE = Result.unwrap(timezoneIdentifierFromString("UTC"));
 
@@ -83,15 +110,12 @@ Deno.test("EditItemWorkflow - should update item title", async () => {
       updatedAt: now,
       timezone: TEST_TIMEZONE,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
-    assertEquals(result.value.data.title.toString(), "Updated Title");
+    assertEquals(result.value.item.data.title.toString(), "Updated Title");
   }
 });
 
@@ -144,15 +168,12 @@ Deno.test("EditItemWorkflow - should update item via alias", async () => {
       updatedAt: now,
       timezone: TEST_TIMEZONE,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
-    assertEquals(result.value.data.title.toString(), "Updated via Alias");
+    assertEquals(result.value.item.data.title.toString(), "Updated via Alias");
   }
 });
 
@@ -196,17 +217,14 @@ Deno.test("EditItemWorkflow - should update multiple fields", async () => {
       updatedAt: now,
       timezone: TEST_TIMEZONE,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
-    assertEquals(result.value.data.title.toString(), "Updated Title");
-    assertEquals(result.value.data.icon.toString(), "task");
-    assertEquals(result.value.data.body, "New body content");
+    assertEquals(result.value.item.data.title.toString(), "Updated Title");
+    assertEquals(result.value.item.data.icon.toString(), "task");
+    assertEquals(result.value.item.data.body, "New body content");
   }
 });
 
@@ -241,10 +259,7 @@ Deno.test("EditItemWorkflow - should return error for non-existent item", async 
       updatedAt: now,
       timezone: TEST_TIMEZONE,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "error");
@@ -295,10 +310,7 @@ Deno.test("EditItemWorkflow - should handle invalid title", async () => {
       updatedAt: now,
       timezone: TEST_TIMEZONE,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "error");
@@ -353,15 +365,12 @@ Deno.test("EditItemWorkflow - should update alias index when alias changes", asy
       updatedAt: now,
       timezone: TEST_TIMEZONE,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
-    assertEquals(result.value.data.alias?.toString(), "new-alias");
+    assertEquals(result.value.item.data.alias?.toString(), "new-alias");
   }
 
   // Verify old alias was deleted
@@ -423,15 +432,12 @@ Deno.test("EditItemWorkflow - should delete alias index when alias is cleared", 
       updatedAt: now,
       timezone: TEST_TIMEZONE,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
-    assertEquals(result.value.data.alias, undefined);
+    assertEquals(result.value.item.data.alias, undefined);
   }
 
   // Verify old alias was deleted
@@ -486,15 +492,12 @@ Deno.test("EditItemWorkflow - should save alias index when alias is added", asyn
       updatedAt: now,
       timezone: TEST_TIMEZONE,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
-    assertEquals(result.value.data.alias?.toString(), "new-alias");
+    assertEquals(result.value.item.data.alias?.toString(), "new-alias");
   }
 
   // Verify no alias was deleted (since there was no old alias)
@@ -550,19 +553,16 @@ Deno.test("EditItemWorkflow - should preserve existing schedule fields on partia
       updatedAt: now,
       timezone: TEST_TIMEZONE,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     // Duration should be updated
-    assertEquals(result.value.data.duration?.toString(), "30m");
+    assertEquals(result.value.item.data.duration?.toString(), "30m");
     // startAt and dueAt should be preserved
-    assertEquals(result.value.data.startAt?.toString(), startAt.toString());
-    assertEquals(result.value.data.dueAt?.toString(), dueAt.toString());
+    assertEquals(result.value.item.data.startAt?.toString(), startAt.toString());
+    assertEquals(result.value.item.data.dueAt?.toString(), dueAt.toString());
   }
 });
 
@@ -615,10 +615,7 @@ Deno.test("EditItemWorkflow - should reject alias collision", async () => {
       updatedAt: now,
       timezone: TEST_TIMEZONE,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "error");
@@ -669,17 +666,14 @@ Deno.test("EditItemWorkflow - should use placement date for time-only startAt", 
       updatedAt: now,
       timezone: TEST_TIMEZONE,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
-    assertExists(result.value.data.startAt);
+    assertExists(result.value.item.data.startAt);
     // Should use placement date (2025-02-10) instead of today
-    const isoString = result.value.data.startAt.data.iso;
+    const isoString = result.value.item.data.startAt.data.iso;
     // Time-only input is interpreted in system timezone
     // Verify the date portion is correct (UTC representation)
     assertEquals(isoString.substring(0, 10), "2025-02-10");
@@ -726,17 +720,14 @@ Deno.test("EditItemWorkflow - should use placement date for time-only dueAt", as
       updatedAt: now,
       timezone: TEST_TIMEZONE,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
-    assertExists(result.value.data.dueAt);
+    assertExists(result.value.item.data.dueAt);
     // Should use placement date (2025-02-15) instead of today
-    const isoString = result.value.data.dueAt.data.iso;
+    const isoString = result.value.item.data.dueAt.data.iso;
     // Time-only input is interpreted in system timezone
     // Verify the date portion is correct (UTC representation)
     assertEquals(isoString.substring(0, 10), "2025-02-15");
@@ -789,16 +780,13 @@ Deno.test("EditItemWorkflow - time-only startAt uses workspace timezone (PST)", 
       updatedAt: now,
       timezone: pstTimezone,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
-    assertExists(result.value.data.startAt);
-    const isoString = result.value.data.startAt.data.iso;
+    assertExists(result.value.item.data.startAt);
+    const isoString = result.value.item.data.startAt.data.iso;
     // Placement date is 2025-02-10
     // Reference date uses noon UTC to ensure stable date in workspace timezone
     // So 09:00 PST on 2025-02-10 = 2025-02-10T17:00:00.000Z
@@ -852,19 +840,102 @@ Deno.test("EditItemWorkflow - time-only dueAt uses workspace timezone (JST)", as
       updatedAt: now,
       timezone: jstTimezone,
     },
-    {
-      itemRepository: mockItemRepository,
-      aliasRepository: mockAliasRepository,
-    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
   );
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
-    assertExists(result.value.data.dueAt);
-    const isoString = result.value.data.dueAt.data.iso;
+    assertExists(result.value.item.data.dueAt);
+    const isoString = result.value.item.data.dueAt.data.iso;
     // Placement date is 2025-02-10
     // Reference date uses noon UTC to ensure stable date in workspace timezone
     // So 09:00 JST on 2025-02-10 = 2025-02-10T00:00:00.000Z
     assertEquals(isoString, "2025-02-10T00:00:00.000Z");
   }
+});
+
+// Test for deferred topic persistence - no orphan topics on validation failure
+Deno.test("EditItemWorkflow - does not create orphan topics when validation fails", async () => {
+  const itemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd120"));
+  const now = Result.unwrap(dateTimeFromDate(new Date("2025-02-10T12:00:00Z")));
+  const originalItem = createTestItem(itemId, "Original Title", now);
+
+  // Track what gets saved
+  const savedItems: Item[] = [];
+  const savedAliases: Alias[] = [];
+
+  // Existing alias that will cause a collision
+  const existingAliasSlug = Result.unwrap(aliasSlugFromString("taken-alias"));
+  const existingAlias = createAlias({
+    slug: existingAliasSlug,
+    itemId: Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd999")),
+    createdAt: now,
+  });
+
+  const mockItemRepository: ItemRepository = {
+    load: (id: ItemId) => {
+      if (id.equals(itemId)) {
+        return Promise.resolve(Result.ok(originalItem));
+      }
+      return Promise.resolve(
+        Result.error(createRepositoryError("item", "load", "Item not found")),
+      );
+    },
+    save: (item: Item) => {
+      savedItems.push(item);
+      return Promise.resolve(Result.ok(undefined));
+    },
+    delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
+    listByPlacement: () => Promise.resolve(Result.ok([])),
+  };
+
+  const mockAliasRepository: AliasRepository = {
+    load: (slug: AliasSlug) => {
+      // Return existing alias for "taken-alias"
+      if (slug.toString() === "taken-alias") {
+        return Promise.resolve(Result.ok(existingAlias));
+      }
+      // Return undefined for other aliases (including "new-project")
+      return Promise.resolve(Result.ok(undefined));
+    },
+    save: (alias: Alias) => {
+      savedAliases.push(alias);
+      return Promise.resolve(Result.ok(undefined));
+    },
+    delete: (_slug) => Promise.resolve(Result.ok(undefined)),
+    list: () => Promise.resolve(Result.ok([])),
+  };
+
+  // Try to edit with:
+  // - A project reference to non-existent alias (would trigger auto-creation)
+  // - An alias that already exists (will fail validation)
+  const result = await EditItemWorkflow.execute(
+    {
+      itemLocator: itemId.toString(),
+      updates: {
+        project: "new-project", // Would trigger topic auto-creation
+        alias: "taken-alias", // Conflicts with existing alias
+      },
+      updatedAt: now,
+      timezone: TEST_TIMEZONE,
+    },
+    createMockDeps(mockItemRepository, mockAliasRepository),
+  );
+
+  // Verify the edit failed due to alias conflict
+  assertEquals(result.type, "error");
+
+  // Verify NO items were saved (no orphan topics)
+  assertEquals(
+    savedItems.length,
+    0,
+    "No items should be saved when validation fails (no orphan topics)",
+  );
+
+  // Verify NO aliases were saved
+  assertEquals(
+    savedAliases.length,
+    0,
+    "No aliases should be saved when validation fails",
+  );
 });

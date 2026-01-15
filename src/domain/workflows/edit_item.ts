@@ -22,6 +22,14 @@ import {
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
+import { RankService } from "../services/rank_service.ts";
+import { IdGenerationService } from "../services/id_generation_service.ts";
+import {
+  buildTopicItem,
+  persistPreparedTopic,
+  PreparedTopic,
+  TopicBuildError,
+} from "../services/topic_auto_creation_service.ts";
 
 export type EditItemInput = Readonly<{
   itemLocator: string;
@@ -43,6 +51,8 @@ export type EditItemInput = Readonly<{
 export type EditItemDependencies = Readonly<{
   itemRepository: ItemRepository;
   aliasRepository: AliasRepository;
+  rankService: RankService;
+  idGenerationService: IdGenerationService;
 }>;
 
 export type EditItemValidationError = ValidationError<"EditItem">;
@@ -51,11 +61,27 @@ export type EditItemError =
   | EditItemValidationError
   | RepositoryError;
 
+export type EditItemResult = Readonly<{
+  item: Item;
+  /** Aliases of topics that were auto-created for project/context references */
+  createdTopics: ReadonlyArray<AliasSlug>;
+}>;
+
+const topicBuildErrorToEditItemError = (error: TopicBuildError): EditItemError => {
+  if (error.kind === "validation") {
+    return createValidationError("EditItem", error.issues);
+  }
+  return error.error;
+};
+
 export const EditItemWorkflow = {
   execute: async (
     input: EditItemInput,
     deps: EditItemDependencies,
-  ): Promise<Result<Item, EditItemError>> => {
+  ): Promise<Result<EditItemResult, EditItemError>> => {
+    const createdTopics: AliasSlug[] = [];
+    // Collect prepared topics during validation; persist only after all validation passes
+    const pendingTopics: PreparedTopic[] = [];
     let item: Item | undefined;
     const uuidResult = parseItemId(input.itemLocator);
 
@@ -154,7 +180,7 @@ export const EditItemWorkflow = {
       }
     }
 
-    // Resolve project alias to ItemId
+    // Resolve project alias to ItemId (auto-create if not found)
     if (input.updates.project !== undefined) {
       let projectId: ItemId | undefined;
       if (input.updates.project.trim().length > 0) {
@@ -173,10 +199,18 @@ export const EditItemWorkflow = {
               message: `Failed to look up project alias: ${aliasLookup.error.message}`,
             });
           } else if (aliasLookup.value === undefined) {
-            issues.push({
-              field: "project",
-              message: `Alias '${input.updates.project}' not found`,
-            });
+            // Build topic for non-existent project alias (deferred persistence)
+            const buildResult = await buildTopicItem(
+              projectAliasResult.value,
+              input.updatedAt,
+              deps,
+            );
+            if (buildResult.type === "error") {
+              return Result.error(topicBuildErrorToEditItemError(buildResult.error));
+            }
+            projectId = buildResult.value.item.data.id;
+            pendingTopics.push(buildResult.value);
+            createdTopics.push(projectAliasResult.value);
           } else {
             projectId = aliasLookup.value.data.itemId;
           }
@@ -187,9 +221,11 @@ export const EditItemWorkflow = {
       }
     }
 
-    // Resolve context aliases to ItemIds
+    // Resolve context aliases to ItemIds (auto-create if not found)
     if (input.updates.contexts !== undefined) {
       const contextIds: ItemId[] = [];
+      // Track already processed aliases to avoid duplicate auto-creation
+      const processedAliases = new Map<string, ItemId>();
       let hasContextErrors = false;
       for (const [index, contextStr] of input.updates.contexts.entries()) {
         if (contextStr.trim().length > 0) {
@@ -202,6 +238,14 @@ export const EditItemWorkflow = {
             });
             hasContextErrors = true;
           } else {
+            const aliasKey = contextAliasResult.value.toString();
+            // Check if we already processed this alias in this command
+            const alreadyProcessed = processedAliases.get(aliasKey);
+            if (alreadyProcessed) {
+              contextIds.push(alreadyProcessed);
+              continue;
+            }
+
             // Look up alias to get target ItemId
             const aliasLookup = await deps.aliasRepository.load(contextAliasResult.value);
             if (aliasLookup.type === "error") {
@@ -211,13 +255,31 @@ export const EditItemWorkflow = {
               });
               hasContextErrors = true;
             } else if (aliasLookup.value === undefined) {
-              issues.push({
-                field: `contexts[${index}]`,
-                message: `Alias '${contextStr}' not found`,
-              });
-              hasContextErrors = true;
+              // Check if this topic was already prepared (e.g., same alias used for project)
+              const alreadyPrepared = pendingTopics.find((t) => t.slug.toString() === aliasKey);
+              if (alreadyPrepared) {
+                const itemId = alreadyPrepared.item.data.id;
+                contextIds.push(itemId);
+                processedAliases.set(aliasKey, itemId);
+              } else {
+                // Build topic for non-existent context alias (deferred persistence)
+                const buildResult = await buildTopicItem(
+                  contextAliasResult.value,
+                  input.updatedAt,
+                  deps,
+                );
+                if (buildResult.type === "error") {
+                  return Result.error(topicBuildErrorToEditItemError(buildResult.error));
+                }
+                contextIds.push(buildResult.value.item.data.id);
+                processedAliases.set(aliasKey, buildResult.value.item.data.id);
+                pendingTopics.push(buildResult.value);
+                createdTopics.push(contextAliasResult.value);
+              }
             } else {
-              contextIds.push(aliasLookup.value.data.itemId);
+              const itemId = aliasLookup.value.data.itemId;
+              contextIds.push(itemId);
+              processedAliases.set(aliasKey, itemId);
             }
           }
         }
@@ -339,6 +401,14 @@ export const EditItemWorkflow = {
       }
     }
 
+    // Persist all prepared topics now that validation has passed
+    for (const prepared of pendingTopics) {
+      const persistResult = await persistPreparedTopic(prepared, deps);
+      if (persistResult.type === "error") {
+        return Result.error(persistResult.error);
+      }
+    }
+
     // Save item first to ensure it succeeds before updating indexes
     const saveResult = await deps.itemRepository.save(updatedItem);
     if (saveResult.type === "error") {
@@ -369,6 +439,9 @@ export const EditItemWorkflow = {
       }
     }
 
-    return Result.ok(updatedItem);
+    return Result.ok({
+      item: updatedItem,
+      createdTopics: Object.freeze(createdTopics),
+    });
   },
 };

@@ -32,6 +32,7 @@ export type ItemIdResolver = (id: string) => string | undefined;
  * - note: -
  * - task: •
  * - event: ○
+ * - topic: ◆
  *
  * Status/state symbols:
  * - closed: ✓
@@ -58,6 +59,8 @@ export const formatItemIcon = (
       return "•";
     case "event":
       return "○";
+    case "topic":
+      return "◆";
     default:
       return "-";
   }
@@ -69,6 +72,7 @@ export const formatItemIcon = (
  * - note: [note] / [note:closed] / [note:snoozing]
  * - task: [task] / [task:closed] / [task:snoozing]
  * - event: [event] / [event:closed] / [event:snoozing]
+ * - topic: [topic] / [topic:closed] / [topic:snoozing]
  */
 const formatItemIconPlain = (
   icon: ItemIcon,
@@ -85,6 +89,8 @@ const formatItemIconPlain = (
       return `[task${statusSuffix}]`;
     case "event":
       return `[event${statusSuffix}]`;
+    case "topic":
+      return `[topic${statusSuffix}]`;
     default:
       return "[note]";
   }

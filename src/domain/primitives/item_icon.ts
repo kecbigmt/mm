@@ -8,7 +8,7 @@ import { createStringPrimitiveFactory, StringPrimitive } from "./string_primitiv
 
 const ITEM_ICON_KIND = "ItemIcon" as const;
 
-export type ItemIconValue = "note" | "task" | "event";
+export type ItemIconValue = "note" | "task" | "event" | "topic";
 
 const itemIconFactory = createStringPrimitiveFactory<
   typeof ITEM_ICON_KIND,
@@ -32,7 +32,7 @@ export type ItemIconValidationError = ValidationError<typeof ITEM_ICON_KIND>;
 
 export const isItemIcon = (value: unknown): value is ItemIcon => itemIconFactory.is(value);
 
-const ITEM_ICON_VALUES: ReadonlyArray<ItemIconValue> = ["note", "task", "event"];
+const ITEM_ICON_VALUES: ReadonlyArray<ItemIconValue> = ["note", "task", "event", "topic"];
 
 export const parseItemIcon = (
   input: unknown,
@@ -56,7 +56,7 @@ export const parseItemIcon = (
   if (!ITEM_ICON_VALUES.includes(normalized as ItemIconValue)) {
     return Result.error(
       createValidationError(ITEM_ICON_KIND, [
-        createValidationIssue("icon must be 'note', 'task', or 'event'", {
+        createValidationIssue("icon must be 'note', 'task', 'event', or 'topic'", {
           path: ["value"],
           code: "invalid_value",
         }),
