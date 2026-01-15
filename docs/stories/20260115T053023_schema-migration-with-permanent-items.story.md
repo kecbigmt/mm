@@ -71,6 +71,112 @@ Additionally, since mm is used across multiple devices with Git sync, we must en
 #### 10. Multi-device Safety
 - [ ] **Given** migration prompt is shown, **When** user sees the message, **Then** it includes: "⚠️ Before migrating: Commit all local changes, Push to remote (if using Git sync), Run on ONE device only to avoid conflicts"
 
+### Example Output
+
+#### Auto-detection Warning
+```bash
+$ mm ls
+Warning: Workspace schema version is outdated (0.1.0 → 0.2.0)
+Migration required. Run: mm doctor migrate schema
+
+# ... normal ls output continues ...
+```
+
+#### Migration Command - Dry Run
+```bash
+$ mm doctor migrate schema --dry-run
+Running in dry-run mode (no changes will be made)
+
+Checking workspace for outdated schemas...
+Found 1,234 items requiring migration
+
+Analysis Results:
+  - Will create 50 permanent items for tags:
+    • alpha-project
+    • beta-context
+    • gamma-task
+    ... (47 more)
+
+  - Will update 1,234 item frontmatter files
+    • 800 items with contexts fields
+    • 450 items with project fields
+    • 16 items with both
+
+Run without --dry-run to apply the migration.
+```
+
+#### Migration Command - Full Execution
+```bash
+$ mm doctor migrate schema
+Checking workspace for outdated schemas...
+Found 1,234 items requiring migration
+
+Checking Git status...
+✓ No uncommitted changes
+✓ No unpushed commits
+✓ Working directory clean
+
+This will:
+  1. Create 50 permanent items for tags
+  2. Update 1,234 item frontmatter files
+  3. Update workspace.json version: 0.1.0 → 0.2.0
+
+⚠️  Before migrating:
+  - Commit all local changes
+  - Push to remote (if using Git sync)
+  - Run on ONE device only to avoid conflicts
+
+Continue? [y/N] y
+
+Creating permanent items... (50/50)
+✓ Created permanent items
+
+Updating item frontmatter... (1,234/1,234)
+✓ Updated item frontmatter
+
+Updating workspace.json version: 0.1.0 → 0.2.0
+✓ Updated workspace version
+
+✓ Migration completed successfully
+
+Next steps:
+  - Commit the changes: git add -A && git commit -m "chore: migrate to schema v4"
+  - Push to remote: git push
+```
+
+#### Migration Command - With Git Warnings
+```bash
+$ mm doctor migrate schema
+Checking workspace for outdated schemas...
+Found 150 items requiring migration
+
+Checking Git status...
+⚠️  Uncommitted changes detected:
+  modified:   items/2024/01/15/abc123.md
+  modified:   items/2024/01/16/def456.md
+
+⚠️  Unpushed commits detected:
+  Your branch is ahead of 'origin/main' by 3 commits
+
+Please commit and push your changes before migrating.
+This ensures no conflicts occur during multi-device sync.
+
+Aborting migration.
+```
+
+#### Repository-level Error Detection
+```bash
+$ mm ls
+Error: Outdated item schema detected
+  File: items/2024/01/15/abc123.md
+  Issue: Item has mm.item.frontmatter/3 with alias strings in contexts field
+
+Run: mm doctor migrate schema
+
+$ mm doctor migrate schema
+# ... proceeds with migration ...
+```
+
 ### Verification Approach
 - CLI command execution with test workspace
 - Create fixtures with old-format items
