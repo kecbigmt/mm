@@ -1,0 +1,10 @@
+builds:
+  id: mm
+  builder: deno
+  binary: mm
+  targets:
+    - aarch640apple-darwin
+  dir: .
+  main: src/main.ts
+  command: run compile
+
