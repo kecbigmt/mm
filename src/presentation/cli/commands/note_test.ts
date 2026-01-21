@@ -48,6 +48,7 @@ Deno.test({
     env: true,
     read: true,
     write: true,
+    sys: true,
   },
   async fn() {
     const workspace = await Deno.makeTempDir({ prefix: "mm-cli-integration-" });
@@ -151,6 +152,7 @@ Deno.test({
     env: true,
     read: true,
     write: true,
+    sys: true,
   },
   async fn() {
     const workspace = await Deno.makeTempDir({ prefix: "mm-cli-permanent-" });
@@ -237,6 +239,7 @@ Deno.test({
     env: true,
     read: true,
     write: true,
+    sys: true,
   },
   async fn() {
     const workspace = await Deno.makeTempDir({ prefix: "mm-cli-invalid-placement-" });

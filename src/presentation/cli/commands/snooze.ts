@@ -64,13 +64,12 @@ export function createSnoozeCommand() {
 
       const now = new Date();
 
-      const cwdResult = await CwdResolutionService.getCwd(
-        {
-          getEnv: (name) => Deno.env.get(name),
-          itemRepository: deps.itemRepository,
-          timezone: deps.timezone,
-        },
-      );
+      const cwdResult = await CwdResolutionService.getCwd({
+        sessionRepository: deps.sessionRepository,
+        workspacePath: deps.root,
+        itemRepository: deps.itemRepository,
+        timezone: deps.timezone,
+      });
 
       if (cwdResult.type === "error") {
         console.error(cwdResult.error.message);
