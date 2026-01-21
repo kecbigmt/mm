@@ -130,6 +130,11 @@ PR #95 and #96 introduced a +17% performance regression in the `ls` command benc
 
 **Next:** Code Review (after CI performance benchmark confirms criterion 4)
 
+### Pull Request
+PR: [#98](https://github.com/kecbigmt/mm/pull/98)
+Created: 2026-01-21
+Status: Ready for review (pending CI benchmark)
+
 ### Follow-ups / Open Risks
 
 #### Remaining
