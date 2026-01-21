@@ -174,6 +174,20 @@ All acceptance criteria verified through independent testing. Implementation cor
 - src/presentation/cli/commands/list.ts (no changes to listAction signature)
 - tests/e2e/scenarios/scenario_default_commands_test.ts (comprehensive E2E tests)
 
+---
+
+## Pull Request
+
+**PR:** [#93](https://github.com/kecbigmt/mm/pull/93)
+**Created:** 2026-01-21
+**Status:** Ready for review
+
+**Commits:**
+1. `test: add E2E tests for default command shortcuts` - Test-driven evidence
+2. `feat(cli): enable default actions for mm and workspace commands` - Feature implementation with ANSI bold hints
+3. `refactor(cli): extract itemTypeEnum to shared types module` - Code quality improvement
+4. `docs: add story log for default command shortcuts feature` - Documentation
+
 ## Follow-ups / Open Risks
 
 ### Addressed
@@ -181,6 +195,7 @@ All acceptance criteria verified through independent testing. Implementation cor
 - Single responsibility maintained: hint display separated from list logic
 - No boolean parameters: each action function has clear, single purpose
 - All acceptance criteria verified independently
+- ANSI bold formatting: Terminal displays actual bold text (not markdown)
 
 ### Remaining
 - None identified
