@@ -74,8 +74,8 @@ export function createTaskCommand() {
         {
           getEnv: (name) => Deno.env.get(name),
           itemRepository: deps.itemRepository,
+          timezone: deps.timezone,
         },
-        now,
       );
       if (cwdResult.type === "error") {
         console.error(formatError(cwdResult.error, debug));

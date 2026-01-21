@@ -47,8 +47,8 @@ export const rebalanceRankCommand = new Command()
       {
         getEnv: (name) => Deno.env.get(name),
         itemRepository: deps.itemRepository,
+        timezone: deps.timezone,
       },
-      now,
     );
 
     if (cwdResult.type === "error") {

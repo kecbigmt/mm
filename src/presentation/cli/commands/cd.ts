@@ -33,8 +33,8 @@ export function createCdCommand() {
           {
             getEnv: (name) => Deno.env.get(name),
             itemRepository: deps.itemRepository,
+            timezone: deps.timezone,
           },
-          now,
         );
         if (cwdResult.type === "error") {
           console.error(formatError(cwdResult.error, debug));
@@ -60,8 +60,8 @@ export function createCdCommand() {
         {
           getEnv: (name) => Deno.env.get(name),
           itemRepository: deps.itemRepository,
+          timezone: deps.timezone,
         },
-        now,
       );
       if (cwdPlacementResult.type === "error") {
         console.error(formatError(cwdPlacementResult.error, debug));

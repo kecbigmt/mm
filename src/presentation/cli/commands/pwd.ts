@@ -23,14 +23,13 @@ export function createPwdCommand() {
       }
 
       const deps = depsResult.value;
-      const now = new Date();
 
       const cwdResult = await CwdResolutionService.getCwd(
         {
           getEnv: (name) => Deno.env.get(name),
           itemRepository: deps.itemRepository,
+          timezone: deps.timezone,
         },
-        now,
       );
 
       if (cwdResult.type === "error") {
