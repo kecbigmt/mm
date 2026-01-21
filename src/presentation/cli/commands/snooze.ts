@@ -64,17 +64,20 @@ export function createSnoozeCommand() {
 
       const now = new Date();
 
-      const cwdResult = await CwdResolutionService.getCwd(
-        {
-          stateRepository: deps.stateRepository,
-          itemRepository: deps.itemRepository,
-        },
-        now,
-      );
+      const cwdResult = await CwdResolutionService.getCwd({
+        sessionRepository: deps.sessionRepository,
+        workspacePath: deps.root,
+        itemRepository: deps.itemRepository,
+        timezone: deps.timezone,
+      });
 
       if (cwdResult.type === "error") {
         console.error(cwdResult.error.message);
         return;
+      }
+
+      if (cwdResult.value.warning) {
+        console.error(`Warning: ${cwdResult.value.warning}`);
       }
 
       const occurredAtResult = dateTimeFromDate(now);
@@ -117,7 +120,7 @@ export function createSnoozeCommand() {
         }
 
         const itemPlacementResult = await pathResolver.resolvePath(
-          cwdResult.value,
+          cwdResult.value.placement,
           itemExprResult.value,
         );
         if (itemPlacementResult.type === "error") {

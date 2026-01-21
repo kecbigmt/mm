@@ -1,4 +1,5 @@
 import { Command } from "@cliffy/command";
+import { bold } from "@std/fmt/colors";
 import { Result } from "../../../shared/result.ts";
 import { resolveMmHome } from "../dependencies.ts";
 import { workspaceNameFromString } from "../../../domain/primitives/workspace_name.ts";
@@ -89,6 +90,16 @@ const listAction = async () => {
       console.log(`    ${name}`);
     }
   }
+};
+
+/**
+ * Default action for `mm workspace` with no arguments.
+ * Shows hint message followed by workspace list.
+ */
+const defaultListAction = async () => {
+  console.log(`${bold("Hint:")} Use \`mm ws -h\` for a list of available commands.`);
+  console.log("");
+  await listAction();
 };
 
 const rebuildIndex = async (workspaceRoot: string): Promise<void> => {
@@ -281,6 +292,7 @@ const useAction = async (
 export const createWorkspaceCommand = () =>
   new Command()
     .description("Workspace management")
+    .action(defaultListAction)
     .command(
       "list",
       new Command()

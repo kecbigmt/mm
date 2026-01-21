@@ -50,17 +50,20 @@ export function createMoveCommand() {
 
       const now = new Date();
 
-      const cwdResult = await CwdResolutionService.getCwd(
-        {
-          stateRepository: deps.stateRepository,
-          itemRepository: deps.itemRepository,
-        },
-        now,
-      );
+      const cwdResult = await CwdResolutionService.getCwd({
+        sessionRepository: deps.sessionRepository,
+        workspacePath: deps.root,
+        itemRepository: deps.itemRepository,
+        timezone: deps.timezone,
+      });
 
       if (cwdResult.type === "error") {
         console.error(formatError(cwdResult.error, debug));
         return;
+      }
+
+      if (cwdResult.value.warning) {
+        console.error(`Warning: ${cwdResult.value.warning}`);
       }
 
       const occurredAtResult = dateTimeFromDate(now);
@@ -80,7 +83,7 @@ export function createMoveCommand() {
           {
             itemExpression: itemRef,
             targetExpression,
-            cwd: cwdResult.value,
+            cwd: cwdResult.value.placement,
             today: now,
             occurredAt: occurredAtResult.value,
             timezone: deps.timezone,

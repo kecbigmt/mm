@@ -3,12 +3,10 @@ import { Result } from "../../shared/result.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
 import { StateRepository, SyncState } from "../../domain/repositories/state_repository.ts";
-import { parsePlacement, Placement } from "../../domain/primitives/mod.ts";
 
 const STATE_FILE_NAME = ".state.json";
 
 type StateSnapshot = Readonly<{
-  readonly default_cwd?: string;
   readonly sync_state?: {
     readonly commits_since_last_sync?: number;
     readonly last_sync_timestamp?: number | null;
@@ -75,42 +73,6 @@ export const createFileSystemStateRepository = (
 ): StateRepository => {
   const statePath = join(options.workspaceRoot, STATE_FILE_NAME);
 
-  const loadCwd = async (): Promise<Result<Placement | undefined, RepositoryError>> => {
-    const stateResult = await readState(statePath);
-    if (stateResult.type === "error") {
-      return stateResult;
-    }
-
-    const cwdString = stateResult.value?.default_cwd;
-    if (!cwdString || cwdString.trim() === "") {
-      return Result.ok(undefined);
-    }
-
-    const parsed = parsePlacement(cwdString);
-    if (parsed.type === "error") {
-      return Result.error(
-        createRepositoryError("state", "load", "invalid cwd placement in state file", {
-          cause: parsed.error,
-        }),
-      );
-    }
-
-    return Result.ok(parsed.value);
-  };
-
-  const saveCwd = async (placement: Placement): Promise<Result<void, RepositoryError>> => {
-    const stateResult = await readState(statePath);
-    if (stateResult.type === "error") {
-      return stateResult;
-    }
-
-    const nextState: StateSnapshot = {
-      ...stateResult.value,
-      default_cwd: placement.toString(),
-    };
-    return await writeState(statePath, nextState);
-  };
-
   const loadSyncState = async (): Promise<Result<SyncState, RepositoryError>> => {
     const stateResult = await readState(statePath);
     if (stateResult.type === "error") {
@@ -141,8 +103,6 @@ export const createFileSystemStateRepository = (
   };
 
   return {
-    loadCwd,
-    saveCwd,
     loadSyncState,
     saveSyncState,
   };

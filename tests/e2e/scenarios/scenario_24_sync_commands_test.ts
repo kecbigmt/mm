@@ -239,6 +239,7 @@ describe("Scenario 24: Sync Commands", () => {
           "--allow-write",
           "--allow-env",
           "--allow-run",
+          "--allow-sys",
           "src/main.ts",
           ...args,
         ],

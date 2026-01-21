@@ -75,13 +75,9 @@ export async function placementToResolvedGraphPath(
       date: currentPlacement.head.date,
     });
   } else {
-    // permanent head - use "permanent" as the root segment
-    // Note: ResolvedGraphPath doesn't have a "permanent" kind yet,
-    // so we represent it as a section with index 0 as placeholder
-    // This will need to be extended when permanent display is fully implemented
+    // permanent head
     segments.push({
-      kind: "section",
-      index: 0,
+      kind: "permanent",
     });
   }
 

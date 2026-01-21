@@ -70,20 +70,22 @@ export function createTaskCommand() {
       const now = new Date();
       const parentArg = typeof options.parent === "string" ? options.parent : undefined;
 
-      const cwdResult = await CwdResolutionService.getCwd(
-        {
-          stateRepository: deps.stateRepository,
-          itemRepository: deps.itemRepository,
-        },
-        now,
-      );
+      const cwdResult = await CwdResolutionService.getCwd({
+        sessionRepository: deps.sessionRepository,
+        workspacePath: deps.root,
+        itemRepository: deps.itemRepository,
+        timezone: deps.timezone,
+      });
       if (cwdResult.type === "error") {
         console.error(formatError(cwdResult.error, debug));
         return;
       }
+      if (cwdResult.value.warning) {
+        console.error(`Warning: ${cwdResult.value.warning}`);
+      }
 
       // Resolve parent placement
-      let parentPlacement = cwdResult.value;
+      let parentPlacement = cwdResult.value.placement;
 
       if (parentArg) {
         const exprResult = parsePathExpression(parentArg);
@@ -103,7 +105,7 @@ export function createTaskCommand() {
         });
 
         const resolveResult = await pathResolver.resolvePath(
-          cwdResult.value,
+          cwdResult.value.placement,
           exprResult.value,
         );
 

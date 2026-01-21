@@ -12,6 +12,8 @@ export type { FileSystemItemRepositoryDependencies } from "./item_repository.ts"
 
 export { createFileSystemConfigRepository } from "./config_repository.ts";
 export { createFileSystemStateRepository } from "./state_repository.ts";
+export { createFileSessionRepository } from "./session_repository.ts";
+export type { FileSessionRepositoryOptions } from "./session_repository.ts";
 
 export { createWorkspaceScanner } from "./workspace_scanner.ts";
 export type { ScanError, WorkspaceScanner } from "./workspace_scanner.ts";

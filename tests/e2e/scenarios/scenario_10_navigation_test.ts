@@ -24,6 +24,7 @@ import {
   cleanupTestEnvironment,
   getCurrentDateFromCli,
   initWorkspace,
+  runCd,
   runCommand,
   setupTestEnvironment,
   type TestContext,
@@ -42,75 +43,94 @@ describe("Scenario 10: Navigation", () => {
   });
 
   it("navigates up item hierarchy using dotdot (../)", async () => {
-    await runCommand(ctx.testHome, ["cd", "today"]);
+    const cdToday = await runCd(ctx.testHome, "today");
+    assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 
     // Create hierarchy: A -> B -> C
-    await runCommand(ctx.testHome, ["note", "A", "--alias", "a"]);
-    await runCommand(ctx.testHome, ["note", "B", "--parent", "a", "--alias", "b"]);
-    await runCommand(ctx.testHome, ["note", "C", "--parent", "b", "--alias", "c"]);
+    await runCommand(ctx.testHome, ["note", "A", "--alias", "a"], { sessionDir: ctx.sessionDir });
+    await runCommand(ctx.testHome, ["note", "B", "--parent", "a", "--alias", "b"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "C", "--parent", "b", "--alias", "c"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // Navigate to c
-    const cdCResult = await runCommand(ctx.testHome, ["cd", "c"]);
-    assertEquals(cdCResult.success, true, `cd c failed: ${cdCResult.stderr}`);
+    let cdResult = await runCd(ctx.testHome, "c", { sessionDir: ctx.sessionDir });
+    assertEquals(cdResult.success, true, `cd c failed: ${cdResult.stderr}`);
 
     // Verify pwd is c
-    let pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    let pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.success, true, `pwd failed: ${pwdResult.stderr}`);
     assertEquals(pwdResult.stdout.includes("/a/b/c"), true, "CWD should be /a/b/c");
 
     // Navigate up to b using ../
-    const cdUpResult = await runCommand(ctx.testHome, ["cd", "../"]);
+    const cdUpResult = await runCd(ctx.testHome, "../", { sessionDir: ctx.sessionDir });
     assertEquals(cdUpResult.success, true, `cd ../ failed: ${cdUpResult.stderr}`);
 
     // Verify pwd is b
-    pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.success, true, `pwd failed: ${pwdResult.stderr}`);
     assertEquals(pwdResult.stdout.includes("/a/b"), true, "CWD should be /a/b");
     assertEquals(pwdResult.stdout.includes("/c"), false, "CWD should not include /c");
 
     // Navigate up to a using ../../ (from c)
-    await runCommand(ctx.testHome, ["cd", "c"]);
-    const cdUp2Result = await runCommand(ctx.testHome, ["cd", "../../"]);
+    cdResult = await runCd(ctx.testHome, "c", { sessionDir: ctx.sessionDir });
+    assertEquals(cdResult.success, true, `cd c failed: ${cdResult.stderr}`);
+    const cdUp2Result = await runCd(ctx.testHome, "../../", { sessionDir: ctx.sessionDir });
     assertEquals(cdUp2Result.success, true, `cd ../../ failed: ${cdUp2Result.stderr}`);
 
     // Verify pwd is a
-    pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.success, true, `pwd failed: ${pwdResult.stderr}`);
     assertEquals(pwdResult.stdout.includes("/a"), true, "CWD should be /a");
     assertEquals(pwdResult.stdout.includes("/b"), false, "CWD should not include /b");
   });
 
   it("navigates up from sections to parent items using dotdot", async () => {
-    await runCommand(ctx.testHome, ["cd", "today"]);
+    const cdToday = await runCd(ctx.testHome, "today");
+    assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 
     // Create item with sections
-    await runCommand(ctx.testHome, ["note", "Chapter", "--alias", "chapter"]);
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter/1"]);
+    await runCommand(ctx.testHome, ["note", "Chapter", "--alias", "chapter"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter/1"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // Navigate to chapter/1
-    await runCommand(ctx.testHome, ["cd", "chapter/1"]);
+    const cdSection = await runCd(ctx.testHome, "chapter/1", { sessionDir: ctx.sessionDir });
+    assertEquals(cdSection.success, true, `cd chapter/1 failed: ${cdSection.stderr}`);
 
     // Verify we're in section 1
-    let pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    let pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.stdout.includes("chapter/1"), true, "CWD should be chapter/1");
 
     // Navigate up using ../
-    const cdUpResult = await runCommand(ctx.testHome, ["cd", "../"]);
+    const cdUpResult = await runCd(ctx.testHome, "../", { sessionDir: ctx.sessionDir });
     assertEquals(cdUpResult.success, true, `cd ../ from section failed: ${cdUpResult.stderr}`);
 
     // Verify we're back to chapter (section removed)
-    pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.stdout.includes("/chapter"), true, "CWD should be /chapter");
     assertEquals(pwdResult.stdout.includes("/1"), false, "CWD should not include section /1");
   });
 
   it("lists parent items using dotdot (ls ../)", async () => {
-    await runCommand(ctx.testHome, ["cd", "today"]);
+    const cdToday = await runCd(ctx.testHome, "today");
+    assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 
     // Create hierarchy: Parent -> Child1, Child2, Grandchild
-    await runCommand(ctx.testHome, ["note", "Parent", "--alias", "parent"]);
-    await runCommand(ctx.testHome, ["note", "Child1", "--parent", "parent"]);
-    await runCommand(ctx.testHome, ["note", "Child2", "--parent", "parent"]);
+    await runCommand(ctx.testHome, ["note", "Parent", "--alias", "parent"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "Child1", "--parent", "parent"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "Child2", "--parent", "parent"], {
+      sessionDir: ctx.sessionDir,
+    });
     await runCommand(ctx.testHome, [
       "note",
       "Grandchild",
@@ -118,13 +138,16 @@ describe("Scenario 10: Navigation", () => {
       "parent",
       "--alias",
       "grandchild",
-    ]);
+    ], { sessionDir: ctx.sessionDir });
 
     // Navigate to grandchild
-    await runCommand(ctx.testHome, ["cd", "grandchild"]);
+    const cdGrandchild = await runCd(ctx.testHome, "grandchild", { sessionDir: ctx.sessionDir });
+    assertEquals(cdGrandchild.success, true, `cd grandchild failed: ${cdGrandchild.stderr}`);
 
     // List parent directory (should show siblings: Child1, Child2, Grandchild)
-    const lsParentResult = await runCommand(ctx.testHome, ["ls", "../"]);
+    const lsParentResult = await runCommand(ctx.testHome, ["ls", "../"], {
+      sessionDir: ctx.sessionDir,
+    });
     assertEquals(lsParentResult.success, true, `ls ../ failed: ${lsParentResult.stderr}`);
 
     const lines = lsParentResult.stdout.split("\n").filter((line) => line.trim() !== "");
@@ -149,7 +172,9 @@ describe("Scenario 10: Navigation", () => {
     );
 
     // List grandparent directory (should show Parent)
-    const lsGrandparentResult = await runCommand(ctx.testHome, ["ls", "../../"]);
+    const lsGrandparentResult = await runCommand(ctx.testHome, ["ls", "../../"], {
+      sessionDir: ctx.sessionDir,
+    });
     assertEquals(
       lsGrandparentResult.success,
       true,
@@ -164,80 +189,96 @@ describe("Scenario 10: Navigation", () => {
   });
 
   it("navigates using dot (.) for current directory", async () => {
-    await runCommand(ctx.testHome, ["cd", "today"]);
-    await runCommand(ctx.testHome, ["note", "Item", "--alias", "item"]);
+    const cdToday = await runCd(ctx.testHome, "today");
+    assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
+    await runCommand(ctx.testHome, ["note", "Item", "--alias", "item"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // cd to item
-    await runCommand(ctx.testHome, ["cd", "item"]);
+    const cdItem = await runCd(ctx.testHome, "item", { sessionDir: ctx.sessionDir });
+    assertEquals(cdItem.success, true, `cd item failed: ${cdItem.stderr}`);
 
     // Navigate using . (should stay in same place)
-    const cdDotResult = await runCommand(ctx.testHome, ["cd", "."]);
+    const cdDotResult = await runCd(ctx.testHome, ".", { sessionDir: ctx.sessionDir });
     assertEquals(cdDotResult.success, true, `cd . failed: ${cdDotResult.stderr}`);
 
     // Verify still in item
-    const pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    const pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.stdout.includes("/item"), true, "CWD should still be /item");
 
     // List using . (should list current directory)
-    const lsDotResult = await runCommand(ctx.testHome, ["ls", "."]);
+    const lsDotResult = await runCommand(ctx.testHome, ["ls", "."], { sessionDir: ctx.sessionDir });
     assertEquals(lsDotResult.success, true, `ls . failed: ${lsDotResult.stderr}`);
   });
 
   it("navigates using absolute paths", async () => {
     const today = await getCurrentDateFromCli(ctx.testHome);
 
-    await runCommand(ctx.testHome, ["cd", "today"]);
-    await runCommand(ctx.testHome, ["note", "A", "--alias", "a"]);
-    await runCommand(ctx.testHome, ["note", "B", "--parent", "a", "--alias", "b"]);
+    const cdToday = await runCd(ctx.testHome, "today");
+    assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
+    await runCommand(ctx.testHome, ["note", "A", "--alias", "a"], { sessionDir: ctx.sessionDir });
+    await runCommand(ctx.testHome, ["note", "B", "--parent", "a", "--alias", "b"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // Navigate to b
-    await runCommand(ctx.testHome, ["cd", "b"]);
+    const cdB = await runCd(ctx.testHome, "b", { sessionDir: ctx.sessionDir });
+    assertEquals(cdB.success, true, `cd b failed: ${cdB.stderr}`);
 
     // Navigate to root using absolute path
-    const cdAbsResult = await runCommand(ctx.testHome, ["cd", `/${today}`]);
+    const cdAbsResult = await runCd(ctx.testHome, `/${today}`, { sessionDir: ctx.sessionDir });
     assertEquals(cdAbsResult.success, true, `cd to absolute path failed: ${cdAbsResult.stderr}`);
 
     // Verify we're at today
-    const pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    const pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.stdout.trim(), `/${today}`, "CWD should be today's date");
   });
 
   it("navigates using mixed relative and absolute paths", async () => {
-    await runCommand(ctx.testHome, ["cd", "today"]);
-    await runCommand(ctx.testHome, ["note", "A", "--alias", "a"]);
-    await runCommand(ctx.testHome, ["note", "B", "--parent", "a", "--alias", "b"]);
-
-    // Start from today
-    await runCommand(ctx.testHome, ["cd", "today"]);
+    const cdToday = await runCd(ctx.testHome, "today");
+    assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
+    await runCommand(ctx.testHome, ["note", "A", "--alias", "a"], { sessionDir: ctx.sessionDir });
+    await runCommand(ctx.testHome, ["note", "B", "--parent", "a", "--alias", "b"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // Navigate to a/b
-    const cdResult = await runCommand(ctx.testHome, ["cd", "a/b"]);
+    const cdResult = await runCd(ctx.testHome, "a/b", { sessionDir: ctx.sessionDir });
     assertEquals(cdResult.success, true, `cd a/b failed: ${cdResult.stderr}`);
 
     // Verify we're at a/b
-    const pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    const pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.stdout.includes("/a/b"), true, "CWD should be /a/b");
   });
 
   it("navigates complex path with mixed dotdot segments", async () => {
-    await runCommand(ctx.testHome, ["cd", "today"]);
+    const cdToday = await runCd(ctx.testHome, "today");
+    assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 
     // Create hierarchy: A -> B -> C, A -> D
-    await runCommand(ctx.testHome, ["note", "A", "--alias", "a"]);
-    await runCommand(ctx.testHome, ["note", "B", "--parent", "a", "--alias", "b"]);
-    await runCommand(ctx.testHome, ["note", "C", "--parent", "b", "--alias", "c"]);
-    await runCommand(ctx.testHome, ["note", "D", "--parent", "a", "--alias", "d"]);
+    await runCommand(ctx.testHome, ["note", "A", "--alias", "a"], { sessionDir: ctx.sessionDir });
+    await runCommand(ctx.testHome, ["note", "B", "--parent", "a", "--alias", "b"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "C", "--parent", "b", "--alias", "c"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "D", "--parent", "a", "--alias", "d"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // Navigate to c
-    await runCommand(ctx.testHome, ["cd", "c"]);
+    const cdC = await runCd(ctx.testHome, "c", { sessionDir: ctx.sessionDir });
+    assertEquals(cdC.success, true, `cd c failed: ${cdC.stderr}`);
 
     // Navigate using ../../../d (up to b, up to a, up to today, then to today's a, then to d)
     // Actually: up to b, up to a, then to d (sibling of b under a)
-    const cdResult = await runCommand(ctx.testHome, ["cd", "../../d"]);
+    const cdResult = await runCd(ctx.testHome, "../../d", { sessionDir: ctx.sessionDir });
     assertEquals(cdResult.success, true, `cd ../../d failed: ${cdResult.stderr}`);
 
     // Verify we're at d
-    const pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    const pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.stdout.includes("/a/d"), true, "CWD should be /a/d");
   });
 
@@ -245,36 +286,52 @@ describe("Scenario 10: Navigation", () => {
     const today = await getCurrentDateFromCli(ctx.testHome);
 
     // Create hierarchy
-    await runCommand(ctx.testHome, ["cd", "today"]);
-    await runCommand(ctx.testHome, ["note", "Root", "--alias", "root"]);
-    await runCommand(ctx.testHome, ["note", "Branch1", "--parent", "root", "--alias", "branch1"]);
-    await runCommand(ctx.testHome, ["note", "Branch2", "--parent", "root", "--alias", "branch2"]);
-    await runCommand(ctx.testHome, ["note", "Leaf", "--parent", "branch1", "--alias", "leaf"]);
+    const cdToday = await runCd(ctx.testHome, "today");
+    assertEquals(cdToday.success, true, "cd today should succeed");
+    await runCommand(ctx.testHome, ["note", "Root", "--alias", "root"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "Branch1", "--parent", "root", "--alias", "branch1"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "Branch2", "--parent", "root", "--alias", "branch2"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "Leaf", "--parent", "branch1", "--alias", "leaf"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // Step 1: Navigate using absolute path
-    await runCommand(ctx.testHome, ["cd", `/${today}/root/branch1/leaf`]);
-    let pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    let cdResult = await runCd(ctx.testHome, `/${today}/root/branch1/leaf`, {
+      sessionDir: ctx.sessionDir,
+    });
+    assertEquals(cdResult.success, true, "cd to absolute path should succeed");
+    let pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.stdout.includes("/leaf"), true, "Should be at leaf");
 
     // Step 2: Navigate up using ../
-    await runCommand(ctx.testHome, ["cd", "../"]);
-    pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    cdResult = await runCd(ctx.testHome, "../", { sessionDir: ctx.sessionDir });
+    assertEquals(cdResult.success, true, "cd ../ should succeed");
+    pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.stdout.includes("/branch1"), true, "Should be at branch1");
 
     // Step 3: Navigate to sibling using ../branch2
-    await runCommand(ctx.testHome, ["cd", "../branch2"]);
-    pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    cdResult = await runCd(ctx.testHome, "../branch2", { sessionDir: ctx.sessionDir });
+    assertEquals(cdResult.success, true, "cd ../branch2 should succeed");
+    pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.stdout.includes("/branch2"), true, "Should be at branch2");
 
     // Step 4: Navigate up to root using ../
-    await runCommand(ctx.testHome, ["cd", "../"]);
-    pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    cdResult = await runCd(ctx.testHome, "../", { sessionDir: ctx.sessionDir });
+    assertEquals(cdResult.success, true, "cd ../ should succeed");
+    pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.stdout.includes("/root"), true, "Should be at root");
     assertEquals(pwdResult.stdout.includes("/branch"), false, "Should not include branch");
 
     // Step 5: Navigate to today using ../
-    await runCommand(ctx.testHome, ["cd", "../"]);
-    pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    cdResult = await runCd(ctx.testHome, "../", { sessionDir: ctx.sessionDir });
+    assertEquals(cdResult.success, true, "cd ../ should succeed");
+    pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.stdout.trim(), `/${today}`, "Should be at today");
   });
 });

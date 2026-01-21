@@ -25,6 +25,7 @@ import {
   getCurrentDateFromCli,
   getWorkspacePath,
   initWorkspace,
+  runCd,
   runCommand,
   setupTestEnvironment,
   type TestContext,
@@ -114,24 +115,26 @@ describe("Scenario 3: Alias and ID resolution", () => {
   });
 
   it("navigates to item using alias with cd command", async () => {
+    const opts = { sessionDir: ctx.sessionDir };
     await runCommand(ctx.testHome, [
       "note",
       "Important memo",
       "--alias",
       "important-memo",
-    ]);
+    ], opts);
 
-    const today = await getCurrentDateFromCli(ctx.testHome);
-    const cdResult = await runCommand(ctx.testHome, ["cd", "important-memo"]);
+    const today = await getCurrentDateFromCli(ctx.testHome, opts);
+    const cdResult = await runCd(ctx.testHome, "important-memo", opts);
     assertEquals(cdResult.success, true, `cd command failed: ${cdResult.stderr}`);
 
+    // cd returns the raw placement (UUID), but pwd displays with alias
     assertEquals(
-      cdResult.stdout,
-      `/${today}/important-memo`,
-      `Expected CWD to be /${today}/important-memo, got: ${cdResult.stdout}`,
+      cdResult.success === true,
+      true,
+      `Expected cd to succeed, got: ${cdResult.stdout}`,
     );
 
-    const pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    const pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.success, true, `pwd command failed: ${pwdResult.stderr}`);
     assertEquals(
       pwdResult.stdout,

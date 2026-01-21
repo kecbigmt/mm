@@ -25,6 +25,7 @@ import {
   cleanupTestEnvironment,
   extractItemLines,
   initWorkspace,
+  runCd,
   runCommand,
   setupTestEnvironment,
   type TestContext,
@@ -43,7 +44,8 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
   });
 
   it("creates items under numeric sections", async () => {
-    await runCommand(ctx.testHome, ["cd", "today"]);
+    const cdToday = await runCd(ctx.testHome, "today");
+    assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 
     // Create chapter1 item with alias
     const chapterResult = await runCommand(ctx.testHome, [
@@ -51,7 +53,7 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
       "Chapter 1",
       "--alias",
       "chapter1",
-    ]);
+    ], { sessionDir: ctx.sessionDir });
     assertEquals(chapterResult.success, true, `Failed to create chapter: ${chapterResult.stderr}`);
 
     // Create pages under chapter1/1 section
@@ -60,7 +62,7 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
       "Page 1",
       "--parent",
       "chapter1/1",
-    ]);
+    ], { sessionDir: ctx.sessionDir });
     assertEquals(page1Result.success, true, `Failed to create page1: ${page1Result.stderr}`);
 
     const page2Result = await runCommand(ctx.testHome, [
@@ -68,7 +70,7 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
       "Page 2",
       "--parent",
       "chapter1/1",
-    ]);
+    ], { sessionDir: ctx.sessionDir });
     assertEquals(page2Result.success, true, `Failed to create page2: ${page2Result.stderr}`);
 
     const page3Result = await runCommand(ctx.testHome, [
@@ -76,12 +78,13 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
       "Page 3",
       "--parent",
       "chapter1/1",
-    ]);
+    ], { sessionDir: ctx.sessionDir });
     assertEquals(page3Result.success, true, `Failed to create page3: ${page3Result.stderr}`);
   });
 
   it("navigates to numeric sections and lists items", async () => {
-    await runCommand(ctx.testHome, ["cd", "today"]);
+    const cdToday = await runCd(ctx.testHome, "today");
+    assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 
     // Create chapter1 item with alias
     const chapterResult = await runCommand(ctx.testHome, [
@@ -89,25 +92,31 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
       "Chapter 1",
       "--alias",
       "chapter1",
-    ]);
+    ], { sessionDir: ctx.sessionDir });
     assertEquals(chapterResult.success, true, `Failed to create chapter: ${chapterResult.stderr}`);
 
     // Create pages under chapter1/1
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"]);
-    await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "chapter1/1"]);
-    await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "chapter1/1"]);
+    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "chapter1/1"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "chapter1/1"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // Navigate to chapter1/1
-    const cdResult = await runCommand(ctx.testHome, ["cd", "chapter1/1"]);
+    const cdResult = await runCd(ctx.testHome, "chapter1/1", { sessionDir: ctx.sessionDir });
     assertEquals(cdResult.success, true, `cd failed: ${cdResult.stderr}`);
 
     // Verify CWD
-    const pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    const pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.success, true, `pwd failed: ${pwdResult.stderr}`);
     assertEquals(pwdResult.stdout.includes("chapter1/1"), true, "CWD should be chapter1/1");
 
     // List items in section
-    const lsResult = await runCommand(ctx.testHome, ["ls"]);
+    const lsResult = await runCommand(ctx.testHome, ["ls"], { sessionDir: ctx.sessionDir });
     assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
 
     const itemLines = extractItemLines(lsResult.stdout);
@@ -118,57 +127,75 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
   });
 
   it("navigates up sections using relative path", async () => {
-    await runCommand(ctx.testHome, ["cd", "today"]);
+    const cdToday = await runCd(ctx.testHome, "today");
+    assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 
     // Create chapter1 and pages
-    await runCommand(ctx.testHome, ["note", "Chapter 1", "--alias", "chapter1"]);
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"]);
+    await runCommand(ctx.testHome, ["note", "Chapter 1", "--alias", "chapter1"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // Navigate to chapter1/1
-    await runCommand(ctx.testHome, ["cd", "chapter1/1"]);
+    const cdSection = await runCd(ctx.testHome, "chapter1/1", { sessionDir: ctx.sessionDir });
+    assertEquals(cdSection.success, true, `cd chapter1/1 failed: ${cdSection.stderr}`);
 
     // Navigate up one section
-    const cdUpResult = await runCommand(ctx.testHome, ["cd", "../"]);
+    const cdUpResult = await runCd(ctx.testHome, "../", { sessionDir: ctx.sessionDir });
     assertEquals(cdUpResult.success, true, `cd .. failed: ${cdUpResult.stderr}`);
 
     // Verify CWD is chapter1
-    const pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    const pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.success, true, `pwd failed: ${pwdResult.stderr}`);
     assertEquals(pwdResult.stdout.includes("chapter1"), true, "CWD should be chapter1");
     assertEquals(pwdResult.stdout.includes("/1"), false, "CWD should not include /1");
   });
 
   it("navigates to child sections using section numbers", async () => {
-    await runCommand(ctx.testHome, ["cd", "today"]);
+    const cdToday = await runCd(ctx.testHome, "today");
+    assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 
     // Create chapter1 and pages
-    await runCommand(ctx.testHome, ["note", "Chapter 1", "--alias", "chapter1"]);
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"]);
+    await runCommand(ctx.testHome, ["note", "Chapter 1", "--alias", "chapter1"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // Navigate to chapter1
-    await runCommand(ctx.testHome, ["cd", "chapter1"]);
+    const cdChapter = await runCd(ctx.testHome, "chapter1", { sessionDir: ctx.sessionDir });
+    assertEquals(cdChapter.success, true, `cd chapter1 failed: ${cdChapter.stderr}`);
 
     // Navigate to section 1
-    const cdSectionResult = await runCommand(ctx.testHome, ["cd", "1"]);
+    const cdSectionResult = await runCd(ctx.testHome, "1", { sessionDir: ctx.sessionDir });
     assertEquals(cdSectionResult.success, true, `cd 1 failed: ${cdSectionResult.stderr}`);
 
     // Verify CWD is chapter1/1
-    const pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    const pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.success, true, `pwd failed: ${pwdResult.stderr}`);
     assertEquals(pwdResult.stdout.includes("chapter1/1"), true, "CWD should be chapter1/1");
   });
 
   it("creates deep hierarchies and navigates through them", async () => {
-    await runCommand(ctx.testHome, ["cd", "today"]);
+    const cdToday = await runCd(ctx.testHome, "today");
+    assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 
     // Create chapter1
-    await runCommand(ctx.testHome, ["note", "Chapter 1", "--alias", "chapter1"]);
+    await runCommand(ctx.testHome, ["note", "Chapter 1", "--alias", "chapter1"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // Create page under chapter1/1
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"]);
+    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // Navigate to chapter1/1
-    await runCommand(ctx.testHome, ["cd", "chapter1/1"]);
+    const cdSection = await runCd(ctx.testHome, "chapter1/1", { sessionDir: ctx.sessionDir });
+    assertEquals(cdSection.success, true, `cd chapter1/1 failed: ${cdSection.stderr}`);
 
     // Create sub-page under ./2 (relative to current CWD)
     const subPageResult = await runCommand(ctx.testHome, [
@@ -176,20 +203,20 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
       "Sub-page 1",
       "--parent",
       "./2",
-    ]);
+    ], { sessionDir: ctx.sessionDir });
     assertEquals(subPageResult.success, true, `Failed to create sub-page: ${subPageResult.stderr}`);
 
     // Navigate to section 2
-    const cd2Result = await runCommand(ctx.testHome, ["cd", "2"]);
+    const cd2Result = await runCd(ctx.testHome, "2", { sessionDir: ctx.sessionDir });
     assertEquals(cd2Result.success, true, `cd 2 failed: ${cd2Result.stderr}`);
 
     // Verify CWD is chapter1/1/2
-    const pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    const pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.success, true, `pwd failed: ${pwdResult.stderr}`);
     assertEquals(pwdResult.stdout.includes("chapter1/1/2"), true, "CWD should be chapter1/1/2");
 
     // List items in section 2
-    const lsResult = await runCommand(ctx.testHome, ["ls"]);
+    const lsResult = await runCommand(ctx.testHome, ["ls"], { sessionDir: ctx.sessionDir });
     assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
 
     const itemLines = extractItemLines(lsResult.stdout);
@@ -198,8 +225,11 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
   });
 
   it("executes full flow: create hierarchy → navigate → list", async () => {
+    const opts = { sessionDir: ctx.sessionDir };
+
     // Step 1: Navigate to today
-    await runCommand(ctx.testHome, ["cd", "today"]);
+    const cdToday = await runCd(ctx.testHome, "today", opts);
+    assertEquals(cdToday.success, true, "cd today should succeed");
 
     // Step 2: Create chapter1 with alias
     const chapterResult = await runCommand(ctx.testHome, [
@@ -207,44 +237,55 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
       "Chapter 1",
       "--alias",
       "chapter1",
-    ]);
+    ], opts);
     assertEquals(chapterResult.success, true, "Chapter creation should succeed");
 
     // Step 3-5: Create pages under chapter1/1
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"]);
-    await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "chapter1/1"]);
-    await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "chapter1/1"]);
+    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "chapter1/1"], {
+      sessionDir: ctx.sessionDir,
+    });
+    await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "chapter1/1"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // Step 6: Navigate to chapter1/1
-    const cd1Result = await runCommand(ctx.testHome, ["cd", "chapter1/1"]);
+    const cd1Result = await runCd(ctx.testHome, "chapter1/1", opts);
     assertEquals(cd1Result.success, true, "cd chapter1/1 should succeed");
 
     // Step 7: List items
-    const ls1Result = await runCommand(ctx.testHome, ["ls"]);
+    const ls1Result = await runCommand(ctx.testHome, ["ls"], opts);
     assertEquals(ls1Result.success, true, "ls should succeed");
     const itemLines1 = extractItemLines(ls1Result.stdout);
     assertEquals(itemLines1.length, 3, "Should list 3 pages");
 
     // Step 8: Navigate up
-    await runCommand(ctx.testHome, ["cd", "../"]);
+    const cdUp = await runCd(ctx.testHome, "../", opts);
+    assertEquals(cdUp.success, true, "cd ../ should succeed");
 
     // Step 9: Navigate to section 1
-    await runCommand(ctx.testHome, ["cd", "1"]);
+    const cdSection1 = await runCd(ctx.testHome, "1", opts);
+    assertEquals(cdSection1.success, true, "cd 1 should succeed");
 
     // Step 10: Create sub-page under ./2
-    await runCommand(ctx.testHome, ["note", "Sub-page 1", "--parent", "./2"]);
+    await runCommand(ctx.testHome, ["note", "Sub-page 1", "--parent", "./2"], {
+      sessionDir: ctx.sessionDir,
+    });
 
     // Step 11: Navigate to section 2
-    await runCommand(ctx.testHome, ["cd", "2"]);
+    const cdSection2 = await runCd(ctx.testHome, "2", opts);
+    assertEquals(cdSection2.success, true, "cd 2 should succeed");
 
     // Step 12: List items
-    const ls2Result = await runCommand(ctx.testHome, ["ls"]);
+    const ls2Result = await runCommand(ctx.testHome, ["ls"], opts);
     assertEquals(ls2Result.success, true, "ls should succeed");
     const itemLines2 = extractItemLines(ls2Result.stdout);
     assertEquals(itemLines2.length, 1, "Should list 1 sub-page");
 
     // Step 13: Verify final CWD
-    const finalPwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    const finalPwdResult = await runCommand(ctx.testHome, ["pwd"], opts);
     assertEquals(finalPwdResult.success, true, "pwd should succeed");
     assertEquals(
       finalPwdResult.stdout.includes("chapter1/1/2"),

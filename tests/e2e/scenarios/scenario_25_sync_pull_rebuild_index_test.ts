@@ -80,6 +80,7 @@ describe("Scenario 25: Sync Pull Index Rebuild", () => {
           "--allow-write",
           "--allow-env",
           "--allow-run",
+          "--allow-sys",
           "src/main.ts",
           ...args,
         ],

@@ -7,7 +7,8 @@ export type RepositoryScope =
   | "tag"
   | "config"
   | "state"
-  | "section";
+  | "section"
+  | "session";
 
 export type RepositoryOperation =
   | "load"

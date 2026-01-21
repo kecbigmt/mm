@@ -4,24 +4,56 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
-import { createPlacement, parseCalendarDay, Placement } from "../primitives/mod.ts";
+import {
+  createPlacement,
+  parseCalendarDay,
+  parsePlacement,
+  Placement,
+  TimezoneIdentifier,
+} from "../primitives/mod.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
-import { StateRepository } from "../repositories/state_repository.ts";
+import { SessionRepository } from "../repositories/session_repository.ts";
 import { Item } from "../models/item.ts";
 
 export type CwdResolutionError = ValidationError<"CwdResolution"> | RepositoryError;
 
 export type CwdResolutionDependencies = Readonly<{
-  readonly stateRepository: StateRepository;
+  readonly sessionRepository: SessionRepository;
+  readonly workspacePath: string;
+  readonly itemRepository: ItemRepository;
+  readonly timezone: TimezoneIdentifier;
+}>;
+
+export type CwdValidationDependencies = Readonly<{
   readonly itemRepository: ItemRepository;
 }>;
 
-const defaultCwdPlacement = (today: Date): Placement => {
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-  const dateStr = `${year}-${month}-${day}`;
+export type CwdSaveDependencies = Readonly<{
+  readonly sessionRepository: SessionRepository;
+  readonly workspacePath: string;
+}>;
+
+export type CwdResult = Readonly<{
+  readonly placement: Placement;
+  readonly warning?: string;
+}>;
+
+/**
+ * Compute today's date in the given timezone.
+ */
+const computeTodayInTimezone = (now: Date, timezone: TimezoneIdentifier): string => {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone.toString(),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(now);
+};
+
+const defaultCwdPlacement = (now: Date, timezone: TimezoneIdentifier): Placement => {
+  const dateStr = computeTodayInTimezone(now, timezone);
   const calendarDayResult = parseCalendarDay(dateStr);
   if (calendarDayResult.type === "error") {
     throw new Error("Failed to create default CWD placement: invalid date");
@@ -31,7 +63,7 @@ const defaultCwdPlacement = (today: Date): Placement => {
 
 const resolvePlacementToItem = async (
   placement: Placement,
-  deps: CwdResolutionDependencies,
+  deps: CwdValidationDependencies,
 ): Promise<Item | undefined> => {
   if (placement.head.kind === "date" || placement.head.kind === "permanent") {
     return undefined;
@@ -45,82 +77,76 @@ const resolvePlacementToItem = async (
   return undefined;
 };
 
-const findNearestValidAncestor = async (
-  placement: Placement,
-  deps: CwdResolutionDependencies,
-): Promise<Placement> => {
-  let current = placement;
-
-  while (true) {
-    const item = await resolvePlacementToItem(current, deps);
-    if (item !== undefined) {
-      return current;
-    }
-
-    const parent = current.parent();
-    if (!parent) {
-      break;
-    }
-    current = parent;
-  }
-
-  return defaultCwdPlacement(new Date());
-};
-
 export const CwdResolutionService = {
   async getCwd(
     deps: CwdResolutionDependencies,
-    today: Date,
-  ): Promise<Result<Placement, CwdResolutionError>> {
-    const cwdResult = await deps.stateRepository.loadCwd();
-    if (cwdResult.type === "error") {
-      return Result.error(cwdResult.error);
+  ): Promise<Result<CwdResult, CwdResolutionError>> {
+    const now = new Date();
+
+    const sessionResult = await deps.sessionRepository.load();
+    if (sessionResult.type === "error") {
+      return sessionResult;
     }
 
-    const cwd = cwdResult.value;
-    if (!cwd) {
-      const defaultPlacement = defaultCwdPlacement(today);
-      return Result.ok(defaultPlacement);
+    const session = sessionResult.value;
+
+    // No session or workspace mismatch -> default to today
+    if (!session || session.workspace !== deps.workspacePath) {
+      return Result.ok({ placement: defaultCwdPlacement(now, deps.timezone) });
     }
 
-    const isDatePlacement = cwd.head.kind === "date";
-    if (isDatePlacement) {
-      return Result.ok(cwd);
+    const parseResult = parsePlacement(session.cwd);
+    if (parseResult.type === "error") {
+      return Result.ok({
+        placement: defaultCwdPlacement(now, deps.timezone),
+        warning: `Invalid cwd value "${session.cwd}" in session, falling back to today`,
+      });
     }
 
-    const item = await resolvePlacementToItem(cwd, deps);
-    if (item === undefined) {
-      const resolved = await findNearestValidAncestor(cwd, deps);
-      await deps.stateRepository.saveCwd(resolved);
-      return Result.ok(resolved);
-    }
+    const placement = parseResult.value;
 
-    return Result.ok(cwd);
-  },
-
-  async setCwd(
-    target: Placement,
-    deps: CwdResolutionDependencies,
-  ): Promise<Result<Placement, CwdResolutionError>> {
-    const isDatePlacement = target.head.kind === "date";
-    if (!isDatePlacement) {
-      // Validate that the item exists
-      const item = await resolvePlacementToItem(target, deps);
+    if (placement.head.kind === "item") {
+      const item = await resolvePlacementToItem(placement, deps);
       if (item === undefined) {
-        return Result.error(
-          createValidationError("CwdResolution", [
-            createValidationIssue("target placement does not resolve to a valid item", {
-              code: "invalid_target",
-              path: ["value"],
-            }),
-          ]),
-        );
+        return Result.ok({
+          placement: defaultCwdPlacement(now, deps.timezone),
+          warning: `Item in session cwd not found, falling back to today`,
+        });
       }
     }
 
-    const setResult = await deps.stateRepository.saveCwd(target);
-    if (setResult.type === "error") {
-      return Result.error(setResult.error);
+    return Result.ok({ placement });
+  },
+
+  async setCwd(
+    placement: Placement,
+    deps: CwdSaveDependencies,
+  ): Promise<Result<void, CwdResolutionError>> {
+    const saveResult = await deps.sessionRepository.save({
+      workspace: deps.workspacePath,
+      cwd: placement.toString(),
+    });
+    return saveResult;
+  },
+
+  async validatePlacement(
+    target: Placement,
+    deps: CwdValidationDependencies,
+  ): Promise<Result<Placement, CwdResolutionError>> {
+    if (target.head.kind === "date" || target.head.kind === "permanent") {
+      return Result.ok(target);
+    }
+
+    const item = await resolvePlacementToItem(target, deps);
+    if (item === undefined) {
+      return Result.error(
+        createValidationError("CwdResolution", [
+          createValidationIssue("target placement does not resolve to a valid item", {
+            code: "invalid_target",
+            path: ["value"],
+          }),
+        ]),
+      );
     }
 
     return Result.ok(target);

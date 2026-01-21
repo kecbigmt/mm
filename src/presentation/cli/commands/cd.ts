@@ -31,8 +31,7 @@ export function createCdCommand() {
 
       if (!pathArg) {
         // Navigate to today's date (home) - matching bash cd behavior
-        const todayDate = computeTodayInTimezone(now, deps.timezone.toString());
-        const todayStr = formatDateStr(todayDate);
+        const todayStr = computeTodayInTimezone(now, deps.timezone.toString());
         const calendarDayResult = parseCalendarDay(todayStr);
         if (calendarDayResult.type === "error") {
           console.error(formatError(calendarDayResult.error, debug));
@@ -40,21 +39,18 @@ export function createCdCommand() {
         }
         const todayPlacement = createDatePlacement(calendarDayResult.value);
 
-        const setResult = await CwdResolutionService.setCwd(
-          todayPlacement,
-          {
-            stateRepository: deps.stateRepository,
-            itemRepository: deps.itemRepository,
-          },
-        );
+        const saveResult = await CwdResolutionService.setCwd(todayPlacement, {
+          sessionRepository: deps.sessionRepository,
+          workspacePath: deps.root,
+        });
 
-        if (setResult.type === "error") {
-          console.error(formatError(setResult.error, debug));
+        if (saveResult.type === "error") {
+          console.error(formatError(saveResult.error, debug));
           return;
         }
 
         // Display placement with aliases
-        const displayResult = await formatPlacementForDisplay(setResult.value, {
+        const displayResult = await formatPlacementForDisplay(todayPlacement, {
           itemRepository: deps.itemRepository,
         });
         if (displayResult.type === "error") {
@@ -66,16 +62,18 @@ export function createCdCommand() {
       }
 
       // Get current placement
-      const cwdPlacementResult = await CwdResolutionService.getCwd(
-        {
-          stateRepository: deps.stateRepository,
-          itemRepository: deps.itemRepository,
-        },
-        now,
-      );
+      const cwdPlacementResult = await CwdResolutionService.getCwd({
+        sessionRepository: deps.sessionRepository,
+        workspacePath: deps.root,
+        itemRepository: deps.itemRepository,
+        timezone: deps.timezone,
+      });
       if (cwdPlacementResult.type === "error") {
         console.error(formatError(cwdPlacementResult.error, debug));
         return;
+      }
+      if (cwdPlacementResult.value.warning) {
+        console.error(`Warning: ${cwdPlacementResult.value.warning}`);
       }
 
       // Parse path expression
@@ -95,7 +93,7 @@ export function createCdCommand() {
 
       // Resolve expression to placement
       const placementResult = await pathResolver.resolvePath(
-        cwdPlacementResult.value,
+        cwdPlacementResult.value.placement,
         exprResult.value,
       );
 
@@ -104,21 +102,32 @@ export function createCdCommand() {
         return;
       }
 
-      const setResult = await CwdResolutionService.setCwd(
+      // Validate placement (for item placements, check existence)
+      const validateResult = await CwdResolutionService.validatePlacement(
         placementResult.value,
         {
-          stateRepository: deps.stateRepository,
           itemRepository: deps.itemRepository,
         },
       );
 
-      if (setResult.type === "error") {
-        console.error(formatError(setResult.error, debug));
+      if (validateResult.type === "error") {
+        console.error(formatError(validateResult.error, debug));
+        return;
+      }
+
+      // Save to session file
+      const saveResult = await CwdResolutionService.setCwd(validateResult.value, {
+        sessionRepository: deps.sessionRepository,
+        workspacePath: deps.root,
+      });
+
+      if (saveResult.type === "error") {
+        console.error(formatError(saveResult.error, debug));
         return;
       }
 
       // Display placement with aliases
-      const displayResult = await formatPlacementForDisplay(setResult.value, {
+      const displayResult = await formatPlacementForDisplay(validateResult.value, {
         itemRepository: deps.itemRepository,
       });
       if (displayResult.type === "error") {
@@ -132,28 +141,12 @@ export function createCdCommand() {
 /**
  * Compute today's date in the given timezone.
  */
-const computeTodayInTimezone = (now: Date, timezone: string): Date => {
+const computeTodayInTimezone = (now: Date, timezone: string): string => {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
-  const parts = formatter.formatToParts(now);
-  const lookup = new Map(parts.map((part) => [part.type, part.value]));
-  return new Date(
-    Number(lookup.get("year")),
-    Number(lookup.get("month")) - 1,
-    Number(lookup.get("day")),
-  );
-};
-
-/**
- * Format a Date object to YYYY-MM-DD string.
- */
-const formatDateStr = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return formatter.format(now);
 };
