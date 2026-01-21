@@ -6,6 +6,7 @@ import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import { formatPlacementForDisplay } from "../../../domain/services/placement_display_service.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
+import { createDatePlacement, parseCalendarDay } from "../../../domain/primitives/mod.ts";
 
 export function createCdCommand() {
   return new Command()
@@ -29,19 +30,31 @@ export function createCdCommand() {
       const now = new Date();
 
       if (!pathArg) {
-        const cwdResult = await CwdResolutionService.getCwd(
+        // Navigate to today's date (home) - matching bash cd behavior
+        const todayDate = computeTodayInTimezone(now, deps.timezone.toString());
+        const todayStr = formatDateStr(todayDate);
+        const calendarDayResult = parseCalendarDay(todayStr);
+        if (calendarDayResult.type === "error") {
+          console.error(formatError(calendarDayResult.error, debug));
+          return;
+        }
+        const todayPlacement = createDatePlacement(calendarDayResult.value);
+
+        const setResult = await CwdResolutionService.setCwd(
+          todayPlacement,
           {
             stateRepository: deps.stateRepository,
             itemRepository: deps.itemRepository,
           },
-          now,
         );
-        if (cwdResult.type === "error") {
-          console.error(formatError(cwdResult.error, debug));
+
+        if (setResult.type === "error") {
+          console.error(formatError(setResult.error, debug));
           return;
         }
+
         // Display placement with aliases
-        const displayResult = await formatPlacementForDisplay(cwdResult.value, {
+        const displayResult = await formatPlacementForDisplay(setResult.value, {
           itemRepository: deps.itemRepository,
         });
         if (displayResult.type === "error") {
@@ -115,3 +128,32 @@ export function createCdCommand() {
       console.log(displayResult.value);
     });
 }
+
+/**
+ * Compute today's date in the given timezone.
+ */
+const computeTodayInTimezone = (now: Date, timezone: string): Date => {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(now);
+  const lookup = new Map(parts.map((part) => [part.type, part.value]));
+  return new Date(
+    Number(lookup.get("year")),
+    Number(lookup.get("month")) - 1,
+    Number(lookup.get("day")),
+  );
+};
+
+/**
+ * Format a Date object to YYYY-MM-DD string.
+ */
+const formatDateStr = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
