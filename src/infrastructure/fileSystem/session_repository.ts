@@ -21,11 +21,10 @@ const readSessionFile = async (
       return Result.ok(null);
     }
     if (error instanceof SyntaxError) {
-      return Result.error(
-        createRepositoryError("session", "load", "session file contains invalid JSON", {
-          cause: error,
-        }),
-      );
+      // Treat corrupt session file as missing - fall back to today's date
+      // This can happen if write was interrupted or file was manually edited
+      console.error(`Warning: Session file at ${path} contains invalid JSON, ignoring.`);
+      return Result.ok(null);
     }
     return Result.error(
       createRepositoryError("session", "load", "failed to read session file", {

@@ -114,7 +114,7 @@ Deno.test("FileSessionRepository", async (t) => {
     }
   });
 
-  await t.step("returns error for invalid JSON", async () => {
+  await t.step("returns null for invalid JSON (treats as missing)", async () => {
     const ppid = 33333;
     const sessionDir = join(testBaseDir, "1000", "sessions");
     await Deno.mkdir(sessionDir, { recursive: true });
@@ -127,10 +127,9 @@ Deno.test("FileSessionRepository", async (t) => {
     });
 
     const result = await repo.load();
-    assertEquals(result.type, "error");
-    if (result.type === "error") {
-      assertEquals(result.error.scope, "session");
-      assertEquals(result.error.operation, "load");
+    assertEquals(result.type, "ok");
+    if (result.type === "ok") {
+      assertEquals(result.value, null);
     }
   });
 
