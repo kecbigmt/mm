@@ -29,6 +29,7 @@ import {
   findPreviousWeekday,
   getCurrentDateFromCli,
   initWorkspace,
+  runCd,
   runCommand,
   setupTestEnvironment,
   type TestContext,
@@ -56,20 +57,20 @@ describe("Scenario 8: Date range listing", () => {
     const dateBefore = "2025-10-31"; // Before range
     const dateAfter = "2025-11-04"; // After range
 
-    await runCommand(ctx.testHome, ["cd", dateBefore]);
-    await runCommand(ctx.testHome, ["note", "Before range item"]);
+    let cd = await runCd(ctx.testHome, dateBefore);
+    await runCommand(ctx.testHome, ["note", "Before range item"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", date1]);
-    await runCommand(ctx.testHome, ["note", "11/01のタスク"]);
+    cd = await runCd(ctx.testHome, date1);
+    await runCommand(ctx.testHome, ["note", "11/01のタスク"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", date2]);
-    await runCommand(ctx.testHome, ["note", "11/02のタスク"]);
+    cd = await runCd(ctx.testHome, date2);
+    await runCommand(ctx.testHome, ["note", "11/02のタスク"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", date3]);
-    await runCommand(ctx.testHome, ["note", "11/03のタスク"]);
+    cd = await runCd(ctx.testHome, date3);
+    await runCommand(ctx.testHome, ["note", "11/03のタスク"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", dateAfter]);
-    await runCommand(ctx.testHome, ["note", "After range item"]);
+    cd = await runCd(ctx.testHome, dateAfter);
+    await runCommand(ctx.testHome, ["note", "After range item"], { mmCwd: cd.mmCwd! });
 
     // List items across the date range
     const lsResult = await runCommand(ctx.testHome, ["ls", `${date1}..${date3}`]);
@@ -111,20 +112,20 @@ describe("Scenario 8: Date range listing", () => {
     const yesterdayDate = addDaysToString(today, -1); // Before range
     const dayAfterRange = addDaysToString(today, 3); // After range
 
-    await runCommand(ctx.testHome, ["cd", yesterdayDate]);
-    await runCommand(ctx.testHome, ["note", "Yesterday's task"]);
+    let cd = await runCd(ctx.testHome, yesterdayDate);
+    await runCommand(ctx.testHome, ["note", "Yesterday's task"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", todayDate]);
-    await runCommand(ctx.testHome, ["note", "Today's task"]);
+    cd = await runCd(ctx.testHome, todayDate);
+    await runCommand(ctx.testHome, ["note", "Today's task"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", tomorrowDate]);
-    await runCommand(ctx.testHome, ["note", "Tomorrow's task"]);
+    cd = await runCd(ctx.testHome, tomorrowDate);
+    await runCommand(ctx.testHome, ["note", "Tomorrow's task"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", dayAfterTomorrowDate]);
-    await runCommand(ctx.testHome, ["note", "Day after tomorrow's task"]);
+    cd = await runCd(ctx.testHome, dayAfterTomorrowDate);
+    await runCommand(ctx.testHome, ["note", "Day after tomorrow's task"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", dayAfterRange]);
-    await runCommand(ctx.testHome, ["note", "After range task"]);
+    cd = await runCd(ctx.testHome, dayAfterRange);
+    await runCommand(ctx.testHome, ["note", "After range task"], { mmCwd: cd.mmCwd! });
 
     // List items using relative date range
     const lsResult = await runCommand(ctx.testHome, ["ls", `today..+2d`]);
@@ -172,18 +173,18 @@ describe("Scenario 8: Date range listing", () => {
     dates.push(prevMondayPlus1, prevMondayPlus2);
 
     // Create items outside the range
-    await runCommand(ctx.testHome, ["cd", beforeMonday]);
-    await runCommand(ctx.testHome, ["note", "Before Monday task"]);
+    let cd = await runCd(ctx.testHome, beforeMonday);
+    await runCommand(ctx.testHome, ["note", "Before Monday task"], { mmCwd: cd.mmCwd! });
 
     // Create items on each date within the range
     for (const date of dates) {
-      await runCommand(ctx.testHome, ["cd", date]);
-      await runCommand(ctx.testHome, ["note", `Task on ${date}`]);
+      cd = await runCd(ctx.testHome, date);
+      await runCommand(ctx.testHome, ["note", `Task on ${date}`], { mmCwd: cd.mmCwd! });
     }
 
     // Create item after the range
-    await runCommand(ctx.testHome, ["cd", afterFriday]);
-    await runCommand(ctx.testHome, ["note", "After Friday task"]);
+    cd = await runCd(ctx.testHome, afterFriday);
+    await runCommand(ctx.testHome, ["note", "After Friday task"], { mmCwd: cd.mmCwd! });
 
     // List items using relative weekday range
     const lsResult = await runCommand(ctx.testHome, ["ls", "~mon..+fri"]);
@@ -229,17 +230,17 @@ describe("Scenario 8: Date range listing", () => {
     const dateAfter = "2025-11-04"; // After range
     // date2 = 2025-11-02 intentionally left empty
 
-    await runCommand(ctx.testHome, ["cd", dateBefore]);
-    await runCommand(ctx.testHome, ["note", "Before range item"]);
+    let cd = await runCd(ctx.testHome, dateBefore);
+    await runCommand(ctx.testHome, ["note", "Before range item"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", date1]);
-    await runCommand(ctx.testHome, ["note", "First item"]);
+    cd = await runCd(ctx.testHome, date1);
+    await runCommand(ctx.testHome, ["note", "First item"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", date2]);
-    await runCommand(ctx.testHome, ["note", "Third item"]);
+    cd = await runCd(ctx.testHome, date2);
+    await runCommand(ctx.testHome, ["note", "Third item"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", dateAfter]);
-    await runCommand(ctx.testHome, ["note", "After range item"]);
+    cd = await runCd(ctx.testHome, dateAfter);
+    await runCommand(ctx.testHome, ["note", "After range item"], { mmCwd: cd.mmCwd! });
 
     // List items across range that includes an empty date
     const lsResult = await runCommand(ctx.testHome, ["ls", `${date1}..${date2}`]);
@@ -281,20 +282,20 @@ describe("Scenario 8: Date range listing", () => {
     const dateBefore = "2025-10-31"; // Before range
     const dateAfter = "2025-11-04"; // After range
 
-    await runCommand(ctx.testHome, ["cd", dateBefore]);
-    await runCommand(ctx.testHome, ["note", "Before range item"]);
+    let cd = await runCd(ctx.testHome, dateBefore);
+    await runCommand(ctx.testHome, ["note", "Before range item"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", date1]);
-    await runCommand(ctx.testHome, ["note", "Item A"]);
+    cd = await runCd(ctx.testHome, date1);
+    await runCommand(ctx.testHome, ["note", "Item A"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", date2]);
-    await runCommand(ctx.testHome, ["note", "Item B"]);
+    cd = await runCd(ctx.testHome, date2);
+    await runCommand(ctx.testHome, ["note", "Item B"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", date3]);
-    await runCommand(ctx.testHome, ["note", "Item C"]);
+    cd = await runCd(ctx.testHome, date3);
+    await runCommand(ctx.testHome, ["note", "Item C"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", dateAfter]);
-    await runCommand(ctx.testHome, ["note", "After range item"]);
+    cd = await runCd(ctx.testHome, dateAfter);
+    await runCommand(ctx.testHome, ["note", "After range item"], { mmCwd: cd.mmCwd! });
 
     // List items across the date range
     const lsResult = await runCommand(ctx.testHome, ["ls", `${date1}..${date3}`]);
@@ -341,14 +342,14 @@ describe("Scenario 8: Date range listing", () => {
     const dateBefore = "2025-11-01"; // Before range
     const dateAfter = "2025-11-03"; // After range
 
-    await runCommand(ctx.testHome, ["cd", dateBefore]);
-    await runCommand(ctx.testHome, ["note", "Before single day item"]);
+    let cd = await runCd(ctx.testHome, dateBefore);
+    await runCommand(ctx.testHome, ["note", "Before single day item"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", date]);
-    await runCommand(ctx.testHome, ["note", "Single day item"]);
+    cd = await runCd(ctx.testHome, date);
+    await runCommand(ctx.testHome, ["note", "Single day item"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", dateAfter]);
-    await runCommand(ctx.testHome, ["note", "After single day item"]);
+    cd = await runCd(ctx.testHome, dateAfter);
+    await runCommand(ctx.testHome, ["note", "After single day item"], { mmCwd: cd.mmCwd! });
 
     // List items using a single-day range
     const lsResult = await runCommand(ctx.testHome, ["ls", `${date}`]);
@@ -379,11 +380,11 @@ describe("Scenario 8: Date range listing", () => {
     const date3 = "2025-11-03";
     const date4 = "2025-11-05"; // Outside range
 
-    await runCommand(ctx.testHome, ["cd", date1]);
-    await runCommand(ctx.testHome, ["note", "Item before range"]);
+    let cd = await runCd(ctx.testHome, date1);
+    await runCommand(ctx.testHome, ["note", "Item before range"], { mmCwd: cd.mmCwd! });
 
-    await runCommand(ctx.testHome, ["cd", date4]);
-    await runCommand(ctx.testHome, ["note", "Item after range"]);
+    cd = await runCd(ctx.testHome, date4);
+    await runCommand(ctx.testHome, ["note", "Item after range"], { mmCwd: cd.mmCwd! });
 
     // List items in a range that has no items
     const lsResult = await runCommand(ctx.testHome, ["ls", `${date2}..${date3}`]);

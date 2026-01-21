@@ -108,10 +108,10 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   const cwdResult = await profileAsync("getCwd", () =>
     CwdResolutionService.getCwd(
       {
-        stateRepository: deps.stateRepository,
+        getEnv: (name) => Deno.env.get(name),
         itemRepository: deps.itemRepository,
+        timezone: deps.timezone,
       },
-      now,
     ));
 
   if (cwdResult.type === "error") {
@@ -120,7 +120,11 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     return;
   }
 
-  const cwd = cwdResult.value;
+  if (cwdResult.value.warning) {
+    console.error(`Warning: ${cwdResult.value.warning}`);
+  }
+
+  const cwd = cwdResult.value.placement;
   const statusFilter: ListItemsStatusFilter = options.all ? "all" : "open";
   const isPrintMode = options.print === true;
 

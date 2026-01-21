@@ -23,14 +23,13 @@ export function createPwdCommand() {
       }
 
       const deps = depsResult.value;
-      const now = new Date();
 
       const cwdResult = await CwdResolutionService.getCwd(
         {
-          stateRepository: deps.stateRepository,
+          getEnv: (name) => Deno.env.get(name),
           itemRepository: deps.itemRepository,
+          timezone: deps.timezone,
         },
-        now,
       );
 
       if (cwdResult.type === "error") {
@@ -38,8 +37,12 @@ export function createPwdCommand() {
         return;
       }
 
+      if (cwdResult.value.warning) {
+        console.error(`Warning: ${cwdResult.value.warning}`);
+      }
+
       // Display placement with aliases
-      const displayResult = await formatPlacementForDisplay(cwdResult.value, {
+      const displayResult = await formatPlacementForDisplay(cwdResult.value.placement, {
         itemRepository: deps.itemRepository,
       });
       if (displayResult.type === "error") {

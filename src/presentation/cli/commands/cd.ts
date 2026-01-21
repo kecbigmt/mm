@@ -31,17 +31,20 @@ export function createCdCommand() {
       if (!pathArg) {
         const cwdResult = await CwdResolutionService.getCwd(
           {
-            stateRepository: deps.stateRepository,
+            getEnv: (name) => Deno.env.get(name),
             itemRepository: deps.itemRepository,
+            timezone: deps.timezone,
           },
-          now,
         );
         if (cwdResult.type === "error") {
           console.error(formatError(cwdResult.error, debug));
           return;
         }
+        if (cwdResult.value.warning) {
+          console.error(`Warning: ${cwdResult.value.warning}`);
+        }
         // Display placement with aliases
-        const displayResult = await formatPlacementForDisplay(cwdResult.value, {
+        const displayResult = await formatPlacementForDisplay(cwdResult.value.placement, {
           itemRepository: deps.itemRepository,
         });
         if (displayResult.type === "error") {
@@ -55,14 +58,17 @@ export function createCdCommand() {
       // Get current placement
       const cwdPlacementResult = await CwdResolutionService.getCwd(
         {
-          stateRepository: deps.stateRepository,
+          getEnv: (name) => Deno.env.get(name),
           itemRepository: deps.itemRepository,
+          timezone: deps.timezone,
         },
-        now,
       );
       if (cwdPlacementResult.type === "error") {
         console.error(formatError(cwdPlacementResult.error, debug));
         return;
+      }
+      if (cwdPlacementResult.value.warning) {
+        console.error(`Warning: ${cwdPlacementResult.value.warning}`);
       }
 
       // Parse path expression
@@ -82,7 +88,7 @@ export function createCdCommand() {
 
       // Resolve expression to placement
       const placementResult = await pathResolver.resolvePath(
-        cwdPlacementResult.value,
+        cwdPlacementResult.value.placement,
         exprResult.value,
       );
 
@@ -91,27 +97,20 @@ export function createCdCommand() {
         return;
       }
 
-      const setResult = await CwdResolutionService.setCwd(
+      // Validate placement (for item placements, check existence)
+      const validateResult = await CwdResolutionService.validatePlacement(
         placementResult.value,
         {
-          stateRepository: deps.stateRepository,
           itemRepository: deps.itemRepository,
         },
       );
 
-      if (setResult.type === "error") {
-        console.error(formatError(setResult.error, debug));
+      if (validateResult.type === "error") {
+        console.error(formatError(validateResult.error, debug));
         return;
       }
 
-      // Display placement with aliases
-      const displayResult = await formatPlacementForDisplay(setResult.value, {
-        itemRepository: deps.itemRepository,
-      });
-      if (displayResult.type === "error") {
-        console.error(formatError(displayResult.error, debug));
-        return;
-      }
-      console.log(displayResult.value);
+      // Output shell export statement for eval
+      console.log(`export MM_CWD="${validateResult.value.toString()}"`);
     });
 }

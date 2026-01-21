@@ -52,15 +52,19 @@ export function createMoveCommand() {
 
       const cwdResult = await CwdResolutionService.getCwd(
         {
-          stateRepository: deps.stateRepository,
+          getEnv: (name) => Deno.env.get(name),
           itemRepository: deps.itemRepository,
+          timezone: deps.timezone,
         },
-        now,
       );
 
       if (cwdResult.type === "error") {
         console.error(formatError(cwdResult.error, debug));
         return;
+      }
+
+      if (cwdResult.value.warning) {
+        console.error(`Warning: ${cwdResult.value.warning}`);
       }
 
       const occurredAtResult = dateTimeFromDate(now);
@@ -80,7 +84,7 @@ export function createMoveCommand() {
           {
             itemExpression: itemRef,
             targetExpression,
-            cwd: cwdResult.value,
+            cwd: cwdResult.value.placement,
             today: now,
             occurredAt: occurredAtResult.value,
             timezone: deps.timezone,

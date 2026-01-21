@@ -66,15 +66,19 @@ export function createSnoozeCommand() {
 
       const cwdResult = await CwdResolutionService.getCwd(
         {
-          stateRepository: deps.stateRepository,
+          getEnv: (name) => Deno.env.get(name),
           itemRepository: deps.itemRepository,
+          timezone: deps.timezone,
         },
-        now,
       );
 
       if (cwdResult.type === "error") {
         console.error(cwdResult.error.message);
         return;
+      }
+
+      if (cwdResult.value.warning) {
+        console.error(`Warning: ${cwdResult.value.warning}`);
       }
 
       const occurredAtResult = dateTimeFromDate(now);
@@ -117,7 +121,7 @@ export function createSnoozeCommand() {
         }
 
         const itemPlacementResult = await pathResolver.resolvePath(
-          cwdResult.value,
+          cwdResult.value.placement,
           itemExprResult.value,
         );
         if (itemPlacementResult.type === "error") {
