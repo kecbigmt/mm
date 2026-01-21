@@ -88,6 +88,24 @@ Implementation complete. Added base date bolding feature to `mm ls`:
 
 **Next:** Code Review
 
+### Refactoring
+
+**Status: Complete - Ready for Verify**
+
+**Applied:**
+- Naming: Renamed `hasRealCwd` to `cwdFromSession` for clarity. The previous name was ambiguous ("real" could mean many things). The new name explicitly describes the source: cwd loaded from user's session state vs a synthetic placeholder created for path resolution.
+
+**Design:**
+- Coupling: Low - the flag is local to the list action and only used in one place
+- Cohesion: Good - the flag tracks a single concern (source of cwd value)
+- Responsibilities: Clear - the flag's sole purpose is to determine if base date extraction is meaningful
+
+**Quality:**
+- Tests passing: 59 tests
+- Linting: Clean
+
+**Next:** Verify
+
 ### Follow-ups / Open Risks
 
 #### Addressed

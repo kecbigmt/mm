@@ -122,7 +122,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   let placementRange: PlacementRange;
   let effectiveExpression: string | undefined;
   let cwd: ReturnType<typeof createPlacement> | undefined;
-  let hasRealCwd = false; // Track if cwd is the actual user's cwd (for base date bolding)
+  let cwdFromSession = false; // Track if cwd was loaded from session (vs placeholder)
 
   if (locatorArg) {
     // Parse locator expression first to check if cwd is needed
@@ -158,10 +158,10 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
       }
 
       cwd = cwdResult.value.placement;
-      hasRealCwd = true;
+      cwdFromSession = true;
     } else {
       // Use today's date as cwd placeholder for path resolution
-      // hasRealCwd stays false - base date won't be extracted from this
+      // cwdFromSession stays false - base date won't be extracted from this
       cwd = createTodayPlacement(now, deps.timezone);
     }
 
@@ -202,7 +202,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     }
 
     cwd = cwdResult.value.placement;
-    hasRealCwd = true;
+    cwdFromSession = true;
 
     // If cwd is an item-head section, use cwd as the target
     // Otherwise, default to today-7d..today+7d date range
@@ -411,10 +411,10 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   }
 
   // Extract base date from cwd for bolding
-  // Only use real cwd (not placeholder) for base date extraction
+  // Only use session cwd (not placeholder) for base date extraction
   // When cwd is a date directory, that date is the base date
   // For absolute paths or non-date cwd, base date is undefined (falls back to today)
-  const baseDate = hasRealCwd && cwd?.head.kind === "date" ? cwd.head.date : undefined;
+  const baseDate = cwdFromSession && cwd?.head.kind === "date" ? cwd.head.date : undefined;
 
   // Format output
   const output = profileSync("formatOutput", () => {
