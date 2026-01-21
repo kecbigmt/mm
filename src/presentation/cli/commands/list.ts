@@ -124,7 +124,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   let cwd: ReturnType<typeof createPlacement> | undefined;
 
   if (locatorArg) {
-    // Parse locator expression first to check if cwd is needed
+    // Parse locator expression first to check if cwd is needed for path resolution
     const rangeExprResult = parseRangeExpression(locatorArg);
     if (rangeExprResult.type === "error") {
       console.error(formatError(rangeExprResult.error, debug));
@@ -133,32 +133,31 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     }
 
     const rangeExpr = rangeExprResult.value;
-    const needsCwd = rangeExpressionRequiresCwd(rangeExpr);
+    const needsCwdForResolution = rangeExpressionRequiresCwd(rangeExpr);
 
-    // Only load cwd if the expression requires it (relative paths)
-    if (needsCwd) {
-      const cwdResult = await profileAsync("getCwd", () =>
-        CwdResolutionService.getCwd({
-          sessionRepository: deps.sessionRepository,
-          workspacePath: deps.root,
-          itemRepository: deps.itemRepository,
-          timezone: deps.timezone,
-        }));
+    // Always load cwd for base date bolding, even if path resolution doesn't need it
+    const cwdResult = await profileAsync("getCwd", () =>
+      CwdResolutionService.getCwd({
+        sessionRepository: deps.sessionRepository,
+        workspacePath: deps.root,
+        itemRepository: deps.itemRepository,
+        timezone: deps.timezone,
+      }));
 
-      if (cwdResult.type === "error") {
+    if (cwdResult.type === "error") {
+      // If cwd resolution fails and we need it for path resolution, error out
+      // Otherwise, use today as fallback (cwd only needed for bolding)
+      if (needsCwdForResolution) {
         console.error(formatError(cwdResult.error, debug));
         profilerFinish();
         return;
       }
-
+      cwd = createTodayPlacement(now, deps.timezone);
+    } else {
       if (cwdResult.value.warning) {
         console.error(`Warning: ${cwdResult.value.warning}`);
       }
-
       cwd = cwdResult.value.placement;
-    } else {
-      // Use today's date as cwd - it won't be used for absolute paths
-      cwd = createTodayPlacement(now, deps.timezone);
     }
 
     const pathResolver = createPathResolver({
