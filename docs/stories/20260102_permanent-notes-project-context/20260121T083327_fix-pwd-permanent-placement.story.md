@@ -112,6 +112,14 @@ When cwd is set to `permanent` via `mm cd permanent`, running `mm pwd` crashes b
 
 **Next:** Code Review
 
+---
+
+### Pull Request
+
+PR: [#97](https://github.com/kecbigmt/mm/pull/97)
+Created: 2026-01-21
+Status: Ready for review
+
 ### Follow-ups / Open Risks
 
 #### Addressed
