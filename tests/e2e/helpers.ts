@@ -18,7 +18,7 @@ export type TestContext = Readonly<{
   originalHome: string | undefined;
   gitConfigPath?: string;
   originalGitConfig?: string;
-  mmCwd?: string;
+  sessionDir: string;
 }>;
 
 /**
@@ -41,7 +41,10 @@ export const setupTestEnvironment = async (): Promise<TestContext> => {
   const originalGitConfig = Deno.env.get("GIT_CONFIG_GLOBAL");
   Deno.env.set("GIT_CONFIG_GLOBAL", gitConfigPath);
 
-  return { testHome, originalHome, gitConfigPath, originalGitConfig };
+  // Create session directory for test isolation
+  const sessionDir = await Deno.makeTempDir({ prefix: "mm_e2e_session_" });
+
+  return { testHome, originalHome, gitConfigPath, originalGitConfig, sessionDir };
 };
 
 /**
@@ -66,6 +69,7 @@ export const cleanupTestEnvironment = async (ctx: TestContext): Promise<void> =>
     return;
   }
   await Deno.remove(ctx.testHome, { recursive: true });
+  await Deno.remove(ctx.sessionDir, { recursive: true });
 };
 
 /**
@@ -74,11 +78,12 @@ export const cleanupTestEnvironment = async (ctx: TestContext): Promise<void> =>
 const MM_BINARY_PATH = Deno.env.get("MM_TEST_BINARY");
 
 export type RunCommandOptions = Readonly<{
-  mmCwd?: string;
+  sessionDir?: string;
 }>;
 
 /**
  * Runs an mm CLI command in a subprocess with the test MM_HOME.
+ * Uses a unique PPID simulation for session isolation via MM_SESSION_BASE_DIR.
  */
 export const runCommand = async (
   testHome: string,
@@ -91,13 +96,13 @@ export const runCommand = async (
     MM_HOME: testHome,
   };
 
-  // Set MM_CWD if provided
-  if (options?.mmCwd) {
-    env.MM_CWD = options.mmCwd;
-  } else {
-    // Ensure MM_CWD is not inherited from parent process
-    delete env.MM_CWD;
+  // Set session base directory for test isolation
+  if (options?.sessionDir) {
+    env.MM_SESSION_BASE_DIR = options.sessionDir;
   }
+
+  // Clean up environment variables that should not be inherited
+  delete env.MM_CWD;
 
   const command = MM_BINARY_PATH
     ? new Deno.Command(MM_BINARY_PATH, {
@@ -114,6 +119,7 @@ export const runCommand = async (
         "--allow-write",
         "--allow-env",
         "--allow-run",
+        "--allow-sys",
         "src/main.ts",
         ...args,
       ],
@@ -149,15 +155,13 @@ export const getCurrentDateFromCli = async (
 
 export type CdResult = Readonly<{
   success: boolean;
-  mmCwd: string | null;
-  displayPath: string | null;
   stdout: string;
   stderr: string;
 }>;
 
 /**
- * Runs cd command and extracts the MM_CWD value from the export statement.
- * Use the returned mmCwd value in subsequent runCommand calls.
+ * Runs cd command. With session-based storage, cd writes to session file directly.
+ * No special parsing needed - just run the command.
  */
 export const runCd = async (
   testHome: string,
@@ -165,38 +169,8 @@ export const runCd = async (
   options?: RunCommandOptions,
 ): Promise<CdResult> => {
   const result = await runCommand(testHome, ["cd", path], options);
-
-  if (!result.success) {
-    return {
-      success: false,
-      mmCwd: null,
-      displayPath: null,
-      stdout: result.stdout,
-      stderr: result.stderr,
-    };
-  }
-
-  // Parse export statement: export MM_CWD="value"
-  const exportMatch = result.stdout.match(/^export MM_CWD="([^"]+)"$/);
-  if (!exportMatch) {
-    return {
-      success: false,
-      mmCwd: null,
-      displayPath: null,
-      stdout: result.stdout,
-      stderr: `Unexpected cd output format: ${result.stdout}`,
-    };
-  }
-
-  const mmCwd = exportMatch[1];
-
-  // Convert to display path (add leading /)
-  const displayPath = `/${mmCwd}`;
-
   return {
-    success: true,
-    mmCwd,
-    displayPath,
+    success: result.success,
     stdout: result.stdout,
     stderr: result.stderr,
   };

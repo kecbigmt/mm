@@ -49,14 +49,14 @@ describe("Scenario 20: List partitioning and formatting", () => {
       const yesterday = addDaysToString(today, -1);
       const tomorrow = addDaysToString(today, 1);
 
-      let cd = await runCd(ctx.testHome, yesterday);
-      await runCommand(ctx.testHome, ["note", "Yesterday's note"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, yesterday, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Yesterday's note"], { sessionDir: ctx.sessionDir });
 
-      cd = await runCd(ctx.testHome, today);
-      await runCommand(ctx.testHome, ["note", "Today's note"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Today's note"], { sessionDir: ctx.sessionDir });
 
-      cd = await runCd(ctx.testHome, tomorrow);
-      await runCommand(ctx.testHome, ["note", "Tomorrow's note"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, tomorrow, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Tomorrow's note"], { sessionDir: ctx.sessionDir });
 
       // Run ls without arguments (default range)
       const lsResult = await runCommand(ctx.testHome, ["ls", "--no-pager"]);
@@ -74,8 +74,8 @@ describe("Scenario 20: List partitioning and formatting", () => {
     });
 
     it("shows relative date labels (today, tomorrow, yesterday)", async () => {
-      const cd = await runCd(ctx.testHome, today);
-      await runCommand(ctx.testHome, ["note", "A note for today"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "A note for today"], { sessionDir: ctx.sessionDir });
 
       const lsResult = await runCommand(ctx.testHome, ["ls", "--no-pager"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
@@ -87,8 +87,8 @@ describe("Scenario 20: List partitioning and formatting", () => {
     it("shows (empty) when no items exist in default range", async () => {
       // Create an item far outside the default range
       const farPast = addDaysToString(today, -30);
-      const cd = await runCd(ctx.testHome, farPast);
-      await runCommand(ctx.testHome, ["note", "Old note"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, farPast, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Old note"], { sessionDir: ctx.sessionDir });
 
       const lsResult = await runCommand(ctx.testHome, ["ls", "--no-pager"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
@@ -99,8 +99,8 @@ describe("Scenario 20: List partitioning and formatting", () => {
 
   describe("Print mode (--print)", () => {
     it("--print mode shows ISO date column and plain icons", async () => {
-      const cd = await runCd(ctx.testHome, today);
-      await runCommand(ctx.testHome, ["note", "Test note"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Test note"], { sessionDir: ctx.sessionDir });
 
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "--print"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
@@ -113,8 +113,8 @@ describe("Scenario 20: List partitioning and formatting", () => {
     });
 
     it("--print mode does not include color codes", async () => {
-      const cd = await runCd(ctx.testHome, today);
-      await runCommand(ctx.testHome, ["note", "Color test"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Color test"], { sessionDir: ctx.sessionDir });
 
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "--print"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
@@ -130,19 +130,19 @@ describe("Scenario 20: List partitioning and formatting", () => {
 
   describe("CWD listing (mm ls .)", () => {
     it("lists only items at current working directory", async () => {
-      let cd = await runCd(ctx.testHome, today);
-      await runCommand(ctx.testHome, ["note", "Today's item"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Today's item"], { sessionDir: ctx.sessionDir });
 
       const yesterday = addDaysToString(today, -1);
-      cd = await runCd(ctx.testHome, yesterday);
-      await runCommand(ctx.testHome, ["note", "Yesterday's item"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, yesterday, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Yesterday's item"], { sessionDir: ctx.sessionDir });
 
       // Go back to today
-      cd = await runCd(ctx.testHome, today);
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
 
       // ls . should only show today's items
       const lsResult = await runCommand(ctx.testHome, ["ls", ".", "--no-pager"], {
-        mmCwd: cd.mmCwd!,
+        sessionDir: ctx.sessionDir,
       });
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
 
@@ -157,14 +157,14 @@ describe("Scenario 20: List partitioning and formatting", () => {
     it("shows (empty) when current directory has no items", async () => {
       // Create item on a different date
       const yesterday = addDaysToString(today, -1);
-      let cd = await runCd(ctx.testHome, yesterday);
-      await runCommand(ctx.testHome, ["note", "An item"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, yesterday, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "An item"], { sessionDir: ctx.sessionDir });
 
       // Go to today (empty)
-      cd = await runCd(ctx.testHome, today);
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
 
       const lsResult = await runCommand(ctx.testHome, ["ls", ".", "--no-pager"], {
-        mmCwd: cd.mmCwd!,
+        sessionDir: ctx.sessionDir,
       });
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
 
@@ -174,16 +174,18 @@ describe("Scenario 20: List partitioning and formatting", () => {
 
   describe("Item-head range with section stubs", () => {
     it("shows items under item-head sections", async () => {
-      let cd = await runCd(ctx.testHome, today);
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
       // Create parent item
-      await runCommand(ctx.testHome, ["note", "Book notes", "-a", "book"], { mmCwd: cd.mmCwd! });
+      await runCommand(ctx.testHome, ["note", "Book notes", "-a", "book"], {
+        sessionDir: ctx.sessionDir,
+      });
 
       // Create items in sections
-      cd = await runCd(ctx.testHome, "book/1", { mmCwd: cd.mmCwd! });
-      await runCommand(ctx.testHome, ["note", "Chapter 1 notes"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, "book/1", { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Chapter 1 notes"], { sessionDir: ctx.sessionDir });
 
-      cd = await runCd(ctx.testHome, "book/2");
-      await runCommand(ctx.testHome, ["note", "Chapter 2 notes"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, "book/2", { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Chapter 2 notes"], { sessionDir: ctx.sessionDir });
 
       // List the range book/1..2
       const lsResult = await runCommand(ctx.testHome, ["ls", "book/1..2", "--no-pager"]);
@@ -195,15 +197,17 @@ describe("Scenario 20: List partitioning and formatting", () => {
     });
 
     it("omits empty sections in range", async () => {
-      let cd = await runCd(ctx.testHome, today);
-      await runCommand(ctx.testHome, ["note", "Book", "-a", "book"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Book", "-a", "book"], {
+        sessionDir: ctx.sessionDir,
+      });
 
       // Create items only in section 1 and 3, not 2
-      cd = await runCd(ctx.testHome, "book/1", { mmCwd: cd.mmCwd! });
-      await runCommand(ctx.testHome, ["note", "Section 1"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, "book/1", { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Section 1"], { sessionDir: ctx.sessionDir });
 
-      cd = await runCd(ctx.testHome, "book/3");
-      await runCommand(ctx.testHome, ["note", "Section 3"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, "book/3", { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Section 3"], { sessionDir: ctx.sessionDir });
 
       // List range 1..3
       const lsResult = await runCommand(ctx.testHome, ["ls", "book/1..3", "--no-pager"]);
@@ -222,11 +226,13 @@ describe("Scenario 20: List partitioning and formatting", () => {
     });
 
     it("shows section headers with alias when available", async () => {
-      let cd = await runCd(ctx.testHome, today);
-      await runCommand(ctx.testHome, ["note", "Book", "-a", "book"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Book", "-a", "book"], {
+        sessionDir: ctx.sessionDir,
+      });
 
-      cd = await runCd(ctx.testHome, "book/1", { mmCwd: cd.mmCwd! });
-      await runCommand(ctx.testHome, ["note", "Chapter 1"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, "book/1", { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Chapter 1"], { sessionDir: ctx.sessionDir });
 
       const lsResult = await runCommand(ctx.testHome, ["ls", "book/1", "--no-pager"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
@@ -238,9 +244,9 @@ describe("Scenario 20: List partitioning and formatting", () => {
 
   describe("Task and event type filtering", () => {
     it("filters by type using --type task", async () => {
-      const cd = await runCd(ctx.testHome, today);
-      await runCommand(ctx.testHome, ["note", "A note"], { mmCwd: cd.mmCwd! });
-      await runCommand(ctx.testHome, ["task", "A task"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "A note"], { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["task", "A task"], { sessionDir: ctx.sessionDir });
 
       // Filter by task type
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "-t", "task", "--no-pager"]);
@@ -256,8 +262,8 @@ describe("Scenario 20: List partitioning and formatting", () => {
     });
 
     it("shows task with task icon", async () => {
-      const cd = await runCd(ctx.testHome, today);
-      await runCommand(ctx.testHome, ["task", "A task item"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["task", "A task item"], { sessionDir: ctx.sessionDir });
 
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "--no-pager"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
@@ -267,8 +273,8 @@ describe("Scenario 20: List partitioning and formatting", () => {
     });
 
     it("shows event under date head with event icon", async () => {
-      const cd = await runCd(ctx.testHome, today);
-      await runCommand(ctx.testHome, ["event", "Meeting at 10am"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["event", "Meeting at 10am"], { sessionDir: ctx.sessionDir });
 
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "--no-pager"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
@@ -279,10 +285,14 @@ describe("Scenario 20: List partitioning and formatting", () => {
     });
 
     it("--all --print shows all items with plain text icons", async () => {
-      const cd = await runCd(ctx.testHome, today);
-      await runCommand(ctx.testHome, ["task", "Open task", "-a", "task1"], { mmCwd: cd.mmCwd! });
-      await runCommand(ctx.testHome, ["task", "Closed task", "-a", "task2"], { mmCwd: cd.mmCwd! });
-      await runCommand(ctx.testHome, ["close", "task2"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["task", "Open task", "-a", "task1"], {
+        sessionDir: ctx.sessionDir,
+      });
+      await runCommand(ctx.testHome, ["task", "Closed task", "-a", "task2"], {
+        sessionDir: ctx.sessionDir,
+      });
+      await runCommand(ctx.testHome, ["close", "task2"], { sessionDir: ctx.sessionDir });
 
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "--all", "--print"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
@@ -301,15 +311,21 @@ describe("Scenario 20: List partitioning and formatting", () => {
 
   describe("Item-head event handling", () => {
     it("omits events placed under item-head and emits warning", async () => {
-      let cd = await runCd(ctx.testHome, today);
-      await runCommand(ctx.testHome, ["note", "Book", "-a", "book"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Book", "-a", "book"], {
+        sessionDir: ctx.sessionDir,
+      });
 
       // Create items under item-head section
-      cd = await runCd(ctx.testHome, "book/1", { mmCwd: cd.mmCwd! });
-      await runCommand(ctx.testHome, ["note", "Chapter note"], { mmCwd: cd.mmCwd! });
+      await runCd(ctx.testHome, "book/1", { sessionDir: ctx.sessionDir });
+      await runCommand(ctx.testHome, ["note", "Chapter note"], { sessionDir: ctx.sessionDir });
       // Create event under item-head section (using edit since event command places under date head)
-      await runCommand(ctx.testHome, ["note", "Chapter event", "-a", "evt1"], { mmCwd: cd.mmCwd! });
-      await runCommand(ctx.testHome, ["edit", "evt1", "--icon", "event"], { mmCwd: cd.mmCwd! });
+      await runCommand(ctx.testHome, ["note", "Chapter event", "-a", "evt1"], {
+        sessionDir: ctx.sessionDir,
+      });
+      await runCommand(ctx.testHome, ["edit", "evt1", "--icon", "event"], {
+        sessionDir: ctx.sessionDir,
+      });
 
       // List the item-head section
       const lsResult = await runCommand(ctx.testHome, ["ls", "book/1", "--no-pager"]);
@@ -334,16 +350,16 @@ describe("Scenario 20: List partitioning and formatting", () => {
 
   describe("Closed items filtering", () => {
     it("filters out closed items by default", async () => {
-      const cd = await runCd(ctx.testHome, today);
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
       await runCommand(ctx.testHome, ["note", "Open note", "-a", "open-note"], {
-        mmCwd: cd.mmCwd!,
+        sessionDir: ctx.sessionDir,
       });
       await runCommand(ctx.testHome, ["note", "Closed note", "-a", "closed-note"], {
-        mmCwd: cd.mmCwd!,
+        sessionDir: ctx.sessionDir,
       });
 
       // Close the second note
-      await runCommand(ctx.testHome, ["close", "closed-note"], { mmCwd: cd.mmCwd! });
+      await runCommand(ctx.testHome, ["close", "closed-note"], { sessionDir: ctx.sessionDir });
 
       // Default listing should not show closed items
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "--no-pager"]);
@@ -358,16 +374,16 @@ describe("Scenario 20: List partitioning and formatting", () => {
     });
 
     it("shows closed items with --all flag", async () => {
-      const cd = await runCd(ctx.testHome, today);
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
       await runCommand(ctx.testHome, ["note", "Open note", "-a", "open-note"], {
-        mmCwd: cd.mmCwd!,
+        sessionDir: ctx.sessionDir,
       });
       await runCommand(ctx.testHome, ["note", "Closed note", "-a", "closed-note"], {
-        mmCwd: cd.mmCwd!,
+        sessionDir: ctx.sessionDir,
       });
 
       // Close the second note
-      await runCommand(ctx.testHome, ["close", "closed-note"], { mmCwd: cd.mmCwd! });
+      await runCommand(ctx.testHome, ["close", "closed-note"], { sessionDir: ctx.sessionDir });
 
       // --all should include closed items
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "--all", "--no-pager"]);
@@ -378,11 +394,11 @@ describe("Scenario 20: List partitioning and formatting", () => {
     });
 
     it("shows closed note with different icon", async () => {
-      const cd = await runCd(ctx.testHome, today);
+      await runCd(ctx.testHome, today, { sessionDir: ctx.sessionDir });
       await runCommand(ctx.testHome, ["note", "Closed note", "-a", "closed-note"], {
-        mmCwd: cd.mmCwd!,
+        sessionDir: ctx.sessionDir,
       });
-      await runCommand(ctx.testHome, ["close", "closed-note"], { mmCwd: cd.mmCwd! });
+      await runCommand(ctx.testHome, ["close", "closed-note"], { sessionDir: ctx.sessionDir });
 
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "--all", "--no-pager"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);

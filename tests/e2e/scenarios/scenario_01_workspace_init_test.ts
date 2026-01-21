@@ -85,31 +85,37 @@ describe("Scenario 1: Workspace initialization and basic operations", () => {
   });
 
   it("navigates to different date with cd", async () => {
+    const opts = { sessionDir: ctx.sessionDir };
     await runCommand(ctx.testHome, ["workspace", "init", "test-workspace"]);
 
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split("T")[0];
 
-    const cdResult = await runCd(ctx.testHome, yesterdayStr);
+    const cdResult = await runCd(ctx.testHome, yesterdayStr, opts);
     assertEquals(cdResult.success, true, `cd failed: ${cdResult.stderr}`);
-    assertEquals(cdResult.displayPath, `/${yesterdayStr}`);
+
+    // Verify with pwd
+    const pwdResult = await runCommand(ctx.testHome, ["pwd"], opts);
+    assertEquals(pwdResult.stdout, `/${yesterdayStr}`);
   });
 
   it("confirms CWD change with pwd after cd", async () => {
+    const opts = { sessionDir: ctx.sessionDir };
     await runCommand(ctx.testHome, ["workspace", "init", "test-workspace"]);
 
     const targetDate = "2025-11-01";
-    const cdResult = await runCd(ctx.testHome, targetDate);
+    const cdResult = await runCd(ctx.testHome, targetDate, opts);
     assertEquals(cdResult.success, true, `cd failed: ${cdResult.stderr}`);
 
-    // Pass the MM_CWD from cd result to pwd command
-    const pwdResult = await runCommand(ctx.testHome, ["pwd"], { mmCwd: cdResult.mmCwd! });
+    // Verify with pwd
+    const pwdResult = await runCommand(ctx.testHome, ["pwd"], opts);
     assertEquals(pwdResult.success, true, `pwd failed: ${pwdResult.stderr}`);
     assertEquals(pwdResult.stdout, `/${targetDate}`);
   });
 
   it("executes full flow: init → pwd → cd → pwd", async () => {
+    const opts = { sessionDir: ctx.sessionDir };
     const initResult = await runCommand(ctx.testHome, ["workspace", "init", "test-workspace"]);
     assertEquals(initResult.success, true, "workspace init should succeed");
     assertEquals(
@@ -117,18 +123,17 @@ describe("Scenario 1: Workspace initialization and basic operations", () => {
       true,
     );
 
-    const pwd1Result = await runCommand(ctx.testHome, ["pwd"]);
+    const pwd1Result = await runCommand(ctx.testHome, ["pwd"], opts);
     assertEquals(pwd1Result.success, true, "first pwd should succeed");
     const match = pwd1Result.stdout.match(/^\/\d{4}-\d{2}-\d{2}$/);
     assertExists(match, `pwd should return ISO date path, got: ${pwd1Result.stdout}`);
 
     const targetDate = "2025-11-01";
-    const cdResult = await runCd(ctx.testHome, targetDate);
+    const cdResult = await runCd(ctx.testHome, targetDate, opts);
     assertEquals(cdResult.success, true, "cd should succeed");
-    assertEquals(cdResult.displayPath, `/${targetDate}`, "cd should return new cwd");
 
-    // Pass the MM_CWD from cd result to pwd command
-    const pwd2Result = await runCommand(ctx.testHome, ["pwd"], { mmCwd: cdResult.mmCwd! });
+    // Verify with pwd
+    const pwd2Result = await runCommand(ctx.testHome, ["pwd"], opts);
     assertEquals(pwd2Result.success, true, "second pwd should succeed");
     assertEquals(pwd2Result.stdout, `/${targetDate}`, "cwd should be updated");
   });
