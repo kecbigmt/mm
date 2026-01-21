@@ -122,9 +122,10 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   let placementRange: PlacementRange;
   let effectiveExpression: string | undefined;
   let cwd: ReturnType<typeof createPlacement> | undefined;
+  let hasRealCwd = false; // Track if cwd is the actual user's cwd (for base date bolding)
 
   if (locatorArg) {
-    // Parse locator expression first to check if cwd is needed for path resolution
+    // Parse locator expression first to check if cwd is needed
     const rangeExprResult = parseRangeExpression(locatorArg);
     if (rangeExprResult.type === "error") {
       console.error(formatError(rangeExprResult.error, debug));
@@ -133,31 +134,35 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     }
 
     const rangeExpr = rangeExprResult.value;
-    const needsCwdForResolution = rangeExpressionRequiresCwd(rangeExpr);
+    const needsCwd = rangeExpressionRequiresCwd(rangeExpr);
 
-    // Always load cwd for base date bolding, even if path resolution doesn't need it
-    const cwdResult = await profileAsync("getCwd", () =>
-      CwdResolutionService.getCwd({
-        sessionRepository: deps.sessionRepository,
-        workspacePath: deps.root,
-        itemRepository: deps.itemRepository,
-        timezone: deps.timezone,
-      }));
+    // Only load cwd if the expression requires it (relative paths)
+    // For absolute paths, skip cwd loading for performance
+    if (needsCwd) {
+      const cwdResult = await profileAsync("getCwd", () =>
+        CwdResolutionService.getCwd({
+          sessionRepository: deps.sessionRepository,
+          workspacePath: deps.root,
+          itemRepository: deps.itemRepository,
+          timezone: deps.timezone,
+        }));
 
-    if (cwdResult.type === "error") {
-      // If cwd resolution fails and we need it for path resolution, error out
-      // Otherwise, use today as fallback (cwd only needed for bolding)
-      if (needsCwdForResolution) {
+      if (cwdResult.type === "error") {
         console.error(formatError(cwdResult.error, debug));
         profilerFinish();
         return;
       }
-      cwd = createTodayPlacement(now, deps.timezone);
-    } else {
+
       if (cwdResult.value.warning) {
         console.error(`Warning: ${cwdResult.value.warning}`);
       }
+
       cwd = cwdResult.value.placement;
+      hasRealCwd = true;
+    } else {
+      // Use today's date as cwd placeholder for path resolution
+      // hasRealCwd stays false - base date won't be extracted from this
+      cwd = createTodayPlacement(now, deps.timezone);
     }
 
     const pathResolver = createPathResolver({
@@ -197,6 +202,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     }
 
     cwd = cwdResult.value.placement;
+    hasRealCwd = true;
 
     // If cwd is an item-head section, use cwd as the target
     // Otherwise, default to today-7d..today+7d date range
@@ -405,9 +411,10 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   }
 
   // Extract base date from cwd for bolding
+  // Only use real cwd (not placeholder) for base date extraction
   // When cwd is a date directory, that date is the base date
-  // Otherwise (permanent or item), base date is undefined (falls back to today)
-  const baseDate = cwd?.head.kind === "date" ? cwd.head.date : undefined;
+  // For absolute paths or non-date cwd, base date is undefined (falls back to today)
+  const baseDate = hasRealCwd && cwd?.head.kind === "date" ? cwd.head.date : undefined;
 
   // Format output
   const output = profileSync("formatOutput", () => {
