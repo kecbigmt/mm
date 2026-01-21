@@ -26,6 +26,7 @@ import { afterEach, beforeEach, describe, it } from "@std/testing/bdd";
 import {
   cleanupTestEnvironment,
   getWorkspacePath,
+  runCd,
   runCommand,
   setupTestEnvironment,
   type TestContext,
@@ -90,18 +91,20 @@ describe("Scenario 1: Workspace initialization and basic operations", () => {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split("T")[0];
 
-    const cdResult = await runCommand(ctx.testHome, ["cd", yesterdayStr]);
+    const cdResult = await runCd(ctx.testHome, yesterdayStr);
     assertEquals(cdResult.success, true, `cd failed: ${cdResult.stderr}`);
-    assertEquals(cdResult.stdout, `/${yesterdayStr}`);
+    assertEquals(cdResult.displayPath, `/${yesterdayStr}`);
   });
 
   it("confirms CWD change with pwd after cd", async () => {
     await runCommand(ctx.testHome, ["workspace", "init", "test-workspace"]);
 
     const targetDate = "2025-11-01";
-    await runCommand(ctx.testHome, ["cd", targetDate]);
+    const cdResult = await runCd(ctx.testHome, targetDate);
+    assertEquals(cdResult.success, true, `cd failed: ${cdResult.stderr}`);
 
-    const pwdResult = await runCommand(ctx.testHome, ["pwd"]);
+    // Pass the MM_CWD from cd result to pwd command
+    const pwdResult = await runCommand(ctx.testHome, ["pwd"], { mmCwd: cdResult.mmCwd! });
     assertEquals(pwdResult.success, true, `pwd failed: ${pwdResult.stderr}`);
     assertEquals(pwdResult.stdout, `/${targetDate}`);
   });
@@ -120,11 +123,12 @@ describe("Scenario 1: Workspace initialization and basic operations", () => {
     assertExists(match, `pwd should return ISO date path, got: ${pwd1Result.stdout}`);
 
     const targetDate = "2025-11-01";
-    const cdResult = await runCommand(ctx.testHome, ["cd", targetDate]);
+    const cdResult = await runCd(ctx.testHome, targetDate);
     assertEquals(cdResult.success, true, "cd should succeed");
-    assertEquals(cdResult.stdout, `/${targetDate}`, "cd should return new cwd");
+    assertEquals(cdResult.displayPath, `/${targetDate}`, "cd should return new cwd");
 
-    const pwd2Result = await runCommand(ctx.testHome, ["pwd"]);
+    // Pass the MM_CWD from cd result to pwd command
+    const pwd2Result = await runCommand(ctx.testHome, ["pwd"], { mmCwd: cdResult.mmCwd! });
     assertEquals(pwd2Result.success, true, "second pwd should succeed");
     assertEquals(pwd2Result.stdout, `/${targetDate}`, "cwd should be updated");
   });

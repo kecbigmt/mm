@@ -18,6 +18,7 @@ export type TestContext = Readonly<{
   originalHome: string | undefined;
   gitConfigPath?: string;
   originalGitConfig?: string;
+  mmCwd?: string;
 }>;
 
 /**
@@ -72,18 +73,31 @@ export const cleanupTestEnvironment = async (ctx: TestContext): Promise<void> =>
  */
 const MM_BINARY_PATH = Deno.env.get("MM_TEST_BINARY");
 
+export type RunCommandOptions = Readonly<{
+  mmCwd?: string;
+}>;
+
 /**
  * Runs an mm CLI command in a subprocess with the test MM_HOME.
  */
 export const runCommand = async (
   testHome: string,
   args: string[],
+  options?: RunCommandOptions,
 ): Promise<CommandResult> => {
   // Inherit GIT_CONFIG_GLOBAL if set (for CI environments)
   const env: Record<string, string> = {
     ...Deno.env.toObject(),
     MM_HOME: testHome,
   };
+
+  // Set MM_CWD if provided
+  if (options?.mmCwd) {
+    env.MM_CWD = options.mmCwd;
+  } else {
+    // Ensure MM_CWD is not inherited from parent process
+    delete env.MM_CWD;
+  }
 
   const command = MM_BINARY_PATH
     ? new Deno.Command(MM_BINARY_PATH, {
@@ -118,8 +132,11 @@ export const runCommand = async (
   };
 };
 
-export const getCurrentDateFromCli = async (testHome: string): Promise<string> => {
-  const pwdResult = await runCommand(testHome, ["pwd"]);
+export const getCurrentDateFromCli = async (
+  testHome: string,
+  options?: RunCommandOptions,
+): Promise<string> => {
+  const pwdResult = await runCommand(testHome, ["pwd"], options);
   if (!pwdResult.success) {
     throw new Error(`Failed to resolve current date from pwd: ${pwdResult.stderr}`);
   }
@@ -128,6 +145,61 @@ export const getCurrentDateFromCli = async (testHome: string): Promise<string> =
     throw new Error(`Failed to extract date from pwd output: ${pwdResult.stdout}`);
   }
   return match[1];
+};
+
+export type CdResult = Readonly<{
+  success: boolean;
+  mmCwd: string | null;
+  displayPath: string | null;
+  stdout: string;
+  stderr: string;
+}>;
+
+/**
+ * Runs cd command and extracts the MM_CWD value from the export statement.
+ * Use the returned mmCwd value in subsequent runCommand calls.
+ */
+export const runCd = async (
+  testHome: string,
+  path: string,
+  options?: RunCommandOptions,
+): Promise<CdResult> => {
+  const result = await runCommand(testHome, ["cd", path], options);
+
+  if (!result.success) {
+    return {
+      success: false,
+      mmCwd: null,
+      displayPath: null,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    };
+  }
+
+  // Parse export statement: export MM_CWD="value"
+  const exportMatch = result.stdout.match(/^export MM_CWD="([^"]+)"$/);
+  if (!exportMatch) {
+    return {
+      success: false,
+      mmCwd: null,
+      displayPath: null,
+      stdout: result.stdout,
+      stderr: `Unexpected cd output format: ${result.stdout}`,
+    };
+  }
+
+  const mmCwd = exportMatch[1];
+
+  // Convert to display path (add leading /)
+  const displayPath = `/${mmCwd}`;
+
+  return {
+    success: true,
+    mmCwd,
+    displayPath,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
 };
 
 /**

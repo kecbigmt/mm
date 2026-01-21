@@ -69,7 +69,7 @@ export function createEventCommand() {
 
       const cwdResult = await CwdResolutionService.getCwd(
         {
-          stateRepository: deps.stateRepository,
+          getEnv: (name) => Deno.env.get(name),
           itemRepository: deps.itemRepository,
         },
         now,
@@ -78,9 +78,12 @@ export function createEventCommand() {
         console.error(formatError(cwdResult.error, debug));
         return;
       }
+      if (cwdResult.value.warning) {
+        console.error(`Warning: ${cwdResult.value.warning}`);
+      }
 
       // Resolve parent placement
-      let parentPlacement = cwdResult.value;
+      let parentPlacement = cwdResult.value.placement;
 
       if (parentArg) {
         const exprResult = parsePathExpression(parentArg);
@@ -100,7 +103,7 @@ export function createEventCommand() {
         });
 
         const resolveResult = await pathResolver.resolvePath(
-          cwdResult.value,
+          cwdResult.value.placement,
           exprResult.value,
         );
 
