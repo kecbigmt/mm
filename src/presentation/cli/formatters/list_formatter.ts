@@ -328,12 +328,14 @@ const computeRelativeLabel = (day: CalendarDay, referenceDate: Date): string => 
  *   - last-{weekday} (for -2 to -7 days)
  *   - +Nd (for beyond +7 days)
  *   - ~Nd (for beyond -7 days)
- * - Bold when relative is "today" in colored mode
+ * - Bold when day matches baseDate in colored mode
+ * - If baseDate is not provided, falls back to bolding "today"
  */
 export const formatDateHeader = (
   day: CalendarDay,
   referenceDate: Date,
   options: ListFormatterOptions,
+  baseDate?: CalendarDay,
 ): string => {
   const { printMode } = options;
   const dateStr = `[${day.toString()}]`;
@@ -341,8 +343,13 @@ export const formatDateHeader = (
 
   let header = relative ? `${dateStr} ${relative}` : dateStr;
 
-  if (!printMode && relative === "today") {
-    header = bold(header);
+  if (!printMode) {
+    const shouldBold = baseDate
+      ? day.toString() === baseDate.toString()
+      : relative === "today";
+    if (shouldBold) {
+      header = bold(header);
+    }
   }
 
   return header;

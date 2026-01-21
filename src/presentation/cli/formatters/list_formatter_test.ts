@@ -684,6 +684,98 @@ Deno.test("formatDateHeader - colored mode includes ANSI codes for today", () =>
 });
 
 // =============================================================================
+// formatDateHeader - base date bolding tests
+// =============================================================================
+
+Deno.test("formatDateHeader - base date is bold when different from today", () => {
+  // Base date is 2025-02-15, today is 2025-02-10
+  const day = makeCalendarDay("2025-02-15");
+  const referenceDate = new Date("2025-02-10T12:00:00Z"); // today for relative labels
+  const baseDate = makeCalendarDay("2025-02-15"); // base date (from cwd)
+  const options: ListFormatterOptions = {
+    printMode: false,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW,
+  };
+  const result = formatDateHeader(day, referenceDate, options, baseDate);
+  // Should be bold because day matches baseDate
+  assertEquals(result.includes("\x1b[1m"), true); // bold ANSI code
+});
+
+Deno.test("formatDateHeader - today is not bold when base date is different", () => {
+  // Today is 2025-02-10, base date is 2025-02-15
+  const day = makeCalendarDay("2025-02-10"); // today
+  const referenceDate = new Date("2025-02-10T12:00:00Z");
+  const baseDate = makeCalendarDay("2025-02-15"); // base date (from cwd)
+  const options: ListFormatterOptions = {
+    printMode: false,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW,
+  };
+  const result = formatDateHeader(day, referenceDate, options, baseDate);
+  // Should NOT be bold because day matches today but not baseDate
+  assertEquals(result.includes("\x1b[1m"), false);
+});
+
+Deno.test("formatDateHeader - today is bold when base date equals today", () => {
+  // Both today and base date are 2025-02-10
+  const day = makeCalendarDay("2025-02-10");
+  const referenceDate = new Date("2025-02-10T12:00:00Z");
+  const baseDate = makeCalendarDay("2025-02-10"); // base date equals today
+  const options: ListFormatterOptions = {
+    printMode: false,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW,
+  };
+  const result = formatDateHeader(day, referenceDate, options, baseDate);
+  // Should be bold because day matches baseDate (which also equals today)
+  assertEquals(result.includes("\x1b[1m"), true);
+});
+
+Deno.test("formatDateHeader - no date is bold when base date not in output range", () => {
+  // Base date is 2025-02-20, but we're displaying 2025-02-10
+  const day = makeCalendarDay("2025-02-10");
+  const referenceDate = new Date("2025-02-10T12:00:00Z");
+  const baseDate = makeCalendarDay("2025-02-20"); // base date not in range
+  const options: ListFormatterOptions = {
+    printMode: false,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW,
+  };
+  const result = formatDateHeader(day, referenceDate, options, baseDate);
+  // Should NOT be bold because day doesn't match baseDate
+  assertEquals(result.includes("\x1b[1m"), false);
+});
+
+Deno.test("formatDateHeader - base date not bold in print mode", () => {
+  const day = makeCalendarDay("2025-02-15");
+  const referenceDate = new Date("2025-02-10T12:00:00Z");
+  const baseDate = makeCalendarDay("2025-02-15");
+  const options: ListFormatterOptions = {
+    printMode: true, // print mode - no ANSI codes
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW,
+  };
+  const result = formatDateHeader(day, referenceDate, options, baseDate);
+  // Should NOT contain ANSI codes in print mode
+  assertEquals(result.includes("\x1b"), false);
+});
+
+Deno.test("formatDateHeader - backwards compatible when baseDate not provided", () => {
+  // When baseDate is undefined, fall back to bolding today
+  const day = makeCalendarDay("2025-02-10");
+  const referenceDate = new Date("2025-02-10T12:00:00Z");
+  const options: ListFormatterOptions = {
+    printMode: false,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW,
+  };
+  // No baseDate parameter - should fall back to bolding today
+  const result = formatDateHeader(day, referenceDate, options);
+  assertEquals(result.includes("\x1b[1m"), true);
+});
+
+// =============================================================================
 // formatItemHeadHeader tests
 // =============================================================================
 

@@ -405,6 +405,11 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     return;
   }
 
+  // Extract base date from cwd for bolding
+  // When cwd is a date directory, that date is the base date
+  // Otherwise (permanent or item), base date is undefined (falls back to today)
+  const baseDate = cwd?.head.kind === "date" ? cwd.head.date : undefined;
+
   // Format output
   const output = profileSync("formatOutput", () => {
     const formatterOptions: ListFormatterOptions = {
@@ -418,7 +423,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     for (const partition of partitions) {
       // Format header
       if (partition.header.kind === "date") {
-        outputLines.push(formatDateHeader(partition.header.date, now, formatterOptions));
+        outputLines.push(formatDateHeader(partition.header.date, now, formatterOptions, baseDate));
       } else {
         outputLines.push(
           formatItemHeadHeader(
