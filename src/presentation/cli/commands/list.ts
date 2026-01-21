@@ -122,6 +122,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   let placementRange: PlacementRange;
   let effectiveExpression: string | undefined;
   let cwd: ReturnType<typeof createPlacement> | undefined;
+  let cwdFromSession = false; // Track if cwd was loaded from session (vs placeholder)
 
   if (locatorArg) {
     // Parse locator expression first to check if cwd is needed
@@ -136,6 +137,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     const needsCwd = rangeExpressionRequiresCwd(rangeExpr);
 
     // Only load cwd if the expression requires it (relative paths)
+    // For absolute paths, skip cwd loading for performance
     if (needsCwd) {
       const cwdResult = await profileAsync("getCwd", () =>
         CwdResolutionService.getCwd({
@@ -156,8 +158,10 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
       }
 
       cwd = cwdResult.value.placement;
+      cwdFromSession = true;
     } else {
-      // Use today's date as cwd - it won't be used for absolute paths
+      // Use today's date as cwd placeholder for path resolution
+      // cwdFromSession stays false - base date won't be extracted from this
       cwd = createTodayPlacement(now, deps.timezone);
     }
 
@@ -198,6 +202,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     }
 
     cwd = cwdResult.value.placement;
+    cwdFromSession = true;
 
     // If cwd is an item-head section, use cwd as the target
     // Otherwise, default to today-7d..today+7d date range
@@ -405,6 +410,12 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     return;
   }
 
+  // Extract base date from cwd for bolding
+  // Only use session cwd (not placeholder) for base date extraction
+  // When cwd is a date directory, that date is the base date
+  // For absolute paths or non-date cwd, base date is undefined (falls back to today)
+  const baseDate = cwdFromSession && cwd?.head.kind === "date" ? cwd.head.date : undefined;
+
   // Format output
   const output = profileSync("formatOutput", () => {
     const formatterOptions: ListFormatterOptions = {
@@ -418,7 +429,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     for (const partition of partitions) {
       // Format header
       if (partition.header.kind === "date") {
-        outputLines.push(formatDateHeader(partition.header.date, now, formatterOptions));
+        outputLines.push(formatDateHeader(partition.header.date, now, formatterOptions, baseDate));
       } else {
         outputLines.push(
           formatItemHeadHeader(
