@@ -1,6 +1,7 @@
 import { isAbsolute, resolve } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import {
+  createFileSessionRepository,
   createFileSystemAliasRepository,
   createFileSystemItemRepository,
   createFileSystemSectionQueryService,
@@ -24,6 +25,7 @@ import { WorkspaceName, workspaceNameFromString } from "../../domain/primitives/
 import { createFileSystemConfigRepository } from "../../infrastructure/fileSystem/config_repository.ts";
 import { createFileSystemStateRepository } from "../../infrastructure/fileSystem/state_repository.ts";
 import { StateRepository } from "../../domain/repositories/state_repository.ts";
+import { SessionRepository } from "../../domain/repositories/session_repository.ts";
 import {
   AliasAutoGenerator,
   createAliasAutoGenerator,
@@ -45,6 +47,7 @@ export type CliDependencies = Readonly<{
   readonly aliasAutoGenerator: AliasAutoGenerator;
   readonly workspaceRepository: WorkspaceRepository;
   readonly stateRepository: StateRepository;
+  readonly sessionRepository: SessionRepository;
   readonly sectionQueryService: SectionQueryService;
   readonly rankService: RankService;
   readonly idGenerationService: IdGenerationService;
@@ -256,6 +259,10 @@ export const loadCliDependencies = async (
   const services = profileSync("deps:createOtherServices", () => {
     const aliasAutoGenerator = createAliasAutoGenerator(createCryptoRandomSource());
     const stateRepository = createFileSystemStateRepository({ workspaceRoot: root });
+    const sessionRepository = createFileSessionRepository({
+      uid: Deno.uid() ?? 0,
+      ppid: Deno.ppid,
+    });
     const sectionQueryService = createFileSystemSectionQueryService({ root });
     const rankService = createLexoRankService();
     const idGenerationService = createIdGenerationService(createUuidV7Generator());
@@ -267,6 +274,7 @@ export const loadCliDependencies = async (
     return {
       aliasAutoGenerator,
       stateRepository,
+      sessionRepository,
       sectionQueryService,
       rankService,
       idGenerationService,

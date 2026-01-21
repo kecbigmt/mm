@@ -29,13 +29,12 @@ export function createCdCommand() {
       const now = new Date();
 
       if (!pathArg) {
-        const cwdResult = await CwdResolutionService.getCwd(
-          {
-            getEnv: (name) => Deno.env.get(name),
-            itemRepository: deps.itemRepository,
-            timezone: deps.timezone,
-          },
-        );
+        const cwdResult = await CwdResolutionService.getCwd({
+          sessionRepository: deps.sessionRepository,
+          workspacePath: deps.root,
+          itemRepository: deps.itemRepository,
+          timezone: deps.timezone,
+        });
         if (cwdResult.type === "error") {
           console.error(formatError(cwdResult.error, debug));
           return;
@@ -56,13 +55,12 @@ export function createCdCommand() {
       }
 
       // Get current placement
-      const cwdPlacementResult = await CwdResolutionService.getCwd(
-        {
-          getEnv: (name) => Deno.env.get(name),
-          itemRepository: deps.itemRepository,
-          timezone: deps.timezone,
-        },
-      );
+      const cwdPlacementResult = await CwdResolutionService.getCwd({
+        sessionRepository: deps.sessionRepository,
+        workspacePath: deps.root,
+        itemRepository: deps.itemRepository,
+        timezone: deps.timezone,
+      });
       if (cwdPlacementResult.type === "error") {
         console.error(formatError(cwdPlacementResult.error, debug));
         return;
@@ -110,7 +108,17 @@ export function createCdCommand() {
         return;
       }
 
-      // Output shell export statement for eval
-      console.log(`export MM_CWD="${validateResult.value.toString()}"`);
+      // Save to session file
+      const saveResult = await CwdResolutionService.setCwd(validateResult.value, {
+        sessionRepository: deps.sessionRepository,
+        workspacePath: deps.root,
+      });
+
+      if (saveResult.type === "error") {
+        console.error(formatError(saveResult.error, debug));
+        return;
+      }
+
+      // Success - no output needed (silent like shell cd)
     });
 }

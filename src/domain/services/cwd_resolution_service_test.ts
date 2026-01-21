@@ -11,9 +11,11 @@ import { createItemIcon } from "../primitives/item_icon.ts";
 import { aliasSlugFromString } from "../primitives/alias_slug.ts";
 import { parseTimezoneIdentifier } from "../primitives/timezone_identifier.ts";
 import type { ItemRepository } from "../repositories/item_repository.ts";
+import { createFakeSessionRepository } from "../repositories/session_repository_fake.ts";
 import { Result } from "../../shared/result.ts";
 
 const timezone = Result.unwrap(parseTimezoneIdentifier("UTC"));
+const workspacePath = "/path/to/workspace";
 
 const createMockItemRepository = (
   items: Map<string, ReturnType<typeof createItem>>,
@@ -28,70 +30,101 @@ const createMockItemRepository = (
 });
 
 // ============================================================================
-// getCwd tests - reads from MM_CWD environment variable
+// getCwd tests - reads from session file
 // ============================================================================
 
-Deno.test("CwdResolutionService.getCwd returns today when MM_CWD is not set", async () => {
+Deno.test("CwdResolutionService.getCwd returns today when no session exists", async () => {
   const itemRepo = createMockItemRepository(new Map());
+  const sessionRepo = createFakeSessionRepository(null);
 
-  const result = await CwdResolutionService.getCwd(
-    { getEnv: () => undefined, itemRepository: itemRepo, timezone },
-  );
+  const result = await CwdResolutionService.getCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
 
   assert(result.type === "ok", "operation should succeed");
-  // Returns today's date in UTC timezone
   assertEquals(result.value.warning, undefined);
 });
 
-Deno.test("CwdResolutionService.getCwd returns today when MM_CWD is empty", async () => {
+Deno.test("CwdResolutionService.getCwd returns today when workspace differs", async () => {
   const itemRepo = createMockItemRepository(new Map());
+  const sessionRepo = createFakeSessionRepository({
+    workspace: "/different/workspace",
+    cwd: "2024-12-25",
+  });
 
-  const result = await CwdResolutionService.getCwd(
-    { getEnv: () => "", itemRepository: itemRepo, timezone },
-  );
+  const result = await CwdResolutionService.getCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
 
   assert(result.type === "ok", "operation should succeed");
-  // Returns today's date in UTC timezone
+  // Should return today, not the stored cwd, because workspace differs
   assertEquals(result.value.warning, undefined);
 });
 
-Deno.test("CwdResolutionService.getCwd returns placement from MM_CWD when set to date", async () => {
+Deno.test("CwdResolutionService.getCwd returns placement from session when workspace matches", async () => {
   const itemRepo = createMockItemRepository(new Map());
+  const sessionRepo = createFakeSessionRepository({
+    workspace: workspacePath,
+    cwd: "2024-12-25",
+  });
 
-  const result = await CwdResolutionService.getCwd(
-    { getEnv: () => "2024-12-25", itemRepository: itemRepo, timezone },
-  );
+  const result = await CwdResolutionService.getCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
 
   assert(result.type === "ok", "operation should succeed");
   assertEquals(result.value.placement.toString(), "2024-12-25");
   assertEquals(result.value.warning, undefined);
 });
 
-Deno.test("CwdResolutionService.getCwd returns placement from MM_CWD with sections", async () => {
+Deno.test("CwdResolutionService.getCwd returns placement from session with sections", async () => {
   const itemRepo = createMockItemRepository(new Map());
+  const sessionRepo = createFakeSessionRepository({
+    workspace: workspacePath,
+    cwd: "2024-12-25/1/3",
+  });
 
-  const result = await CwdResolutionService.getCwd(
-    { getEnv: () => "2024-12-25/1/3", itemRepository: itemRepo, timezone },
-  );
+  const result = await CwdResolutionService.getCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
 
   assert(result.type === "ok", "operation should succeed");
   assertEquals(result.value.placement.toString(), "2024-12-25/1/3");
   assertEquals(result.value.warning, undefined);
 });
 
-Deno.test("CwdResolutionService.getCwd returns placement from MM_CWD for permanent", async () => {
+Deno.test("CwdResolutionService.getCwd returns placement from session for permanent", async () => {
   const itemRepo = createMockItemRepository(new Map());
+  const sessionRepo = createFakeSessionRepository({
+    workspace: workspacePath,
+    cwd: "permanent",
+  });
 
-  const result = await CwdResolutionService.getCwd(
-    { getEnv: () => "permanent", itemRepository: itemRepo, timezone },
-  );
+  const result = await CwdResolutionService.getCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
 
   assert(result.type === "ok", "operation should succeed");
   assertEquals(result.value.placement.toString(), "permanent");
   assertEquals(result.value.warning, undefined);
 });
 
-Deno.test("CwdResolutionService.getCwd returns placement from MM_CWD for valid item", async () => {
+Deno.test("CwdResolutionService.getCwd returns placement from session for valid item", async () => {
   const itemId = itemIdFromString("019965a7-2789-740a-b8c1-1415904fd108");
   assert(itemId.type === "ok");
 
@@ -120,39 +153,96 @@ Deno.test("CwdResolutionService.getCwd returns placement from MM_CWD for valid i
 
   const items = new Map([[item.data.id.toString(), item]]);
   const itemRepo = createMockItemRepository(items);
+  const sessionRepo = createFakeSessionRepository({
+    workspace: workspacePath,
+    cwd: item.data.id.toString(),
+  });
 
-  const result = await CwdResolutionService.getCwd(
-    { getEnv: () => item.data.id.toString(), itemRepository: itemRepo, timezone },
-  );
+  const result = await CwdResolutionService.getCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
 
   assert(result.type === "ok", "getCwd should succeed");
   assertEquals(result.value.placement.toString(), item.data.id.toString());
   assertEquals(result.value.warning, undefined);
 });
 
-Deno.test("CwdResolutionService.getCwd falls back to today with warning when MM_CWD is invalid", async () => {
+Deno.test("CwdResolutionService.getCwd falls back to today with warning when cwd is invalid", async () => {
   const itemRepo = createMockItemRepository(new Map());
+  const sessionRepo = createFakeSessionRepository({
+    workspace: workspacePath,
+    cwd: "not-a-valid-placement",
+  });
 
-  const result = await CwdResolutionService.getCwd(
-    { getEnv: () => "not-a-valid-placement", itemRepository: itemRepo, timezone },
-  );
+  const result = await CwdResolutionService.getCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
 
   assert(result.type === "ok", "operation should succeed with fallback");
-  // Returns today's date in UTC timezone
   assert(result.value.warning !== undefined, "should have a warning");
-  assert(result.value.warning.includes("MM_CWD"), "warning should mention MM_CWD");
+  assert(result.value.warning.includes("Invalid cwd"), "warning should mention invalid cwd");
 });
 
 Deno.test("CwdResolutionService.getCwd falls back to today with warning when item not found", async () => {
   const itemRepo = createMockItemRepository(new Map());
+  const sessionRepo = createFakeSessionRepository({
+    workspace: workspacePath,
+    cwd: "019965a7-2789-740a-b8c1-1415904fd108",
+  });
 
-  const result = await CwdResolutionService.getCwd(
-    { getEnv: () => "019965a7-2789-740a-b8c1-1415904fd108", itemRepository: itemRepo, timezone },
-  );
+  const result = await CwdResolutionService.getCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
 
   assert(result.type === "ok", "operation should succeed with fallback");
-  // Returns today's date in UTC timezone
   assert(result.value.warning !== undefined, "should have a warning");
+});
+
+// ============================================================================
+// setCwd tests - saves to session file
+// ============================================================================
+
+Deno.test("CwdResolutionService.setCwd saves placement to session", async () => {
+  const sessionRepo = createFakeSessionRepository(null);
+  const placement = parsePlacement("2024-12-25");
+  assert(placement.type === "ok");
+
+  const result = await CwdResolutionService.setCwd(placement.value, {
+    sessionRepository: sessionRepo,
+    workspacePath,
+  });
+
+  assert(result.type === "ok", "operation should succeed");
+  const savedData = sessionRepo.getData();
+  assertEquals(savedData?.workspace, workspacePath);
+  assertEquals(savedData?.cwd, "2024-12-25");
+});
+
+Deno.test("CwdResolutionService.setCwd overwrites existing session", async () => {
+  const sessionRepo = createFakeSessionRepository({
+    workspace: workspacePath,
+    cwd: "2024-01-01",
+  });
+  const placement = parsePlacement("permanent");
+  assert(placement.type === "ok");
+
+  const result = await CwdResolutionService.setCwd(placement.value, {
+    sessionRepository: sessionRepo,
+    workspacePath,
+  });
+
+  assert(result.type === "ok", "operation should succeed");
+  const savedData = sessionRepo.getData();
+  assertEquals(savedData?.cwd, "permanent");
 });
 
 // ============================================================================

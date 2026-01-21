@@ -51,7 +51,7 @@ describe("Scenario 9: Numeric section range listing", () => {
       "Book",
       "--alias",
       "book",
-    ], { mmCwd: cdToday.mmCwd! });
+    ], { sessionDir: ctx.sessionDir });
     assertEquals(bookResult.success, true, `Failed to create book: ${bookResult.stderr}`);
 
     // Create pages under different sections
@@ -60,7 +60,7 @@ describe("Scenario 9: Numeric section range listing", () => {
       "Page 1",
       "--parent",
       "book/1",
-    ], { mmCwd: cdToday.mmCwd! });
+    ], { sessionDir: ctx.sessionDir });
     assertEquals(page1Result.success, true, `Failed to create page1: ${page1Result.stderr}`);
 
     const page2Result = await runCommand(ctx.testHome, [
@@ -68,7 +68,7 @@ describe("Scenario 9: Numeric section range listing", () => {
       "Page 2",
       "--parent",
       "book/2",
-    ], { mmCwd: cdToday.mmCwd! });
+    ], { sessionDir: ctx.sessionDir });
     assertEquals(page2Result.success, true, `Failed to create page2: ${page2Result.stderr}`);
 
     const page3Result = await runCommand(ctx.testHome, [
@@ -76,7 +76,7 @@ describe("Scenario 9: Numeric section range listing", () => {
       "Page 3",
       "--parent",
       "book/3",
-    ], { mmCwd: cdToday.mmCwd! });
+    ], { sessionDir: ctx.sessionDir });
     assertEquals(page3Result.success, true, `Failed to create page3: ${page3Result.stderr}`);
 
     const page4Result = await runCommand(ctx.testHome, [
@@ -84,7 +84,7 @@ describe("Scenario 9: Numeric section range listing", () => {
       "Page 4",
       "--parent",
       "book/4",
-    ], { mmCwd: cdToday.mmCwd! });
+    ], { sessionDir: ctx.sessionDir });
     assertEquals(page4Result.success, true, `Failed to create page4: ${page4Result.stderr}`);
 
     const page5Result = await runCommand(ctx.testHome, [
@@ -92,7 +92,7 @@ describe("Scenario 9: Numeric section range listing", () => {
       "Page 5",
       "--parent",
       "book/5",
-    ], { mmCwd: cdToday.mmCwd! });
+    ], { sessionDir: ctx.sessionDir });
     assertEquals(page5Result.success, true, `Failed to create page5: ${page5Result.stderr}`);
   });
 
@@ -101,25 +101,29 @@ describe("Scenario 9: Numeric section range listing", () => {
     assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 
     // Create book and pages
-    await runCommand(ctx.testHome, ["note", "Book", "--alias", "book"], { mmCwd: cdToday.mmCwd! });
+    await runCommand(ctx.testHome, ["note", "Book", "--alias", "book"], {
+      sessionDir: ctx.sessionDir,
+    });
     await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "book/1"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
     await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "book/2"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
     await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "book/3"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
     await runCommand(ctx.testHome, ["note", "Page 4", "--parent", "book/4"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
     await runCommand(ctx.testHome, ["note", "Page 5", "--parent", "book/5"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
 
     // List items using range 1..3
-    const lsResult = await runCommand(ctx.testHome, ["ls", "book/1..3"], { mmCwd: cdToday.mmCwd! });
+    const lsResult = await runCommand(ctx.testHome, ["ls", "book/1..3"], {
+      sessionDir: ctx.sessionDir,
+    });
     assertEquals(lsResult.success, true, `ls book/1..3 failed: ${lsResult.stderr}`);
 
     const lines = lsResult.stdout.split("\n").filter((line) => line.trim() !== "");
@@ -138,25 +142,29 @@ describe("Scenario 9: Numeric section range listing", () => {
     assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 
     // Create book and pages
-    await runCommand(ctx.testHome, ["note", "Book", "--alias", "book"], { mmCwd: cdToday.mmCwd! });
+    await runCommand(ctx.testHome, ["note", "Book", "--alias", "book"], {
+      sessionDir: ctx.sessionDir,
+    });
     await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "book/1"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
     await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "book/2"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
     await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "book/3"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
     await runCommand(ctx.testHome, ["note", "Page 4", "--parent", "book/4"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
     await runCommand(ctx.testHome, ["note", "Page 5", "--parent", "book/5"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
 
     // List items using range 2..5
-    const lsResult = await runCommand(ctx.testHome, ["ls", "book/2..5"], { mmCwd: cdToday.mmCwd! });
+    const lsResult = await runCommand(ctx.testHome, ["ls", "book/2..5"], {
+      sessionDir: ctx.sessionDir,
+    });
     assertEquals(lsResult.success, true, `ls book/2..5 failed: ${lsResult.stderr}`);
 
     const lines = lsResult.stdout.split("\n").filter((line) => line.trim() !== "");
@@ -175,34 +183,36 @@ describe("Scenario 9: Numeric section range listing", () => {
     assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 
     // Create book and pages
-    await runCommand(ctx.testHome, ["note", "Book", "--alias", "book"], { mmCwd: cdToday.mmCwd! });
+    await runCommand(ctx.testHome, ["note", "Book", "--alias", "book"], {
+      sessionDir: ctx.sessionDir,
+    });
     await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "book/1"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
     await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "book/2"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
     await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "book/3"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
     await runCommand(ctx.testHome, ["note", "Page 4", "--parent", "book/4"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
     await runCommand(ctx.testHome, ["note", "Page 5", "--parent", "book/5"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
 
     // Navigate to book
-    const cdResult = await runCd(ctx.testHome, "book", { mmCwd: cdToday.mmCwd! });
+    const cdResult = await runCd(ctx.testHome, "book", { sessionDir: ctx.sessionDir });
     assertEquals(cdResult.success, true, `cd book failed: ${cdResult.stderr}`);
 
     // Verify CWD
-    const pwdResult = await runCommand(ctx.testHome, ["pwd"], { mmCwd: cdResult.mmCwd! });
+    const pwdResult = await runCommand(ctx.testHome, ["pwd"], { sessionDir: ctx.sessionDir });
     assertEquals(pwdResult.success, true, `pwd failed: ${pwdResult.stderr}`);
     assertEquals(pwdResult.stdout.includes("book"), true, "CWD should be book");
 
     // List items using range 1..5 from CWD
-    const lsResult = await runCommand(ctx.testHome, ["ls", "1..5"], { mmCwd: cdResult.mmCwd! });
+    const lsResult = await runCommand(ctx.testHome, ["ls", "1..5"], { sessionDir: ctx.sessionDir });
     if (!lsResult.success) {
       console.error(`ls failed: ${lsResult.stderr}`);
       console.error(`stdout: ${lsResult.stdout}`);
@@ -221,10 +231,11 @@ describe("Scenario 9: Numeric section range listing", () => {
   });
 
   it("executes full flow: create → range list → verify inclusiveness", async () => {
+    const opts = { sessionDir: ctx.sessionDir };
+
     // Step 1: Navigate to today
-    const cdToday = await runCd(ctx.testHome, "today");
+    const cdToday = await runCd(ctx.testHome, "today", opts);
     assertEquals(cdToday.success, true, "cd today should succeed");
-    let currentCwd = cdToday.mmCwd!;
 
     // Step 2: Create book item with alias
     const bookResult = await runCommand(ctx.testHome, [
@@ -232,18 +243,18 @@ describe("Scenario 9: Numeric section range listing", () => {
       "Book",
       "--alias",
       "book",
-    ], { mmCwd: currentCwd });
+    ], opts);
     assertEquals(bookResult.success, true, "Book creation should succeed");
 
     // Step 3-7: Create pages under different sections
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "book/1"], { mmCwd: currentCwd });
-    await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "book/2"], { mmCwd: currentCwd });
-    await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "book/3"], { mmCwd: currentCwd });
-    await runCommand(ctx.testHome, ["note", "Page 4", "--parent", "book/4"], { mmCwd: currentCwd });
-    await runCommand(ctx.testHome, ["note", "Page 5", "--parent", "book/5"], { mmCwd: currentCwd });
+    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "book/1"], opts);
+    await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "book/2"], opts);
+    await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "book/3"], opts);
+    await runCommand(ctx.testHome, ["note", "Page 4", "--parent", "book/4"], opts);
+    await runCommand(ctx.testHome, ["note", "Page 5", "--parent", "book/5"], opts);
 
     // Step 8: List items using range 1..3
-    const ls1Result = await runCommand(ctx.testHome, ["ls", "book/1..3"], { mmCwd: currentCwd });
+    const ls1Result = await runCommand(ctx.testHome, ["ls", "book/1..3"], opts);
     assertEquals(ls1Result.success, true, "ls book/1..3 should succeed");
     const lines1 = ls1Result.stdout.split("\n").filter((line) => line.trim() !== "");
     assertEquals(lines1.length >= 3, true, "Should list at least 3 pages");
@@ -259,7 +270,7 @@ describe("Scenario 9: Numeric section range listing", () => {
     );
 
     // Step 9: List items using range 2..5
-    const ls2Result = await runCommand(ctx.testHome, ["ls", "book/2..5"], { mmCwd: currentCwd });
+    const ls2Result = await runCommand(ctx.testHome, ["ls", "book/2..5"], opts);
     assertEquals(ls2Result.success, true, "ls book/2..5 should succeed");
     const lines2 = ls2Result.stdout.split("\n").filter((line) => line.trim() !== "");
     assertEquals(lines2.length >= 4, true, "Should list at least 4 pages");
@@ -275,12 +286,11 @@ describe("Scenario 9: Numeric section range listing", () => {
     );
 
     // Step 10: Navigate to book
-    const cdBook = await runCd(ctx.testHome, "book", { mmCwd: currentCwd });
+    const cdBook = await runCd(ctx.testHome, "book", opts);
     assertEquals(cdBook.success, true, "cd book should succeed");
-    currentCwd = cdBook.mmCwd!;
 
     // Step 11: List items using range 1..5 from CWD
-    const ls3Result = await runCommand(ctx.testHome, ["ls", "1..5"], { mmCwd: currentCwd });
+    const ls3Result = await runCommand(ctx.testHome, ["ls", "1..5"], opts);
     assertEquals(ls3Result.success, true, "ls 1..5 should succeed");
     const lines3 = ls3Result.stdout.split("\n").filter((line) => line.trim() !== "");
     assertEquals(lines3.length >= 5, true, "Should list all 5 pages");
@@ -301,13 +311,17 @@ describe("Scenario 9: Numeric section range listing", () => {
     assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 
     // Create book and page
-    await runCommand(ctx.testHome, ["note", "Book", "--alias", "book"], { mmCwd: cdToday.mmCwd! });
+    await runCommand(ctx.testHome, ["note", "Book", "--alias", "book"], {
+      sessionDir: ctx.sessionDir,
+    });
     await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "book/1"], {
-      mmCwd: cdToday.mmCwd!,
+      sessionDir: ctx.sessionDir,
     });
 
     // List items using range 1..1 (single section)
-    const lsResult = await runCommand(ctx.testHome, ["ls", "book/1..1"], { mmCwd: cdToday.mmCwd! });
+    const lsResult = await runCommand(ctx.testHome, ["ls", "book/1..1"], {
+      sessionDir: ctx.sessionDir,
+    });
     assertEquals(lsResult.success, true, `ls book/1..1 failed: ${lsResult.stderr}`);
 
     const lines = lsResult.stdout.split("\n").filter((line) => line.trim() !== "");

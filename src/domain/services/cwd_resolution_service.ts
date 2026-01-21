@@ -13,12 +13,14 @@ import {
 } from "../primitives/mod.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
+import { SessionRepository } from "../repositories/session_repository.ts";
 import { Item } from "../models/item.ts";
 
 export type CwdResolutionError = ValidationError<"CwdResolution"> | RepositoryError;
 
 export type CwdResolutionDependencies = Readonly<{
-  readonly getEnv: (name: string) => string | undefined;
+  readonly sessionRepository: SessionRepository;
+  readonly workspacePath: string;
   readonly itemRepository: ItemRepository;
   readonly timezone: TimezoneIdentifier;
 }>;
@@ -27,12 +29,15 @@ export type CwdValidationDependencies = Readonly<{
   readonly itemRepository: ItemRepository;
 }>;
 
+export type CwdSaveDependencies = Readonly<{
+  readonly sessionRepository: SessionRepository;
+  readonly workspacePath: string;
+}>;
+
 export type CwdResult = Readonly<{
   readonly placement: Placement;
   readonly warning?: string;
 }>;
-
-const ENV_VAR_NAME = "MM_CWD";
 
 /**
  * Compute today's date in the given timezone.
@@ -77,17 +82,24 @@ export const CwdResolutionService = {
     deps: CwdResolutionDependencies,
   ): Promise<Result<CwdResult, CwdResolutionError>> {
     const now = new Date();
-    const envValue = deps.getEnv(ENV_VAR_NAME);
 
-    if (!envValue || envValue.trim() === "") {
+    const sessionResult = await deps.sessionRepository.load();
+    if (sessionResult.type === "error") {
+      return sessionResult;
+    }
+
+    const session = sessionResult.value;
+
+    // No session or workspace mismatch -> default to today
+    if (!session || session.workspace !== deps.workspacePath) {
       return Result.ok({ placement: defaultCwdPlacement(now, deps.timezone) });
     }
 
-    const parseResult = parsePlacement(envValue);
+    const parseResult = parsePlacement(session.cwd);
     if (parseResult.type === "error") {
       return Result.ok({
         placement: defaultCwdPlacement(now, deps.timezone),
-        warning: `Invalid ${ENV_VAR_NAME} value "${envValue}", falling back to today`,
+        warning: `Invalid cwd value "${session.cwd}" in session, falling back to today`,
       });
     }
 
@@ -98,12 +110,23 @@ export const CwdResolutionService = {
       if (item === undefined) {
         return Result.ok({
           placement: defaultCwdPlacement(now, deps.timezone),
-          warning: `Item in ${ENV_VAR_NAME} not found, falling back to today`,
+          warning: `Item in session cwd not found, falling back to today`,
         });
       }
     }
 
     return Result.ok({ placement });
+  },
+
+  async setCwd(
+    placement: Placement,
+    deps: CwdSaveDependencies,
+  ): Promise<Result<void, CwdResolutionError>> {
+    const saveResult = await deps.sessionRepository.save({
+      workspace: deps.workspacePath,
+      cwd: placement.toString(),
+    });
+    return saveResult;
   },
 
   async validatePlacement(

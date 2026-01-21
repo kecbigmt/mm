@@ -106,13 +106,12 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   const nowDateTime = Result.unwrap(dateTimeFromDate(now));
 
   const cwdResult = await profileAsync("getCwd", () =>
-    CwdResolutionService.getCwd(
-      {
-        getEnv: (name) => Deno.env.get(name),
-        itemRepository: deps.itemRepository,
-        timezone: deps.timezone,
-      },
-    ));
+    CwdResolutionService.getCwd({
+      sessionRepository: deps.sessionRepository,
+      workspacePath: deps.root,
+      itemRepository: deps.itemRepository,
+      timezone: deps.timezone,
+    }));
 
   if (cwdResult.type === "error") {
     console.error(formatError(cwdResult.error, debug));
