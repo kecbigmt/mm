@@ -344,9 +344,7 @@ export const formatDateHeader = (
   let header = relative ? `${dateStr} ${relative}` : dateStr;
 
   if (!printMode) {
-    const shouldBold = baseDate
-      ? day.toString() === baseDate.toString()
-      : relative === "today";
+    const shouldBold = baseDate ? day.toString() === baseDate.toString() : relative === "today";
     if (shouldBold) {
       header = bold(header);
     }
