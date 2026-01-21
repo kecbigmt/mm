@@ -40,7 +40,10 @@ Out of scope:
 
 * Invocation: `mm ls [<locator>] [options]`
 * Locator grammar: same as 001_redesign path/range expressions (dates, aliases/UUIDs, numeric sections, final-segment ranges). Resolved by `PathResolver` → `PlacementRange`.
-* Default locator when omitted: **date window** `today-7d .. today+7d` in workspace TZ (matches mm-prototype). Use `mm ls .` to list only CWD.
+* Default locator when omitted:
+  * If CWD is an item-head section: list items under CWD (equivalent to `mm ls .`).
+  * If CWD is a date: **date window** `cwd-7d .. cwd+7d` centered on the CWD date.
+  * If CWD is workspace root: **date window** `today-7d .. today+7d` in workspace TZ.
 * Output:
   * Grouped by **placement head date** (current placement, not birthplace), newest date first.
   * Within a date group: sorted by `rank` ascending; ties break by `createdAt` then `id`.
@@ -61,7 +64,7 @@ mm ls [<locator>] [--type <note|task|event>] [--all] [--print] [--no-pager] [--w
 
 Examples:
 
-* `mm ls` → last 7 days through next 7 days, grouped by date.
+* `mm ls` → ±7 days centered on CWD date (or today if CWD is workspace root), grouped by date.
 * `mm ls today` → only today’s placement head (still grouped, single header).
 * `mm ls today..+3d --all` → 4-day window, includes closed.
 * `mm ls book/2` → items under that placement (one group, head date from each item’s placement head if it is a date).
@@ -84,7 +87,10 @@ Flags:
   * Date keywords/relative ops resolved in workspace TZ.
   * Ranges remain **final segment only**; date ranges remain **head-only** (001_redesign rules).
 * Default locator logic:
-  * When locator is absent, build `PlacementRange.dateRange` from `today-7d` to `today+7d`.
+  * When locator is absent:
+    * If CWD is an item-head section, use CWD as the target (`PlacementRange.single`).
+    * If CWD is a date, build `PlacementRange.dateRange` from `cwd-7d` to `cwd+7d`.
+    * If CWD is workspace root, build `PlacementRange.dateRange` from `today-7d` to `today+7d`.
   * When locator is present:
     * `single` → query that placement (one group).
     * `dateRange` → query range (multi-group).
@@ -225,7 +231,7 @@ Empty states:
   * Workflow tests: type filter, `--all` inclusion, default range construction, ordering.
   * CLI tests: snapshot of colored mode (strip ANSI in assertions) and `--print` output; default (no locator) uses windowed date range. Pager path: unit-test helper resolves pager command and falls back without throwing when pager is unavailable (mocked).
   * E2E scenarios (fixtures with workspace TZ fixed):
-    - `mm ls` (no locator): shows today±7d date partitions; icon-first; alias shown; empty overall → single `(empty)`.
+    - `mm ls` (no locator): shows ±7d date partitions centered on CWD date (or today if CWD is workspace root); icon-first; alias shown; empty overall → single `(empty)`.
     - `mm ls some-book/1..3`: emits partitions for 1,2,3 (skip empty prefixes); shows section stub for non-empty child prefix; honors cap=100 if exceeded (truncation + warning).
     - `mm ls today..+2d --type task --all --print`: prints plain lines with dates, includes closed tasks, no colors.
     - `mm ls today --type event`: events render with times in workspace TZ.
