@@ -7,6 +7,7 @@ import { formatPlacementForDisplay } from "../../../domain/services/placement_di
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import { createDatePlacement, parseCalendarDay } from "../../../domain/primitives/mod.ts";
+import { formatDateStringForTimezone } from "../../../shared/timezone_format.ts";
 
 export function createCdCommand() {
   return new Command()
@@ -31,7 +32,7 @@ export function createCdCommand() {
 
       if (!pathArg) {
         // Navigate to today's date (home) - matching bash cd behavior
-        const todayStr = computeTodayInTimezone(now, deps.timezone.toString());
+        const todayStr = formatDateStringForTimezone(now, deps.timezone);
         const calendarDayResult = parseCalendarDay(todayStr);
         if (calendarDayResult.type === "error") {
           console.error(formatError(calendarDayResult.error, debug));
@@ -137,16 +138,3 @@ export function createCdCommand() {
       console.log(displayResult.value);
     });
 }
-
-/**
- * Compute today's date in the given timezone.
- */
-const computeTodayInTimezone = (now: Date, timezone: string): string => {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  return formatter.format(now);
-};
