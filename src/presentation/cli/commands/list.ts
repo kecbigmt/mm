@@ -12,8 +12,10 @@ import {
 import { parseCalendarDay } from "../../../domain/primitives/calendar_day.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/date_time.ts";
 import { Result } from "../../../shared/result.ts";
+import { formatDateStringForTimezone } from "../../../shared/timezone_format.ts";
 import { createPlacement } from "../../../domain/primitives/placement.ts";
 import { parseItemId } from "../../../domain/primitives/item_id.ts";
+import type { RangeExpression } from "../../../domain/primitives/path_types.ts";
 import type { SectionSummary } from "../../../domain/services/section_query_service.ts";
 import { buildPartitions, formatWarning } from "../partitioning/build_partitions.ts";
 import {
@@ -46,41 +48,50 @@ type ListOptions = {
 const DEFAULT_DATE_WINDOW_DAYS = 7;
 
 /**
- * Compute today's date in the given timezone.
+ * Add days to a date string (YYYY-MM-DD format).
  */
-const computeTodayInTimezone = (now: Date, timezone: string): Date => {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = formatter.formatToParts(now);
-  const lookup = new Map(parts.map((part) => [part.type, part.value]));
-  return new Date(
-    Number(lookup.get("year")),
-    Number(lookup.get("month")) - 1,
-    Number(lookup.get("day")),
-  );
+const addDaysToDateString = (dateStr: string, days: number): string => {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  const newYear = date.getFullYear();
+  const newMonth = String(date.getMonth() + 1).padStart(2, "0");
+  const newDay = String(date.getDate()).padStart(2, "0");
+  return `${newYear}-${newMonth}-${newDay}`;
 };
 
 /**
- * Add days to a date (handles month/year boundaries).
+ * Create a placement for today's date in the given timezone.
  */
-const addDays = (date: Date, days: number): Date => {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
+const createTodayPlacement = (
+  now: Date,
+  timezone: Parameters<typeof formatDateStringForTimezone>[1],
+): ReturnType<typeof createPlacement> => {
+  const todayStr = formatDateStringForTimezone(now, timezone);
+  const todayResult = parseCalendarDay(todayStr);
+  if (todayResult.type === "error") {
+    throw new Error("Failed to compute today's date");
+  }
+  return createPlacement({ kind: "date", date: todayResult.value }, []);
 };
 
 /**
- * Format a Date as YYYY-MM-DD string.
+ * Check if a RangeExpression requires cwd for resolution.
+ * Returns true if any path segment is relative (., .., or numeric).
  */
-const formatDateString = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+const rangeExpressionRequiresCwd = (expr: RangeExpression): boolean => {
+  const checkPath = (segments: ReadonlyArray<{ kind: string }>): boolean => {
+    if (segments.length === 0) return false;
+    const first = segments[0];
+    // Relative navigation or numeric section reference requires cwd
+    return first.kind === "dot" || first.kind === "dotdot" || first.kind === "numeric";
+  };
+
+  if (expr.kind === "single") {
+    return checkPath(expr.path.segments);
+  }
+  // For range, check both from and to
+  return checkPath(expr.from.segments) || checkPath(expr.to.segments);
 };
 
 export async function listAction(options: ListOptions, locatorArg?: string) {
@@ -104,40 +115,50 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   const deps = depsResult.value;
   const now = new Date();
   const nowDateTime = Result.unwrap(dateTimeFromDate(now));
-
-  const cwdResult = await profileAsync("getCwd", () =>
-    CwdResolutionService.getCwd({
-      sessionRepository: deps.sessionRepository,
-      workspacePath: deps.root,
-      itemRepository: deps.itemRepository,
-      timezone: deps.timezone,
-    }));
-
-  if (cwdResult.type === "error") {
-    console.error(formatError(cwdResult.error, debug));
-    profilerFinish();
-    return;
-  }
-
-  if (cwdResult.value.warning) {
-    console.error(`Warning: ${cwdResult.value.warning}`);
-  }
-
-  const cwd = cwdResult.value.placement;
   const statusFilter: ListItemsStatusFilter = options.all ? "all" : "open";
   const isPrintMode = options.print === true;
 
   // Resolve PlacementRange and effective expression for workflow
   let placementRange: PlacementRange;
   let effectiveExpression: string | undefined;
+  let cwd: ReturnType<typeof createPlacement> | undefined;
 
   if (locatorArg) {
-    // Parse and resolve locator expression
+    // Parse locator expression first to check if cwd is needed
     const rangeExprResult = parseRangeExpression(locatorArg);
     if (rangeExprResult.type === "error") {
       console.error(formatError(rangeExprResult.error, debug));
       profilerFinish();
       return;
+    }
+
+    const rangeExpr = rangeExprResult.value;
+    const needsCwd = rangeExpressionRequiresCwd(rangeExpr);
+
+    // Only load cwd if the expression requires it (relative paths)
+    if (needsCwd) {
+      const cwdResult = await profileAsync("getCwd", () =>
+        CwdResolutionService.getCwd({
+          sessionRepository: deps.sessionRepository,
+          workspacePath: deps.root,
+          itemRepository: deps.itemRepository,
+          timezone: deps.timezone,
+        }));
+
+      if (cwdResult.type === "error") {
+        console.error(formatError(cwdResult.error, debug));
+        profilerFinish();
+        return;
+      }
+
+      if (cwdResult.value.warning) {
+        console.error(`Warning: ${cwdResult.value.warning}`);
+      }
+
+      cwd = cwdResult.value.placement;
+    } else {
+      // Use today's date as cwd - it won't be used for absolute paths
+      cwd = createTodayPlacement(now, deps.timezone);
     }
 
     const pathResolver = createPathResolver({
@@ -147,7 +168,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
       today: now,
     });
 
-    const resolveResult = await pathResolver.resolveRange(cwd, rangeExprResult.value);
+    const resolveResult = await pathResolver.resolveRange(cwd, rangeExpr);
     if (resolveResult.type === "error") {
       console.error(formatError(resolveResult.error, debug));
       profilerFinish();
@@ -157,18 +178,38 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     placementRange = resolveResult.value;
     effectiveExpression = locatorArg;
   } else {
+    // No locator - need cwd to determine default behavior
+    const cwdResult = await profileAsync("getCwd", () =>
+      CwdResolutionService.getCwd({
+        sessionRepository: deps.sessionRepository,
+        workspacePath: deps.root,
+        itemRepository: deps.itemRepository,
+        timezone: deps.timezone,
+      }));
+
+    if (cwdResult.type === "error") {
+      console.error(formatError(cwdResult.error, debug));
+      profilerFinish();
+      return;
+    }
+
+    if (cwdResult.value.warning) {
+      console.error(`Warning: ${cwdResult.value.warning}`);
+    }
+
+    cwd = cwdResult.value.placement;
+
     // If cwd is an item-head section, use cwd as the target
     // Otherwise, default to today-7d..today+7d date range
     if (cwd.head.kind === "item") {
       placementRange = { kind: "single", at: cwd };
       effectiveExpression = ".";
     } else {
-      const todayResult = computeTodayInTimezone(now, deps.timezone.toString());
-      const fromDate = addDays(todayResult, -DEFAULT_DATE_WINDOW_DAYS);
-      const toDate = addDays(todayResult, DEFAULT_DATE_WINDOW_DAYS);
-
-      const fromDateStr = formatDateString(fromDate);
-      const toDateStr = formatDateString(toDate);
+      const todayStr = cwd.head.kind === "date"
+        ? cwd.head.date.toString()
+        : formatDateStringForTimezone(now, deps.timezone);
+      const fromDateStr = addDaysToDateString(todayStr, -DEFAULT_DATE_WINDOW_DAYS);
+      const toDateStr = addDaysToDateString(todayStr, DEFAULT_DATE_WINDOW_DAYS);
 
       const fromResult = parseCalendarDay(fromDateStr);
       const toResult = parseCalendarDay(toDateStr);

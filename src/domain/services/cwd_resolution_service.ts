@@ -1,4 +1,5 @@
 import { Result } from "../../shared/result.ts";
+import { formatDateStringForTimezone } from "../../shared/timezone_format.ts";
 import {
   createValidationError,
   createValidationIssue,
@@ -39,21 +40,8 @@ export type CwdResult = Readonly<{
   readonly warning?: string;
 }>;
 
-/**
- * Compute today's date in the given timezone.
- */
-const computeTodayInTimezone = (now: Date, timezone: TimezoneIdentifier): string => {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone.toString(),
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  return formatter.format(now);
-};
-
 const defaultCwdPlacement = (now: Date, timezone: TimezoneIdentifier): Placement => {
-  const dateStr = computeTodayInTimezone(now, timezone);
+  const dateStr = formatDateStringForTimezone(now, timezone);
   const calendarDayResult = parseCalendarDay(dateStr);
   if (calendarDayResult.type === "error") {
     throw new Error("Failed to create default CWD placement: invalid date");
