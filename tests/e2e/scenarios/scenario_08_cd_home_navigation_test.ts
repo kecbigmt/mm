@@ -87,7 +87,11 @@ describe("Scenario 8: CD home navigation", () => {
     const cdResult = await runCommand(ctx.testHome, ["cd"]);
 
     assertEquals(cdResult.success, true, `cd failed: ${cdResult.stderr}`);
-    assertEquals(cdResult.stdout, `/${today}`, "cd without args should work for non-existent container");
+    assertEquals(
+      cdResult.stdout,
+      `/${today}`,
+      "cd without args should work for non-existent container",
+    );
   });
 
   it("is idempotent when already at today", async () => {
