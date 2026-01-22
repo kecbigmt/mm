@@ -235,3 +235,129 @@ Deno.test({
     );
   },
 });
+
+Deno.test({
+  name: "zsh script includes --project flag with alias completion for note/task/event",
+  async fn() {
+    const captured = captureConsole();
+    try {
+      await buildCli().parse(["completions", "zsh"]);
+    } finally {
+      captured.restore();
+    }
+
+    const output = captured.logs.join("\n");
+
+    // Verify --project flag is declared in note_flags
+    assertStringIncludes(
+      output,
+      "'--project[Project reference]:project:->project_aliases'",
+      "zsh script should declare --project flag with alias completion in note_flags",
+    );
+
+    // Verify project_aliases case handler exists (combined with context_aliases)
+    assertStringIncludes(
+      output,
+      "project_aliases|context_aliases)",
+      "zsh script should have project_aliases case handler",
+    );
+  },
+});
+
+Deno.test({
+  name: "zsh script includes --project flag with alias completion for edit command",
+  async fn() {
+    const captured = captureConsole();
+    try {
+      await buildCli().parse(["completions", "zsh"]);
+    } finally {
+      captured.restore();
+    }
+
+    const output = captured.logs.join("\n");
+
+    // Verify edit command handles --project flag
+    assertStringIncludes(
+      output,
+      "'--project[Project reference]:project:->project_aliases'",
+      "zsh script should declare --project flag for edit command",
+    );
+  },
+});
+
+Deno.test({
+  name: "zsh script uses alias candidates for --context completion",
+  async fn() {
+    const captured = captureConsole();
+    try {
+      await buildCli().parse(["completions", "zsh"]);
+    } finally {
+      captured.restore();
+    }
+
+    const output = captured.logs.join("\n");
+
+    // Verify --context flag uses alias candidates (not old context tags)
+    assertStringIncludes(
+      output,
+      "'--context[Context reference]:context:->context_aliases'",
+      "zsh script should declare --context flag with alias completion",
+    );
+
+    // Verify context_aliases case handler uses alias candidates
+    assertStringIncludes(
+      output,
+      "context_aliases)",
+      "zsh script should have context_aliases case handler",
+    );
+  },
+});
+
+Deno.test({
+  name: "bash script includes --project flag with alias completion",
+  async fn() {
+    const captured = captureConsole();
+    try {
+      await buildCli().parse(["completions", "bash"]);
+    } finally {
+      captured.restore();
+    }
+
+    const output = captured.logs.join("\n");
+
+    // Verify --project flag is in the flags list
+    assertStringIncludes(
+      output,
+      "--project",
+      "bash script should include --project flag",
+    );
+
+    // Verify --project flag value completion uses aliases
+    assertStringIncludes(
+      output,
+      '"--project"',
+      "bash script should handle --project flag value completion",
+    );
+  },
+});
+
+Deno.test({
+  name: "bash script uses alias candidates for --context and --project completion",
+  async fn() {
+    const captured = captureConsole();
+    try {
+      await buildCli().parse(["completions", "bash"]);
+    } finally {
+      captured.restore();
+    }
+
+    const output = captured.logs.join("\n");
+
+    // Verify that --project completion uses alias candidates
+    assertStringIncludes(
+      output,
+      "_mm_get_alias_candidates",
+      "bash script should use _mm_get_alias_candidates for completion",
+    );
+  },
+});
