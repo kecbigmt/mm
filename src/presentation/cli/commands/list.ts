@@ -427,9 +427,13 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     const outputLines: string[] = [];
 
     for (const partition of partitions) {
-      // Format header
+      // Format header (skip date headers in print mode for flat output)
       if (partition.header.kind === "date") {
-        outputLines.push(formatDateHeader(partition.header.date, now, formatterOptions, baseDate));
+        if (!isPrintMode) {
+          outputLines.push(
+            formatDateHeader(partition.header.date, now, formatterOptions, baseDate),
+          );
+        }
       } else {
         outputLines.push(
           formatItemHeadHeader(
@@ -463,8 +467,10 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
         outputLines.push(formatSectionStub(stubSummary, stub.relativePath, formatterOptions));
       }
 
-      // Add empty line between partitions
-      outputLines.push("");
+      // Add empty line between partitions (skip in print mode for flat output)
+      if (!isPrintMode) {
+        outputLines.push("");
+      }
     }
 
     // Remove trailing empty line
