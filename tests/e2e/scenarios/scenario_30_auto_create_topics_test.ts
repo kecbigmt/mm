@@ -297,11 +297,11 @@ describe("E2E: Auto-creation of Project/Context Topics", () => {
       const lsResult = await runCommand(ctx.testHome, ["ls", "permanent", "--print"]);
       assertEquals(lsResult.success, true, `Failed to list permanent: ${lsResult.stderr}`);
 
-      // Check for topic icon in output (in print mode it shows [topic])
+      // Check for topic type in output (in print mode it shows alias:topic format)
       assertEquals(
-        lsResult.stdout.includes("[topic]"),
+        lsResult.stdout.includes(":topic"),
         true,
-        `Should display [topic] icon. Got: ${lsResult.stdout}`,
+        `Should display :topic type token. Got: ${lsResult.stdout}`,
       );
     });
   });

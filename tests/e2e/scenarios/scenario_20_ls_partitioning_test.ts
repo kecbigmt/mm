@@ -108,8 +108,12 @@ describe("Scenario 20: List partitioning and formatting", () => {
       // Print mode should include date column
       assertStringIncludes(lsResult.stdout, today, "Should include ISO date in print mode");
 
-      // Print mode should use plain text icon
-      assertStringIncludes(lsResult.stdout, "[note]", "Should include plain text note icon");
+      // Print mode should use alias:type format
+      assertStringIncludes(
+        lsResult.stdout,
+        ":note",
+        "Should include type token in alias:type format",
+      );
     });
 
     it("--print mode does not include color codes", async () => {
@@ -297,12 +301,12 @@ describe("Scenario 20: List partitioning and formatting", () => {
       const lsResult = await runCommand(ctx.testHome, ["ls", today, "--all", "--print"]);
       assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
 
-      // Print mode should use plain text icons
-      assertStringIncludes(lsResult.stdout, "[task]", "Should show [task] icon");
+      // Print mode should use alias:type format
+      assertStringIncludes(lsResult.stdout, "task1:task ", "Should show task1:task format");
       assertStringIncludes(
         lsResult.stdout,
-        "[task:closed]",
-        "Should show [task:closed] icon for closed task",
+        "task2:task:closed",
+        "Should show task2:task:closed format for closed task",
       );
       assertStringIncludes(lsResult.stdout, "Open task", "Should include open task");
       assertStringIncludes(lsResult.stdout, "Closed task", "Should include closed task");
