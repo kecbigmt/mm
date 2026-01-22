@@ -1,11 +1,44 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
+import {
+  CwdResolutionService,
+  CwdSaveDependencies,
+} from "../../../domain/services/cwd_resolution_service.ts";
 import { parsePathExpression } from "../path_parser.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
-import { formatPlacementForDisplay } from "../../../domain/services/placement_display_service.ts";
+import {
+  formatPlacementForDisplay,
+  PlacementDisplayDependencies,
+} from "../../../domain/services/placement_display_service.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
+import { Placement } from "../../../domain/primitives/mod.ts";
+
+type SaveAndDisplayDeps = CwdSaveDependencies & PlacementDisplayDependencies;
+
+/**
+ * Saves the placement to session and displays it.
+ * Returns true on success, false on error (errors are logged to stderr).
+ */
+async function saveAndDisplayPlacement(
+  placement: Placement,
+  deps: SaveAndDisplayDeps,
+  debug: boolean,
+): Promise<boolean> {
+  const saveResult = await CwdResolutionService.setCwd(placement, deps);
+  if (saveResult.type === "error") {
+    console.error(formatError(saveResult.error, debug));
+    return false;
+  }
+
+  const displayResult = await formatPlacementForDisplay(placement, deps);
+  if (displayResult.type === "error") {
+    console.error(formatError(displayResult.error, debug));
+    return false;
+  }
+  console.log(displayResult.value);
+  return true;
+}
 
 export function createCdCommand() {
   return new Command()
@@ -29,28 +62,18 @@ export function createCdCommand() {
       const now = new Date();
 
       if (!pathArg) {
-        const cwdResult = await CwdResolutionService.getCwd({
+        // Navigate to today's date (home) - matching bash cd behavior
+        const todayPlacementResult = CwdResolutionService.createTodayPlacement(now, deps.timezone);
+        if (todayPlacementResult.type === "error") {
+          console.error(formatError(todayPlacementResult.error, debug));
+          return;
+        }
+
+        await saveAndDisplayPlacement(todayPlacementResult.value, {
           sessionRepository: deps.sessionRepository,
           workspacePath: deps.root,
           itemRepository: deps.itemRepository,
-          timezone: deps.timezone,
-        });
-        if (cwdResult.type === "error") {
-          console.error(formatError(cwdResult.error, debug));
-          return;
-        }
-        if (cwdResult.value.warning) {
-          console.error(`Warning: ${cwdResult.value.warning}`);
-        }
-        // Display placement with aliases
-        const displayResult = await formatPlacementForDisplay(cwdResult.value.placement, {
-          itemRepository: deps.itemRepository,
-        });
-        if (displayResult.type === "error") {
-          console.error(formatError(displayResult.error, debug));
-          return;
-        }
-        console.log(displayResult.value);
+        }, debug);
         return;
       }
 
@@ -108,17 +131,10 @@ export function createCdCommand() {
         return;
       }
 
-      // Save to session file
-      const saveResult = await CwdResolutionService.setCwd(validateResult.value, {
+      await saveAndDisplayPlacement(validateResult.value, {
         sessionRepository: deps.sessionRepository,
         workspacePath: deps.root,
-      });
-
-      if (saveResult.type === "error") {
-        console.error(formatError(saveResult.error, debug));
-        return;
-      }
-
-      // Success - no output needed (silent like shell cd)
+        itemRepository: deps.itemRepository,
+      }, debug);
     });
 }
