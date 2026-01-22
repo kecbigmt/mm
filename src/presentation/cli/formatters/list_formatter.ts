@@ -204,9 +204,16 @@ const formatItemLinePrintMode = (
   const typeToken = formatTypeToken(icon, status, isSnoozing);
   parts.push(`${identifier}:${typeToken}`);
 
+  // Date/time column
+  const isEvent = icon.toString() === "event";
   if (dateStr) {
-    const isEvent = icon.toString() === "event";
     parts.push(isEvent ? formatDateTimeForPrint(dateStr, item, timezone) : dateStr);
+  } else if (isEvent) {
+    // For events without dateStr (e.g., permanent placement), still emit time if available
+    const timeStr = formatEventTimeString(item, timezone);
+    if (timeStr) {
+      parts.push(timeStr);
+    }
   }
 
   parts.push(title.toString());

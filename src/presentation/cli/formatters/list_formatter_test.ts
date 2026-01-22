@@ -1016,3 +1016,23 @@ Deno.test("formatItemLine - print mode event without time uses date only", () =>
   // New format: all-day:event 2025-02-10 All day event (no T suffix without time)
   assertEquals(result, "all-day:event 2025-02-10 All day event");
 });
+
+Deno.test("formatItemLine - print mode event without dateStr still shows time", () => {
+  // For events in non-date placements (e.g., permanent), time should still appear
+  const item = makeItem({
+    icon: "event",
+    alias: "perm-evt",
+    title: "Permanent event",
+    startAt: "2025-02-10T06:30:00Z", // 15:30 in Asia/Tokyo
+    duration: "30m",
+  });
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW,
+  };
+  // No dateStr provided (non-date placement)
+  const result = formatItemLine(item, options);
+  // Should still include time: perm-evt:event 15:30-16:00 Permanent event
+  assertEquals(result, "perm-evt:event 15:30-16:00 Permanent event");
+});
