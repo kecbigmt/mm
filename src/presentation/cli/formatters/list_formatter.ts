@@ -67,36 +67,6 @@ export const formatItemIcon = (
 };
 
 /**
- * Returns a plain text token for an item icon (for print mode).
- *
- * - note: [note] / [note:closed] / [note:snoozing]
- * - task: [task] / [task:closed] / [task:snoozing]
- * - event: [event] / [event:closed] / [event:snoozing]
- * - topic: [topic] / [topic:closed] / [topic:snoozing]
- */
-const formatItemIconPlain = (
-  icon: ItemIcon,
-  status: ItemStatus,
-  isSnoozing: boolean,
-): string => {
-  const iconValue = icon.toString();
-  const statusSuffix = status.isClosed() ? ":closed" : isSnoozing ? ":snoozing" : "";
-
-  switch (iconValue) {
-    case "note":
-      return status.isClosed() ? "[note:closed]" : isSnoozing ? "[note:snoozing]" : "[note]";
-    case "task":
-      return `[task${statusSuffix}]`;
-    case "event":
-      return `[event${statusSuffix}]`;
-    case "topic":
-      return `[topic${statusSuffix}]`;
-    default:
-      return "[note]";
-  }
-};
-
-/**
  * Formats a time in HH:MM format in the given timezone.
  */
 const formatTimeInTimezone = (date: Date, timezone: TimezoneIdentifier): string => {
@@ -110,24 +80,20 @@ const formatTimeInTimezone = (date: Date, timezone: TimezoneIdentifier): string 
 };
 
 /**
- * Formats the event time portion of an item line (colored mode).
+ * Formats the event time string (colored mode).
  *
- * - With startAt only: ○ (HH:MM)
- * - With startAt and duration: ○ (HH:MM-HH:MM)
- * - Without startAt: ○
+ * - With startAt only: HH:MM
+ * - With startAt and duration: HH:MM-HH:MM
+ * - Without startAt: undefined
  */
-const formatEventTime = (
+const formatEventTimeString = (
   item: Item,
   timezone: TimezoneIdentifier,
-  isSnoozing: boolean,
-): string => {
-  const { startAt, duration, status } = item.data;
-
-  // Closed/snoozed events show status symbol instead of ○
-  const symbol = status.isClosed() ? "✓" : isSnoozing ? "~" : "○";
+): string | undefined => {
+  const { startAt, duration } = item.data;
 
   if (!startAt) {
-    return symbol;
+    return undefined;
   }
 
   const startTime = formatTimeInTimezone(startAt.toDate(), timezone);
@@ -135,42 +101,47 @@ const formatEventTime = (
   if (duration) {
     const endDate = startAt.addDuration(duration);
     const endTime = formatTimeInTimezone(endDate.toDate(), timezone);
-    return `${symbol} (${startTime}-${endTime})`;
+    return `${startTime}-${endTime}`;
   }
 
-  return `${symbol} (${startTime})`;
+  return startTime;
 };
 
 /**
- * Formats the event time portion of an item line (print mode with plain text).
+ * Formats the type token for print mode.
  *
- * - With startAt only: [event](HH:MM) or [event:closed](HH:MM) or [event:snoozing](HH:MM)
- * - With startAt and duration: [event](HH:MM-HH:MM) or [event:closed](HH:MM-HH:MM)
- * - Without startAt: [event] or [event:closed] or [event:snoozing]
+ * Format: <type> or <type>:<status>
+ * - task, task:closed, task:snoozing
+ * - event, event:closed, event:snoozing
+ * - note, note:closed, note:snoozing
+ * - topic, topic:closed, topic:snoozing
  */
-const formatEventTimePlain = (
-  item: Item,
-  timezone: TimezoneIdentifier,
+const formatTypeToken = (
+  icon: ItemIcon,
   status: ItemStatus,
   isSnoozing: boolean,
 ): string => {
-  const { startAt, duration } = item.data;
+  const iconValue = icon.toString();
   const statusSuffix = status.isClosed() ? ":closed" : isSnoozing ? ":snoozing" : "";
-  const token = `[event${statusSuffix}]`;
+  return `${iconValue}${statusSuffix}`;
+};
 
-  if (!startAt) {
-    return token;
+/**
+ * Formats the date+time string for print mode events.
+ *
+ * - With time: <date>T<HH:MM> or <date>T<HH:MM-HH:MM>
+ * - Without time: <date>
+ */
+const formatDateTimeForPrint = (
+  dateStr: string,
+  item: Item,
+  timezone: TimezoneIdentifier,
+): string => {
+  const timeStr = formatEventTimeString(item, timezone);
+  if (timeStr) {
+    return `${dateStr}T${timeStr}`;
   }
-
-  const startTime = formatTimeInTimezone(startAt.toDate(), timezone);
-
-  if (duration) {
-    const endDate = startAt.addDuration(duration);
-    const endTime = formatTimeInTimezone(endDate.toDate(), timezone);
-    return `${token}(${startTime}-${endTime})`;
-  }
-
-  return `${token}(${startTime})`;
+  return dateStr;
 };
 
 /**
@@ -179,18 +150,105 @@ const formatEventTimePlain = (
 const truncateUuid = (uuid: string): string => uuid.slice(0, 8) + "…";
 
 /**
+ * Resolves an item ID to a display string using the resolver or falling back to truncated UUID.
+ */
+const resolveIdToDisplay = (
+  id: string,
+  resolveItemId?: ItemIdResolver,
+): string => resolveItemId?.(id) ?? truncateUuid(id);
+
+/**
+ * Formats the metadata suffix (project, contexts, due date).
+ * Returns an array of formatted strings without styling applied.
+ */
+const formatMetadata = (
+  item: Item,
+  resolveItemId?: ItemIdResolver,
+): string[] => {
+  const { project, contexts, dueAt } = item.data;
+  const parts: string[] = [];
+
+  if (project) {
+    parts.push(`+${resolveIdToDisplay(project.toString(), resolveItemId)}`);
+  }
+
+  if (contexts && contexts.length > 0) {
+    for (const context of contexts) {
+      parts.push(`@${resolveIdToDisplay(context.toString(), resolveItemId)}`);
+    }
+  }
+
+  if (dueAt) {
+    parts.push(`→${dueAt.toString().slice(0, 10)}`);
+  }
+
+  return parts;
+};
+
+/**
+ * Formats an item line for print mode (plain text, machine-readable).
+ *
+ * Format: <alias>:<type>[:status] <date|dateTime> <title> <project?> <contexts?> <due?>
+ */
+const formatItemLinePrintMode = (
+  item: Item,
+  timezone: TimezoneIdentifier,
+  isSnoozing: boolean,
+  dateStr?: string,
+  resolveItemId?: ItemIdResolver,
+): string => {
+  const { icon, status, alias, title } = item.data;
+  const parts: string[] = [];
+
+  const identifier = alias?.toString() ?? item.data.id.toString();
+  const typeToken = formatTypeToken(icon, status, isSnoozing);
+  parts.push(`${identifier}:${typeToken}`);
+
+  if (dateStr) {
+    const isEvent = icon.toString() === "event";
+    parts.push(isEvent ? formatDateTimeForPrint(dateStr, item, timezone) : dateStr);
+  }
+
+  parts.push(title.toString());
+  parts.push(...formatMetadata(item, resolveItemId));
+
+  return parts.join(" ");
+};
+
+/**
+ * Formats an item line for colored mode (terminal display with ANSI colors).
+ *
+ * Format: <icon> <alias> <time?> <title> <project?> <contexts?> <due?>
+ */
+const formatItemLineColoredMode = (
+  item: Item,
+  timezone: TimezoneIdentifier,
+  isSnoozing: boolean,
+  resolveItemId?: ItemIdResolver,
+): string => {
+  const { icon, status, alias, title } = item.data;
+  const parts: string[] = [];
+
+  parts.push(formatItemIcon(icon, status, isSnoozing));
+  parts.push(cyan(alias?.toString() ?? item.data.id.toString()));
+
+  if (icon.toString() === "event") {
+    const timeStr = formatEventTimeString(item, timezone);
+    if (timeStr) {
+      parts.push(timeStr);
+    }
+  }
+
+  parts.push(title.toString());
+  parts.push(...formatMetadata(item, resolveItemId).map(dim));
+
+  return parts.join(" ");
+};
+
+/**
  * Formats a single item line.
  *
- * Colored mode template: <icon> <alias-or-id> <title> <project?> <contexts?> <due?>
- * Print mode template: <date> <icon> <alias-or-id> <title> <project?> <contexts?> <due?>
- *
- * - date: YYYY-MM-DD (print mode only, derived from placement)
- * - icon: symbol (colored) or plain text token (print)
- * - alias-or-id: alias if present, else full UUID (cyan in colored mode)
- * - project: dim +project format if present (todo.txt convention)
- * - contexts: dim @tag format if present (todo.txt convention)
- * - due: dim →YYYY-MM-DD format if dueAt exists
- * - snoozing state: computed from item.isSnoozing(options.now)
+ * Delegates to mode-specific formatters for clean separation of concerns.
  */
 export const formatItemLine = (
   item: Item,
@@ -199,63 +257,12 @@ export const formatItemLine = (
   resolveItemId?: ItemIdResolver,
 ): string => {
   const { printMode, timezone, now } = options;
-  const { icon, status, alias, title, project, contexts, dueAt } = item.data;
   const isSnoozing = item.isSnoozing(now);
 
-  const parts: string[] = [];
-
-  // Date column (print mode only)
-  if (printMode && dateStr) {
-    parts.push(dateStr);
-  }
-
-  // Icon (with event time if applicable)
   if (printMode) {
-    if (icon.toString() === "event") {
-      parts.push(formatEventTimePlain(item, timezone, status, isSnoozing));
-    } else {
-      parts.push(formatItemIconPlain(icon, status, isSnoozing));
-    }
-  } else {
-    if (icon.toString() === "event") {
-      parts.push(formatEventTime(item, timezone, isSnoozing));
-    } else {
-      parts.push(formatItemIcon(icon, status, isSnoozing));
-    }
+    return formatItemLinePrintMode(item, timezone, isSnoozing, dateStr, resolveItemId);
   }
-
-  // Alias or UUID
-  const identifier = alias?.toString() ?? item.data.id.toString();
-  parts.push(printMode ? identifier : cyan(identifier));
-
-  // Title
-  parts.push(title.toString());
-
-  // Project (todo.txt convention: +project)
-  if (project) {
-    const projectId = project.toString();
-    const displayStr = resolveItemId?.(projectId) ?? truncateUuid(projectId);
-    const projectStr = `+${displayStr}`;
-    parts.push(printMode ? projectStr : dim(projectStr));
-  }
-
-  // Contexts (todo.txt convention: @context)
-  if (contexts && contexts.length > 0) {
-    for (const context of contexts) {
-      const contextId = context.toString();
-      const displayStr = resolveItemId?.(contextId) ?? truncateUuid(contextId);
-      const contextStr = `@${displayStr}`;
-      parts.push(printMode ? contextStr : dim(contextStr));
-    }
-  }
-
-  // Due date
-  if (dueAt) {
-    const dueStr = `→${dueAt.toString().slice(0, 10)}`;
-    parts.push(printMode ? dueStr : dim(dueStr));
-  }
-
-  return parts.join(" ");
+  return formatItemLineColoredMode(item, timezone, isSnoozing, resolveItemId);
 };
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
