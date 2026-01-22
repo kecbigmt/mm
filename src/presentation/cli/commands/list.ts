@@ -430,7 +430,9 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
       // Format header (skip date headers in print mode for flat output)
       if (partition.header.kind === "date") {
         if (!isPrintMode) {
-          outputLines.push(formatDateHeader(partition.header.date, now, formatterOptions, baseDate));
+          outputLines.push(
+            formatDateHeader(partition.header.date, now, formatterOptions, baseDate),
+          );
         }
       } else {
         outputLines.push(
