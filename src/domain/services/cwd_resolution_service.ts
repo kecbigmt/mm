@@ -40,13 +40,35 @@ export type CwdResult = Readonly<{
   readonly warning?: string;
 }>;
 
-const defaultCwdPlacement = (now: Date, timezone: TimezoneIdentifier): Placement => {
+/**
+ * Creates a placement for today's date in the given timezone.
+ * This is the "home" placement, matching bash cd behavior.
+ */
+const createTodayPlacement = (
+  now: Date,
+  timezone: TimezoneIdentifier,
+): Result<Placement, ValidationError<"CwdResolution">> => {
   const dateStr = formatDateStringForTimezone(now, timezone);
   const calendarDayResult = parseCalendarDay(dateStr);
   if (calendarDayResult.type === "error") {
+    return Result.error(
+      createValidationError("CwdResolution", [
+        createValidationIssue("Failed to parse today's date", {
+          code: "invalid_date",
+          path: ["value"],
+        }),
+      ]),
+    );
+  }
+  return Result.ok(createPlacement({ kind: "date", date: calendarDayResult.value }, []));
+};
+
+const defaultCwdPlacement = (now: Date, timezone: TimezoneIdentifier): Placement => {
+  const result = createTodayPlacement(now, timezone);
+  if (result.type === "error") {
     throw new Error("Failed to create default CWD placement: invalid date");
   }
-  return createPlacement({ kind: "date", date: calendarDayResult.value }, []);
+  return result.value;
 };
 
 const resolvePlacementToItem = async (
@@ -66,6 +88,12 @@ const resolvePlacementToItem = async (
 };
 
 export const CwdResolutionService = {
+  /**
+   * Creates a placement for today's date in the given timezone.
+   * This is the "home" placement, matching bash cd behavior.
+   */
+  createTodayPlacement,
+
   async getCwd(
     deps: CwdResolutionDependencies,
   ): Promise<Result<CwdResult, CwdResolutionError>> {
