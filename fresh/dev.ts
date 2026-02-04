@@ -7,5 +7,8 @@ const builder = new Builder();
 if (Deno.args.includes("build")) {
   await builder.build();
 } else {
-  await builder.listen(() => import("./main.ts"));
+  await builder.listen(() => import("./main.ts"), {
+    hostname: "0.0.0.0",
+    port: 8000,
+  });
 }
