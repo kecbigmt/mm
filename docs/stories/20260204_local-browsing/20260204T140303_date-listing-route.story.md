@@ -111,14 +111,18 @@ All acceptance criteria verified via automated tests:
 - Date resolution uses existing domain services (isDateExpression, resolveRelativeDate)
 - Item rendering includes HTML escaping for security
 
-**Next:** Code Review
+### Pull Request
+
+PR: [#102](https://github.com/kecbigmt/mm/pull/102)
+Created: 2026-02-04
+Status: Ready for review (draft PR updated with Story 2 completion)
 
 ### Follow-ups / Open Risks
 
 #### Addressed
-- None yet
+- Workspace config loading implemented via `workspace_middleware.ts`
+- Relative date resolution uses workspace timezone from config
 
 #### Remaining
-- Workspace config loading needs to be implemented (workspace root, timezone)
 - Need to decide on styling approach (minimal for now, polish in later story)
-- Relative date resolution (`today`, `tm`) depends on workspace timezone
+- UTF-8 charset added to fix Japanese text display
