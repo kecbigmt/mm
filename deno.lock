@@ -36,6 +36,7 @@
     "jsr:@std/uuid@1.0.9": "1.0.9",
     "jsr:@std/yaml@1.0.10": "1.0.10",
     "npm:@opentelemetry/api@^1.9.0": "1.9.0",
+    "npm:@preact/signals@^2.2.1": "2.7.0_preact@10.28.3",
     "npm:@types/node@*": "24.2.0",
     "npm:lexorank@1.0.5": "1.0.5",
     "npm:preact-render-to-string@^6.6.3": "6.6.5_preact@10.28.3",
@@ -78,10 +79,12 @@
       "dependencies": [
         "jsr:@fresh/build-id",
         "jsr:@std/fmt@^1.0.8",
+        "jsr:@std/fs",
         "jsr:@std/html",
         "jsr:@std/http",
         "jsr:@std/path@^1.1.2",
         "npm:@opentelemetry/api",
+        "npm:@preact/signals",
         "npm:preact",
         "npm:preact-render-to-string"
       ]
@@ -173,6 +176,16 @@
   "npm": {
     "@opentelemetry/api@1.9.0": {
       "integrity": "sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg=="
+    },
+    "@preact/signals-core@1.13.0": {
+      "integrity": "sha512-slT6XeTCAbdql61GVLlGU4x7XHI7kCZV5Um5uhE4zLX4ApgiiXc0UYFvVOKq06xcovzp7p+61l68oPi563ARKg=="
+    },
+    "@preact/signals@2.7.0_preact@10.28.3": {
+      "integrity": "sha512-9rQ030JhUfdBO4xlFB6Iwc/rOBi9IFXaCgu8VrFMSjAJfubGRTTxBPsgSlAF5qmWdY3C91b9kBK09mpUOMh1Rw==",
+      "dependencies": [
+        "@preact/signals-core",
+        "preact"
+      ]
     },
     "@types/node@24.2.0": {
       "integrity": "sha512-3xyG3pMCq3oYCNg7/ZP+E1ooTaGB4cG8JWRsqqOYQdbWNY4zbaV0Ennrd7stjiJEFZCaybcIgpTjJWHRfBSIDw==",
