@@ -8,6 +8,7 @@ import { createDatePlacement } from "../../../src/domain/primitives/placement.ts
 import { createSingleRange } from "../../../src/domain/primitives/placement_range.ts";
 import type { Item } from "../../../src/domain/models/item.ts";
 import type { CalendarDay } from "../../../src/domain/primitives/calendar_day.ts";
+import type { TimezoneIdentifier } from "../../../src/domain/primitives/timezone_identifier.ts";
 
 const escapeHtml = (str: string): string =>
   str
@@ -27,9 +28,14 @@ const formatDateHumanReadable = (day: CalendarDay): string => {
   });
 };
 
-const isToday = (day: CalendarDay, now: Date): boolean => {
-  const todayStr = now.toISOString().split("T")[0];
-  return day.toString() === todayStr;
+const isTodayInTimezone = (
+  day: CalendarDay,
+  timezone: TimezoneIdentifier,
+  now: Date,
+): boolean => {
+  const todayResult = resolveRelativeDate("today", timezone, now);
+  if (todayResult.type !== "ok") return false;
+  return day.toString() === todayResult.value.toString();
 };
 
 export const handler = {
@@ -97,7 +103,7 @@ export const handler = {
     let headerText: string;
     if (resolvedDay) {
       const humanReadable = formatDateHumanReadable(resolvedDay);
-      if (isToday(resolvedDay, now)) {
+      if (timezone && isTodayInTimezone(resolvedDay, timezone, now)) {
         headerText = `Today - ${humanReadable}`;
       } else {
         headerText = humanReadable;
