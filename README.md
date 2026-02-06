@@ -77,8 +77,8 @@ Alternatively, build a standalone binary with `deno task compile`.
 ### Releases
 
 Pre-built binaries for **macOS Apple Silicon** are published on
-[GitHub Releases](https://github.com/kecbigmt/mm/releases). Download `mm-<version>-darwin-arm64`
-for the release you need. The version shown by `mm --version` matches the release tag.
+[GitHub Releases](https://github.com/kecbigmt/mm/releases). Download `mm-<version>-darwin-arm64` for
+the release you need. The version shown by `mm --version` matches the release tag.
 
 **Shell Completion (optional):** Enable tab completion for Zsh/Bash by adding
 `source <(mm completions zsh)` or `source <(mm completions bash)` to your shell config. See
