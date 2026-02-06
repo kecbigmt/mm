@@ -86,11 +86,8 @@ jobs:
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
-
-      - name: Flatten artifact directories
-        run: |
-          for d in */; do mv "$d"* . 2>/dev/null || true; done
-          rmdir */ 2>/dev/null || true
+        with:
+          merge-multiple: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
