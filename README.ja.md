@@ -73,7 +73,7 @@ mm list
 
 ### リリース
 
-**macOS Apple Silicon** 向けのビルド済みバイナリは [GitHub Releases](https://github.com/kkato1030/mm/releases) で公開しています。必要なバージョンの `mm-<version>-darwin-arm64` をダウンロードしてください。`mm --version` で表示されるバージョンはリリースタグと一致します。
+**macOS Apple Silicon** 向けのビルド済みバイナリは [GitHub Releases](https://github.com/kecbigmt/mm/releases) で公開しています。必要なバージョンの `mm-<version>-darwin-arm64` をダウンロードしてください。`mm --version` で表示されるバージョンはリリースタグと一致します。
 
 **シェル補完（オプション）**: Zsh/Bash用のタブ補完を有効にするには、シェル設定に
 `source <(mm completions zsh)` または `source <(mm completions bash)` を追加します。詳細は
