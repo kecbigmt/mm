@@ -1,9 +1,5 @@
-# macOS Apple Silicon 向けバイナリをビルドし GitHub Release に添付する。
-# 他プラットフォーム用は下記コメントを参照（必要に応じてコメント解除して追加）。
-# - x86_64-apple-darwin → mm-${VERSION}-darwin-x64
-# - x86_64-unknown-linux-gnu → mm-${VERSION}-linux-x64
-# - aarch64-unknown-linux-gnu → mm-${VERSION}-linux-arm64
-# - x86_64-pc-windows-msvc → mm-${VERSION}-windows-x64.exe
+# バイナリをビルドし GitHub Release に添付する。
+# 対応プラットフォームを増やす場合は、下記 matrix.include の該当ブロックのコメントを外す。
 
 name: Release
 
@@ -11,8 +7,6 @@ on:
   push:
     tags:
       - "v*"
-    branches:
-      - chore/release
   workflow_dispatch:
     inputs:
       version:
@@ -25,6 +19,25 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            suffix: darwin-arm64
+            ext: ""
+          # - target: x86_64-apple-darwin
+          #   suffix: darwin-x64
+          #   ext: ""
+          # - target: x86_64-unknown-linux-gnu
+          #   suffix: linux-x64
+          #   ext: ""
+          # - target: aarch64-unknown-linux-gnu
+          #   suffix: linux-arm64
+          #   ext: ""
+          # - target: x86_64-pc-windows-msvc
+          #   suffix: windows-x64
+          #   ext: ".exe"
     outputs:
       version: ${{ steps.set_version.outputs.version }}
     steps:
@@ -46,13 +59,13 @@ jobs:
         with:
           deno-version: v2.x
 
-      - name: Build macOS Apple Silicon binary
+      - name: Build ${{ matrix.suffix }}
         run: |
           deno compile \
             --config=deno.json \
             --allow-read --allow-write --allow-env --allow-run \
-            --target aarch64-apple-darwin \
-            --output mm-${{ steps.set_version.outputs.version }}-darwin-arm64 \
+            --target ${{ matrix.target }} \
+            --output mm-${{ steps.set_version.outputs.version }}-${{ matrix.suffix }}${{ matrix.ext }} \
             src/main.ts
         env:
           MM_VERSION: ${{ steps.set_version.outputs.version }}
@@ -60,23 +73,26 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mm-${{ steps.set_version.outputs.version }}-darwin-arm64
-          path: mm-${{ steps.set_version.outputs.version }}-darwin-arm64
+          name: mm-${{ steps.set_version.outputs.version }}-${{ matrix.suffix }}${{ matrix.ext }}
+          path: mm-${{ steps.set_version.outputs.version }}-${{ matrix.suffix }}${{ matrix.ext }}
 
   release:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download artifact
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
-        with:
-          name: mm-${{ needs.build.outputs.version }}-darwin-arm64
+
+      - name: Flatten artifact directories
+        run: |
+          for d in */; do mv "$d"* . 2>/dev/null || true; done
+          rmdir */ 2>/dev/null || true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', needs.build.outputs.version) || github.ref_name }}
-          files: mm-${{ needs.build.outputs.version }}-darwin-arm64
+          files: mm-*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
