@@ -35,7 +35,7 @@ async function defaultListAction() {
 async function main() {
   const cli = new Command()
     .name("mm")
-    .version("0.1.0")
+    .version(Deno.env.get("MM_VERSION") ?? "0.1.0")
     .description("Personal knowledge management CLI tool")
     .action(defaultListAction)
     .command("note", createNoteCommand().description("Create a new note")).alias("n")

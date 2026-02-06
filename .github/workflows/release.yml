@@ -1,0 +1,82 @@
+# macOS Apple Silicon 向けバイナリをビルドし GitHub Release に添付する。
+# 他プラットフォーム用は下記コメントを参照（必要に応じてコメント解除して追加）。
+# - x86_64-apple-darwin → mm-${VERSION}-darwin-x64
+# - x86_64-unknown-linux-gnu → mm-${VERSION}-linux-x64
+# - aarch64-unknown-linux-gnu → mm-${VERSION}-linux-arm64
+# - x86_64-pc-windows-msvc → mm-${VERSION}-windows-x64.exe
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - chore/release
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.0.0 or v1.0.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version
+        id: set_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            v="${{ inputs.version }}"
+            v="${v#v}"
+          else
+            v="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=$v" >> $GITHUB_OUTPUT
+          echo "VERSION=$v" >> $GITHUB_ENV
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Build macOS Apple Silicon binary
+        run: |
+          deno compile \
+            --config=deno.json \
+            --allow-read --allow-write --allow-env --allow-run \
+            --target aarch64-apple-darwin \
+            --output mm-${{ steps.set_version.outputs.version }}-darwin-arm64 \
+            src/main.ts
+        env:
+          MM_VERSION: ${{ steps.set_version.outputs.version }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mm-${{ steps.set_version.outputs.version }}-darwin-arm64
+          path: mm-${{ steps.set_version.outputs.version }}-darwin-arm64
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mm-${{ needs.build.outputs.version }}-darwin-arm64
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', needs.build.outputs.version) || github.ref_name }}
+          files: mm-${{ needs.build.outputs.version }}-darwin-arm64
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
