@@ -13,6 +13,10 @@ on:
         description: "Release version (e.g. 1.0.0 or v1.0.0)"
         required: true
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
