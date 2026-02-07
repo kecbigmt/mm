@@ -63,6 +63,12 @@ jobs:
         with:
           deno-version: v2.x
 
+      - name: Inject version into source
+        run: |
+          v="${{ steps.set_version.outputs.version }}"
+          echo "/** Version string. Replaced at release build time by CI. */" > src/version.ts
+          echo "export const VERSION = \"$v\";" >> src/version.ts
+
       - name: Build ${{ matrix.suffix }}
         run: |
           deno compile \
@@ -71,8 +77,6 @@ jobs:
             --target ${{ matrix.target }} \
             --output mm-${{ steps.set_version.outputs.version }}-${{ matrix.suffix }}${{ matrix.ext }} \
             src/main.ts
-        env:
-          MM_VERSION: ${{ steps.set_version.outputs.version }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
