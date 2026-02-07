@@ -67,7 +67,7 @@ jobs:
         run: |
           deno compile \
             --config=deno.json \
-            --allow-read --allow-write --allow-env --allow-run \
+            --allow-read --allow-write --allow-env --allow-run --allow-sys \
             --target ${{ matrix.target }} \
             --output mm-${{ steps.set_version.outputs.version }}-${{ matrix.suffix }}${{ matrix.ext }} \
             src/main.ts
