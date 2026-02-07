@@ -16,6 +16,10 @@ on:
       - '**/GEMINI.md'
       - 'docs/steering/**/*.md'
 
+concurrency:
+  group: doc-check-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check-doc-length:
     runs-on: ubuntu-latest
