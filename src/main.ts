@@ -21,6 +21,7 @@ import { createSnoozeCommand } from "./presentation/cli/commands/snooze.ts";
 import { createSyncCommand } from "./presentation/cli/commands/sync.ts";
 import { createConfigCommand } from "./presentation/cli/commands/config.ts";
 import { createCompletionsCommand } from "./presentation/cli/commands/completions.ts";
+import { VERSION } from "./version.ts";
 
 /**
  * Default action for `mm` with no arguments.
@@ -35,7 +36,7 @@ async function defaultListAction() {
 async function main() {
   const cli = new Command()
     .name("mm")
-    .version("0.1.0")
+    .version(VERSION)
     .description("Personal knowledge management CLI tool")
     .action(defaultListAction)
     .command("note", createNoteCommand().description("Create a new note")).alias("n")

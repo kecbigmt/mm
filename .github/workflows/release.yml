@@ -1,0 +1,103 @@
+# バイナリをビルドし GitHub Release に添付する。
+# 対応プラットフォームを増やす場合は、下記 matrix.include の該当ブロックのコメントを外す。
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.0.0 or v1.0.0)"
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            suffix: darwin-arm64
+            ext: ""
+          # - target: x86_64-apple-darwin
+          #   suffix: darwin-x64
+          #   ext: ""
+          # - target: x86_64-unknown-linux-gnu
+          #   suffix: linux-x64
+          #   ext: ""
+          # - target: aarch64-unknown-linux-gnu
+          #   suffix: linux-arm64
+          #   ext: ""
+          # - target: x86_64-pc-windows-msvc
+          #   suffix: windows-x64
+          #   ext: ".exe"
+    outputs:
+      version: ${{ steps.set_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version
+        id: set_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            v="${{ inputs.version }}"
+            v="${v#v}"
+          else
+            v="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=$v" >> $GITHUB_OUTPUT
+          echo "VERSION=$v" >> $GITHUB_ENV
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Inject version into source
+        run: |
+          v="${{ steps.set_version.outputs.version }}"
+          echo "/** Version string. Replaced at release build time by CI. */" > src/version.ts
+          echo "export const VERSION = \"$v\";" >> src/version.ts
+
+      - name: Build ${{ matrix.suffix }}
+        run: |
+          deno compile \
+            --config=deno.json \
+            --allow-read --allow-write --allow-env --allow-run --allow-sys \
+            --target ${{ matrix.target }} \
+            --output mm-${{ steps.set_version.outputs.version }}-${{ matrix.suffix }}${{ matrix.ext }} \
+            src/main.ts
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mm-${{ steps.set_version.outputs.version }}-${{ matrix.suffix }}${{ matrix.ext }}
+          path: mm-${{ steps.set_version.outputs.version }}-${{ matrix.suffix }}${{ matrix.ext }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', needs.build.outputs.version) || github.ref_name }}
+          files: mm-*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
