@@ -96,3 +96,36 @@ Deno.test("resolvePrefix empty input returns no match", () => {
   const result = resolvePrefix("", prioritySet, allItems);
   assertEquals(result, { kind: "none" });
 });
+
+// --- Hyphenated alias handling ---
+
+Deno.test("resolvePrefix matches hyphenated aliases with unhyphenated input", () => {
+  const prioritySet = ["bace-x7q", "kuno-p3r"];
+  const allItems = ["bace-x7q", "bace-y2m", "kuno-p3r", "mize-p2r"];
+  const result = resolvePrefix("k", prioritySet, allItems);
+  assertEquals(result, { kind: "single", alias: "kuno-p3r" });
+});
+
+Deno.test("resolvePrefix returns raw alias with hyphens in result", () => {
+  const prioritySet = ["bace-x7q", "kuno-p3r"];
+  const allItems = ["bace-x7q", "kuno-p3r"];
+  const result = resolvePrefix("bacex", prioritySet, allItems);
+  assertEquals(result, { kind: "single", alias: "bace-x7q" });
+});
+
+Deno.test("resolvePrefix handles hyphenated input against hyphenated aliases", () => {
+  const prioritySet = ["bace-x7q", "kuno-p3r"];
+  const allItems = ["bace-x7q", "kuno-p3r"];
+  const result = resolvePrefix("bace-x", prioritySet, allItems);
+  assertEquals(result, { kind: "single", alias: "bace-x7q" });
+});
+
+Deno.test("resolvePrefix ambiguous with hyphenated aliases", () => {
+  const prioritySet = ["bace-x7q", "bace-y2m"];
+  const allItems = ["bace-x7q", "bace-y2m"];
+  const result = resolvePrefix("bace", prioritySet, allItems);
+  assertEquals(result.kind, "ambiguous");
+  if (result.kind === "ambiguous") {
+    assertEquals(result.candidates, ["bace-x7q", "bace-y2m"]);
+  }
+});

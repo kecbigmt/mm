@@ -42,18 +42,18 @@ export const shortestUniquePrefix = (
 
 /**
  * Resolve a normalized prefix against a single alias set.
- * Returns a definitive result (single/ambiguous) or "none" if no matches found.
+ * Aliases are normalized internally for comparison but raw aliases are returned in results.
  */
 const resolvePrefixInSet = (
   prefix: string,
   aliases: readonly string[],
 ): PrefixResolutionResult => {
-  const exact = aliases.find((a) => a === prefix);
+  const exact = aliases.find((a) => normalizeAlias(a) === prefix);
   if (exact) {
     return { kind: "single", alias: exact };
   }
 
-  const matches = aliases.filter((a) => a.startsWith(prefix));
+  const matches = aliases.filter((a) => normalizeAlias(a).startsWith(prefix));
   if (matches.length === 1) {
     return { kind: "single", alias: matches[0] };
   }
