@@ -129,3 +129,15 @@ Deno.test("resolvePrefix ambiguous with hyphenated aliases", () => {
     assertEquals(result.candidates, ["bace-x7q", "bace-y2m"]);
   }
 });
+
+// --- Normalized collision handling ---
+
+Deno.test("resolvePrefix returns ambiguous when aliases differ only by hyphen placement", () => {
+  const prioritySet = ["a-bc", "ab-c"];
+  const allItems = ["a-bc", "ab-c"];
+  const result = resolvePrefix("abc", prioritySet, allItems);
+  assertEquals(result.kind, "ambiguous");
+  if (result.kind === "ambiguous") {
+    assertEquals(result.candidates, ["a-bc", "ab-c"]);
+  }
+});

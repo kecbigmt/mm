@@ -48,9 +48,12 @@ const resolvePrefixInSet = (
   prefix: string,
   aliases: readonly string[],
 ): PrefixResolutionResult => {
-  const exact = aliases.find((a) => normalizeAlias(a) === prefix);
-  if (exact) {
-    return { kind: "single", alias: exact };
+  const exactMatches = aliases.filter((a) => normalizeAlias(a) === prefix);
+  if (exactMatches.length === 1) {
+    return { kind: "single", alias: exactMatches[0] };
+  }
+  if (exactMatches.length > 1) {
+    return { kind: "ambiguous", candidates: exactMatches };
   }
 
   const matches = aliases.filter((a) => normalizeAlias(a).startsWith(prefix));
