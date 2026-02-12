@@ -38,9 +38,9 @@ const addDaysToDateString = (dateStr: string, days: number): string => {
   const [year, month, day] = dateStr.split("-").map(Number);
   const date = new Date(year, month - 1, day);
   date.setDate(date.getDate() + days);
-  return `${date.getFullYear()}-${
-    String(date.getMonth() + 1).padStart(2, "0")
-  }-${String(date.getDate()).padStart(2, "0")}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${
+    String(date.getDate()).padStart(2, "0")
+  }`;
 };
 
 export type PathResolverError = ValidationError<typeof PATH_RESOLVER_ERROR_KIND>;
