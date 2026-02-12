@@ -12,19 +12,19 @@ Stories 1 and 2 implemented the prefix resolution algorithm and wired it into Pa
 ### Acceptance Criteria
 
 #### 1. Priority Set Loading
-- [ ] **Given** items placed within today ± 7 days have aliases `[bace-x7q, kuno-p3r]` and an older item has alias `bace-y2m`, **When** resolving prefix `b`, **Then** return the item for `bace-x7q` (matched in priority set, not ambiguous because `bace-y2m` is outside)
-- [ ] **Given** no items are placed within today ± 7 days, **When** resolving prefix `b` and alias `bace-x7q` exists globally, **Then** return the item for `bace-x7q` (empty priority set, falls back to all items)
+- [x] **Given** items placed within today ± 7 days have aliases `[bace-x7q, kuno-p3r]` and an older item has alias `bace-y2m`, **When** resolving prefix `b`, **Then** return the item for `bace-x7q` (matched in priority set, not ambiguous because `bace-y2m` is outside)
+- [x] **Given** no items are placed within today ± 7 days, **When** resolving prefix `b` and alias `bace-x7q` exists globally, **Then** return the item for `bace-x7q` (empty priority set, falls back to all items)
 
 #### 2. Priority Set Scoping
-- [ ] **Given** priority set contains aliases `[bace-x7q, bace-y2m]` (both recent), **When** resolving prefix `bace`, **Then** return ambiguous error with both candidates (ambiguous within priority set — no fallback)
-- [ ] **Given** priority set contains alias `kuno-p3r` only and all items include `[bace-x7q, bace-y2m, kuno-p3r]`, **When** resolving prefix `bace`, **Then** return ambiguous error with `[bace-x7q, bace-y2m]` (no priority match, falls back to all items where it's ambiguous)
+- [x] **Given** priority set contains aliases `[bace-x7q, bace-y2m]` (both recent), **When** resolving prefix `bace`, **Then** return ambiguous error with both candidates (ambiguous within priority set — no fallback)
+- [x] **Given** priority set contains alias `kuno-p3r` only and all items include `[bace-x7q, bace-y2m, kuno-p3r]`, **When** resolving prefix `bace`, **Then** return ambiguous error with `[bace-x7q, bace-y2m]` (no priority match, falls back to all items where it's ambiguous)
 
 #### 3. Exact Match Still Works
-- [ ] **Given** alias `bace-x7q` exists, **When** resolving exact path `bace-x7q`, **Then** return the item (exact match unchanged by priority set)
+- [x] **Given** alias `bace-x7q` exists, **When** resolving exact path `bace-x7q`, **Then** return the item (exact match unchanged by priority set)
 
 #### 4. Edge Cases
-- [ ] **Given** an item is in the priority date range but has no alias, **When** resolving any prefix, **Then** that item is excluded from the priority set (only aliased items participate)
-- [ ] **Given** the item repository fails to load recent items, **When** resolving a prefix, **Then** fall back to using an empty priority set (degrade gracefully, still search all items)
+- [x] **Given** an item is in the priority date range but has no alias, **When** resolving any prefix, **Then** that item is excluded from the priority set (only aliased items participate)
+- [x] **Given** the item repository fails to load recent items, **When** resolving a prefix, **Then** fall back to using an empty priority set (degrade gracefully, still search all items)
 
 ### Out of Scope
 - Shortest unique prefix display in `mm list` output — separate story
