@@ -24,6 +24,7 @@ import {
   formatItemLine,
   formatSectionStub,
   type ItemIdResolver,
+  type ItemLineContext,
   type ListFormatterOptions,
 } from "../formatters/list_formatter.ts";
 import { outputWithPager } from "../pager.ts";
@@ -36,6 +37,7 @@ import {
   profileSync,
 } from "../../../shared/profiler.ts";
 import { itemTypeEnum } from "../types.ts";
+import { shortestUniquePrefix } from "../../../domain/services/alias_prefix_service.ts";
 
 type ListOptions = {
   workspace?: string;
@@ -366,6 +368,36 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   // Create resolver function
   const resolveItemId: ItemIdResolver = (id: string): string | undefined => refItemAliasMap.get(id);
 
+  // Compute shortest unique prefix lengths for alias display highlighting
+  const prefixLengthMap = await profileAsync("computePrefixLengths", async () => {
+    const map = new Map<string, number>();
+    const displayedAliases = items
+      .map((item) => item.data.alias?.toString())
+      .filter((a): a is string => a !== undefined);
+
+    if (displayedAliases.length === 0) return map;
+
+    if (locatorArg) {
+      // Custom range: compute prefix against all aliases
+      const allAliasesResult = await deps.aliasRepository.list();
+      if (allAliasesResult.type === "ok") {
+        const allAliasStrings = allAliasesResult.value.map((a) => a.data.slug.toString());
+        const sorted = [...allAliasStrings].sort();
+        for (const alias of displayedAliases) {
+          map.set(alias, shortestUniquePrefix(alias, sorted).length);
+        }
+      }
+    } else {
+      // Default range (priority set): compute prefix within displayed items
+      const sorted = [...displayedAliases].sort();
+      for (const alias of displayedAliases) {
+        map.set(alias, shortestUniquePrefix(alias, sorted).length);
+      }
+    }
+
+    return map;
+  });
+
   // Build display label function for item sections
   const getDisplayLabel = (
     parent: ReturnType<typeof createPlacement>,
@@ -449,7 +481,16 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
         const dateStr = item.data.placement.head.kind === "date"
           ? item.data.placement.head.date.toString()
           : undefined;
-        outputLines.push(formatItemLine(item, formatterOptions, dateStr, resolveItemId));
+        const alias = item.data.alias?.toString();
+        const prefixLen = alias ? prefixLengthMap.get(alias) : undefined;
+        const lineContext: ItemLineContext = {
+          dateStr,
+          resolveItemId,
+          prefixLength: prefixLen,
+        };
+        outputLines.push(
+          formatItemLine(item, formatterOptions, lineContext),
+        );
       }
 
       // Format stubs
