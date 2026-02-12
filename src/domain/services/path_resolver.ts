@@ -33,6 +33,16 @@ import { formatDateStringForTimezone } from "../../shared/timezone_format.ts";
 const PATH_RESOLVER_ERROR_KIND = "PathResolver" as const;
 const DEFAULT_DATE_WINDOW_DAYS = 7;
 
+/** Add days to a YYYY-MM-DD date string using calendar-day arithmetic */
+const addDaysToDateString = (dateStr: string, days: number): string => {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${
+    String(date.getMonth() + 1).padStart(2, "0")
+  }-${String(date.getDate()).padStart(2, "0")}`;
+};
+
 export type PathResolverError = ValidationError<typeof PATH_RESOLVER_ERROR_KIND>;
 
 /**
@@ -80,10 +90,9 @@ export const createPathResolver = (
 
   /** Load alias slugs of items placed within today +/- 7 days */
   const loadPrioritySet = async (): Promise<readonly string[]> => {
-    const fromDate = new Date(today.getTime() - DEFAULT_DATE_WINDOW_DAYS * 86400000);
-    const toDate = new Date(today.getTime() + DEFAULT_DATE_WINDOW_DAYS * 86400000);
-    const fromStr = formatDateStringForTimezone(fromDate, timezone);
-    const toStr = formatDateStringForTimezone(toDate, timezone);
+    const todayStr = formatDateStringForTimezone(today, timezone);
+    const fromStr = addDaysToDateString(todayStr, -DEFAULT_DATE_WINDOW_DAYS);
+    const toStr = addDaysToDateString(todayStr, DEFAULT_DATE_WINDOW_DAYS);
 
     const fromDay = parseCalendarDay(fromStr);
     const toDay = parseCalendarDay(toStr);
