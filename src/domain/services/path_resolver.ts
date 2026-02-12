@@ -28,8 +28,20 @@ import {
   resolveRelativeDate as resolveDateExpression,
 } from "./date_resolver.ts";
 import { resolvePrefix } from "./alias_prefix_service.ts";
+import { formatDateStringForTimezone } from "../../shared/timezone_format.ts";
 
 const PATH_RESOLVER_ERROR_KIND = "PathResolver" as const;
+const DEFAULT_DATE_WINDOW_DAYS = 7;
+
+/** Add days to a YYYY-MM-DD date string using calendar-day arithmetic */
+const addDaysToDateString = (dateStr: string, days: number): string => {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${
+    String(date.getDate()).padStart(2, "0")
+  }`;
+};
 
 export type PathResolverError = ValidationError<typeof PATH_RESOLVER_ERROR_KIND>;
 
@@ -67,65 +79,89 @@ export type PathResolverDependencies = Readonly<{
   readonly today?: Date; // For testing; defaults to new Date()
 }>;
 
-/** Try prefix resolution against all known aliases */
-const resolveAliasByPrefix = async (
-  token: string,
-  aliasRepository: AliasRepository,
-): Promise<Result<Placement, PathResolverError>> => {
-  const listResult = await aliasRepository.list();
-  if (listResult.type === "error") {
-    return Result.error(
-      createValidationError(PATH_RESOLVER_ERROR_KIND, [
-        createValidationIssue(
-          `failed to list aliases for prefix resolution: ${listResult.error.message}`,
-          { code: "alias_resolution_failed", path: [] },
-        ),
-      ]),
-    );
-  }
-
-  const allAliases = listResult.value;
-  const allAliasStrings = allAliases.map((a) => a.data.slug.toString());
-  const prefixResult = resolvePrefix(token, [], allAliasStrings);
-
-  if (prefixResult.kind === "single") {
-    const matched = allAliases.find(
-      (a) => a.data.slug.toString() === prefixResult.alias,
-    );
-    if (matched) {
-      return Result.ok(createItemPlacement(matched.data.itemId, []));
-    }
-  }
-
-  if (prefixResult.kind === "ambiguous") {
-    return Result.error(
-      createValidationError(PATH_RESOLVER_ERROR_KIND, [
-        createValidationIssue(
-          `ambiguous alias prefix '${token}': matches ${prefixResult.candidates.join(", ")}`,
-          { code: "ambiguous_alias_prefix", path: [] },
-        ),
-      ]),
-    );
-  }
-
-  return Result.error(
-    createValidationError(PATH_RESOLVER_ERROR_KIND, [
-      createValidationIssue(`alias '${token}' not found`, {
-        code: "alias_not_found",
-        path: [],
-      }),
-    ]),
-  );
-};
-
 /**
  * Create a PathResolver service
  */
 export const createPathResolver = (
   dependencies: PathResolverDependencies,
 ): PathResolver => {
-  const { aliasRepository, timezone } = dependencies;
+  const { aliasRepository, itemRepository, timezone } = dependencies;
   const today = dependencies.today ?? new Date();
+
+  /** Load alias slugs of items placed within today +/- 7 days */
+  const loadPrioritySet = async (): Promise<readonly string[]> => {
+    const todayStr = formatDateStringForTimezone(today, timezone);
+    const fromStr = addDaysToDateString(todayStr, -DEFAULT_DATE_WINDOW_DAYS);
+    const toStr = addDaysToDateString(todayStr, DEFAULT_DATE_WINDOW_DAYS);
+
+    const fromDay = parseCalendarDay(fromStr);
+    const toDay = parseCalendarDay(toStr);
+    if (fromDay.type === "error" || toDay.type === "error") {
+      return [];
+    }
+
+    const itemsResult = await itemRepository.listByPlacement(
+      createDateRange(fromDay.value, toDay.value),
+    );
+    if (itemsResult.type === "error") {
+      return [];
+    }
+
+    return itemsResult.value
+      .filter((item) => item.data.alias !== undefined)
+      .map((item) => item.data.alias!.toString());
+  };
+
+  /** Try prefix resolution against all known aliases, with priority set from recent items */
+  const resolveAliasByPrefix = async (
+    token: string,
+  ): Promise<Result<Placement, PathResolverError>> => {
+    const listResult = await aliasRepository.list();
+    if (listResult.type === "error") {
+      return Result.error(
+        createValidationError(PATH_RESOLVER_ERROR_KIND, [
+          createValidationIssue(
+            `failed to list aliases for prefix resolution: ${listResult.error.message}`,
+            { code: "alias_resolution_failed", path: [] },
+          ),
+        ]),
+      );
+    }
+
+    const allAliases = listResult.value;
+    const allAliasStrings = allAliases.map((a) => a.data.slug.toString());
+    const prioritySet = await loadPrioritySet();
+    const prefixResult = resolvePrefix(token, prioritySet, allAliasStrings);
+
+    if (prefixResult.kind === "single") {
+      const matched = allAliases.find(
+        (a) => a.data.slug.toString() === prefixResult.alias,
+      );
+      if (matched) {
+        return Result.ok(createItemPlacement(matched.data.itemId, []));
+      }
+    }
+
+    if (prefixResult.kind === "ambiguous") {
+      return Result.error(
+        createValidationError(PATH_RESOLVER_ERROR_KIND, [
+          createValidationIssue(
+            `ambiguous alias prefix '${token}': matches ${prefixResult.candidates.join(", ")}`,
+            { code: "ambiguous_alias_prefix", path: [] },
+          ),
+        ]),
+      );
+    }
+
+    return Result.error(
+      createValidationError(PATH_RESOLVER_ERROR_KIND, [
+        createValidationIssue(`alias '${token}' not found`, {
+          code: "alias_not_found",
+          path: [],
+        }),
+      ]),
+    );
+  };
 
   const resolveToken = async (
     token: PathToken,
@@ -146,7 +182,7 @@ export const createPathResolver = (
         // No more sections - try navigating to parent item
         if (context.stack.head.kind === "item") {
           // Load the item to get its placement (parent)
-          const itemResult = await dependencies.itemRepository.load(context.stack.head.id);
+          const itemResult = await itemRepository.load(context.stack.head.id);
           if (itemResult.type === "error") {
             return Result.error(
               createValidationError(PATH_RESOLVER_ERROR_KIND, [
@@ -252,7 +288,7 @@ export const createPathResolver = (
         }
 
         // Exact alias not found -- fall back to prefix resolution
-        return resolveAliasByPrefix(token.value, aliasRepository);
+        return resolveAliasByPrefix(token.value);
       }
 
       case "permanent": {
