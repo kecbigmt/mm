@@ -27,6 +27,8 @@ import {
   parseTimezoneIdentifier,
 } from "../primitives/mod.ts";
 import { Result } from "../../shared/result.ts";
+import { createRepositoryError } from "../repositories/repository_error.ts";
+import type { ItemRepository } from "../repositories/item_repository.ts";
 
 const TODAY = new Date("2026-02-11T00:00:00Z");
 
@@ -269,6 +271,50 @@ Deno.test("PathResolver priority - recent item without alias excluded from prior
 
   const resolver = createResolver();
   // No aliases in priority set → falls back to all items → matches bace-x7q
+  const expr = Result.unwrap(parsePathExpression("b"));
+  const result = await resolver.resolvePath(cwd, expr);
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.head.kind, "item");
+    if (result.value.head.kind === "item") {
+      assertEquals(result.value.head.id.toString(), "019a0000-0000-7000-8000-000000000001");
+    }
+  }
+});
+
+Deno.test("PathResolver priority - degrades gracefully when item repository fails", async () => {
+  const aliasRepository = new InMemoryAliasRepository();
+  const now = Result.unwrap(dateTimeFromDate(TODAY));
+  const today = Result.unwrap(parseCalendarDay("2026-02-11"));
+  const cwd = createDatePlacement(today, []);
+  const timezone = Result.unwrap(parseTimezoneIdentifier("UTC"));
+
+  // Item repository that fails on listByPlacement
+  const failingItemRepository: ItemRepository = {
+    load: () => Promise.resolve(Result.ok(undefined)),
+    save: () => Promise.resolve(Result.ok(undefined)),
+    delete: () => Promise.resolve(Result.ok(undefined)),
+    listByPlacement: () =>
+      Promise.resolve(
+        Result.error(createRepositoryError("item", "list", "simulated failure")),
+      ),
+  };
+
+  aliasRepository.set(createAlias({
+    slug: Result.unwrap(parseAliasSlug("bace-x7q")),
+    itemId: Result.unwrap(itemIdFromString("019a0000-0000-7000-8000-000000000001")),
+    createdAt: now,
+  }));
+
+  const resolver = createPathResolver({
+    itemRepository: failingItemRepository,
+    aliasRepository,
+    timezone,
+    today: TODAY,
+  });
+
+  // Priority set loading fails → empty priority set → falls back to all items
   const expr = Result.unwrap(parsePathExpression("b"));
   const result = await resolver.resolvePath(cwd, expr);
 
