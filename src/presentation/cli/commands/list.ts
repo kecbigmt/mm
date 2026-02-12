@@ -368,7 +368,8 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   // Create resolver function
   const resolveItemId: ItemIdResolver = (id: string): string | undefined => refItemAliasMap.get(id);
 
-  // Compute shortest unique prefix lengths for alias display highlighting
+  // Compute shortest unique prefix lengths for alias display highlighting.
+  // Uses the same two-tier scope as the resolver: priority set (today ±7d) and all aliases.
   const prefixLengthMap = await profileAsync("computePrefixLengths", async () => {
     const map = new Map<string, number>();
     const displayedAliases = items
@@ -377,21 +378,40 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
 
     if (displayedAliases.length === 0) return map;
 
-    if (locatorArg) {
-      // Custom range: compute prefix against all aliases
-      const allAliasesResult = await deps.aliasRepository.list();
-      if (allAliasesResult.type === "ok") {
-        const allAliasStrings = allAliasesResult.value.map((a) => a.data.slug.toString());
-        const sorted = [...allAliasStrings].sort();
-        for (const alias of displayedAliases) {
-          map.set(alias, shortestUniquePrefix(alias, sorted).length);
-        }
+    // Load priority set: all aliased items in today ±7d (unfiltered by status/type)
+    const todayStr = formatDateStringForTimezone(now, deps.timezone);
+    const psFromStr = addDaysToDateString(todayStr, -DEFAULT_DATE_WINDOW_DAYS);
+    const psToStr = addDaysToDateString(todayStr, DEFAULT_DATE_WINDOW_DAYS);
+    const psFromDay = parseCalendarDay(psFromStr);
+    const psToDay = parseCalendarDay(psToStr);
+
+    let prioritySetAliases: string[] = [];
+    if (psFromDay.type === "ok" && psToDay.type === "ok") {
+      const psResult = await deps.itemRepository.listByPlacement(
+        createDateRange(psFromDay.value, psToDay.value),
+      );
+      if (psResult.type === "ok") {
+        prioritySetAliases = psResult.value
+          .filter((item) => item.data.alias !== undefined)
+          .map((item) => item.data.alias!.toString());
       }
-    } else {
-      // Default range (priority set): compute prefix within displayed items
-      const sorted = [...displayedAliases].sort();
-      for (const alias of displayedAliases) {
-        map.set(alias, shortestUniquePrefix(alias, sorted).length);
+    }
+
+    // Load all aliases
+    const allAliasesResult = await deps.aliasRepository.list();
+    const allAliasStrings = allAliasesResult.type === "ok"
+      ? allAliasesResult.value.map((a) => a.data.slug.toString())
+      : [];
+
+    const sortedPrioritySet = [...prioritySetAliases].sort();
+    const sortedAllAliases = [...allAliasStrings].sort();
+    const prioritySetLookup = new Set(prioritySetAliases);
+
+    for (const alias of displayedAliases) {
+      if (prioritySetLookup.has(alias)) {
+        map.set(alias, shortestUniquePrefix(alias, sortedPrioritySet).length);
+      } else {
+        map.set(alias, shortestUniquePrefix(alias, sortedAllAliases).length);
       }
     }
 
