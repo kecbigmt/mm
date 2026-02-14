@@ -6,7 +6,8 @@ import { formatItemDetail } from "../formatters/item_detail_formatter.ts";
 import type { ItemIdResolver } from "../formatters/list_formatter.ts";
 import { outputWithPager } from "../pager.ts";
 import { parseItemId } from "../../../domain/primitives/item_id.ts";
-import { parseAliasSlug } from "../../../domain/primitives/alias_slug.ts";
+import { createItemLocatorService } from "../../../domain/services/item_locator_service.ts";
+import { createValidationError, createValidationIssue } from "../../../shared/errors.ts";
 
 export function createShowCommand() {
   return new Command()
@@ -31,41 +32,42 @@ export function createShowCommand() {
 
       const deps = depsResult.value;
 
-      // Try to resolve item by UUID first, then by alias
-      let item = undefined;
-      const uuidResult = parseItemId(itemLocator);
-
-      if (uuidResult.type === "ok") {
-        const loadResult = await deps.itemRepository.load(uuidResult.value);
-        if (loadResult.type === "error") {
-          console.error(formatError(loadResult.error, debug));
-          Deno.exit(1);
+      const locatorService = createItemLocatorService({
+        itemRepository: deps.itemRepository,
+        aliasRepository: deps.aliasRepository,
+        timezone: deps.timezone,
+      });
+      const resolveResult = await locatorService.resolve(itemLocator);
+      if (resolveResult.type === "error") {
+        const locatorError = resolveResult.error;
+        if (locatorError.kind === "repository_error") {
+          console.error(formatError(locatorError.error, debug));
+        } else if (locatorError.kind === "ambiguous_prefix") {
+          console.error(formatError(
+            createValidationError("ItemLocator", [
+              createValidationIssue(
+                `Ambiguous prefix '${locatorError.locator}': matches ${
+                  locatorError.candidates.join(", ")
+                }`,
+                { code: "ambiguous_prefix" },
+              ),
+            ]),
+            debug,
+          ));
+        } else {
+          console.error(formatError(
+            createValidationError("ItemLocator", [
+              createValidationIssue(`Item not found: ${locatorError.locator}`, {
+                code: "not_found",
+              }),
+            ]),
+            debug,
+          ));
         }
-        item = loadResult.value;
-      } else {
-        const aliasResult = parseAliasSlug(itemLocator);
-        if (aliasResult.type === "ok") {
-          const aliasLoadResult = await deps.aliasRepository.load(aliasResult.value);
-          if (aliasLoadResult.type === "error") {
-            console.error(formatError(aliasLoadResult.error, debug));
-            Deno.exit(1);
-          }
-          const alias = aliasLoadResult.value;
-          if (alias) {
-            const itemLoadResult = await deps.itemRepository.load(alias.data.itemId);
-            if (itemLoadResult.type === "error") {
-              console.error(formatError(itemLoadResult.error, debug));
-              Deno.exit(1);
-            }
-            item = itemLoadResult.value;
-          }
-        }
-      }
-
-      if (!item) {
-        console.error(formatError(new Error(`Item not found: ${itemLocator}`), debug));
         Deno.exit(1);
       }
+
+      const item = resolveResult.value;
 
       // Build a resolver for project/context ItemIds
       const refItemAliasMap = new Map<string, string>();

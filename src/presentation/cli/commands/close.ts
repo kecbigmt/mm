@@ -54,6 +54,7 @@ export function createCloseCommand() {
         itemIds: ids,
         action: "close",
         occurredAt: occurredAtResult.value,
+        timezone: deps.timezone,
       }, {
         itemRepository: deps.itemRepository,
         aliasRepository: deps.aliasRepository,
