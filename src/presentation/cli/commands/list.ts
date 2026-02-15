@@ -379,24 +379,11 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
 
   // Compute prefix lengths from displayed items only (no extra I/O).
   const getPrefixLength = profileSync("computePrefixLengths", () => {
-    const displayedAliases = items
+    const sortedAliases = items
       .map((item) => item.data.alias?.toString())
-      .filter((a): a is string => a !== undefined);
-
-    if (displayedAliases.length === 0) {
-      return createPrefixLengthResolver({
-        sortedPrioritySet: [],
-        sortedAllAliases: [],
-        prioritySetLookup: new Set(),
-      });
-    }
-
-    const sorted = [...displayedAliases].sort();
-    return createPrefixLengthResolver({
-      sortedPrioritySet: sorted,
-      sortedAllAliases: sorted,
-      prioritySetLookup: new Set(displayedAliases),
-    });
+      .filter((a): a is string => a !== undefined)
+      .sort();
+    return createPrefixLengthResolver(sortedAliases);
   });
 
   // Build display label function for item sections
