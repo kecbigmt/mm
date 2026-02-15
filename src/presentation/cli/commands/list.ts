@@ -37,8 +37,11 @@ import {
   profileSync,
 } from "../../../shared/profiler.ts";
 import { itemTypeEnum } from "../types.ts";
-import { shortestUniquePrefix } from "../../../domain/services/alias_prefix_service.ts";
 import type { Item } from "../../../domain/models/item.ts";
+import {
+  type AliasPrefixData,
+  createPrefixLengthResolver,
+} from "../formatters/alias_prefix_resolver.ts";
 
 type ListOptions = {
   workspace?: string;
@@ -377,17 +380,9 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   // Create resolver function
   const resolveItemId: ItemIdResolver = (id: string): string | undefined => refItemAliasMap.get(id);
 
-  // Compute shortest unique prefix lengths for alias display highlighting.
-  // Uses the same two-tier scope as the resolver: priority set (today ±7d) and all aliases.
-  const prefixLengthMap = await profileAsync("computePrefixLengths", async () => {
-    const map = new Map<string, number>();
-    const displayedAliases = items
-      .map((item) => item.data.alias?.toString())
-      .filter((a): a is string => a !== undefined);
-
-    if (displayedAliases.length === 0) return map;
-
-    // Load priority set: all aliased items in today ±7d (unfiltered by status/type)
+  // Load alias data for prefix highlighting (two-tier: priority set + all aliases).
+  // Priority set = aliased items in today +/-7d; other aliases fall back to the full set.
+  const getPrefixLength = await profileAsync("computePrefixLengths", async () => {
     const todayStr = formatDateStringForTimezone(now, deps.timezone);
     const psFromStr = addDaysToDateString(todayStr, -DEFAULT_DATE_WINDOW_DAYS);
     const psToStr = addDaysToDateString(todayStr, DEFAULT_DATE_WINDOW_DAYS);
@@ -406,25 +401,18 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
       }
     }
 
-    // Load all aliases
     const allAliasesResult = await deps.aliasRepository.list();
     const allAliasStrings = allAliasesResult.type === "ok"
       ? allAliasesResult.value.map((a) => a.data.slug.toString())
       : [];
 
-    const sortedPrioritySet = [...prioritySetAliases].sort();
-    const sortedAllAliases = [...allAliasStrings].sort();
-    const prioritySetLookup = new Set(prioritySetAliases);
+    const prefixData: AliasPrefixData = {
+      sortedPrioritySet: [...prioritySetAliases].sort(),
+      sortedAllAliases: [...allAliasStrings].sort(),
+      prioritySetLookup: new Set(prioritySetAliases),
+    };
 
-    for (const alias of displayedAliases) {
-      if (prioritySetLookup.has(alias)) {
-        map.set(alias, shortestUniquePrefix(alias, sortedPrioritySet).length);
-      } else {
-        map.set(alias, shortestUniquePrefix(alias, sortedAllAliases).length);
-      }
-    }
-
-    return map;
+    return createPrefixLengthResolver(prefixData);
   });
 
   // Build display label function for item sections
@@ -500,7 +488,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
         ? item.data.placement.head.date.toString()
         : undefined;
       const alias = item.data.alias?.toString();
-      const prefixLen = alias ? prefixLengthMap.get(alias) : undefined;
+      const prefixLen = alias ? getPrefixLength(alias) : undefined;
       const lineContext: ItemLineContext = {
         dateStr,
         resolveItemId,
