@@ -1,10 +1,10 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { parseItemId } from "../../../domain/primitives/item_id.ts";
-import { parseAliasSlug } from "../../../domain/primitives/alias_slug.ts";
 import { deriveFilePathFromId } from "../../../infrastructure/fileSystem/item_repository.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
+import { createItemLocatorService } from "../../../domain/services/item_locator_service.ts";
+import { createValidationError, createValidationIssue } from "../../../shared/errors.ts";
 
 const formatItemLabel = (
   item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
@@ -30,43 +30,42 @@ export function createWhereCommand() {
 
       const deps = depsResult.value;
 
-      // Try to resolve as UUID first, then as alias
-      let item;
-      const uuidResult = parseItemId(itemRef);
-
-      if (uuidResult.type === "ok") {
-        // It's a valid UUID
-        const loadResult = await deps.itemRepository.load(uuidResult.value);
-        if (loadResult.type === "error") {
-          console.error(formatError(loadResult.error, debug));
-          return;
+      const locatorService = createItemLocatorService({
+        itemRepository: deps.itemRepository,
+        aliasRepository: deps.aliasRepository,
+        timezone: deps.timezone,
+      });
+      const resolveResult = await locatorService.resolve(itemRef);
+      if (resolveResult.type === "error") {
+        const locatorError = resolveResult.error;
+        if (locatorError.kind === "repository_error") {
+          console.error(formatError(locatorError.error, debug));
+        } else if (locatorError.kind === "ambiguous_prefix") {
+          console.error(formatError(
+            createValidationError("ItemLocator", [
+              createValidationIssue(
+                `Ambiguous prefix '${locatorError.locator}': matches ${
+                  locatorError.candidates.join(", ")
+                }`,
+                { code: "ambiguous_prefix" },
+              ),
+            ]),
+            debug,
+          ));
+        } else {
+          console.error(formatError(
+            createValidationError("ItemLocator", [
+              createValidationIssue(`Item not found: ${locatorError.locator}`, {
+                code: "not_found",
+              }),
+            ]),
+            debug,
+          ));
         }
-        item = loadResult.value;
-      } else {
-        // Try as alias
-        const aliasResult = parseAliasSlug(itemRef);
-        if (aliasResult.type === "ok") {
-          const aliasLoadResult = await deps.aliasRepository.load(aliasResult.value);
-          if (aliasLoadResult.type === "error") {
-            console.error(formatError(aliasLoadResult.error, debug));
-            return;
-          }
-          const alias = aliasLoadResult.value;
-          if (alias) {
-            const itemLoadResult = await deps.itemRepository.load(alias.data.itemId);
-            if (itemLoadResult.type === "error") {
-              console.error(formatError(itemLoadResult.error, debug));
-              return;
-            }
-            item = itemLoadResult.value;
-          }
-        }
-      }
-
-      if (!item) {
-        console.error(`Item not found: ${itemRef}`);
         return;
       }
+
+      const item = resolveResult.value;
 
       const label = formatItemLabel(item);
       console.log(`Item [${label}]:`);

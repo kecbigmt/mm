@@ -26,6 +26,20 @@ export type ListFormatterOptions = Readonly<{
 export type ItemIdResolver = (id: string) => string | undefined;
 
 /**
+ * Per-item context for formatting a single item line.
+ * Groups optional parameters that vary per item (as opposed to ListFormatterOptions
+ * which are shared across all items in a single list render).
+ */
+export type ItemLineContext = Readonly<{
+  /** Date string (YYYY-MM-DD) for the item's placement day, used in print mode */
+  dateStr?: string;
+  /** Resolver for project/context ItemId UUIDs to display aliases */
+  resolveItemId?: ItemIdResolver;
+  /** Number of characters in the shortest unique prefix for alias highlighting */
+  prefixLength?: number;
+}>;
+
+/**
  * Returns the symbol for an item based on its type, status, and snoozing state.
  *
  * Type symbols (when open and not snoozing):
@@ -194,9 +208,9 @@ const formatItemLinePrintMode = (
   item: Item,
   timezone: TimezoneIdentifier,
   isSnoozing: boolean,
-  dateStr?: string,
-  resolveItemId?: ItemIdResolver,
+  context: ItemLineContext,
 ): string => {
+  const { dateStr, resolveItemId } = context;
   const { icon, status, alias, title } = item.data;
   const parts: string[] = [];
 
@@ -231,13 +245,22 @@ const formatItemLineColoredMode = (
   item: Item,
   timezone: TimezoneIdentifier,
   isSnoozing: boolean,
-  resolveItemId?: ItemIdResolver,
+  context: ItemLineContext,
 ): string => {
+  const { resolveItemId, prefixLength } = context;
   const { icon, status, alias, title } = item.data;
   const parts: string[] = [];
 
   parts.push(formatItemIcon(icon, status, isSnoozing));
-  parts.push(cyan(alias?.toString() ?? item.data.id.toString()));
+
+  const aliasStr = alias?.toString();
+  if (aliasStr && prefixLength !== undefined && prefixLength > 0) {
+    const prefix = aliasStr.slice(0, prefixLength);
+    const rest = aliasStr.slice(prefixLength);
+    parts.push(bold(cyan(prefix)) + dim(cyan(rest)));
+  } else {
+    parts.push(cyan(aliasStr ?? item.data.id.toString()));
+  }
 
   if (icon.toString() === "event") {
     const timeStr = formatEventTimeString(item, timezone);
@@ -260,16 +283,15 @@ const formatItemLineColoredMode = (
 export const formatItemLine = (
   item: Item,
   options: ListFormatterOptions,
-  dateStr?: string,
-  resolveItemId?: ItemIdResolver,
+  context: ItemLineContext = {},
 ): string => {
   const { printMode, timezone, now } = options;
   const isSnoozing = item.isSnoozing(now);
 
   if (printMode) {
-    return formatItemLinePrintMode(item, timezone, isSnoozing, dateStr, resolveItemId);
+    return formatItemLinePrintMode(item, timezone, isSnoozing, context);
   }
-  return formatItemLineColoredMode(item, timezone, isSnoozing, resolveItemId);
+  return formatItemLineColoredMode(item, timezone, isSnoozing, context);
 };
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;

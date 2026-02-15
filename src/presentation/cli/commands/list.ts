@@ -24,6 +24,7 @@ import {
   formatItemLine,
   formatSectionStub,
   type ItemIdResolver,
+  type ItemLineContext,
   type ListFormatterOptions,
 } from "../formatters/list_formatter.ts";
 import { outputWithPager } from "../pager.ts";
@@ -36,6 +37,7 @@ import {
   profileSync,
 } from "../../../shared/profiler.ts";
 import { itemTypeEnum } from "../types.ts";
+import { shortestUniquePrefix } from "../../../domain/services/alias_prefix_service.ts";
 
 type ListOptions = {
   workspace?: string;
@@ -366,6 +368,56 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   // Create resolver function
   const resolveItemId: ItemIdResolver = (id: string): string | undefined => refItemAliasMap.get(id);
 
+  // Compute shortest unique prefix lengths for alias display highlighting.
+  // Uses the same two-tier scope as the resolver: priority set (today ±7d) and all aliases.
+  const prefixLengthMap = await profileAsync("computePrefixLengths", async () => {
+    const map = new Map<string, number>();
+    const displayedAliases = items
+      .map((item) => item.data.alias?.toString())
+      .filter((a): a is string => a !== undefined);
+
+    if (displayedAliases.length === 0) return map;
+
+    // Load priority set: all aliased items in today ±7d (unfiltered by status/type)
+    const todayStr = formatDateStringForTimezone(now, deps.timezone);
+    const psFromStr = addDaysToDateString(todayStr, -DEFAULT_DATE_WINDOW_DAYS);
+    const psToStr = addDaysToDateString(todayStr, DEFAULT_DATE_WINDOW_DAYS);
+    const psFromDay = parseCalendarDay(psFromStr);
+    const psToDay = parseCalendarDay(psToStr);
+
+    let prioritySetAliases: string[] = [];
+    if (psFromDay.type === "ok" && psToDay.type === "ok") {
+      const psResult = await deps.itemRepository.listByPlacement(
+        createDateRange(psFromDay.value, psToDay.value),
+      );
+      if (psResult.type === "ok") {
+        prioritySetAliases = psResult.value
+          .filter((item) => item.data.alias !== undefined)
+          .map((item) => item.data.alias!.toString());
+      }
+    }
+
+    // Load all aliases
+    const allAliasesResult = await deps.aliasRepository.list();
+    const allAliasStrings = allAliasesResult.type === "ok"
+      ? allAliasesResult.value.map((a) => a.data.slug.toString())
+      : [];
+
+    const sortedPrioritySet = [...prioritySetAliases].sort();
+    const sortedAllAliases = [...allAliasStrings].sort();
+    const prioritySetLookup = new Set(prioritySetAliases);
+
+    for (const alias of displayedAliases) {
+      if (prioritySetLookup.has(alias)) {
+        map.set(alias, shortestUniquePrefix(alias, sortedPrioritySet).length);
+      } else {
+        map.set(alias, shortestUniquePrefix(alias, sortedAllAliases).length);
+      }
+    }
+
+    return map;
+  });
+
   // Build display label function for item sections
   const getDisplayLabel = (
     parent: ReturnType<typeof createPlacement>,
@@ -449,7 +501,16 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
         const dateStr = item.data.placement.head.kind === "date"
           ? item.data.placement.head.date.toString()
           : undefined;
-        outputLines.push(formatItemLine(item, formatterOptions, dateStr, resolveItemId));
+        const alias = item.data.alias?.toString();
+        const prefixLen = alias ? prefixLengthMap.get(alias) : undefined;
+        const lineContext: ItemLineContext = {
+          dateStr,
+          resolveItemId,
+          prefixLength: prefixLen,
+        };
+        outputLines.push(
+          formatItemLine(item, formatterOptions, lineContext),
+        );
       }
 
       // Format stubs

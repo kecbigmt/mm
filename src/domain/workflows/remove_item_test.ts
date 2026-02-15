@@ -1,7 +1,12 @@
 import { assertEquals } from "@std/assert";
 import { RemoveItemWorkflow } from "./remove_item.ts";
 import { createItem } from "../models/item.ts";
-import { createItemIcon, dateTimeFromDate, itemStatusOpen } from "../primitives/mod.ts";
+import {
+  createItemIcon,
+  dateTimeFromDate,
+  itemStatusOpen,
+  parseTimezoneIdentifier,
+} from "../primitives/mod.ts";
 import { itemIdFromString } from "../primitives/item_id.ts";
 import { itemTitleFromString } from "../primitives/item_title.ts";
 import { itemRankFromString } from "../primitives/item_rank.ts";
@@ -12,6 +17,7 @@ import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.t
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
 
 const createAliasRepository = (): InMemoryAliasRepository => new InMemoryAliasRepository();
+const testTimezone = Result.unwrap(parseTimezoneIdentifier("UTC"));
 
 async function createTestItem(id: string, alias?: string) {
   // Use actual UUID v7 format for testing
@@ -45,6 +51,7 @@ Deno.test("RemoveItemWorkflow - remove single item by ID", async () => {
 
   const result = await RemoveItemWorkflow.execute({
     itemIds: [item.data.id.toString()],
+    timezone: testTimezone,
   }, {
     itemRepository: repository,
     aliasRepository: createAliasRepository(),
@@ -82,6 +89,7 @@ Deno.test("RemoveItemWorkflow - remove single item by alias", async () => {
 
   const result = await RemoveItemWorkflow.execute({
     itemIds: ["meeting"],
+    timezone: testTimezone,
   }, {
     itemRepository,
     aliasRepository,
@@ -111,6 +119,7 @@ Deno.test("RemoveItemWorkflow - remove multiple items", async () => {
 
   const result = await RemoveItemWorkflow.execute({
     itemIds: [item1.data.id.toString(), item2.data.id.toString()],
+    timezone: testTimezone,
   }, {
     itemRepository: repository,
     aliasRepository: createAliasRepository(),
@@ -152,6 +161,7 @@ Deno.test("RemoveItemWorkflow - mixed IDs and aliases", async () => {
 
   const result = await RemoveItemWorkflow.execute({
     itemIds: ["task-1", item2.data.id.toString()],
+    timezone: testTimezone,
   }, {
     itemRepository,
     aliasRepository,
@@ -174,6 +184,7 @@ Deno.test("RemoveItemWorkflow - partial failure", async () => {
 
   const result = await RemoveItemWorkflow.execute({
     itemIds: [item1.data.id.toString(), nonExistentId],
+    timezone: testTimezone,
   }, {
     itemRepository: repository,
     aliasRepository: createAliasRepository(),
@@ -193,6 +204,7 @@ Deno.test("RemoveItemWorkflow - empty item list", async () => {
 
   const result = await RemoveItemWorkflow.execute({
     itemIds: [],
+    timezone: testTimezone,
   }, {
     itemRepository: repository,
     aliasRepository: createAliasRepository(),
@@ -210,6 +222,7 @@ Deno.test("RemoveItemWorkflow - item not found", async () => {
 
   const result = await RemoveItemWorkflow.execute({
     itemIds: [nonExistentId],
+    timezone: testTimezone,
   }, {
     itemRepository: repository,
     aliasRepository: createAliasRepository(),
