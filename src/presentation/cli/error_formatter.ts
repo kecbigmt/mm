@@ -1,5 +1,10 @@
-import { ValidationError } from "../../shared/errors.ts";
+import {
+  createValidationError,
+  createValidationIssue,
+  ValidationError,
+} from "../../shared/errors.ts";
 import { bold, red } from "@std/fmt/colors";
+import type { ItemLocatorError } from "../../domain/services/item_locator_service.ts";
 
 const ERROR_PREFIX = `${bold(red("error"))}: `;
 
@@ -77,4 +82,33 @@ export function formatError(error: unknown, isDebug = false): string {
     // Normal mode: don't expose internal error details
     return `${ERROR_PREFIX}An unexpected error occurred.`;
   }
+}
+
+/**
+ * Convert an ItemLocatorError into a formatted error string.
+ * Centralizes the mapping from locator error variants to user-facing messages.
+ */
+export function formatLocatorError(error: ItemLocatorError, isDebug: boolean): string {
+  if (error.kind === "repository_error") {
+    return formatError(error.error, isDebug);
+  }
+  if (error.kind === "ambiguous_prefix") {
+    return formatError(
+      createValidationError("ItemLocator", [
+        createValidationIssue(
+          `Ambiguous prefix '${error.locator}': matches ${error.candidates.join(", ")}`,
+          { code: "ambiguous_prefix" },
+        ),
+      ]),
+      isDebug,
+    );
+  }
+  return formatError(
+    createValidationError("ItemLocator", [
+      createValidationIssue(`Item not found: ${error.locator}`, {
+        code: "not_found",
+      }),
+    ]),
+    isDebug,
+  );
 }

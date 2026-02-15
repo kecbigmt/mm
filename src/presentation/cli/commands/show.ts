@@ -1,13 +1,12 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { formatError } from "../error_formatter.ts";
+import { formatError, formatLocatorError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import { formatItemDetail } from "../formatters/item_detail_formatter.ts";
 import type { ItemIdResolver } from "../formatters/list_formatter.ts";
 import { outputWithPager } from "../pager.ts";
 import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import { createItemLocatorService } from "../../../domain/services/item_locator_service.ts";
-import { createValidationError, createValidationIssue } from "../../../shared/errors.ts";
 
 export function createShowCommand() {
   return new Command()
@@ -39,31 +38,7 @@ export function createShowCommand() {
       });
       const resolveResult = await locatorService.resolve(itemLocator);
       if (resolveResult.type === "error") {
-        const locatorError = resolveResult.error;
-        if (locatorError.kind === "repository_error") {
-          console.error(formatError(locatorError.error, debug));
-        } else if (locatorError.kind === "ambiguous_prefix") {
-          console.error(formatError(
-            createValidationError("ItemLocator", [
-              createValidationIssue(
-                `Ambiguous prefix '${locatorError.locator}': matches ${
-                  locatorError.candidates.join(", ")
-                }`,
-                { code: "ambiguous_prefix" },
-              ),
-            ]),
-            debug,
-          ));
-        } else {
-          console.error(formatError(
-            createValidationError("ItemLocator", [
-              createValidationIssue(`Item not found: ${locatorError.locator}`, {
-                code: "not_found",
-              }),
-            ]),
-            debug,
-          ));
-        }
+        console.error(formatLocatorError(resolveResult.error, debug));
         Deno.exit(1);
       }
 
