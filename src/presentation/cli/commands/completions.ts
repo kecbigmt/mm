@@ -79,7 +79,7 @@ _mm() {
         'workspace:Workspace management'
         'cd:Navigate to location in knowledge graph'
         'pwd:Show current location in knowledge graph'
-        'where:Show logical and physical paths for an item'
+        'where:Print the physical file path for an item'
         'snooze:Snooze item until a future datetime'
         'doctor:Workspace validation and maintenance'
         'sync:Sync with remote repository'
