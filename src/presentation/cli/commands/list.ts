@@ -38,10 +38,7 @@ import {
 } from "../../../shared/profiler.ts";
 import { itemTypeEnum } from "../types.ts";
 import type { Item } from "../../../domain/models/item.ts";
-import {
-  type AliasPrefixData,
-  createPrefixLengthResolver,
-} from "../formatters/alias_prefix_resolver.ts";
+import { createPrefixLengthResolver } from "../formatters/alias_prefix_resolver.ts";
 
 type ListOptions = {
   workspace?: string;
@@ -380,49 +377,13 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   // Create resolver function
   const resolveItemId: ItemIdResolver = (id: string): string | undefined => refItemAliasMap.get(id);
 
-  // Load alias data for prefix highlighting (two-tier: priority set + all aliases).
-  // Priority set = aliased items in today +/-7d; other aliases fall back to the full set.
-  const getPrefixLength = await profileAsync("computePrefixLengths", async () => {
-    // Load all aliases first; if none exist, skip the priority set query entirely.
-    const allAliasesResult = await deps.aliasRepository.list();
-    const allAliasStrings = allAliasesResult.type === "ok"
-      ? allAliasesResult.value.map((a) => a.data.slug.toString())
-      : [];
-
-    if (allAliasStrings.length === 0) {
-      return createPrefixLengthResolver({
-        sortedPrioritySet: [],
-        sortedAllAliases: [],
-        prioritySetLookup: new Set(),
-      });
-    }
-
-    // Load priority set: all aliased items in today ±7d (unfiltered by status/type)
-    const todayStr = formatDateStringForTimezone(now, deps.timezone);
-    const psFromStr = addDaysToDateString(todayStr, -DEFAULT_DATE_WINDOW_DAYS);
-    const psToStr = addDaysToDateString(todayStr, DEFAULT_DATE_WINDOW_DAYS);
-    const psFromDay = parseCalendarDay(psFromStr);
-    const psToDay = parseCalendarDay(psToStr);
-
-    let prioritySetAliases: string[] = [];
-    if (psFromDay.type === "ok" && psToDay.type === "ok") {
-      const psResult = await deps.itemRepository.listByPlacement(
-        createDateRange(psFromDay.value, psToDay.value),
-      );
-      if (psResult.type === "ok") {
-        prioritySetAliases = psResult.value
-          .filter((item) => item.data.alias !== undefined)
-          .map((item) => item.data.alias!.toString());
-      }
-    }
-
-    const prefixData: AliasPrefixData = {
-      sortedPrioritySet: [...prioritySetAliases].sort(),
-      sortedAllAliases: [...allAliasStrings].sort(),
-      prioritySetLookup: new Set(prioritySetAliases),
-    };
-
-    return createPrefixLengthResolver(prefixData);
+  // Compute prefix lengths from displayed items only (no extra I/O).
+  const getPrefixLength = profileSync("computePrefixLengths", () => {
+    const sortedAliases = items
+      .map((item) => item.data.alias?.toString())
+      .filter((a): a is string => a !== undefined)
+      .sort();
+    return createPrefixLengthResolver(sortedAliases);
   });
 
   // Build display label function for item sections

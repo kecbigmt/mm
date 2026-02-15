@@ -147,10 +147,57 @@ All acceptance criteria verified via automated tests and code review:
 
 **Next:** Code Review
 
+### Refactoring (post-perf-fix)
+
+**Status: Complete - Ready for Verify**
+**Applied:** [Simplify `createPrefixLengthResolver` API]: After the perf fix removed the two-tier priority-set/all-aliases I/O, the caller always passed identical data for both tiers. Removed the `AliasPrefixData` type and its three fields; the factory now accepts a single `readonly string[]`. (Simplify, single responsibility, loose coupling)
+**Design:** Eliminated dead two-tier branching logic and the `prioritySetLookup` set. Caller in `list.ts` reduced from 14 lines to 5 lines. Test count reduced from 4 to 3 (removed the two-tier fallback test which tested now-removed behavior).
+**Quality:** Tests passing (3), Linting clean (262 files), Formatting clean
+**Next:** Verify
+
+### Verification (post-perf-fix and refactor)
+
+**Status: Verified - Ready for Code Review**
+
+**Date:** 2026-02-16
+
+**Acceptance Criteria:**
+
+1. **Performance restored**:
+   - **PASS**: CI benchmark shows 90.9ms (target: ~90ms, was 173ms before fix)
+   - Evidence: `deno bench` output shows average time of 90.9ms for 500-item workspace with single date query (10 matches)
+
+2. **All tests pass**:
+   - **PASS**: `deno task test` completed with 954 passing tests
+   - Known failures: 3 shell completion tests (zsh/bash not available in NixOS environment - expected)
+   - Evidence: Test output shows all domain, workflow, presentation, and E2E tests passing
+
+3. **Clean lint/fmt**:
+   - **PASS**: `deno lint` - 262 files checked, no issues
+   - **PASS**: `deno fmt --check` - 264 files checked, no issues
+   - Evidence: Both commands completed without errors or warnings
+
+4. **Prefix highlighting still works**:
+   - **PASS**: Code review confirms correct implementation
+   - Evidence:
+     - `list.ts` lines 382-386: Creates `sortedAliases` from displayed items only (no I/O)
+     - `alias_prefix_resolver.ts`: Simplified to single-parameter API accepting sorted alias array
+     - `alias_prefix_resolver_test.ts`: All 3 tests passing, covering empty data, prefix computation, and caching
+     - `getPrefixLength` resolver passed to `formatItems` which is used for both main listing and expanded sections
+
+**Implementation Quality:**
+- No debug code: Only legitimate console.log/error for user output in tests
+- No uncontextualized TODOs: Clean codebase
+- Simplified API: Refactored from 3-field `AliasPrefixData` to single `readonly string[]` parameter
+
+**Next:** Code Review
+
 ### Follow-ups / Open Risks
 
 #### Addressed
 - Depth expansion implemented with per-section async queries (acceptable perf for typical section counts)
+- Performance regression fixed: O(n) I/O removed from prefix computation
+- Prefix resolver API simplified after removing dead two-tier logic
 
 #### Remaining
 - Depth > 1 not yet tested with deeply nested sections in E2E (unit test coverage only)
