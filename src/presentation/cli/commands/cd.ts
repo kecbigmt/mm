@@ -24,8 +24,9 @@ async function saveAndDisplayPlacement(
   placement: Placement,
   deps: SaveAndDisplayDeps,
   debug: boolean,
+  previousPlacement?: Placement,
 ): Promise<boolean> {
-  const saveResult = await CwdResolutionService.setCwd(placement, deps);
+  const saveResult = await CwdResolutionService.setCwd(placement, deps, previousPlacement);
   if (saveResult.type === "error") {
     console.error(formatError(saveResult.error, debug));
     return false;
@@ -60,8 +61,14 @@ export function createCdCommand() {
 
       const deps = depsResult.value;
       const now = new Date();
+      const cwdDeps = {
+        sessionRepository: deps.sessionRepository,
+        workspacePath: deps.root,
+        itemRepository: deps.itemRepository,
+        timezone: deps.timezone,
+      };
 
-      if (!pathArg) {
+      if (!pathArg || pathArg === "~") {
         // Navigate to today's date (home) - matching bash cd behavior
         const todayPlacementResult = CwdResolutionService.createTodayPlacement(now, deps.timezone);
         if (todayPlacementResult.type === "error") {
@@ -69,21 +76,38 @@ export function createCdCommand() {
           return;
         }
 
-        await saveAndDisplayPlacement(todayPlacementResult.value, {
-          sessionRepository: deps.sessionRepository,
-          workspacePath: deps.root,
-          itemRepository: deps.itemRepository,
-        }, debug);
+        // Load current cwd to save as previous
+        const cwdResult = await CwdResolutionService.getCwd(cwdDeps);
+        const currentPlacement = cwdResult.type === "ok" ? cwdResult.value.placement : undefined;
+
+        await saveAndDisplayPlacement(
+          todayPlacementResult.value,
+          cwdDeps,
+          debug,
+          currentPlacement,
+        );
+        return;
+      }
+
+      if (pathArg === "-") {
+        // Navigate to previous directory - matching bash cd - behavior
+        const previousResult = await CwdResolutionService.getPreviousCwd(cwdDeps);
+        if (previousResult.type === "error") {
+          console.error(formatError(previousResult.error, debug));
+          Deno.exitCode = 1;
+          return;
+        }
+
+        // Load current cwd to save as previous (for toggle behavior)
+        const cwdResult = await CwdResolutionService.getCwd(cwdDeps);
+        const currentPlacement = cwdResult.type === "ok" ? cwdResult.value.placement : undefined;
+
+        await saveAndDisplayPlacement(previousResult.value, cwdDeps, debug, currentPlacement);
         return;
       }
 
       // Get current placement
-      const cwdPlacementResult = await CwdResolutionService.getCwd({
-        sessionRepository: deps.sessionRepository,
-        workspacePath: deps.root,
-        itemRepository: deps.itemRepository,
-        timezone: deps.timezone,
-      });
+      const cwdPlacementResult = await CwdResolutionService.getCwd(cwdDeps);
       if (cwdPlacementResult.type === "error") {
         console.error(formatError(cwdPlacementResult.error, debug));
         return;
@@ -131,10 +155,11 @@ export function createCdCommand() {
         return;
       }
 
-      await saveAndDisplayPlacement(validateResult.value, {
-        sessionRepository: deps.sessionRepository,
-        workspacePath: deps.root,
-        itemRepository: deps.itemRepository,
-      }, debug);
+      await saveAndDisplayPlacement(
+        validateResult.value,
+        cwdDeps,
+        debug,
+        cwdPlacementResult.value.placement,
+      );
     });
 }

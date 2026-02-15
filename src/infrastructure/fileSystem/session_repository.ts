@@ -7,6 +7,7 @@ import { SessionData, SessionRepository } from "../../domain/repositories/sessio
 type SessionFileContent = Readonly<{
   workspace: string;
   cwd: string;
+  previousCwd?: string;
 }>;
 
 const readSessionFile = async (

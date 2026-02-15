@@ -245,6 +245,134 @@ Deno.test("CwdResolutionService.setCwd overwrites existing session", async () =>
   assertEquals(savedData?.cwd, "permanent");
 });
 
+Deno.test("CwdResolutionService.setCwd saves previousCwd when previousPlacement is provided", async () => {
+  const sessionRepo = createFakeSessionRepository(null);
+  const placement = parsePlacement("permanent");
+  assert(placement.type === "ok");
+  const previous = parsePlacement("2024-12-25");
+  assert(previous.type === "ok");
+
+  const result = await CwdResolutionService.setCwd(placement.value, {
+    sessionRepository: sessionRepo,
+    workspacePath,
+  }, previous.value);
+
+  assert(result.type === "ok", "operation should succeed");
+  const savedData = sessionRepo.getData();
+  assertEquals(savedData?.cwd, "permanent");
+  assertEquals(savedData?.previousCwd, "2024-12-25");
+});
+
+Deno.test("CwdResolutionService.setCwd omits previousCwd when previousPlacement is undefined", async () => {
+  const sessionRepo = createFakeSessionRepository(null);
+  const placement = parsePlacement("2024-12-25");
+  assert(placement.type === "ok");
+
+  const result = await CwdResolutionService.setCwd(placement.value, {
+    sessionRepository: sessionRepo,
+    workspacePath,
+  });
+
+  assert(result.type === "ok", "operation should succeed");
+  const savedData = sessionRepo.getData();
+  assertEquals(savedData?.cwd, "2024-12-25");
+  assertEquals(savedData?.previousCwd, undefined);
+});
+
+// ============================================================================
+// getPreviousCwd tests - reads previous directory from session
+// ============================================================================
+
+Deno.test("CwdResolutionService.getPreviousCwd returns previous placement from session", async () => {
+  const itemRepo = createMockItemRepository(new Map());
+  const sessionRepo = createFakeSessionRepository({
+    workspace: workspacePath,
+    cwd: "permanent",
+    previousCwd: "2024-12-25",
+  });
+
+  const result = await CwdResolutionService.getPreviousCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
+
+  assert(result.type === "ok", "operation should succeed");
+  assertEquals(result.value.toString(), "2024-12-25");
+});
+
+Deno.test("CwdResolutionService.getPreviousCwd returns error when no session exists", async () => {
+  const itemRepo = createMockItemRepository(new Map());
+  const sessionRepo = createFakeSessionRepository(null);
+
+  const result = await CwdResolutionService.getPreviousCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
+
+  assert(result.type === "error", "should fail when no session");
+  assertEquals(result.error.kind, "ValidationError");
+});
+
+Deno.test("CwdResolutionService.getPreviousCwd returns error when previousCwd is absent", async () => {
+  const itemRepo = createMockItemRepository(new Map());
+  const sessionRepo = createFakeSessionRepository({
+    workspace: workspacePath,
+    cwd: "2024-12-25",
+  });
+
+  const result = await CwdResolutionService.getPreviousCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
+
+  assert(result.type === "error", "should fail when no previousCwd");
+  assertEquals(result.error.kind, "ValidationError");
+});
+
+Deno.test("CwdResolutionService.getPreviousCwd returns error when workspace differs", async () => {
+  const itemRepo = createMockItemRepository(new Map());
+  const sessionRepo = createFakeSessionRepository({
+    workspace: "/different/workspace",
+    cwd: "permanent",
+    previousCwd: "2024-12-25",
+  });
+
+  const result = await CwdResolutionService.getPreviousCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
+
+  assert(result.type === "error", "should fail when workspace differs");
+  assertEquals(result.error.kind, "ValidationError");
+});
+
+Deno.test("CwdResolutionService.getPreviousCwd returns error when previousCwd is invalid", async () => {
+  const itemRepo = createMockItemRepository(new Map());
+  const sessionRepo = createFakeSessionRepository({
+    workspace: workspacePath,
+    cwd: "2024-12-25",
+    previousCwd: "not-a-valid-placement",
+  });
+
+  const result = await CwdResolutionService.getPreviousCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
+
+  assert(result.type === "error", "should fail for invalid previousCwd");
+  assertEquals(result.error.kind, "ValidationError");
+});
+
 // ============================================================================
 // validatePlacement tests - validates placement without persisting
 // ============================================================================

@@ -4,6 +4,7 @@ import { RepositoryError } from "./repository_error.ts";
 export type SessionData = Readonly<{
   workspace: string;
   cwd: string;
+  previousCwd?: string;
 }>;
 
 export interface SessionRepository {
