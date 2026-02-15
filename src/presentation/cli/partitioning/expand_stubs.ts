@@ -32,9 +32,10 @@ export type FormatItemsFn = (
 ) => void;
 
 /**
- * Predicate to filter items by status (open, closed, or all).
+ * Predicate to filter items (status, snooze, icon, etc.).
+ * Should match the same filters applied by the main listing workflow.
  */
-export type StatusFilterFn = (item: Item) => boolean;
+export type ItemFilterFn = (item: Item) => boolean;
 
 /**
  * Convert a SectionSummary to a SectionStub relative to a parent placement.
@@ -81,7 +82,7 @@ export const expandStubs = async (
   deps: ExpandStubsDeps,
   formatterOptions: ListFormatterOptions,
   formatItems: FormatItemsFn,
-  statusFilter: StatusFilterFn,
+  itemFilter: ItemFilterFn,
   indentLevel = 0,
 ): Promise<void> => {
   const prefix = indent(indentLevel);
@@ -105,12 +106,16 @@ export const expandStubs = async (
     const sectionRange = createSingleRange(stub.placement);
     const sectionItemsResult = await deps.itemRepository.listByPlacement(sectionRange);
     if (sectionItemsResult.type === "ok") {
-      const sectionItems = sectionItemsResult.value.filter(statusFilter);
+      const sectionItems = sectionItemsResult.value.filter(itemFilter);
       const itemLines: string[] = [];
       formatItems(sectionItems, itemLines);
       for (const line of itemLines) {
         lines.push(childPrefix + line);
       }
+    } else {
+      console.error(
+        `Warning: failed to load items for section ${stub.relativePath}: ${sectionItemsResult.error.message}`,
+      );
     }
 
     // Query sub-sections for deeper expansion or stub display
@@ -127,8 +132,12 @@ export const expandStubs = async (
           deps,
           formatterOptions,
           formatItems,
-          statusFilter,
+          itemFilter,
           indentLevel + 1,
+        );
+      } else {
+        console.error(
+          `Warning: failed to query sub-sections for ${stub.relativePath}: ${subSectionsResult.error.message}`,
         );
       }
     } else if (stub.sectionCount > 0) {
@@ -149,6 +158,10 @@ export const expandStubs = async (
             );
           }
         }
+      } else {
+        console.error(
+          `Warning: failed to query sub-sections for ${stub.relativePath}: ${subSectionsResult.error.message}`,
+        );
       }
     }
   }

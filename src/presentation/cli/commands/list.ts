@@ -510,10 +510,16 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     }
   };
 
-  // Build status filter matching the main listing's filter
-  const statusFilterFn = (item: Item): boolean => {
-    if (statusFilter === "all") return true;
-    return !item.data.status.isClosed();
+  // Build item filter matching the main listing workflow's filters
+  // (status + snooze + icon) so expanded sections are consistent
+  const itemFilterFn = (item: Item): boolean => {
+    // Status filter
+    if (statusFilter !== "all" && item.data.status.isClosed()) return false;
+    // Snooze filter (only when status is not "all")
+    if (statusFilter !== "all" && item.isSnoozing(nowDateTime)) return false;
+    // Icon/type filter
+    if (options.type && item.data.icon.toString() !== options.type) return false;
+    return true;
   };
 
   // Format output (async to support depth expansion)
@@ -549,7 +555,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
         { itemRepository: deps.itemRepository, sectionQueryService: deps.sectionQueryService },
         formatterOptions,
         formatItems,
-        statusFilterFn,
+        itemFilterFn,
       );
 
       // Add empty line between partitions (skip in print mode for flat output)
