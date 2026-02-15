@@ -16,21 +16,21 @@ This forces the user to manually `mm ls 386/` for each section to see its conten
 ### Acceptance Criteria
 
 #### 1. Suppress `/0` header for item-head single placement
-- [ ] **Given** cwd is an item head (e.g. `permanent/modeless-design`), **When** you run `mm ls`, **Then** the partition header shows `[modeless-design]` (no `/0` suffix)
-- [ ] **Given** cwd is an item head with sections, **When** you run `mm ls` in print mode (`-p`), **Then** the header also omits `/0`
+- [x] **Given** cwd is an item head (e.g. `permanent/modeless-design`), **When** you run `mm ls`, **Then** the partition header shows `[modeless-design]` (no `/0` suffix)
+- [x] **Given** cwd is an item head with sections, **When** you run `mm ls` in print mode (`-p`), **Then** the header also omits `/0`
 
 #### 2. Inline section contents (depth expansion)
-- [ ] **Given** cwd is an item head with sections containing items, **When** you run `mm ls`, **Then** items inside each section are displayed under a section header (e.g. `📁 386/` followed by its items indented)
-- [ ] **Given** cwd is an item head with nested sections (sections inside sections), **When** you run `mm ls`, **Then** only 1 level of section contents is expanded by default (deeper sections shown as stubs)
-- [ ] **Given** cwd is an item head with sections, **When** you run `mm ls -d 2` (or `--depth 2`), **Then** 2 levels of section contents are expanded
-- [ ] **Given** cwd is an item head with sections, **When** you run `mm ls -d 0`, **Then** no section contents are expanded (current behavior: stubs only)
+- [x] **Given** cwd is an item head with sections containing items, **When** you run `mm ls`, **Then** items inside each section are displayed under a section header (e.g. `📁 386/` followed by its items indented)
+- [x] **Given** cwd is an item head with nested sections (sections inside sections), **When** you run `mm ls`, **Then** only 1 level of section contents is expanded by default (deeper sections shown as stubs)
+- [x] **Given** cwd is an item head with sections, **When** you run `mm ls -d 2` (or `--depth 2`), **Then** 2 levels of section contents are expanded
+- [x] **Given** cwd is an item head with sections, **When** you run `mm ls -d 0`, **Then** no section contents are expanded (current behavior: stubs only)
 
 #### 3. Backward compatibility
-- [ ] **Given** cwd is a date directory, **When** you run `mm ls`, **Then** output is unchanged (no depth expansion for date ranges)
-- [ ] **Given** a numeric range expression (e.g. `mm ls book/1..3`), **When** you run `mm ls`, **Then** output is unchanged
+- [x] **Given** cwd is a date directory, **When** you run `mm ls`, **Then** output is unchanged (no depth expansion for date ranges)
+- [x] **Given** a numeric range expression (e.g. `mm ls book/1..3`), **When** you run `mm ls`, **Then** output is unchanged
 
 #### 4. Error Cases
-- [ ] **Given** a negative depth value, **When** you run `mm ls -d -1`, **Then** an error message is shown
+- [x] **Given** a negative depth value, **When** you run `mm ls -d -1`, **Then** an error message is shown
 
 ### Verification Approach
 CLI commands: run `mm ls` with cwd set to an item head and verify output format. Use `mm ls -p` for machine-readable verification. Unit tests for partition building and formatting.
@@ -82,15 +82,18 @@ CLI commands: run `mm ls` with cwd set to an item head and verify output format.
 - [Eliminate status filter duplication]: Status filter is now built once as a `StatusFilterFn` and injected into `expandStubs`, removing the duplicated inline filter logic. (Single responsibility, DRY)
 - [Explicit dependency injection for `expandStubs`]: IO dependencies (`itemRepository`, `sectionQueryService`) and formatting callbacks (`FormatItemsFn`, `StatusFilterFn`) are passed as explicit parameters rather than captured from closure scope. (Loose coupling, testability)
 - [Extract shared helpers]: `toRelativeStub` and `isNonEmpty` extracted as named functions in the new module, replacing duplicated inline logic. (High cohesion, DRY)
+- [Extract prefix-length resolver to `alias_prefix_resolver.ts`]: Moved lazy prefix-length computation and caching logic out of `list.ts` into a dedicated module with its own type (`AliasPrefixData`) and factory (`createPrefixLengthResolver`). The command handler now loads alias data and delegates computation via the factory, removing inline caching logic and the intermediate data-bag object. (Single responsibility, loose coupling, testability)
 
 **Design:**
 - `expand_stubs.ts` owns one responsibility: recursive section expansion with IO
+- `alias_prefix_resolver.ts` owns one responsibility: lazy prefix-length computation with caching
 - Dependencies injected via `ExpandStubsDeps` type and callback parameters
 - `list.ts` remains the orchestrator; builds the `FormatItemsFn` closure capturing alias/prefix context
 
 **Quality:**
-- Tests passing: 32 suites (306 steps), only pre-existing completions_test failure
-- 5 new unit tests for `expand_stubs.ts` covering depth 0/1/2, status filtering, boundary stubs
+- Tests passing: 647 passed, 0 failed
+- 5 unit tests for `expand_stubs.ts` covering depth 0/1/2, status filtering, boundary stubs
+- 4 unit tests for `alias_prefix_resolver.ts` covering empty data, priority set, fallback, caching
 - Linting clean, formatting clean
 
 ### Verification
@@ -124,16 +127,23 @@ All acceptance criteria verified via automated tests and code review:
 - **PASS**: CLI validation in `list.ts` line 107 checks depth >= 0
 - Evidence: Error message displayed before any processing occurs
 
-**Tests:** All passing (32 suites, 306 steps)
-- Unit tests: 22 (build_partitions) + 77 (list_formatter) + 5 (expand_stubs) = 104 tests
-- E2E tests: 5 scenarios for item-head listing depth
+**Refactoring Verification:**
+- **PASS**: Alias prefix resolver extraction verified via unit tests and code review
+- **PASS**: `createPrefixLengthResolver` correctly computes prefix lengths for priority set and all aliases
+- **PASS**: Lazy computation and caching working correctly (4 unit tests in `alias_prefix_resolver_test.ts`)
+- **PASS**: `getPrefixLength` resolver used consistently in `formatItems` for both main listing and expanded section items
+- Evidence: Line 491 in list.ts calls `getPrefixLength(alias)` for each item, and `formatItems` closure is passed to `expandStubs` (line 545), ensuring expanded section items get the same prefix highlighting as main items
+
+**Tests:** All passing
+- Unit tests: 647 passed, 0 failed (includes 4 new tests for alias_prefix_resolver)
+- E2E tests: 32 passed (301 steps), 1 failed (2 steps - pre-existing completions_test failure)
 - Only known failure: pre-existing completions_test (bash/zsh not available in NixOS environment)
 
 **Quality Checks:**
-- Linting: Clean (259 files checked)
-- Formatting: Clean (261 files checked)
+- Linting: Clean (261 files checked)
+- Formatting: Clean (263 files checked)
 - Debug code: None found (all console.log/error are legitimate user output)
-- TODOs: All contextualized (no bare TODO markers)
+- TODOs: None found
 
 **Next:** Code Review
 
