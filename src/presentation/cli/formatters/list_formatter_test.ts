@@ -1041,7 +1041,7 @@ Deno.test("formatItemLine - print mode event without dateStr still shows time", 
 // Alias prefix highlighting tests (Story 4)
 // =============================================================================
 
-import { bold, cyan, stripAnsiCode } from "@std/fmt/colors";
+import { bold, cyan, dim, stripAnsiCode } from "@std/fmt/colors";
 
 Deno.test("formatItemLine - colored mode highlights prefix portion bold+cyan", () => {
   const item = makeItem({ alias: "bace-x7q", title: "Morning standup" });
@@ -1054,7 +1054,7 @@ Deno.test("formatItemLine - colored mode highlights prefix portion bold+cyan", (
   const result = formatItemLine(item, options, { prefixLength: 1 });
   // The bold+cyan prefix and regular cyan remainder should both be present
   assertEquals(result.includes(bold(cyan("b"))), true);
-  assertEquals(result.includes(cyan("ace-x7q")), true);
+  assertEquals(result.includes(dim(cyan("ace-x7q"))), true);
   // Full alias text should be present when ANSI stripped
   assertEquals(stripAnsiCode(result).includes("bace-x7q"), true);
 });
@@ -1069,7 +1069,7 @@ Deno.test("formatItemLine - colored mode longer prefix highlights correctly", ()
   // prefixLength=5 means "bace-" is bold+cyan, "x7q" is regular cyan
   const result = formatItemLine(item, options, { prefixLength: 5 });
   assertEquals(result.includes(bold(cyan("bace-"))), true);
-  assertEquals(result.includes(cyan("x7q")), true);
+  assertEquals(result.includes(dim(cyan("x7q"))), true);
 });
 
 Deno.test("formatItemLine - colored mode without prefixLength uses full cyan (no bold)", () => {
@@ -1111,7 +1111,7 @@ Deno.test("formatItemLine - colored mode single item prefix is 1 char", () => {
   };
   const result = formatItemLine(item, options, { prefixLength: 1 });
   assertEquals(result.includes(bold(cyan("k"))), true);
-  assertEquals(result.includes(cyan("uno-p3r")), true);
+  assertEquals(result.includes(dim(cyan("uno-p3r"))), true);
 });
 
 Deno.test("formatItemLine - print mode ignores prefixLength", () => {

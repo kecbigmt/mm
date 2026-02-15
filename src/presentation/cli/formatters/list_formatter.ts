@@ -257,7 +257,7 @@ const formatItemLineColoredMode = (
   if (aliasStr && prefixLength !== undefined && prefixLength > 0) {
     const prefix = aliasStr.slice(0, prefixLength);
     const rest = aliasStr.slice(prefixLength);
-    parts.push(bold(cyan(prefix)) + cyan(rest));
+    parts.push(bold(cyan(prefix)) + dim(cyan(rest)));
   } else {
     parts.push(cyan(aliasStr ?? item.data.id.toString()));
   }
