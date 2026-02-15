@@ -94,9 +94,9 @@ describe("Scenario 6: Item movement (move)", () => {
     });
     assertEquals(whereResult.success, true, `where failed: ${whereResult.stderr}`);
     assertEquals(
-      whereResult.stdout.includes("Logical:"),
+      whereResult.stdout.endsWith(".md"),
       true,
-      `where should show logical path: ${whereResult.stdout}`,
+      `where should print physical path: ${whereResult.stdout}`,
     );
 
     // Verify new order: C, A, B
