@@ -489,7 +489,7 @@ export const extractItemLines = (lsOutput: string): string[] => {
       if (stripped.startsWith("[")) return false;
 
       // Section stubs/headers: lines like "1/" or "1/ (items: ...)"
-      if (/^\t*\d+\//.test(stripped)) return false;
+      if (/^ *\d+\//.test(stripped)) return false;
 
       return true;
     });

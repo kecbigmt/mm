@@ -57,7 +57,7 @@ const toRelativeStub = (
  */
 const isNonEmpty = (s: SectionSummary): boolean => s.itemCount > 0 || s.sectionCount > 0;
 
-const INDENT_UNIT = "\t\t";
+const INDENT_UNIT = "  ";
 
 /**
  * Build an indent prefix string for the given depth level.

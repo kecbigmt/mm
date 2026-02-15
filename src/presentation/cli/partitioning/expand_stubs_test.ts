@@ -135,8 +135,8 @@ Deno.test("expandStubs: depth 1 expands stubs into header + items", async () => 
 
   assertEquals(lines.length, 3);
   assertEquals(lines[0], "1/");
-  assertEquals(lines[1], "\t\titem:Note A");
-  assertEquals(lines[2], "\t\titem:Note B");
+  assertEquals(lines[1], "  item:Note A");
+  assertEquals(lines[2], "  item:Note B");
 });
 
 // =============================================================================
@@ -170,7 +170,7 @@ Deno.test("expandStubs: respects status filter", async () => {
 
   assertEquals(lines.length, 2);
   assertEquals(lines[0], "1/");
-  assertEquals(lines[1], "\t\titem:Open note");
+  assertEquals(lines[1], "  item:Open note");
 });
 
 // =============================================================================
@@ -217,9 +217,9 @@ Deno.test("expandStubs: depth 1 renders sub-sections as stubs at boundary", asyn
 
   assertEquals(lines.length, 4);
   assertEquals(lines[0], "1/");
-  assertEquals(lines[1], "\t\titem:Note");
-  assertEquals(lines[2], "\t\t1/ (items: 3, sections: 0)");
-  assertEquals(lines[3], "\t\t3/ (items: 1, sections: 1)");
+  assertEquals(lines[1], "  item:Note");
+  assertEquals(lines[2], "  1/ (items: 3, sections: 0)");
+  assertEquals(lines[3], "  3/ (items: 1, sections: 1)");
 });
 
 // =============================================================================
@@ -261,6 +261,6 @@ Deno.test("expandStubs: depth 2 recursively expands sub-sections", async () => {
 
   assertEquals(lines.length, 3);
   assertEquals(lines[0], "1/");
-  assertEquals(lines[1], "\t\t1/");
-  assertEquals(lines[2], "\t\t\t\titem:Deep note");
+  assertEquals(lines[1], "  1/");
+  assertEquals(lines[2], "    item:Deep note");
 });
