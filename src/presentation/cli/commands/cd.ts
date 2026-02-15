@@ -68,7 +68,12 @@ export function createCdCommand() {
         timezone: deps.timezone,
       };
 
-      if (!pathArg || pathArg === "~") {
+      // Detect shell-expanded ~ (e.g., /Users/foo or /home/foo)
+      const systemHome = Deno.env.get("HOME");
+      const isHome = !pathArg || pathArg === "~" ||
+        (systemHome !== undefined && pathArg === systemHome);
+
+      if (isHome) {
         // Navigate to today's date (home) - matching bash cd behavior
         const todayPlacementResult = CwdResolutionService.createTodayPlacement(now, deps.timezone);
         if (todayPlacementResult.type === "error") {
