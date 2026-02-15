@@ -383,6 +383,21 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   // Load alias data for prefix highlighting (two-tier: priority set + all aliases).
   // Priority set = aliased items in today +/-7d; other aliases fall back to the full set.
   const getPrefixLength = await profileAsync("computePrefixLengths", async () => {
+    // Load all aliases first; if none exist, skip the priority set query entirely.
+    const allAliasesResult = await deps.aliasRepository.list();
+    const allAliasStrings = allAliasesResult.type === "ok"
+      ? allAliasesResult.value.map((a) => a.data.slug.toString())
+      : [];
+
+    if (allAliasStrings.length === 0) {
+      return createPrefixLengthResolver({
+        sortedPrioritySet: [],
+        sortedAllAliases: [],
+        prioritySetLookup: new Set(),
+      });
+    }
+
+    // Load priority set: all aliased items in today ±7d (unfiltered by status/type)
     const todayStr = formatDateStringForTimezone(now, deps.timezone);
     const psFromStr = addDaysToDateString(todayStr, -DEFAULT_DATE_WINDOW_DAYS);
     const psToStr = addDaysToDateString(todayStr, DEFAULT_DATE_WINDOW_DAYS);
@@ -400,11 +415,6 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
           .map((item) => item.data.alias!.toString());
       }
     }
-
-    const allAliasesResult = await deps.aliasRepository.list();
-    const allAliasStrings = allAliasesResult.type === "ok"
-      ? allAliasesResult.value.map((a) => a.data.slug.toString())
-      : [];
 
     const prefixData: AliasPrefixData = {
       sortedPrioritySet: [...prioritySetAliases].sort(),
