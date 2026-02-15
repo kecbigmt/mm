@@ -392,30 +392,26 @@ export const formatDateHeader = (
 /**
  * Formats a section stub line.
  *
- * Colored mode: 📁 <section-prefix>/ (items: <count>, sections: <count>)
- * Print mode: [section] <section-prefix>/ (items: <count>, sections: <count>)
+ * Format: <section-prefix>/ (items: <count>, sections: <count>)
  */
 export const formatSectionStub = (
   summary: SectionSummary,
   relativePath: string,
-  options: ListFormatterOptions,
+  _options: ListFormatterOptions,
 ): string => {
-  const icon = options.printMode ? "[section]" : "📁";
-  return `${icon} ${relativePath} (items: ${summary.itemCount}, sections: ${summary.sectionCount})`;
+  return `${relativePath} (items: ${summary.itemCount}, sections: ${summary.sectionCount})`;
 };
 
 /**
  * Formats an expanded section header line (when depth > 0).
  *
- * Colored mode: 📁 <section-prefix>/
- * Print mode: [section] <section-prefix>/
+ * Format: <section-prefix>/
  */
 export const formatSectionHeader = (
   relativePath: string,
-  options: ListFormatterOptions,
+  _options: ListFormatterOptions,
 ): string => {
-  const icon = options.printMode ? "[section]" : "📁";
-  return `${icon} ${relativePath}`;
+  return relativePath;
 };
 
 /**

@@ -57,6 +57,13 @@ const toRelativeStub = (
  */
 const isNonEmpty = (s: SectionSummary): boolean => s.itemCount > 0 || s.sectionCount > 0;
 
+const INDENT_UNIT = "\t\t";
+
+/**
+ * Build an indent prefix string for the given depth level.
+ */
+const indent = (level: number): string => INDENT_UNIT.repeat(level);
+
 /**
  * Expand section stubs recursively up to a given depth.
  *
@@ -64,6 +71,8 @@ const isNonEmpty = (s: SectionSummary): boolean => s.itemCount > 0 || s.sectionC
  * At depth 0 (or when depth is exhausted), stubs are rendered as summary lines.
  * Sub-sections discovered during expansion are either recursed into (if depth
  * remains) or rendered as stubs at the boundary.
+ *
+ * @param indentLevel - Current nesting level for indentation (0 = top level)
  */
 export const expandStubs = async (
   stubs: ReadonlyArray<SectionStub>,
@@ -73,7 +82,11 @@ export const expandStubs = async (
   formatterOptions: ListFormatterOptions,
   formatItems: FormatItemsFn,
   statusFilter: StatusFilterFn,
+  indentLevel = 0,
 ): Promise<void> => {
+  const prefix = indent(indentLevel);
+  const childPrefix = indent(indentLevel + 1);
+
   for (const stub of stubs) {
     if (remainingDepth <= 0) {
       const stubSummary: SectionSummary = {
@@ -81,19 +94,23 @@ export const expandStubs = async (
         itemCount: stub.itemCount,
         sectionCount: stub.sectionCount,
       };
-      lines.push(formatSectionStub(stubSummary, stub.relativePath, formatterOptions));
+      lines.push(prefix + formatSectionStub(stubSummary, stub.relativePath, formatterOptions));
       continue;
     }
 
     // Render as expanded section header
-    lines.push(formatSectionHeader(stub.relativePath, formatterOptions));
+    lines.push(prefix + formatSectionHeader(stub.relativePath, formatterOptions));
 
     // Query items under this section's placement
     const sectionRange = createSingleRange(stub.placement);
     const sectionItemsResult = await deps.itemRepository.listByPlacement(sectionRange);
     if (sectionItemsResult.type === "ok") {
       const sectionItems = sectionItemsResult.value.filter(statusFilter);
-      formatItems(sectionItems, lines);
+      const itemLines: string[] = [];
+      formatItems(sectionItems, itemLines);
+      for (const line of itemLines) {
+        lines.push(childPrefix + line);
+      }
     }
 
     // Query sub-sections for deeper expansion or stub display
@@ -111,6 +128,7 @@ export const expandStubs = async (
           formatterOptions,
           formatItems,
           statusFilter,
+          indentLevel + 1,
         );
       }
     } else if (stub.sectionCount > 0) {
@@ -126,7 +144,8 @@ export const expandStubs = async (
               sectionCount: s.sectionCount,
             };
             lines.push(
-              formatSectionStub(subStubSummary, relSection.join("/") + "/", formatterOptions),
+              childPrefix +
+                formatSectionStub(subStubSummary, relSection.join("/") + "/", formatterOptions),
             );
           }
         }

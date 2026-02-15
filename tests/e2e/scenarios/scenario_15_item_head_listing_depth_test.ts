@@ -91,12 +91,9 @@ describe("Scenario 15: Item-head listing with depth expansion", () => {
 
     const lines = lsResult.stdout.split("\n").filter((line) => line.trim() !== "");
     // Should show stubs, not expanded items
-    const hasStub = lines.some((line) => line.includes("[section]"));
-    assertEquals(hasStub, true, `Should show section stubs, got: ${lsResult.stdout}`);
-
-    // Stubs should show counts
-    const hasItemCount = lines.some((line) => line.includes("items:"));
-    assertEquals(hasItemCount, true, `Stubs should show item counts, got: ${lsResult.stdout}`);
+    // Stubs should show counts (e.g. "1/ (items: 1, sections: 0)")
+    const hasStub = lines.some((line) => line.includes("items:"));
+    assertEquals(hasStub, true, `Should show section stubs with counts, got: ${lsResult.stdout}`);
   });
 
   it("does not affect date range listing", async () => {

@@ -521,7 +521,7 @@ Deno.test("formatSectionStub - formats stub with counts (colored mode)", () => {
     now: DEFAULT_NOW,
   };
   const result = formatSectionStub(summary, "1/", options);
-  assertEquals(result, "📁 1/ (items: 3, sections: 2)");
+  assertEquals(result, "1/ (items: 3, sections: 2)");
 });
 
 Deno.test("formatSectionStub - formats stub with counts (print mode)", () => {
@@ -536,7 +536,7 @@ Deno.test("formatSectionStub - formats stub with counts (print mode)", () => {
     now: DEFAULT_NOW,
   };
   const result = formatSectionStub(summary, "1/", options);
-  assertEquals(result, "[section] 1/ (items: 3, sections: 2)");
+  assertEquals(result, "1/ (items: 3, sections: 2)");
 });
 
 Deno.test("formatSectionStub - formats stub with zero sections", () => {
@@ -551,7 +551,7 @@ Deno.test("formatSectionStub - formats stub with zero sections", () => {
     now: DEFAULT_NOW,
   };
   const result = formatSectionStub(summary, "2/", options);
-  assertEquals(result, "📁 2/ (items: 1, sections: 0)");
+  assertEquals(result, "2/ (items: 1, sections: 0)");
 });
 
 // =============================================================================
@@ -1131,22 +1131,12 @@ Deno.test("formatItemLine - print mode ignores prefixLength", () => {
 // formatSectionHeader tests
 // =============================================================================
 
-Deno.test("formatSectionHeader - colored mode shows folder icon", () => {
+Deno.test("formatSectionHeader - shows relative path only", () => {
   const options: ListFormatterOptions = {
     printMode: false,
     timezone: makeTimezone(),
     now: DEFAULT_NOW,
   };
   const result = formatSectionHeader("386/", options);
-  assertEquals(result, "📁 386/");
-});
-
-Deno.test("formatSectionHeader - print mode shows [section] tag", () => {
-  const options: ListFormatterOptions = {
-    printMode: true,
-    timezone: makeTimezone(),
-    now: DEFAULT_NOW,
-  };
-  const result = formatSectionHeader("386/", options);
-  assertEquals(result, "[section] 386/");
+  assertEquals(result, "386/");
 });
