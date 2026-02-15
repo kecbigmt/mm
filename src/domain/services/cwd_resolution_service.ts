@@ -137,12 +137,69 @@ export const CwdResolutionService = {
   async setCwd(
     placement: Placement,
     deps: CwdSaveDependencies,
+    previousPlacement?: Placement,
   ): Promise<Result<void, CwdResolutionError>> {
+    const previousCwd = previousPlacement?.toString();
+
     const saveResult = await deps.sessionRepository.save({
       workspace: deps.workspacePath,
       cwd: placement.toString(),
+      previousCwd,
     });
     return saveResult;
+  },
+
+  async getPreviousCwd(
+    deps: CwdResolutionDependencies,
+  ): Promise<Result<Placement, CwdResolutionError>> {
+    const sessionResult = await deps.sessionRepository.load();
+    if (sessionResult.type === "error") {
+      return sessionResult;
+    }
+
+    const session = sessionResult.value;
+
+    if (!session || session.workspace !== deps.workspacePath || !session.previousCwd) {
+      return Result.error(
+        createValidationError("CwdResolution", [
+          createValidationIssue("no previous directory", {
+            code: "no_previous",
+            path: ["value"],
+          }),
+        ]),
+      );
+    }
+
+    const parseResult = parsePlacement(session.previousCwd);
+    if (parseResult.type === "error") {
+      return Result.error(
+        createValidationError("CwdResolution", [
+          createValidationIssue("previous directory is invalid", {
+            code: "invalid_previous",
+            path: ["value"],
+          }),
+        ]),
+      );
+    }
+
+    const placement = parseResult.value;
+
+    // Validate item-backed placements to avoid navigating to deleted items
+    if (placement.head.kind === "item") {
+      const item = await resolvePlacementToItem(placement, deps);
+      if (item === undefined) {
+        return Result.error(
+          createValidationError("CwdResolution", [
+            createValidationIssue("previous directory references a deleted item", {
+              code: "invalid_previous",
+              path: ["value"],
+            }),
+          ]),
+        );
+      }
+    }
+
+    return Result.ok(placement);
   },
 
   async validatePlacement(
