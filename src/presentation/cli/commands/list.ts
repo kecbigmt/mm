@@ -206,9 +206,9 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     cwd = cwdResult.value.placement;
     cwdFromSession = true;
 
-    // If cwd is an item-head section, use cwd as the target
+    // If cwd is an item-head or permanent section, use cwd as the target
     // Otherwise, default to today-7d..today+7d date range
-    if (cwd.head.kind === "item") {
+    if (cwd.head.kind === "item" || cwd.head.kind === "permanent") {
       placementRange = { kind: "single", at: cwd };
       effectiveExpression = ".";
     } else {
