@@ -373,6 +373,26 @@ Deno.test("CwdResolutionService.getPreviousCwd returns error when previousCwd is
   assertEquals(result.error.kind, "ValidationError");
 });
 
+Deno.test("CwdResolutionService.getPreviousCwd returns error when previous item was deleted", async () => {
+  // Item repo has no items — simulates a deleted item
+  const itemRepo = createMockItemRepository(new Map());
+  const sessionRepo = createFakeSessionRepository({
+    workspace: workspacePath,
+    cwd: "2024-12-25",
+    previousCwd: "019965a7-2789-740a-b8c1-1415904fd108",
+  });
+
+  const result = await CwdResolutionService.getPreviousCwd({
+    sessionRepository: sessionRepo,
+    workspacePath,
+    itemRepository: itemRepo,
+    timezone,
+  });
+
+  assert(result.type === "error", "should fail when previous item was deleted");
+  assertEquals(result.error.kind, "ValidationError");
+});
+
 // ============================================================================
 // validatePlacement tests - validates placement without persisting
 // ============================================================================

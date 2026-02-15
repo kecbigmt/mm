@@ -182,7 +182,24 @@ export const CwdResolutionService = {
       );
     }
 
-    return Result.ok(parseResult.value);
+    const placement = parseResult.value;
+
+    // Validate item-backed placements to avoid navigating to deleted items
+    if (placement.head.kind === "item") {
+      const item = await resolvePlacementToItem(placement, deps);
+      if (item === undefined) {
+        return Result.error(
+          createValidationError("CwdResolution", [
+            createValidationIssue("previous directory references a deleted item", {
+              code: "invalid_previous",
+              path: ["value"],
+            }),
+          ]),
+        );
+      }
+    }
+
+    return Result.ok(placement);
   },
 
   async validatePlacement(
