@@ -799,7 +799,7 @@ Deno.test("formatDateHeader - backwards compatible when baseDate not provided", 
 // formatItemHeadHeader tests
 // =============================================================================
 
-import { formatItemHeadHeader } from "./list_formatter.ts";
+import { formatItemHeadHeader, formatSectionHeader } from "./list_formatter.ts";
 
 Deno.test("formatItemHeadHeader - formats with alias and section", () => {
   const options: ListFormatterOptions = {
@@ -1125,4 +1125,28 @@ Deno.test("formatItemLine - print mode ignores prefixLength", () => {
   const result = formatItemLine(item, options, { dateStr: "2025-02-10", prefixLength: 3 });
   assertEquals(result.includes("bace-x7q:note"), true);
   assertEquals(result.includes("\x1b"), false);
+});
+
+// =============================================================================
+// formatSectionHeader tests
+// =============================================================================
+
+Deno.test("formatSectionHeader - colored mode shows folder icon", () => {
+  const options: ListFormatterOptions = {
+    printMode: false,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW,
+  };
+  const result = formatSectionHeader("386/", options);
+  assertEquals(result, "📁 386/");
+});
+
+Deno.test("formatSectionHeader - print mode shows [section] tag", () => {
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW,
+  };
+  const result = formatSectionHeader("386/", options);
+  assertEquals(result, "[section] 386/");
 });

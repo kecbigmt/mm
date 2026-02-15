@@ -405,6 +405,20 @@ export const formatSectionStub = (
 };
 
 /**
+ * Formats an expanded section header line (when depth > 0).
+ *
+ * Colored mode: 📁 <section-prefix>/
+ * Print mode: [section] <section-prefix>/
+ */
+export const formatSectionHeader = (
+  relativePath: string,
+  options: ListFormatterOptions,
+): string => {
+  const icon = options.printMode ? "[section]" : "📁";
+  return `${icon} ${relativePath}`;
+};
+
+/**
  * Formats an item-head partition header.
  *
  * Format: [<alias-or-uuid>/<section?>]

@@ -24,6 +24,7 @@ export type PartitionHeader =
  * A stub line representing a nested section with summary counts.
  */
 export type SectionStub = Readonly<{
+  readonly placement: Placement;
   readonly relativePath: string;
   readonly itemCount: number;
   readonly sectionCount: number;
@@ -155,6 +156,7 @@ const buildSinglePartition = (
   const stubs: SectionStub[] = sections
     .filter((s) => s.itemCount > 0 || s.sectionCount > 0)
     .map((s) => ({
+      placement: s.placement,
       relativePath: s.placement.section.join("/") + "/",
       itemCount: s.itemCount,
       sectionCount: s.sectionCount,
@@ -353,6 +355,7 @@ const buildNumericRangePartitions = (
         // Relative path from the prefix level
         const relativeSection = s.placement.section.slice(parent.section.length + 1);
         return {
+          placement: s.placement,
           relativePath: relativeSection.join("/") + "/",
           itemCount: s.itemCount,
           sectionCount: s.sectionCount,
