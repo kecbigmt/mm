@@ -57,7 +57,7 @@ describe("Scenario 3: Alias and ID resolution", () => {
     assertEquals(result.stdout.includes("Important memo"), true);
   });
 
-  it("resolves item by alias with where command", async () => {
+  it("resolves item by alias with where command (physical path only)", async () => {
     await runCommand(ctx.testHome, [
       "note",
       "Important memo",
@@ -68,16 +68,23 @@ describe("Scenario 3: Alias and ID resolution", () => {
     const whereResult = await runCommand(ctx.testHome, ["where", "important-memo"]);
     assertEquals(whereResult.success, true, `where command failed: ${whereResult.stderr}`);
 
-    const today = await getCurrentDateFromCli(ctx.testHome);
+    // Default output should be only the physical path, no labels or decorations
     assertEquals(
-      whereResult.stdout.includes(`Logical:  /${today}/important-memo`),
-      true,
-      `Expected logical path to include /${today}/important-memo, got: ${whereResult.stdout}`,
+      whereResult.stdout.includes("Logical:"),
+      false,
+      "Should not contain Logical label",
     );
-    assertEquals(whereResult.stdout.includes("Physical:"), true);
+    assertEquals(
+      whereResult.stdout.includes("Physical:"),
+      false,
+      "Should not contain Physical label",
+    );
+    assertEquals(whereResult.stdout.includes("Item ["), false, "Should not contain Item label");
+    assertEquals(whereResult.stdout.includes("Rank:"), false, "Should not contain Rank label");
+    assertEquals(whereResult.stdout.endsWith(".md"), true, "Should end with .md file extension");
   });
 
-  it("resolves item by UUID with where command", async () => {
+  it("resolves item by UUID with where command (physical path only)", async () => {
     const createResult = await runCommand(ctx.testHome, [
       "note",
       "Important memo",
@@ -105,13 +112,49 @@ describe("Scenario 3: Alias and ID resolution", () => {
     const whereResult = await runCommand(ctx.testHome, ["where", itemId]);
     assertEquals(whereResult.success, true, `where command failed: ${whereResult.stderr}`);
 
-    const todayPath = await getCurrentDateFromCli(ctx.testHome);
+    // Default output should be only the physical path
+    assertEquals(whereResult.stdout.endsWith(".md"), true, "Should end with .md file extension");
+    assertEquals(whereResult.stdout.includes("Logical:"), false, "Should not contain labels");
+  });
+
+  it("outputs logical path with --logical flag", async () => {
+    await runCommand(ctx.testHome, [
+      "note",
+      "Important memo",
+      "--alias",
+      "important-memo",
+    ]);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const whereResult = await runCommand(ctx.testHome, [
+      "where",
+      "important-memo",
+      "--logical",
+    ]);
+    assertEquals(whereResult.success, true, `where --logical failed: ${whereResult.stderr}`);
     assertEquals(
-      whereResult.stdout.includes(`Logical:  /${todayPath}/important-memo`),
-      true,
-      `Expected logical path to include /${todayPath}/important-memo, got: ${whereResult.stdout}`,
+      whereResult.stdout,
+      `/${today}/important-memo`,
+      `Expected logical path /${today}/important-memo, got: ${whereResult.stdout}`,
     );
-    assertEquals(whereResult.stdout.includes("Physical:"), true);
+  });
+
+  it("outputs logical path with -l short flag", async () => {
+    await runCommand(ctx.testHome, [
+      "note",
+      "Important memo",
+      "--alias",
+      "important-memo",
+    ]);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const whereResult = await runCommand(ctx.testHome, ["where", "important-memo", "-l"]);
+    assertEquals(whereResult.success, true, `where -l failed: ${whereResult.stderr}`);
+    assertEquals(
+      whereResult.stdout,
+      `/${today}/important-memo`,
+      `Expected logical path /${today}/important-memo, got: ${whereResult.stdout}`,
+    );
   });
 
   it("navigates to item using alias with cd command", async () => {
