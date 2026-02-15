@@ -53,7 +53,7 @@ async function main() {
     .command("list", createListCommand().description("List items")).alias("ls")
     .command(
       "where",
-      createWhereCommand().description("Show logical and physical paths for an item"),
+      createWhereCommand().description("Print the physical file path for an item"),
     )
     .command("move", createMoveCommand().description("Move items to a new placement")).alias("mv")
     .command("snooze", createSnoozeCommand().description("Snooze item until a future datetime"))
