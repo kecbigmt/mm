@@ -469,7 +469,7 @@ export const stripAnsi = (text: string): string => text.replace(ANSI_PATTERN, ""
 /**
  * Filters ls command output to only include item lines (not headers, stubs, or empty lines).
  * Headers are lines that start with [ (possibly with ANSI codes).
- * Stubs are lines that start with 📁 or [section].
+ * Stubs are lines like "1/ (items: 3, sections: 0)" ending with a slash+counts pattern.
  * Item lines typically start with an emoji (📝, ✔️, ✅, 🗞️, 🕒) or plain icon like [note], [task], [event].
  *
  * @param lsOutput - Raw output from ls command
@@ -488,8 +488,8 @@ export const extractItemLines = (lsOutput: string): string[] => {
       // Header lines start with [ like [2025-11-29] or [alias/1]
       if (stripped.startsWith("[")) return false;
 
-      // Section stubs start with folder icon
-      if (stripped.startsWith("📁")) return false;
+      // Section stubs/headers: lines like "1/" or "1/ (items: ...)"
+      if (/^ *\d+\//.test(stripped)) return false;
 
       return true;
     });

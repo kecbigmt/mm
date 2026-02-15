@@ -521,7 +521,7 @@ Deno.test("formatSectionStub - formats stub with counts (colored mode)", () => {
     now: DEFAULT_NOW,
   };
   const result = formatSectionStub(summary, "1/", options);
-  assertEquals(result, "📁 1/ (items: 3, sections: 2)");
+  assertEquals(result, "1/ (items: 3, sections: 2)");
 });
 
 Deno.test("formatSectionStub - formats stub with counts (print mode)", () => {
@@ -536,7 +536,7 @@ Deno.test("formatSectionStub - formats stub with counts (print mode)", () => {
     now: DEFAULT_NOW,
   };
   const result = formatSectionStub(summary, "1/", options);
-  assertEquals(result, "[section] 1/ (items: 3, sections: 2)");
+  assertEquals(result, "1/ (items: 3, sections: 2)");
 });
 
 Deno.test("formatSectionStub - formats stub with zero sections", () => {
@@ -551,7 +551,7 @@ Deno.test("formatSectionStub - formats stub with zero sections", () => {
     now: DEFAULT_NOW,
   };
   const result = formatSectionStub(summary, "2/", options);
-  assertEquals(result, "📁 2/ (items: 1, sections: 0)");
+  assertEquals(result, "2/ (items: 1, sections: 0)");
 });
 
 // =============================================================================
@@ -799,7 +799,7 @@ Deno.test("formatDateHeader - backwards compatible when baseDate not provided", 
 // formatItemHeadHeader tests
 // =============================================================================
 
-import { formatItemHeadHeader } from "./list_formatter.ts";
+import { formatItemHeadHeader, formatSectionHeader } from "./list_formatter.ts";
 
 Deno.test("formatItemHeadHeader - formats with alias and section", () => {
   const options: ListFormatterOptions = {
@@ -1125,4 +1125,18 @@ Deno.test("formatItemLine - print mode ignores prefixLength", () => {
   const result = formatItemLine(item, options, { dateStr: "2025-02-10", prefixLength: 3 });
   assertEquals(result.includes("bace-x7q:note"), true);
   assertEquals(result.includes("\x1b"), false);
+});
+
+// =============================================================================
+// formatSectionHeader tests
+// =============================================================================
+
+Deno.test("formatSectionHeader - shows relative path only", () => {
+  const options: ListFormatterOptions = {
+    printMode: false,
+    timezone: makeTimezone(),
+    now: DEFAULT_NOW,
+  };
+  const result = formatSectionHeader("386/", options);
+  assertEquals(result, "386/");
 });

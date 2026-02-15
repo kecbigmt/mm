@@ -544,6 +544,37 @@ Deno.test("buildPartitions: single item-head placement", () => {
   }
 });
 
+Deno.test("buildPartitions: single item-head placement with getDisplayLabel omits /0", () => {
+  const parent = makePlacement("019965a7-9999-740a-b8c1-1415904fd108");
+  const items = [
+    makeItem({
+      id: "019965a7-0001-740a-b8c1-1415904fd108",
+      title: "Sub item",
+      placement: "019965a7-9999-740a-b8c1-1415904fd108",
+    }),
+  ];
+  const range = createSingleRange(parent);
+  const sections: SectionSummary[] = [];
+
+  // Custom getDisplayLabel that mimics list.ts behavior
+  const getDisplayLabel = (
+    _parent: Placement,
+    sectionPrefix: number,
+  ): string => {
+    if (sectionPrefix === 0) return "my-alias";
+    return `my-alias/${sectionPrefix}`;
+  };
+
+  const result = buildPartitions({ items, range, sections, getDisplayLabel });
+
+  assertEquals(result.partitions.length, 1);
+  if (result.partitions[0].header.kind === "itemSection") {
+    // getDisplayLabel is called with sectionPrefix=0, should return just "my-alias"
+    assertEquals(result.partitions[0].header.displayLabel, "my-alias");
+    assertEquals(result.partitions[0].header.sectionPrefix, 0);
+  }
+});
+
 Deno.test("buildPartitions: single item-head placement with section", () => {
   const parent = makePlacement("019965a7-9999-740a-b8c1-1415904fd108/1/2");
   const items = [

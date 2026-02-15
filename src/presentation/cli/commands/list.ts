@@ -18,11 +18,11 @@ import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import type { RangeExpression } from "../../../domain/primitives/path_types.ts";
 import type { SectionSummary } from "../../../domain/services/section_query_service.ts";
 import { buildPartitions, formatWarning } from "../partitioning/build_partitions.ts";
+import { expandStubs } from "../partitioning/expand_stubs.ts";
 import {
   formatDateHeader,
   formatItemHeadHeader,
   formatItemLine,
-  formatSectionStub,
   type ItemIdResolver,
   type ItemLineContext,
   type ListFormatterOptions,
@@ -38,6 +38,7 @@ import {
 } from "../../../shared/profiler.ts";
 import { itemTypeEnum } from "../types.ts";
 import { shortestUniquePrefix } from "../../../domain/services/alias_prefix_service.ts";
+import type { Item } from "../../../domain/models/item.ts";
 
 type ListOptions = {
   workspace?: string;
@@ -45,6 +46,7 @@ type ListOptions = {
   all?: boolean;
   print?: boolean;
   noPager?: boolean;
+  depth?: number;
 };
 
 const DEFAULT_DATE_WINDOW_DAYS = 7;
@@ -99,6 +101,13 @@ const rangeExpressionRequiresCwd = (expr: RangeExpression): boolean => {
 export async function listAction(options: ListOptions, locatorArg?: string) {
   profilerInit("ls command");
   const debug = isDebugMode();
+
+  // Validate depth option
+  if (options.depth !== undefined && options.depth < 0) {
+    console.error("error: depth must be a non-negative integer");
+    profilerFinish();
+    return;
+  }
 
   const depsResult = await profileAsync(
     "loadCliDependencies",
@@ -432,6 +441,10 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
       headStr = "permanent";
     }
 
+    if (sectionPrefix === 0 && parent.section.length === 0) {
+      return headStr;
+    }
+
     if (parent.section.length === 0) {
       return `${headStr}/${sectionPrefix}`;
     }
@@ -468,14 +481,49 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   // For absolute paths or non-date cwd, base date is undefined (falls back to today)
   const baseDate = cwdFromSession && cwd?.head.kind === "date" ? cwd.head.date : undefined;
 
-  // Format output
-  const output = profileSync("formatOutput", () => {
-    const formatterOptions: ListFormatterOptions = {
-      printMode: isPrintMode,
-      timezone: deps.timezone,
-      now: nowDateTime,
-    };
+  // Determine effective depth for section expansion
+  // Default: 1 for item-head single placements, 0 for date ranges/numeric ranges
+  const isItemHeadSingle = placementRange.kind === "single" &&
+    placementRange.at.head.kind !== "date";
+  const effectiveDepth = options.depth !== undefined ? options.depth : isItemHeadSingle ? 1 : 0;
 
+  const formatterOptions: ListFormatterOptions = {
+    printMode: isPrintMode,
+    timezone: deps.timezone,
+    now: nowDateTime,
+  };
+
+  // Build item line formatter that captures shared context (alias resolution, prefix highlighting)
+  const formatItems = (itemList: ReadonlyArray<Item>, lines: string[]) => {
+    for (const item of itemList) {
+      const dateStr = item.data.placement.head.kind === "date"
+        ? item.data.placement.head.date.toString()
+        : undefined;
+      const alias = item.data.alias?.toString();
+      const prefixLen = alias ? prefixLengthMap.get(alias) : undefined;
+      const lineContext: ItemLineContext = {
+        dateStr,
+        resolveItemId,
+        prefixLength: prefixLen,
+      };
+      lines.push(formatItemLine(item, formatterOptions, lineContext));
+    }
+  };
+
+  // Build item filter matching the main listing workflow's filters
+  // (status + snooze + icon) so expanded sections are consistent
+  const itemFilterFn = (item: Item): boolean => {
+    // Status filter
+    if (statusFilter !== "all" && item.data.status.isClosed()) return false;
+    // Snooze filter (only when status is not "all")
+    if (statusFilter !== "all" && item.isSnoozing(nowDateTime)) return false;
+    // Icon/type filter
+    if (options.type && item.data.icon.toString() !== options.type) return false;
+    return true;
+  };
+
+  // Format output (async to support depth expansion)
+  const output = await profileAsync("formatOutput", async () => {
     const outputLines: string[] = [];
 
     for (const partition of partitions) {
@@ -497,36 +545,18 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
       }
 
       // Format items
-      for (const item of partition.items) {
-        const dateStr = item.data.placement.head.kind === "date"
-          ? item.data.placement.head.date.toString()
-          : undefined;
-        const alias = item.data.alias?.toString();
-        const prefixLen = alias ? prefixLengthMap.get(alias) : undefined;
-        const lineContext: ItemLineContext = {
-          dateStr,
-          resolveItemId,
-          prefixLength: prefixLen,
-        };
-        outputLines.push(
-          formatItemLine(item, formatterOptions, lineContext),
-        );
-      }
+      formatItems(partition.items, outputLines);
 
-      // Format stubs
-      for (const stub of partition.stubs) {
-        const stubSummary: SectionSummary = {
-          placement: createPlacement(
-            partition.header.kind === "date"
-              ? { kind: "date", date: partition.header.date }
-              : partition.header.parent.head,
-            [],
-          ),
-          itemCount: stub.itemCount,
-          sectionCount: stub.sectionCount,
-        };
-        outputLines.push(formatSectionStub(stubSummary, stub.relativePath, formatterOptions));
-      }
+      // Format stubs (with optional depth expansion)
+      await expandStubs(
+        partition.stubs,
+        effectiveDepth,
+        outputLines,
+        { itemRepository: deps.itemRepository, sectionQueryService: deps.sectionQueryService },
+        formatterOptions,
+        formatItems,
+        itemFilterFn,
+      );
 
       // Add empty line between partitions (skip in print mode for flat output)
       if (!isPrintMode) {
@@ -564,5 +594,6 @@ export function createListCommand() {
     .option("-a, --all", "Include closed items")
     .option("-p, --print", "Plain output without colors (includes ISO date)")
     .option("--no-pager", "Do not use pager")
+    .option("-d, --depth <depth:integer>", "Expand section contents to this depth (default: 1)")
     .action(listAction);
 }
