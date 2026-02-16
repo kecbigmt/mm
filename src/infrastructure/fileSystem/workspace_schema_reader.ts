@@ -17,7 +17,11 @@ export const readMigrationVersion = async (
     return Result.ok(typeof data.migration === "number" ? data.migration : 1);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
-      return Result.ok(1);
+      return Result.error(
+        createRepositoryError("workspace", "load", "workspace.json not found", {
+          cause: error,
+        }),
+      );
     }
     return Result.error(
       createRepositoryError("workspace", "load", "failed to read migration version", {

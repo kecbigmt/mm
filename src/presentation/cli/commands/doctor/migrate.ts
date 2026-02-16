@@ -403,7 +403,19 @@ export function createMigrateCommand() {
       const targetMigration = steps[steps.length - 1].toMigration;
 
       // Phase 1: Scan items
-      const { items, parseErrors: _ } = await scanItems(workspaceRoot);
+      const { items, parseErrors } = await scanItems(workspaceRoot);
+
+      if (parseErrors.length > 0) {
+        console.error(`\n${parseErrors.length} items could not be parsed:`);
+        for (const err of parseErrors.slice(0, 10)) {
+          console.error(`  \u2717 ${err.path}: ${err.message}`);
+        }
+        if (parseErrors.length > 10) {
+          console.error(`  ... and ${parseErrors.length - 10} more`);
+        }
+        console.error(`\nFix these items before migrating.`);
+        Deno.exit(1);
+      }
 
       // Analyze steps
       const analyses = analyzeSteps(items, steps);
