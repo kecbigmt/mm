@@ -136,7 +136,7 @@ jobs:
             desc "Personal knowledge management CLI with built-in MCP server"
             homepage "https://github.com/kecbigmt/mm"
             version "VERSION_PLACEHOLDER"
-            license "MIT"
+            license "AGPL-3.0-or-later"
 
             on_macos do
               on_arm do
