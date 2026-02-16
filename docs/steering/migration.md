@@ -1,20 +1,33 @@
 # Schema & Data Migration
 
-**Role**: Design of the workspace migration system — versioning model, step framework, and
-operational constraints.
+**Role**: Versioning and migration design for workspace data files.
 
 ---
 
-## Version Model
+## Per-file Schema Versioning
 
-`workspace.json` has two version fields:
+Every persisted JSON/YAML file carries a `schema` field identifying its format version:
 
-- **`schema`** (string): File format version of `workspace.json` itself (e.g., `mm.workspace/1`).
-  Changes only when the shape of `workspace.json` changes.
-- **`migration`** (integer): Data migration gate. Tracks which data transformations have been applied
-  to items. Missing field defaults to `1`.
+| File | Schema prefix | Example |
+|------|---------------|---------|
+| `workspace.json` | `mm.workspace/` | `mm.workspace/1` |
+| Item frontmatter (YAML) | `mm.item.frontmatter/` | `mm.item.frontmatter/4` |
+| `.index/**/*.edge.json` | `mm.edge/` | `mm.edge/1` |
+| `.index/**/aliases/*.alias.json` | `mm.alias/` | `mm.alias/2` |
+| `tags/*.tag.json` | `mm.tag/` | `mm.tag/1` |
+
+This allows each file type to evolve independently. Parsers can reject unknown versions early.
+
+## Workspace Migration Gate
+
+`workspace.json` has a separate **`migration`** integer field (distinct from `schema`):
+
+- **`schema`**: format version of `workspace.json` itself. Changes when its shape changes.
+- **`migration`**: data migration gate. Tracks which bulk transformations have been applied across
+  items. Missing field defaults to `1`.
 
 All commands except `mm doctor migrate` are blocked when `migration < CURRENT_MIGRATION_VERSION`.
+This ensures users run migration before operating on stale data.
 
 ## Step Framework
 
@@ -26,27 +39,8 @@ Migration steps are chained by version number (1->2->3->...). Each step:
 - **Transforms** each item's frontmatter, given a resolution map of external references
 
 The runner applies steps sequentially. The `migration` field is updated only after all items are
-transformed successfully.
-
-## Current Steps
-
-| Step | Description |
-|------|-------------|
-| 1->2 | Convert alias strings in `project`/`contexts` to permanent item UUIDs; bump item schema `/3` to `/4` |
-
-## Idempotency
-
-Migration is safe to re-run after partial failure:
-
-- Transform passes through already-migrated values (e.g., UUIDs kept as-is)
-- External reference creation (permanent items) skips existing aliases
-- Migration version updated only on full success
-
-## Multi-device Safety
-
-Workspaces sync via Git. Migration must run on **one device** after all changes are committed and
-pushed. Other devices pull the migrated data and are unblocked automatically. The CLI warns about
-this in the confirmation prompt.
+transformed successfully. Each step is idempotent — transform passes through already-migrated values,
+and external reference creation skips duplicates.
 
 ## Adding a New Step
 
