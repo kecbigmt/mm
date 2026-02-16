@@ -4,6 +4,7 @@ import { formatSegmentsForTimezone } from "../../shared/timezone_format.ts";
 import { ItemRepository } from "../../domain/repositories/item_repository.ts";
 import { AliasRepository } from "../../domain/repositories/alias_repository.ts";
 import { Item, ItemSnapshot, parseItem } from "../../domain/models/item.ts";
+import { CURRENT_ITEM_SCHEMA } from "../../domain/models/workspace_schema.ts";
 import { ItemId, parseAliasSlug, Placement, PlacementRange } from "../../domain/primitives/mod.ts";
 import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
@@ -130,7 +131,7 @@ const writeItemFile = async (
     alias: snapshot.alias,
     project: snapshot.project,
     contexts: snapshot.contexts,
-    schema: "mm.item.frontmatter/3",
+    schema: CURRENT_ITEM_SCHEMA,
   };
 
   // Build body (title + content)
