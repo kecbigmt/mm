@@ -42,7 +42,7 @@ export function createEditCommand() {
     .option("--duration <duration:string>", "Update duration (e.g., 30m, 2h)")
     .option("--due-at <dueAt:string>", "Update due date (ISO8601 format)")
     .option("--alias <alias:string>", "Update alias")
-    .option("--project <project:string>", "Update project reference (alias)")
+    .option("-p, --project <project:string>", "Update project reference (alias)")
     .option("-c, --context <context:string>", "Update context tags (repeatable)", { collect: true })
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .action(async (options: Record<string, unknown>, itemRef: string) => {

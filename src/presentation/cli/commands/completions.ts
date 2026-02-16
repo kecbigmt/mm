@@ -89,7 +89,7 @@ _mm() {
     create_flags=(
         '--body[Body text]:body:'
         '--dir[Directory locator]:dir:'
-        '--project[Project reference]:project:->project_aliases'
+        '(-p --project)'{-p,--project}'[Project reference]:project:->project_aliases'
         '(-c --context)'{-c,--context}'[Context tag]:context:->context_aliases'
         '--alias[Alias for the item]:alias:'
         '--edit[Open editor after creation]'
@@ -104,7 +104,7 @@ _mm() {
         '--duration[Update duration]:duration:'
         '--due-at[Update due date]:due-at:'
         '--alias[Update alias]:alias:'
-        '--project[Project reference]:project:->project_aliases'
+        '(-p --project)'{-p,--project}'[Project reference]:project:->project_aliases'
         '(-c --context)'{-c,--context}'[Context tag]:context:->context_aliases'
     )
 
@@ -368,7 +368,7 @@ _mm() {
     fi
 
     # Complete flag values
-    if [[ "$prev" == "--project" || "$prev" == "--context" || "$prev" == "-c" ]]; then
+    if [[ "$prev" == "--project" || "$prev" == "-p" || "$prev" == "--context" || "$prev" == "-c" ]]; then
         local aliases="$(_mm_get_alias_candidates)"
         COMPREPLY=($(compgen -W "$aliases" -- "$cur"))
         return 0

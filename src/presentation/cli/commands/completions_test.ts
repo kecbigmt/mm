@@ -145,13 +145,18 @@ Deno.test({
 // === Tests for --project and --context completion support ===
 
 Deno.test({
-  name: "zsh script declares --project flag for note/task/event",
+  name: "zsh script declares -p/--project flag for note/task/event",
   async fn() {
     const { output } = await getCompletionOutput("zsh");
     assertStringIncludes(
       output,
-      "'--project[Project reference]:project:->project_aliases'",
-      "zsh script should declare --project flag with project_aliases state",
+      "{-p,--project}",
+      "zsh script should declare -p as short form for --project",
+    );
+    assertStringIncludes(
+      output,
+      "->project_aliases",
+      "zsh script should use ->project_aliases for --project",
     );
   },
 });
@@ -202,13 +207,18 @@ Deno.test({
 });
 
 Deno.test({
-  name: "bash script completes --project value with alias candidates",
+  name: "bash script completes -p/--project value with alias candidates",
   async fn() {
     const { output } = await getCompletionOutput("bash");
     assertStringIncludes(
       output,
       '"--project"',
       "bash script should have --project in flag value completion section",
+    );
+    assertStringIncludes(
+      output,
+      '"-p"',
+      "bash script should have -p in flag value completion section",
     );
   },
 });

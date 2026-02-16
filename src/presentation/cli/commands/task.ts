@@ -36,7 +36,7 @@ export function createTaskCommand() {
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .option("-b, --body <body:string>", "Body text")
     .option("-d, --dir <dir:string>", "Directory locator (e.g., /2025-11-03, /alias, ./1)")
-    .option("--project <project:string>", "Project reference (alias)")
+    .option("-p, --project <project:string>", "Project reference (alias)")
     .option("-c, --context <context:string>", "Context tag (repeatable)", { collect: true })
     .option("-a, --alias <alias:string>", "Alias for the item")
     .option("--due-at <dueAt:string>", "Due date/time (ISO 8601 format)")
