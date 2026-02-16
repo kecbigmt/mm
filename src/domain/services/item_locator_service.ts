@@ -36,6 +36,7 @@ export type ItemLocatorDependencies = Readonly<{
   readonly itemRepository: ItemRepository;
   readonly timezone: TimezoneIdentifier;
   readonly today?: Date;
+  readonly prefixCandidates?: () => Promise<readonly string[]>;
 }>;
 
 export type ItemLocatorService = Readonly<{
@@ -104,29 +105,44 @@ export const createItemLocatorService = (
     }
 
     // 3. Prefix fallback
-    const listResult = await deps.aliasRepository.list();
-    if (listResult.type === "error") {
-      return Result.error({ kind: "repository_error", error: listResult.error });
+    let prefixResult: ReturnType<typeof resolvePrefix>;
+
+    if (deps.prefixCandidates) {
+      // Cache-scoped: single-tier resolution against provided candidates
+      const candidates = await deps.prefixCandidates();
+      prefixResult = resolvePrefix(locator, candidates, []);
+    } else {
+      // Fallback: two-tier resolution (priority set + all aliases)
+      const listResult = await deps.aliasRepository.list();
+      if (listResult.type === "error") {
+        return Result.error({ kind: "repository_error", error: listResult.error });
+      }
+
+      const allAliasStrings = listResult.value.map((a) => a.data.slug.toString());
+      const prioritySet = await loadPrioritySet();
+      prefixResult = resolvePrefix(locator, prioritySet, allAliasStrings);
     }
 
-    const allAliases = listResult.value;
-    const allAliasStrings = allAliases.map((a) => a.data.slug.toString());
-    const prioritySet = await loadPrioritySet();
-    const prefixResult = resolvePrefix(locator, prioritySet, allAliasStrings);
-
     if (prefixResult.kind === "single") {
-      const matched = allAliases.find(
-        (a) => a.data.slug.toString() === prefixResult.alias,
-      );
-      if (matched) {
-        const itemLoadResult = await deps.itemRepository.load(matched.data.itemId);
-        if (itemLoadResult.type === "error") {
-          return Result.error({ kind: "repository_error", error: itemLoadResult.error });
+      // Load by alias slug to get the alias record, then load the item
+      const slugResult = parseAliasSlug(prefixResult.alias);
+      if (slugResult.type === "ok") {
+        const aliasLoadResult = await deps.aliasRepository.load(slugResult.value);
+        if (aliasLoadResult.type === "error") {
+          return Result.error({ kind: "repository_error", error: aliasLoadResult.error });
         }
-        if (itemLoadResult.value) {
-          return Result.ok(itemLoadResult.value);
+        if (aliasLoadResult.value) {
+          const itemLoadResult = await deps.itemRepository.load(
+            aliasLoadResult.value.data.itemId,
+          );
+          if (itemLoadResult.type === "error") {
+            return Result.error({ kind: "repository_error", error: itemLoadResult.error });
+          }
+          if (itemLoadResult.value) {
+            return Result.ok(itemLoadResult.value);
+          }
+          return Result.error({ kind: "not_found", locator });
         }
-        return Result.error({ kind: "not_found", locator });
       }
     }
 

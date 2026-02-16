@@ -94,6 +94,50 @@ Deno.test("CacheUpdateService - silently handles errors", async () => {
   await cleanupWorkspace(workspaceDir);
 });
 
+Deno.test("CacheUpdateService - getAliases returns cached aliases", async () => {
+  const workspaceDir = await setupTestWorkspace();
+  const manager = new CacheManager(workspaceDir, { maxEntries: 1000 });
+  const service = new CacheUpdateService(manager);
+
+  await service.updateFromItems([
+    mockItem("todo", ["work"]),
+    mockItem("notes", ["personal"]),
+  ]);
+
+  const aliases = await service.getAliases();
+  assertEquals(aliases, ["todo", "notes"]);
+
+  await cleanupWorkspace(workspaceDir);
+});
+
+Deno.test("CacheUpdateService - getAliases deduplicates entries", async () => {
+  const workspaceDir = await setupTestWorkspace();
+  const manager = new CacheManager(workspaceDir, { maxEntries: 1000 });
+  const service = new CacheUpdateService(manager);
+
+  // Simulate multiple updates adding the same alias
+  await service.updateFromItem(mockItem("todo", []));
+  await service.updateFromItem(mockItem("todo", []));
+  await service.updateFromItem(mockItem("todo", []));
+
+  const aliases = await service.getAliases();
+  assertEquals(aliases, ["todo"]);
+
+  await cleanupWorkspace(workspaceDir);
+});
+
+Deno.test("CacheUpdateService - getAliases returns empty on error", async () => {
+  const workspaceDir = await setupTestWorkspace();
+  const manager = new CacheManager(workspaceDir, { maxEntries: 1000 });
+  const service = new CacheUpdateService(manager);
+
+  // Remove workspace to trigger read error
+  await Deno.remove(workspaceDir, { recursive: true });
+
+  const aliases = await service.getAliases();
+  assertEquals(aliases, []);
+});
+
 Deno.test("CacheUpdateService - skips empty updates", async () => {
   const workspaceDir = await setupTestWorkspace();
   const manager = new CacheManager(workspaceDir, { maxEntries: 1000 });

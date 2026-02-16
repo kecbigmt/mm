@@ -65,6 +65,7 @@ export const rebalanceRankCommand = new Command()
       itemRepository: deps.itemRepository,
       timezone: deps.timezone,
       today: now,
+      prefixCandidates: () => deps.cacheUpdateService.getAliases(),
     });
 
     // Resolve each path expression and collect items (deduplicated by item ID)

@@ -53,6 +53,7 @@ export type EditItemDependencies = Readonly<{
   aliasRepository: AliasRepository;
   rankService: RankService;
   idGenerationService: IdGenerationService;
+  prefixCandidates?: () => Promise<readonly string[]>;
 }>;
 
 export type EditItemValidationError = ValidationError<"EditItem">;
@@ -87,6 +88,7 @@ export const EditItemWorkflow = {
       itemRepository: deps.itemRepository,
       aliasRepository: deps.aliasRepository,
       timezone: input.timezone,
+      prefixCandidates: deps.prefixCandidates,
     });
     const resolveResult = await locatorService.resolve(input.itemLocator);
 

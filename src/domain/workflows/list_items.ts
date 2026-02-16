@@ -27,6 +27,7 @@ export type ListItemsInput = Readonly<{
 export type ListItemsDependencies = Readonly<{
   itemRepository: ItemRepository;
   aliasRepository: AliasRepository;
+  prefixCandidates?: () => Promise<readonly string[]>;
 }>;
 
 export type ListItemsValidationError = ValidationError<"ListItems">;
@@ -58,6 +59,7 @@ export const ListItemsWorkflow = {
       itemRepository: deps.itemRepository,
       timezone: timezoneResult.value,
       today,
+      prefixCandidates: deps.prefixCandidates,
     });
 
     let placementRange;

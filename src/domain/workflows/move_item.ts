@@ -29,6 +29,7 @@ export type MoveItemDependencies = Readonly<{
   itemRepository: ItemRepository;
   aliasRepository: AliasRepository;
   rankService: RankService;
+  prefixCandidates?: () => Promise<readonly string[]>;
 }>;
 
 export type MoveItemValidationError = ValidationError<"MoveItem">;
@@ -427,6 +428,7 @@ export const MoveItemWorkflow = {
       itemRepository: deps.itemRepository,
       timezone: timezoneResult.value,
       today,
+      prefixCandidates: deps.prefixCandidates,
     });
 
     // Resolve item to move

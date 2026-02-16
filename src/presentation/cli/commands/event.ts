@@ -99,6 +99,7 @@ export function createEventCommand() {
           itemRepository: deps.itemRepository,
           timezone: deps.timezone,
           today: now,
+          prefixCandidates: () => deps.cacheUpdateService.getAliases(),
         });
 
         const resolveResult = await pathResolver.resolvePath(

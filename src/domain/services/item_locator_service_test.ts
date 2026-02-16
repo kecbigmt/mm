@@ -209,3 +209,50 @@ Deno.test("ItemLocatorService - priority set prefers recent items", async () => 
     assertEquals(result.value.data.id.toString(), item1.data.id.toString());
   }
 });
+
+// --- prefixCandidates mode ---
+
+Deno.test("ItemLocatorService - prefixCandidates resolves prefix against provided candidates", async () => {
+  const { addItem, itemRepository, aliasRepository } = setup();
+  addItem("019a0000-0000-7000-8000-000000000001", "bace-x7q");
+  addItem("019a0000-0000-7000-8000-000000000002", "kuno-p3r");
+
+  const timezone = Result.unwrap(parseTimezoneIdentifier("UTC"));
+  const locator = createItemLocatorService({
+    itemRepository,
+    aliasRepository,
+    timezone,
+    today: new Date("2026-02-11T00:00:00Z"),
+    prefixCandidates: () => Promise.resolve(["bace-x7q", "kuno-p3r"]),
+  });
+
+  const result = await locator.resolve("b");
+
+  assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.data.id.toString(), "019a0000-0000-7000-8000-000000000001");
+  }
+});
+
+Deno.test("ItemLocatorService - prefixCandidates returns not_found for alias outside candidates", async () => {
+  const { addItem, itemRepository, aliasRepository } = setup();
+  addItem("019a0000-0000-7000-8000-000000000001", "bace-x7q");
+  addItem("019a0000-0000-7000-8000-000000000002", "kuno-p3r");
+
+  const timezone = Result.unwrap(parseTimezoneIdentifier("UTC"));
+  // Only kuno-p3r in candidates
+  const locator = createItemLocatorService({
+    itemRepository,
+    aliasRepository,
+    timezone,
+    today: new Date("2026-02-11T00:00:00Z"),
+    prefixCandidates: () => Promise.resolve(["kuno-p3r"]),
+  });
+
+  const result = await locator.resolve("b");
+
+  assertEquals(result.type, "error");
+  if (result.type === "error") {
+    assertEquals(result.error.kind, "not_found");
+  }
+});
