@@ -31,7 +31,7 @@ _mm_resolve_workspace_root() {
 }
 
 _mm_find_cache_file() {
-    local filename="$1" # 'completion_aliases.txt' or 'completion_context_tags.txt'
+    local filename="$1" # 'completion_aliases.txt'
     local workspace_root=\$(_mm_resolve_workspace_root)
 
     if [[ -z "$workspace_root" ]]; then
@@ -49,14 +49,6 @@ _mm_find_cache_file() {
 
 _mm_get_alias_candidates() {
     local cache_file="$(_mm_find_cache_file completion_aliases.txt)"
-    if [[ -n "$cache_file" ]]; then
-        cat "$cache_file" 2>/dev/null
-    fi
-    # No fallback: if cache is missing/empty, no candidates are provided
-}
-
-_mm_get_tag_candidates() {
-    local cache_file="$(_mm_find_cache_file completion_context_tags.txt)"
     if [[ -n "$cache_file" ]]; then
         cat "$cache_file" 2>/dev/null
     fi
@@ -93,31 +85,27 @@ _mm() {
         '--version[Show version information]'
     )
 
-    local -a note_flags
-    note_flags=(
+    local -a create_flags
+    create_flags=(
         '--body[Body text]:body:'
         '--dir[Directory locator]:dir:'
-        '--context[Context tag]:context:->context_tags'
+        '(-p --project)'{-p,--project}'[Project reference]:project:->project_aliases'
+        '(-c --context)'{-c,--context}'[Context tag]:context:->context_aliases'
         '--alias[Alias for the item]:alias:'
         '--edit[Open editor after creation]'
     )
 
-    local -a task_flags
-    task_flags=(
-        '--body[Body text]:body:'
-        '--dir[Directory locator]:dir:'
-        '--context[Context tag]:context:->context_tags'
-        '--alias[Alias for the item]:alias:'
-        '--edit[Open editor after creation]'
-    )
-
-    local -a event_flags
-    event_flags=(
-        '--body[Body text]:body:'
-        '--dir[Directory locator]:dir:'
-        '--context[Context tag]:context:->context_tags'
-        '--alias[Alias for the item]:alias:'
-        '--edit[Open editor after creation]'
+    local -a edit_flags
+    edit_flags=(
+        '--title[Update title]:title:'
+        '--icon[Update icon]:icon:'
+        '--body[Update body]:body:'
+        '--start-at[Update start time]:start-at:'
+        '--duration[Update duration]:duration:'
+        '--due-at[Update due date]:due-at:'
+        '--alias[Update alias]:alias:'
+        '(-p --project)'{-p,--project}'[Project reference]:project:->project_aliases'
+        '(-c --context)'{-c,--context}'[Context tag]:context:->context_aliases'
     )
 
     _arguments -C \\
@@ -131,42 +119,23 @@ _mm() {
         args)
             local cmd="$line[1]"
             case "$cmd" in
-                note|n)
-                    _arguments $note_flags $common_flags
+                note|n|task|t|event|ev)
+                    _arguments -C '1:title:' $create_flags $common_flags
                     case "$state" in
-                        context_tags)
-                            local -a tags
-                            tags=(\${(f)"\$(_mm_get_tag_candidates)"})
-                            compadd -a tags
-                            ;;
-                    esac
-                    ;;
-                task|t)
-                    _arguments $task_flags $common_flags
-                    case "$state" in
-                        context_tags)
-                            local -a tags
-                            tags=(\${(f)"\$(_mm_get_tag_candidates)"})
-                            compadd -a tags
-                            ;;
-                    esac
-                    ;;
-                event|ev)
-                    _arguments $event_flags $common_flags
-                    case "$state" in
-                        context_tags)
-                            local -a tags
-                            tags=(\${(f)"\$(_mm_get_tag_candidates)"})
-                            compadd -a tags
+                        project_aliases|context_aliases)
+                            local -a aliases
+                            aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
+                            compadd -a aliases
                             ;;
                     esac
                     ;;
                 edit|e)
-                    _arguments \\
+                    _arguments -C \\
                         '1: :->item_id' \\
+                        $edit_flags \\
                         $common_flags
                     case "$state" in
-                        item_id)
+                        item_id|project_aliases|context_aliases)
                             local -a aliases
                             aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
                             compadd -a aliases
@@ -174,7 +143,7 @@ _mm() {
                     esac
                     ;;
                 show|s)
-                    _arguments \\
+                    _arguments -C \\
                         '1: :->item_id' \\
                         '--print[Output directly without using pager]' \\
                         $common_flags
@@ -204,7 +173,7 @@ _mm() {
                         'next-month:Next month (1st-last)'
                         'last-month:Last month (1st-last)'
                     )
-                    _arguments \\
+                    _arguments -C \\
                         '1: :->path' \\
                         '--all[Show all items including closed]' \\
                         $common_flags
@@ -215,7 +184,7 @@ _mm() {
                     esac
                     ;;
                 move|mv)
-                    _arguments \\
+                    _arguments -C \\
                         '*: :->item_ids' \\
                         $common_flags
                     case "$state" in
@@ -251,44 +220,8 @@ _mm() {
                             ;;
                     esac
                     ;;
-                close|cl)
-                    _arguments \\
-                        '*: :->item_ids' \\
-                        $common_flags
-                    case "$state" in
-                        item_ids)
-                            local -a aliases
-                            aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
-                            compadd -a aliases
-                            ;;
-                    esac
-                    ;;
-                reopen|op)
-                    _arguments \\
-                        '*: :->item_ids' \\
-                        $common_flags
-                    case "$state" in
-                        item_ids)
-                            local -a aliases
-                            aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
-                            compadd -a aliases
-                            ;;
-                    esac
-                    ;;
-                remove|rm)
-                    _arguments \\
-                        '*: :->item_ids' \\
-                        $common_flags
-                    case "$state" in
-                        item_ids)
-                            local -a aliases
-                            aliases=(\${(f)"\$(_mm_get_alias_candidates)"})
-                            compadd -a aliases
-                            ;;
-                    esac
-                    ;;
-                snooze|sn)
-                    _arguments \\
+                close|cl|reopen|op|remove|rm|snooze|sn)
+                    _arguments -C \\
                         '*: :->item_ids' \\
                         $common_flags
                     case "$state" in
@@ -300,7 +233,7 @@ _mm() {
                     esac
                     ;;
                 where)
-                    _arguments \\
+                    _arguments -C \\
                         '1: :->item_id' \\
                         $common_flags
                     case "$state" in
@@ -358,7 +291,7 @@ _mm_resolve_workspace_root() {
 }
 
 _mm_find_cache_file() {
-    local filename="$1" # 'completion_aliases.txt' or 'completion_context_tags.txt'
+    local filename="$1" # 'completion_aliases.txt'
     local workspace_root=\$(_mm_resolve_workspace_root)
 
     if [[ -z "$workspace_root" ]]; then
@@ -376,14 +309,6 @@ _mm_find_cache_file() {
 
 _mm_get_alias_candidates() {
     local cache_file="$(_mm_find_cache_file completion_aliases.txt)"
-    if [[ -n "$cache_file" ]]; then
-        cat "$cache_file" 2>/dev/null
-    fi
-    # No fallback: if cache is missing/empty, no candidates are provided
-}
-
-_mm_get_tag_candidates() {
-    local cache_file="$(_mm_find_cache_file completion_context_tags.txt)"
     if [[ -n "$cache_file" ]]; then
         cat "$cache_file" 2>/dev/null
     fi
@@ -420,7 +345,11 @@ _mm() {
     if [[ "$cur" == -* ]]; then
         case "$cmd" in
             note|task|event|n|t|ev)
-                local flags="--body --dir --context --alias --edit $common_flags"
+                local flags="--body --dir --project --context --alias --edit $common_flags"
+                COMPREPLY=($(compgen -W "$flags" -- "$cur"))
+                ;;
+            edit|e)
+                local flags="--title --icon --body --start-at --duration --due-at --alias --project --context $common_flags"
                 COMPREPLY=($(compgen -W "$flags" -- "$cur"))
                 ;;
             list|ls)
@@ -439,9 +368,9 @@ _mm() {
     fi
 
     # Complete flag values
-    if [[ "$prev" == "--context" || "$prev" == "-c" ]]; then
-        local tags="$(_mm_get_tag_candidates)"
-        COMPREPLY=($(compgen -W "$tags" -- "$cur"))
+    if [[ "$prev" == "--project" || "$prev" == "-p" || "$prev" == "--context" || "$prev" == "-c" ]]; then
+        local aliases="$(_mm_get_alias_candidates)"
+        COMPREPLY=($(compgen -W "$aliases" -- "$cur"))
         return 0
     fi
 

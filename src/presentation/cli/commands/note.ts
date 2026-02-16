@@ -35,7 +35,7 @@ export function createNoteCommand() {
       "-d, --dir <dir:string>",
       "Directory locator (e.g., /2025-11-03, /alias, ./1, permanent)",
     )
-    .option("--project <project:string>", "Project reference (alias)")
+    .option("-p, --project <project:string>", "Project reference (alias)")
     .option("-c, --context <context:string>", "Context tag (repeatable)", { collect: true })
     .option("-a, --alias <alias:string>", "Alias for the item")
     .option("-e, --edit", "Open editor after creation")

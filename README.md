@@ -1,7 +1,7 @@
 # mm CLI
 
-mm is a personal knowledge management system that unifies GTD, Bullet Journal, and
-Zettelkasten methodologies.
+mm is a personal knowledge management system that unifies GTD, Bullet Journal, and Zettelkasten
+methodologies.
 
 **Key Features:**
 
