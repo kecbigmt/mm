@@ -52,7 +52,8 @@ export class CacheUpdateService {
    */
   async getAliases(): Promise<string[]> {
     try {
-      return await this.manager.getAliases();
+      const aliases = await this.manager.getAliases();
+      return [...new Set(aliases)];
     } catch {
       return [];
     }
