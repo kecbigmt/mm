@@ -17,8 +17,10 @@ https://github.com/user-attachments/assets/38335df6-951c-4224-845e-61e96ddc007a
 
 - [Documentation](#documentation)
 - [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
-- [Releases](#releases)
+- [Installation](#installation)
+  - [Homebrew (macOS)](#homebrew-macos)
+  - [From Source](#from-source)
+  - [Pre-built Binaries](#pre-built-binaries)
 - [Commands](#commands)
   - [Creating Items](#creating-items)
   - [Managing Item Status](#managing-item-status)
@@ -33,40 +35,17 @@ https://github.com/user-attachments/assets/38335df6-951c-4224-845e-61e96ddc007a
 
 Domain and product design notes live in [docs/steering/design.md](docs/steering/design.md).
 
-## Prerequisites
+## Installation
 
-- macOS or Linux
-- [Deno](https://deno.com/) v2.x or later
-- Git (optional, required for sync features)
-
-## Getting Started
-
-First, clone the repository:
+### Homebrew (macOS)
 
 ```sh
-git clone https://github.com/kecbigmt/mm.git
-cd mm
+brew install kecbigmt/tap/mm
 ```
 
-### Quick Try
+The binary is ~86 MB because it embeds the Deno runtime.
 
-Try mm without installation:
-
-```sh
-deno task exec workspace init my-workspace
-deno task exec note "My first note"
-deno task exec list
-```
-
-### Installation
-
-For regular use, install mm globally:
-
-```sh
-deno task install
-```
-
-After installation, the `mm` command is available from anywhere:
+After installation:
 
 ```sh
 mm workspace init my-workspace
@@ -74,13 +53,24 @@ mm note "My first note"
 mm list
 ```
 
-Alternatively, build a standalone binary with `deno task compile`.
+### From Source
 
-### Releases
+Prerequisites: [Deno](https://deno.com/) v2.x or later, Git (optional, required for sync features)
 
-Pre-built binaries for **macOS Apple Silicon** are published on
-[GitHub Releases](https://github.com/kecbigmt/mm/releases). Download `mm-<version>-darwin-arm64` for
-the release you need. The version shown by `mm --version` matches the release tag.
+```sh
+git clone https://github.com/kecbigmt/mm.git
+cd mm
+deno task install
+```
+
+Alternatively, build a standalone binary with `deno task compile`, or try without installing via
+`deno task exec`.
+
+### Pre-built Binaries
+
+Binaries for **macOS** (Apple Silicon / Intel) are published on
+[GitHub Releases](https://github.com/kecbigmt/mm/releases). The version shown by `mm --version`
+matches the release tag.
 
 **Shell Completion (optional):** Enable tab completion for Zsh/Bash by adding
 `source <(mm completions zsh)` or `source <(mm completions bash)` to your shell config. See
