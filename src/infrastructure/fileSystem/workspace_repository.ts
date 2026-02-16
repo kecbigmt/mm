@@ -8,10 +8,7 @@ import {
   parseWorkspaceSettings,
   WorkspaceSettings,
 } from "../../domain/models/workspace.ts";
-import {
-  CURRENT_MIGRATION_VERSION,
-  WORKSPACE_SCHEMA,
-} from "../../domain/models/workspace_schema.ts";
+import { CURRENT_MIGRATION_VERSION, WORKSPACE_SCHEMA } from "./workspace_schema.ts";
 import { WorkspaceName, workspaceNameFromString } from "../../domain/primitives/workspace_name.ts";
 import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.ts";
 import { profileAsync, profileSync } from "../../shared/profiler.ts";

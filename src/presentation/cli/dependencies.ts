@@ -38,7 +38,7 @@ import { CacheUpdateService } from "../../infrastructure/completion_cache/cache_
 import { CacheManager } from "../../infrastructure/completion_cache/cache_manager.ts";
 import { profileAsync, profileSync } from "../../shared/profiler.ts";
 import { readMigrationVersion } from "../../infrastructure/fileSystem/workspace_schema_reader.ts";
-import { CURRENT_MIGRATION_VERSION } from "../../domain/models/workspace_schema.ts";
+import { CURRENT_MIGRATION_VERSION } from "../../infrastructure/fileSystem/workspace_schema.ts";
 
 export type CliDependencies = Readonly<{
   readonly root: string;

@@ -1,5 +1,5 @@
 import { Result } from "../../../../shared/result.ts";
-import { ITEM_SCHEMA_V4 } from "../../../../domain/models/workspace_schema.ts";
+import { ITEM_SCHEMA_V4 } from "../../workspace_schema.ts";
 import type { MigrationStep } from "../migration_step.ts";
 import type { MigrationItemError, RawItemFile, RawItemFrontmatter } from "../types.ts";
 

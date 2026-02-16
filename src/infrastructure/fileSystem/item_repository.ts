@@ -4,7 +4,7 @@ import { formatSegmentsForTimezone } from "../../shared/timezone_format.ts";
 import { ItemRepository } from "../../domain/repositories/item_repository.ts";
 import { AliasRepository } from "../../domain/repositories/alias_repository.ts";
 import { Item, ItemSnapshot, parseItem } from "../../domain/models/item.ts";
-import { CURRENT_ITEM_SCHEMA } from "../../domain/models/workspace_schema.ts";
+import { CURRENT_ITEM_SCHEMA } from "./workspace_schema.ts";
 import { ItemId, parseAliasSlug, Placement, PlacementRange } from "../../domain/primitives/mod.ts";
 import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
