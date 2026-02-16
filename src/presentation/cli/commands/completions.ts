@@ -90,7 +90,7 @@ _mm() {
         '--body[Body text]:body:'
         '--dir[Directory locator]:dir:'
         '--project[Project reference]:project:->project_aliases'
-        '--context[Context tag]:context:->context_aliases'
+        '(-c --context)'{-c,--context}'[Context tag]:context:->context_aliases'
         '--alias[Alias for the item]:alias:'
         '--edit[Open editor after creation]'
     )
@@ -105,7 +105,7 @@ _mm() {
         '--due-at[Update due date]:due-at:'
         '--alias[Update alias]:alias:'
         '--project[Project reference]:project:->project_aliases'
-        '--context[Context tag]:context:->context_aliases'
+        '(-c --context)'{-c,--context}'[Context tag]:context:->context_aliases'
     )
 
     _arguments -C \\

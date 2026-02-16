@@ -166,6 +166,18 @@ Deno.test({
 });
 
 Deno.test({
+  name: "zsh script declares -c short form for --context",
+  async fn() {
+    const { output } = await getCompletionOutput("zsh");
+    assertStringIncludes(
+      output,
+      "{-c,--context}",
+      "zsh script should declare -c as short form for --context",
+    );
+  },
+});
+
+Deno.test({
   name: "zsh script includes edit_flags with metadata options",
   async fn() {
     const { output } = await getCompletionOutput("zsh");
