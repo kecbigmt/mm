@@ -11,6 +11,8 @@ Zettelkasten methodologies.
 
 English | [日本語](README.ja.md)
 
+https://github.com/user-attachments/assets/38335df6-951c-4224-845e-61e96ddc007a
+
 ## Table of Contents
 
 - [Documentation](#documentation)
