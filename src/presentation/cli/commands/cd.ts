@@ -134,6 +134,7 @@ export function createCdCommand() {
         itemRepository: deps.itemRepository,
         timezone: deps.timezone,
         today: now,
+        prefixCandidates: () => deps.cacheUpdateService.getAliases(),
       });
 
       // Resolve expression to placement

@@ -91,6 +91,7 @@ export function createSnoozeCommand() {
         itemRepository: deps.itemRepository,
         timezone: deps.timezone,
         today: now,
+        prefixCandidates: () => deps.cacheUpdateService.getAliases(),
       });
 
       // Resolve snoozeUntil expression to DateTime (if provided)

@@ -24,6 +24,7 @@ export type ChangeItemStatusInput = Readonly<{
 export type ChangeItemStatusDependencies = Readonly<{
   itemRepository: ItemRepository;
   aliasRepository: AliasRepository;
+  prefixCandidates?: () => Promise<readonly string[]>;
 }>;
 
 export type ChangeItemStatusValidationError = ValidationError<"ChangeItemStatus">;
@@ -60,6 +61,7 @@ export const ChangeItemStatusWorkflow = {
       itemRepository: deps.itemRepository,
       aliasRepository: deps.aliasRepository,
       timezone: input.timezone,
+      prefixCandidates: deps.prefixCandidates,
     });
 
     const succeeded: Item[] = [];

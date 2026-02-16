@@ -16,10 +16,12 @@ export type PrefixLengthResolver = (alias: string) => number | undefined;
 export const createPrefixLengthResolver = (
   sortedAliases: readonly string[],
 ): PrefixLengthResolver => {
+  const aliasSet = new Set(sortedAliases);
   const cache = new Map<string, number>();
 
   return (alias: string): number | undefined => {
     if (sortedAliases.length === 0) return undefined;
+    if (!aliasSet.has(alias)) return undefined;
     const cached = cache.get(alias);
     if (cached !== undefined) return cached;
     const len = shortestUniquePrefix(alias, sortedAliases).length;

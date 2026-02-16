@@ -58,6 +58,7 @@ export function createCloseCommand() {
       }, {
         itemRepository: deps.itemRepository,
         aliasRepository: deps.aliasRepository,
+        prefixCandidates: () => deps.cacheUpdateService.getAliases(),
       });
 
       if (workflowResult.type === "error") {

@@ -181,6 +181,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
       itemRepository: deps.itemRepository,
       timezone: deps.timezone,
       today: now,
+      prefixCandidates: () => deps.cacheUpdateService.getAliases(),
     });
 
     const resolveResult = await pathResolver.resolveRange(cwd, rangeExpr);
@@ -257,6 +258,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
         {
           itemRepository: deps.itemRepository,
           aliasRepository: deps.aliasRepository,
+          prefixCandidates: () => deps.cacheUpdateService.getAliases(),
         },
       ),
   );
@@ -377,12 +379,14 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   // Create resolver function
   const resolveItemId: ItemIdResolver = (id: string): string | undefined => refItemAliasMap.get(id);
 
-  // Compute prefix lengths from displayed items only (no extra I/O).
+  // Compute prefix lengths using completion cache as the scope.
+  // This ensures prefix hints match what prefix resolution accepts.
+  const cachedAliases = await profileAsync(
+    "readCachedAliases",
+    () => deps.cacheUpdateService.getAliases(),
+  );
   const getPrefixLength = profileSync("computePrefixLengths", () => {
-    const sortedAliases = items
-      .map((item) => item.data.alias?.toString())
-      .filter((a): a is string => a !== undefined)
-      .sort();
+    const sortedAliases = [...cachedAliases].sort();
     return createPrefixLengthResolver(sortedAliases);
   });
 

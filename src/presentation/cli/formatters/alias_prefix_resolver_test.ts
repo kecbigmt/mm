@@ -24,3 +24,9 @@ Deno.test("createPrefixLengthResolver - caches results across calls", () => {
   assertEquals(first, second);
   assertEquals(first, 2);
 });
+
+Deno.test("createPrefixLengthResolver - returns undefined for alias not in sorted list", () => {
+  const sorted = ["alpha", "apex", "bravo"];
+  const resolve = createPrefixLengthResolver(sorted);
+  assertEquals(resolve("charlie"), undefined);
+});

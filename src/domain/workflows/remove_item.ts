@@ -19,6 +19,7 @@ export type RemoveItemInput = Readonly<{
 export type RemoveItemDependencies = Readonly<{
   itemRepository: ItemRepository;
   aliasRepository: AliasRepository;
+  prefixCandidates?: () => Promise<readonly string[]>;
 }>;
 
 export type RemoveItemValidationError = ValidationError<"RemoveItem">;
@@ -50,6 +51,7 @@ export const RemoveItemWorkflow = {
       itemRepository: deps.itemRepository,
       aliasRepository: deps.aliasRepository,
       timezone: input.timezone,
+      prefixCandidates: deps.prefixCandidates,
     });
 
     const succeeded: Item[] = [];

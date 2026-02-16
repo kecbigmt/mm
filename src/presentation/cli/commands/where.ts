@@ -39,6 +39,7 @@ export function createWhereCommand() {
         itemRepository: deps.itemRepository,
         aliasRepository: deps.aliasRepository,
         timezone: deps.timezone,
+        prefixCandidates: () => deps.cacheUpdateService.getAliases(),
       });
       const resolveResult = await locatorService.resolve(itemRef);
       if (resolveResult.type === "error") {

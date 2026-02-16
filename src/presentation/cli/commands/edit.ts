@@ -181,6 +181,7 @@ export function createEditCommand() {
           aliasRepository: deps.aliasRepository,
           rankService: deps.rankService,
           idGenerationService: deps.idGenerationService,
+          prefixCandidates: () => deps.cacheUpdateService.getAliases(),
         },
       );
 

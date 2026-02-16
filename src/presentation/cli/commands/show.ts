@@ -35,6 +35,7 @@ export function createShowCommand() {
         itemRepository: deps.itemRepository,
         aliasRepository: deps.aliasRepository,
         timezone: deps.timezone,
+        prefixCandidates: () => deps.cacheUpdateService.getAliases(),
       });
       const resolveResult = await locatorService.resolve(itemLocator);
       if (resolveResult.type === "error") {

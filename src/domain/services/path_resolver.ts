@@ -77,6 +77,7 @@ export type PathResolverDependencies = Readonly<{
   readonly itemRepository: ItemRepository;
   readonly timezone: TimezoneIdentifier;
   readonly today?: Date; // For testing; defaults to new Date()
+  readonly prefixCandidates?: () => Promise<readonly string[]>;
 }>;
 
 /**
@@ -116,29 +117,39 @@ export const createPathResolver = (
   const resolveAliasByPrefix = async (
     token: string,
   ): Promise<Result<Placement, PathResolverError>> => {
-    const listResult = await aliasRepository.list();
-    if (listResult.type === "error") {
-      return Result.error(
-        createValidationError(PATH_RESOLVER_ERROR_KIND, [
-          createValidationIssue(
-            `failed to list aliases for prefix resolution: ${listResult.error.message}`,
-            { code: "alias_resolution_failed", path: [] },
-          ),
-        ]),
-      );
+    let prefixResult: ReturnType<typeof resolvePrefix>;
+
+    if (dependencies.prefixCandidates) {
+      // Cache-scoped: single-tier resolution against provided candidates
+      const candidates = await dependencies.prefixCandidates();
+      prefixResult = resolvePrefix(token, candidates, []);
+    } else {
+      // Fallback: two-tier resolution (priority set + all aliases)
+      const listResult = await aliasRepository.list();
+      if (listResult.type === "error") {
+        return Result.error(
+          createValidationError(PATH_RESOLVER_ERROR_KIND, [
+            createValidationIssue(
+              `failed to list aliases for prefix resolution: ${listResult.error.message}`,
+              { code: "alias_resolution_failed", path: [] },
+            ),
+          ]),
+        );
+      }
+
+      const allAliasStrings = listResult.value.map((a) => a.data.slug.toString());
+      const prioritySet = await loadPrioritySet();
+      prefixResult = resolvePrefix(token, prioritySet, allAliasStrings);
     }
 
-    const allAliases = listResult.value;
-    const allAliasStrings = allAliases.map((a) => a.data.slug.toString());
-    const prioritySet = await loadPrioritySet();
-    const prefixResult = resolvePrefix(token, prioritySet, allAliasStrings);
-
     if (prefixResult.kind === "single") {
-      const matched = allAliases.find(
-        (a) => a.data.slug.toString() === prefixResult.alias,
-      );
-      if (matched) {
-        return Result.ok(createItemPlacement(matched.data.itemId, []));
+      // Load by alias slug to get itemId
+      const slugResult = parseAliasSlug(prefixResult.alias);
+      if (slugResult.type === "ok") {
+        const loadResult = await aliasRepository.load(slugResult.value);
+        if (loadResult.type === "ok" && loadResult.value) {
+          return Result.ok(createItemPlacement(loadResult.value.data.itemId, []));
+        }
       }
     }
 

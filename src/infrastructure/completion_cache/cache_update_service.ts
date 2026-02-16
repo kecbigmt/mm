@@ -47,6 +47,18 @@ export class CacheUpdateService {
   }
 
   /**
+   * Read all cached aliases
+   * Returns [] on error so callers are never blocked by cache failures
+   */
+  async getAliases(): Promise<string[]> {
+    try {
+      return await this.manager.getAliases();
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * Update cache from multiple item results
    * Call after successful ls command execution
    */

@@ -92,6 +92,7 @@ export function createMoveCommand() {
             itemRepository: deps.itemRepository,
             aliasRepository: deps.aliasRepository,
             rankService: deps.rankService,
+            prefixCandidates: () => deps.cacheUpdateService.getAliases(),
           },
         );
 
