@@ -1,5 +1,5 @@
 /**
- * E2E Performance Benchmarks for Placement Queries
+ * E2E Performance Benchmarks for Directory Queries
  *
  * These benchmarks test the real-world performance of the `ls` command
  * using the edge index optimization.
@@ -18,7 +18,7 @@ import { cleanupTestEnvironment, runCommand, setupTestEnvironment } from "../e2e
 const createItems = async (testHome: string, count: number, date: string) => {
   const promises = [];
   for (let i = 0; i < count; i++) {
-    promises.push(runCommand(testHome, ["note", `Item ${i}`, "-p", date]));
+    promises.push(runCommand(testHome, ["note", `Item ${i}`, "-d", date]));
   }
   const results = await Promise.all(promises);
 

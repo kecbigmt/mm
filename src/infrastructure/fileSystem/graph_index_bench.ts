@@ -1,8 +1,8 @@
 import { join } from "@std/path";
 import { generate as generateUuidV7 } from "@std/uuid/unstable-v7";
 import { queryEdgeReferences } from "./graph_index.ts";
-import { createDateRange, createSingleRange } from "../../domain/primitives/placement_range.ts";
-import { createDatePlacement, createItemPlacement } from "../../domain/primitives/placement.ts";
+import { createDateRange, createSingleRange } from "../../domain/primitives/directory_range.ts";
+import { createDateDirectory, createItemDirectory } from "../../domain/primitives/directory.ts";
 import { parseCalendarDay } from "../../domain/primitives/calendar_day.ts";
 import { parseItemId } from "../../domain/primitives/item_id.ts";
 import { parseItemRank } from "../../domain/primitives/item_rank.ts";
@@ -10,7 +10,7 @@ import { parseItemRank } from "../../domain/primitives/item_rank.ts";
 /**
  * Benchmark suite for graph index query performance
  *
- * These benchmarks measure the performance of edge-based placement queries.
+ * These benchmarks measure the performance of edge-based directory queries.
  *
  * Run with: deno bench --allow-read --allow-write src/infrastructure/fileSystem/graph_index_bench.ts
  */
@@ -47,7 +47,7 @@ const cleanup = async (root: string) => {
   }
 };
 
-// Baseline: Single date placement with small result set
+// Baseline: Single date directory with small result set
 Deno.bench({
   name: "queryEdgeReferences - single date, 10 items",
   group: "single-date",
@@ -57,8 +57,8 @@ Deno.bench({
     const root = await setupWorkspace(10);
     const date = parseCalendarDay("2025-01-15");
     if (date.type === "error") throw new Error("Invalid date");
-    const placement = createDatePlacement(date.value, []);
-    const range = createSingleRange(placement);
+    const directory = createDateDirectory(date.value, []);
+    const range = createSingleRange(directory);
 
     b.start();
     const result = await queryEdgeReferences(root, range);
@@ -80,8 +80,8 @@ Deno.bench({
     const root = await setupWorkspace(100);
     const date = parseCalendarDay("2025-01-15");
     if (date.type === "error") throw new Error("Invalid date");
-    const placement = createDatePlacement(date.value, []);
-    const range = createSingleRange(placement);
+    const directory = createDateDirectory(date.value, []);
+    const range = createSingleRange(directory);
 
     b.start();
     const result = await queryEdgeReferences(root, range);
@@ -103,8 +103,8 @@ Deno.bench({
     const root = await setupWorkspace(1000);
     const date = parseCalendarDay("2025-01-15");
     if (date.type === "error") throw new Error("Invalid date");
-    const placement = createDatePlacement(date.value, []);
-    const range = createSingleRange(placement);
+    const directory = createDateDirectory(date.value, []);
+    const range = createSingleRange(directory);
 
     b.start();
     const result = await queryEdgeReferences(root, range);
@@ -172,8 +172,8 @@ Deno.bench({
     const root = await Deno.makeTempDir({ prefix: "mm-bench-" });
     const date = parseCalendarDay("2025-01-15");
     if (date.type === "error") throw new Error("Invalid date");
-    const placement = createDatePlacement(date.value, []);
-    const range = createSingleRange(placement);
+    const directory = createDateDirectory(date.value, []);
+    const range = createSingleRange(directory);
 
     b.start();
     const result = await queryEdgeReferences(root, range);
@@ -186,10 +186,10 @@ Deno.bench({
   },
 });
 
-// Parent placement query
+// Parent directory query
 Deno.bench({
-  name: "queryEdgeReferences - parent placement, 50 items",
-  group: "parent-placement",
+  name: "queryEdgeReferences - parent directory, 50 items",
+  group: "parent-directory",
   permissions: { read: true, write: true },
   async fn(b) {
     const root = await Deno.makeTempDir({ prefix: "mm-bench-" });
@@ -218,8 +218,8 @@ Deno.bench({
       await Deno.writeTextFile(edgeFile, `${edgeContent}\n`);
     }
 
-    const placement = createItemPlacement(parentId.value, []);
-    const range = createSingleRange(placement);
+    const directory = createItemDirectory(parentId.value, []);
+    const range = createSingleRange(directory);
 
     b.start();
     const result = await queryEdgeReferences(root, range);

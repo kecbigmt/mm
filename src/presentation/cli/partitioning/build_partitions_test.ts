@@ -6,8 +6,8 @@ import {
   createDateRange,
   createNumericRange,
   createSingleRange,
-} from "../../../domain/primitives/placement_range.ts";
-import { parsePlacement, type Placement } from "../../../domain/primitives/placement.ts";
+} from "../../../domain/primitives/directory_range.ts";
+import { type Directory, parseDirectory } from "../../../domain/primitives/directory.ts";
 import type { SectionSummary } from "../../../domain/services/section_query_service.ts";
 
 const unwrapOk = <T, E>(
@@ -26,7 +26,7 @@ const makeItem = (
     title: string;
     icon: string;
     status: string;
-    placement: string;
+    directory: string;
     rank: string;
     createdAt: string;
     updatedAt: string;
@@ -38,7 +38,7 @@ const makeItem = (
     title: overrides.title ?? "Test item",
     icon: overrides.icon ?? "note",
     status: overrides.status ?? "open",
-    placement: overrides.placement ?? "2025-02-10",
+    directory: overrides.directory ?? "2025-02-10",
     rank: overrides.rank ?? "a",
     createdAt: overrides.createdAt ?? "2025-02-10T12:00:00Z",
     updatedAt: overrides.updatedAt ?? "2025-02-10T12:00:00Z",
@@ -50,37 +50,37 @@ const makeItem = (
 const makeCalendarDay = (iso: string): CalendarDay =>
   unwrapOk(parseCalendarDay(iso), `parseCalendarDay(${iso})`);
 
-const makePlacement = (str: string): Placement =>
-  unwrapOk(parsePlacement(str), `parsePlacement(${str})`);
+const makeDirectory = (str: string): Directory =>
+  unwrapOk(parseDirectory(str), `parseDirectory(${str})`);
 
 const makeSectionSummary = (
-  placement: string,
+  dir: string,
   itemCount: number,
   sectionCount: number,
 ): SectionSummary => ({
-  placement: makePlacement(placement),
+  directory: makeDirectory(dir),
   itemCount,
   sectionCount,
 });
 
 // =============================================================================
-// Single Placement Tests
+// Single Directory Tests
 // =============================================================================
 
-Deno.test("buildPartitions: single date placement with items", () => {
+Deno.test("buildPartitions: single date directory with items", () => {
   const items = [
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Item 1",
-      placement: "2025-02-10",
+      directory: "2025-02-10",
     }),
     makeItem({
       id: "019965a7-0002-740a-b8c1-1415904fd108",
       title: "Item 2",
-      placement: "2025-02-10",
+      directory: "2025-02-10",
     }),
   ];
-  const range = createSingleRange(makePlacement("2025-02-10"));
+  const range = createSingleRange(makeDirectory("2025-02-10"));
   const sections: SectionSummary[] = [];
 
   const result = buildPartitions({ items, range, sections });
@@ -95,9 +95,9 @@ Deno.test("buildPartitions: single date placement with items", () => {
   assertEquals(result.warnings.length, 0);
 });
 
-Deno.test("buildPartitions: single placement with no items returns empty", () => {
+Deno.test("buildPartitions: single directory with no items returns empty", () => {
   const items: Item[] = [];
-  const range = createSingleRange(makePlacement("2025-02-10"));
+  const range = createSingleRange(makeDirectory("2025-02-10"));
   const sections: SectionSummary[] = [];
 
   const result = buildPartitions({ items, range, sections });
@@ -106,15 +106,15 @@ Deno.test("buildPartitions: single placement with no items returns empty", () =>
   assertEquals(result.warnings.length, 0);
 });
 
-Deno.test("buildPartitions: single placement with section stubs", () => {
+Deno.test("buildPartitions: single directory with section stubs", () => {
   const items = [
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Item 1",
-      placement: "2025-02-10",
+      directory: "2025-02-10",
     }),
   ];
-  const range = createSingleRange(makePlacement("2025-02-10"));
+  const range = createSingleRange(makeDirectory("2025-02-10"));
   const sections = [
     makeSectionSummary("2025-02-10/1", 3, 1),
     makeSectionSummary("2025-02-10/2", 0, 0), // Empty, should be omitted
@@ -132,28 +132,28 @@ Deno.test("buildPartitions: single placement with section stubs", () => {
   assertEquals(result.partitions[0].stubs[1].itemCount, 5);
 });
 
-Deno.test("buildPartitions: single placement skips item-head events", () => {
+Deno.test("buildPartitions: single directory skips item-head events", () => {
   const items = [
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Note 1",
       icon: "note",
-      placement: "2025-02-10",
+      directory: "2025-02-10",
     }),
     makeItem({
       id: "019965a7-0002-740a-b8c1-1415904fd108",
       title: "Event under item head",
       icon: "event",
-      placement: "019965a7-9999-740a-b8c1-1415904fd108", // Item head
+      directory: "019965a7-9999-740a-b8c1-1415904fd108", // Item head
     }),
     makeItem({
       id: "019965a7-0003-740a-b8c1-1415904fd108",
       title: "Event under date head",
       icon: "event",
-      placement: "2025-02-10",
+      directory: "2025-02-10",
     }),
   ];
-  const range = createSingleRange(makePlacement("2025-02-10"));
+  const range = createSingleRange(makeDirectory("2025-02-10"));
   const sections: SectionSummary[] = [];
 
   const result = buildPartitions({ items, range, sections });
@@ -176,19 +176,19 @@ Deno.test("buildPartitions: date range groups by date descending", () => {
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Item on 10th",
-      placement: "2025-02-10",
+      directory: "2025-02-10",
       rank: "a",
     }),
     makeItem({
       id: "019965a7-0002-740a-b8c1-1415904fd108",
       title: "Item on 9th",
-      placement: "2025-02-09",
+      directory: "2025-02-09",
       rank: "a",
     }),
     makeItem({
       id: "019965a7-0003-740a-b8c1-1415904fd108",
       title: "Another on 10th",
-      placement: "2025-02-10",
+      directory: "2025-02-10",
       rank: "b",
     }),
   ];
@@ -215,7 +215,7 @@ Deno.test("buildPartitions: date range omits empty dates", () => {
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Item on 10th",
-      placement: "2025-02-10",
+      directory: "2025-02-10",
     }),
     // No items on 2025-02-09
   ];
@@ -235,7 +235,7 @@ Deno.test("buildPartitions: date range capped at limit", () => {
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Item",
-      placement: "2025-02-10",
+      directory: "2025-02-10",
     }),
   ];
   const range = createDateRange(makeCalendarDay("2025-02-01"), makeCalendarDay("2025-02-10"));
@@ -257,13 +257,13 @@ Deno.test("buildPartitions: date range skips item-head events", () => {
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Note",
       icon: "note",
-      placement: "2025-02-10",
+      directory: "2025-02-10",
     }),
     makeItem({
       id: "019965a7-0002-740a-b8c1-1415904fd108",
       title: "Event under item",
       icon: "event",
-      placement: "019965a7-9999-740a-b8c1-1415904fd108",
+      directory: "019965a7-9999-740a-b8c1-1415904fd108",
     }),
   ];
   const range = createDateRange(makeCalendarDay("2025-02-09"), makeCalendarDay("2025-02-10"));
@@ -280,22 +280,22 @@ Deno.test("buildPartitions: date range skips item-head events", () => {
 // =============================================================================
 
 Deno.test("buildPartitions: numeric range creates partitions per prefix", () => {
-  const parent = makePlacement("019965a7-9999-740a-b8c1-1415904fd108");
+  const parent = makeDirectory("019965a7-9999-740a-b8c1-1415904fd108");
   const items = [
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Chapter 1 item",
-      placement: "019965a7-9999-740a-b8c1-1415904fd108/1",
+      directory: "019965a7-9999-740a-b8c1-1415904fd108/1",
     }),
     makeItem({
       id: "019965a7-0002-740a-b8c1-1415904fd108",
       title: "Chapter 2 item",
-      placement: "019965a7-9999-740a-b8c1-1415904fd108/2",
+      directory: "019965a7-9999-740a-b8c1-1415904fd108/2",
     }),
     makeItem({
       id: "019965a7-0003-740a-b8c1-1415904fd108",
       title: "Another in chapter 1",
-      placement: "019965a7-9999-740a-b8c1-1415904fd108/1",
+      directory: "019965a7-9999-740a-b8c1-1415904fd108/1",
     }),
   ];
   const range = createNumericRange(parent, 1, 3);
@@ -320,12 +320,12 @@ Deno.test("buildPartitions: numeric range creates partitions per prefix", () => 
 });
 
 Deno.test("buildPartitions: numeric range skips empty prefixes", () => {
-  const parent = makePlacement("019965a7-9999-740a-b8c1-1415904fd108");
+  const parent = makeDirectory("019965a7-9999-740a-b8c1-1415904fd108");
   const items = [
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Chapter 2 item",
-      placement: "019965a7-9999-740a-b8c1-1415904fd108/2",
+      directory: "019965a7-9999-740a-b8c1-1415904fd108/2",
     }),
   ];
   const range = createNumericRange(parent, 1, 3);
@@ -340,12 +340,12 @@ Deno.test("buildPartitions: numeric range skips empty prefixes", () => {
 });
 
 Deno.test("buildPartitions: numeric range includes stubs from sections", () => {
-  const parent = makePlacement("019965a7-9999-740a-b8c1-1415904fd108");
+  const parent = makeDirectory("019965a7-9999-740a-b8c1-1415904fd108");
   const items = [
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Chapter 1 item",
-      placement: "019965a7-9999-740a-b8c1-1415904fd108/1",
+      directory: "019965a7-9999-740a-b8c1-1415904fd108/1",
     }),
   ];
   const sections = [
@@ -365,12 +365,12 @@ Deno.test("buildPartitions: numeric range includes stubs from sections", () => {
 });
 
 Deno.test("buildPartitions: numeric range capped at limit", () => {
-  const parent = makePlacement("019965a7-9999-740a-b8c1-1415904fd108");
+  const parent = makeDirectory("019965a7-9999-740a-b8c1-1415904fd108");
   const items = [
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Chapter 1",
-      placement: "019965a7-9999-740a-b8c1-1415904fd108/1",
+      directory: "019965a7-9999-740a-b8c1-1415904fd108/1",
     }),
   ];
   const range = createNumericRange(parent, 1, 150);
@@ -387,12 +387,12 @@ Deno.test("buildPartitions: numeric range capped at limit", () => {
 });
 
 Deno.test("buildPartitions: numeric range with custom display label", () => {
-  const parent = makePlacement("019965a7-9999-740a-b8c1-1415904fd108");
+  const parent = makeDirectory("019965a7-9999-740a-b8c1-1415904fd108");
   const items = [
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Chapter 1",
-      placement: "019965a7-9999-740a-b8c1-1415904fd108/1",
+      directory: "019965a7-9999-740a-b8c1-1415904fd108/1",
     }),
   ];
   const range = createNumericRange(parent, 1, 2);
@@ -412,17 +412,17 @@ Deno.test("buildPartitions: numeric range with custom display label", () => {
 });
 
 Deno.test("buildPartitions: numeric range under date head", () => {
-  const parent = makePlacement("2025-02-10");
+  const parent = makeDirectory("2025-02-10");
   const items = [
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Section 1 item",
-      placement: "2025-02-10/1",
+      directory: "2025-02-10/1",
     }),
     makeItem({
       id: "019965a7-0002-740a-b8c1-1415904fd108",
       title: "Section 2 item",
-      placement: "2025-02-10/2",
+      directory: "2025-02-10/2",
     }),
   ];
   const range = createNumericRange(parent, 1, 3);
@@ -474,28 +474,28 @@ Deno.test("buildPartitions: handles mixed item-head events across ranges", () =>
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Date note",
       icon: "note",
-      placement: "2025-02-10",
+      directory: "2025-02-10",
     }),
     makeItem({
       id: "019965a7-0002-740a-b8c1-1415904fd108",
       title: "Date event",
       icon: "event",
-      placement: "2025-02-10",
+      directory: "2025-02-10",
     }),
     makeItem({
       id: "019965a7-0003-740a-b8c1-1415904fd108",
       title: "Item-head event 1",
       icon: "event",
-      placement: "019965a7-9999-740a-b8c1-1415904fd108",
+      directory: "019965a7-9999-740a-b8c1-1415904fd108",
     }),
     makeItem({
       id: "019965a7-0004-740a-b8c1-1415904fd108",
       title: "Item-head event 2",
       icon: "event",
-      placement: "019965a7-8888-740a-b8c1-1415904fd108/1",
+      directory: "019965a7-8888-740a-b8c1-1415904fd108/1",
     }),
   ];
-  const range = createSingleRange(makePlacement("2025-02-10"));
+  const range = createSingleRange(makeDirectory("2025-02-10"));
   const sections: SectionSummary[] = [];
 
   const result = buildPartitions({ items, range, sections });
@@ -508,7 +508,7 @@ Deno.test("buildPartitions: handles mixed item-head events across ranges", () =>
 });
 
 Deno.test("buildPartitions: stubs only partition (no items)", () => {
-  const parent = makePlacement("019965a7-9999-740a-b8c1-1415904fd108");
+  const parent = makeDirectory("019965a7-9999-740a-b8c1-1415904fd108");
   const items: Item[] = [];
   const sections = [
     makeSectionSummary("019965a7-9999-740a-b8c1-1415904fd108/1/1", 5, 2),
@@ -522,13 +522,13 @@ Deno.test("buildPartitions: stubs only partition (no items)", () => {
   assertEquals(result.partitions[0].stubs.length, 1);
 });
 
-Deno.test("buildPartitions: single item-head placement", () => {
-  const parent = makePlacement("019965a7-9999-740a-b8c1-1415904fd108");
+Deno.test("buildPartitions: single item-head directory", () => {
+  const parent = makeDirectory("019965a7-9999-740a-b8c1-1415904fd108");
   const items = [
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Sub item",
-      placement: "019965a7-9999-740a-b8c1-1415904fd108",
+      directory: "019965a7-9999-740a-b8c1-1415904fd108",
     }),
   ];
   const range = createSingleRange(parent);
@@ -544,13 +544,13 @@ Deno.test("buildPartitions: single item-head placement", () => {
   }
 });
 
-Deno.test("buildPartitions: single item-head placement with getDisplayLabel omits /0", () => {
-  const parent = makePlacement("019965a7-9999-740a-b8c1-1415904fd108");
+Deno.test("buildPartitions: single item-head directory with getDisplayLabel omits /0", () => {
+  const parent = makeDirectory("019965a7-9999-740a-b8c1-1415904fd108");
   const items = [
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Sub item",
-      placement: "019965a7-9999-740a-b8c1-1415904fd108",
+      directory: "019965a7-9999-740a-b8c1-1415904fd108",
     }),
   ];
   const range = createSingleRange(parent);
@@ -558,7 +558,7 @@ Deno.test("buildPartitions: single item-head placement with getDisplayLabel omit
 
   // Custom getDisplayLabel that mimics list.ts behavior
   const getDisplayLabel = (
-    _parent: Placement,
+    _parent: Directory,
     sectionPrefix: number,
   ): string => {
     if (sectionPrefix === 0) return "my-alias";
@@ -575,13 +575,13 @@ Deno.test("buildPartitions: single item-head placement with getDisplayLabel omit
   }
 });
 
-Deno.test("buildPartitions: single item-head placement with section", () => {
-  const parent = makePlacement("019965a7-9999-740a-b8c1-1415904fd108/1/2");
+Deno.test("buildPartitions: single item-head directory with section", () => {
+  const parent = makeDirectory("019965a7-9999-740a-b8c1-1415904fd108/1/2");
   const items = [
     makeItem({
       id: "019965a7-0001-740a-b8c1-1415904fd108",
       title: "Deep item",
-      placement: "019965a7-9999-740a-b8c1-1415904fd108/1/2",
+      directory: "019965a7-9999-740a-b8c1-1415904fd108/1/2",
     }),
   ];
   const range = createSingleRange(parent);

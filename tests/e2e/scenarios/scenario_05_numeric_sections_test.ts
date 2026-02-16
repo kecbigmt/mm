@@ -60,7 +60,7 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     const page1Result = await runCommand(ctx.testHome, [
       "note",
       "Page 1",
-      "--parent",
+      "--dir",
       "chapter1/1",
     ], { sessionDir: ctx.sessionDir });
     assertEquals(page1Result.success, true, `Failed to create page1: ${page1Result.stderr}`);
@@ -68,7 +68,7 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     const page2Result = await runCommand(ctx.testHome, [
       "note",
       "Page 2",
-      "--parent",
+      "--dir",
       "chapter1/1",
     ], { sessionDir: ctx.sessionDir });
     assertEquals(page2Result.success, true, `Failed to create page2: ${page2Result.stderr}`);
@@ -76,7 +76,7 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     const page3Result = await runCommand(ctx.testHome, [
       "note",
       "Page 3",
-      "--parent",
+      "--dir",
       "chapter1/1",
     ], { sessionDir: ctx.sessionDir });
     assertEquals(page3Result.success, true, `Failed to create page3: ${page3Result.stderr}`);
@@ -96,13 +96,13 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     assertEquals(chapterResult.success, true, `Failed to create chapter: ${chapterResult.stderr}`);
 
     // Create pages under chapter1/1
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 1", "--dir", "chapter1/1"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "chapter1/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 2", "--dir", "chapter1/1"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "chapter1/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 3", "--dir", "chapter1/1"], {
       sessionDir: ctx.sessionDir,
     });
 
@@ -134,7 +134,7 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     await runCommand(ctx.testHome, ["note", "Chapter 1", "--alias", "chapter1"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 1", "--dir", "chapter1/1"], {
       sessionDir: ctx.sessionDir,
     });
 
@@ -161,7 +161,7 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     await runCommand(ctx.testHome, ["note", "Chapter 1", "--alias", "chapter1"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 1", "--dir", "chapter1/1"], {
       sessionDir: ctx.sessionDir,
     });
 
@@ -189,7 +189,7 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     });
 
     // Create page under chapter1/1
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 1", "--dir", "chapter1/1"], {
       sessionDir: ctx.sessionDir,
     });
 
@@ -201,7 +201,7 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     const subPageResult = await runCommand(ctx.testHome, [
       "note",
       "Sub-page 1",
-      "--parent",
+      "--dir",
       "./2",
     ], { sessionDir: ctx.sessionDir });
     assertEquals(subPageResult.success, true, `Failed to create sub-page: ${subPageResult.stderr}`);
@@ -241,13 +241,13 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     assertEquals(chapterResult.success, true, "Chapter creation should succeed");
 
     // Step 3-5: Create pages under chapter1/1
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter1/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 1", "--dir", "chapter1/1"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "chapter1/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 2", "--dir", "chapter1/1"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "chapter1/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 3", "--dir", "chapter1/1"], {
       sessionDir: ctx.sessionDir,
     });
 
@@ -270,7 +270,7 @@ describe("Scenario 5: Numeric section creation and navigation", () => {
     assertEquals(cdSection1.success, true, "cd 1 should succeed");
 
     // Step 10: Create sub-page under ./2
-    await runCommand(ctx.testHome, ["note", "Sub-page 1", "--parent", "./2"], {
+    await runCommand(ctx.testHome, ["note", "Sub-page 1", "--dir", "./2"], {
       sessionDir: ctx.sessionDir,
     });
 

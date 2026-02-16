@@ -9,7 +9,7 @@
  *   This scenario tests cd command home navigation:
  *   - Run `mm cd` without arguments from different locations
  *   - Verify navigation to today's date
- *   - Confirm output shows the new placement
+ *   - Confirm output shows the new directory
  *   - Test workspace option compatibility
  *
  * Design Reference:

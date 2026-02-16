@@ -5,14 +5,14 @@ import { ItemRepository } from "../../domain/repositories/item_repository.ts";
 import { AliasRepository } from "../../domain/repositories/alias_repository.ts";
 import { Item, ItemSnapshot, parseItem } from "../../domain/models/item.ts";
 import { CURRENT_ITEM_SCHEMA } from "./workspace_schema.ts";
-import { ItemId, parseAliasSlug, Placement, PlacementRange } from "../../domain/primitives/mod.ts";
+import { Directory, DirectoryRange, ItemId, parseAliasSlug } from "../../domain/primitives/mod.ts";
 import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.ts";
 import { createRepositoryError } from "../../domain/repositories/mod.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
 import {
-  deletePlacementEdge,
+  deleteDirectoryEdge,
   readEdgeCollection,
-  savePlacementEdge,
+  saveDirectoryEdge,
   writeEdgeCollection,
 } from "./edge_store.ts";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter.ts";
@@ -27,14 +27,14 @@ export type FileSystemItemRepositoryDependencies = Readonly<{
 type LoadResult = Result<Item | undefined, RepositoryError>;
 type SaveResult = Result<void, RepositoryError>;
 type DeleteResult = Result<void, RepositoryError>;
-type ListByPlacementResult = Result<ReadonlyArray<Item>, RepositoryError>;
+type ListByDirectoryResult = Result<ReadonlyArray<Item>, RepositoryError>;
 
 type ItemFrontmatter = Readonly<{
   id: string;
   icon: string;
   kind?: string;
   status: string;
-  placement: string;
+  directory: string;
   rank: string;
   created_at: string;
   updated_at: string;
@@ -89,10 +89,10 @@ const edgesDirectory = (workspaceRoot: string, itemId: string): string =>
   join(workspaceRoot, ".index", "graph", "parents", itemId);
 
 /**
- * Check if a placement is directly under a date (no sections, no parent item)
+ * Check if a directory is directly under a date (no sections, no parent item)
  */
-const isDirectlyUnderDate = (placement: Placement): boolean => {
-  return placement.head.kind === "date" && placement.section.length === 0;
+const isDirectlyUnderDate = (directory: Directory): boolean => {
+  return directory.head.kind === "date" && directory.section.length === 0;
 };
 
 const parseSnapshot = (
@@ -119,7 +119,7 @@ const writeItemFile = async (
     id: snapshot.id,
     icon: snapshot.icon,
     status: snapshot.status,
-    placement: snapshot.placement,
+    directory: snapshot.directory,
     rank: snapshot.rank,
     created_at: snapshot.createdAt,
     updated_at: snapshot.updatedAt,
@@ -288,7 +288,7 @@ const loadItemFromFile = async (
     id: frontmatter.id,
     icon: frontmatter.icon,
     status: frontmatter.status,
-    placement: frontmatter.placement,
+    directory: frontmatter.directory,
     rank: frontmatter.rank,
     createdAt: frontmatter.created_at,
     updatedAt: frontmatter.updated_at,
@@ -447,16 +447,16 @@ export const createFileSystemItemRepository = (
     }
 
     // Handle top-level edge file updates (items directly under date)
-    const newIsDirectUnderDate = isDirectlyUnderDate(item.data.placement);
+    const newIsDirectUnderDate = isDirectlyUnderDate(item.data.directory);
     const oldIsDirectUnderDate = existingItem
-      ? isDirectlyUnderDate(existingItem.data.placement)
+      ? isDirectlyUnderDate(existingItem.data.directory)
       : false;
 
-    // If placement changed from direct-under-date to something else, delete old top-level edge
+    // If directory changed from direct-under-date to something else, delete old top-level edge
     if (existingItem && oldIsDirectUnderDate && !newIsDirectUnderDate) {
-      if (existingItem.data.placement.head.kind === "date") {
-        const oldDateStr = existingItem.data.placement.head.date.toString();
-        const deleteResult = await deletePlacementEdge(
+      if (existingItem.data.directory.head.kind === "date") {
+        const oldDateStr = existingItem.data.directory.head.date.toString();
+        const deleteResult = await deleteDirectoryEdge(
           dependencies.root,
           oldDateStr,
           item.data.id,
@@ -467,16 +467,16 @@ export const createFileSystemItemRepository = (
       }
     }
 
-    // If placement changed between different dates (both direct-under-date), delete old and create new
+    // If directory changed between different dates (both direct-under-date), delete old and create new
     if (existingItem && oldIsDirectUnderDate && newIsDirectUnderDate) {
       if (
-        existingItem.data.placement.head.kind === "date" &&
-        item.data.placement.head.kind === "date" &&
-        existingItem.data.placement.head.date.toString() !==
-          item.data.placement.head.date.toString()
+        existingItem.data.directory.head.kind === "date" &&
+        item.data.directory.head.kind === "date" &&
+        existingItem.data.directory.head.date.toString() !==
+          item.data.directory.head.date.toString()
       ) {
-        const oldDateStr = existingItem.data.placement.head.date.toString();
-        const deleteResult = await deletePlacementEdge(
+        const oldDateStr = existingItem.data.directory.head.date.toString();
+        const deleteResult = await deleteDirectoryEdge(
           dependencies.root,
           oldDateStr,
           item.data.id,
@@ -487,14 +487,14 @@ export const createFileSystemItemRepository = (
       }
     }
 
-    // If placement changed from item-parent to date-parent, delete old parent edge
+    // If directory changed from item-parent to date-parent, delete old parent edge
     if (
       existingItem &&
-      existingItem.data.placement.head.kind === "item" &&
-      item.data.placement.head.kind === "date"
+      existingItem.data.directory.head.kind === "item" &&
+      item.data.directory.head.kind === "date"
     ) {
-      const oldParentId = existingItem.data.placement.head.id;
-      const oldSectionPath = existingItem.data.placement.section.join("/");
+      const oldParentId = existingItem.data.directory.head.id;
+      const oldSectionPath = existingItem.data.directory.section.join("/");
 
       const oldEdgeDir = oldSectionPath
         ? join(
@@ -523,13 +523,13 @@ export const createFileSystemItemRepository = (
       }
     }
 
-    // If placement changed from permanent to date or item, delete old permanent edge
+    // If directory changed from permanent to date or item, delete old permanent edge
     if (
       existingItem &&
-      existingItem.data.placement.head.kind === "permanent" &&
-      item.data.placement.head.kind !== "permanent"
+      existingItem.data.directory.head.kind === "permanent" &&
+      item.data.directory.head.kind !== "permanent"
     ) {
-      const oldSectionPath = existingItem.data.placement.section.join("/");
+      const oldSectionPath = existingItem.data.directory.section.join("/");
       const oldEdgeDir = oldSectionPath
         ? join(dependencies.root, ".index", "graph", "permanent", oldSectionPath)
         : join(dependencies.root, ".index", "graph", "permanent");
@@ -549,16 +549,16 @@ export const createFileSystemItemRepository = (
       }
     }
 
-    // If placement changed from date/item to permanent, delete old edge
+    // If directory changed from date/item to permanent, delete old edge
     // (Date edges are already handled above by oldIsDirectUnderDate check)
     // Handle item-to-permanent transition
     if (
       existingItem &&
-      existingItem.data.placement.head.kind === "item" &&
-      item.data.placement.head.kind === "permanent"
+      existingItem.data.directory.head.kind === "item" &&
+      item.data.directory.head.kind === "permanent"
     ) {
-      const oldParentId = existingItem.data.placement.head.id;
-      const oldSectionPath = existingItem.data.placement.section.join("/");
+      const oldParentId = existingItem.data.directory.head.id;
+      const oldSectionPath = existingItem.data.directory.section.join("/");
       const oldEdgeDir = oldSectionPath
         ? join(
           dependencies.root,
@@ -585,11 +585,11 @@ export const createFileSystemItemRepository = (
       }
     }
 
-    // Save top-level placement edge if this item is directly under a date
+    // Save top-level directory edge if this item is directly under a date
     if (newIsDirectUnderDate) {
-      if (item.data.placement.head.kind === "date") {
-        const dateStr = item.data.placement.head.date.toString(); // YYYY-MM-DD format
-        const topLevelResult = await savePlacementEdge(
+      if (item.data.directory.head.kind === "date") {
+        const dateStr = item.data.directory.head.date.toString(); // YYYY-MM-DD format
+        const topLevelResult = await saveDirectoryEdge(
           dependencies.root,
           dateStr,
           item.data.id,
@@ -599,17 +599,17 @@ export const createFileSystemItemRepository = (
           return topLevelResult;
         }
       }
-    } else if (item.data.placement.head.kind === "item") {
+    } else if (item.data.directory.head.kind === "item") {
       // If not directly under date, save edge file in parent item's edges directory
-      const parentId = item.data.placement.head.id;
+      const parentId = item.data.directory.head.id;
 
       // Delete old parent edge if parent or section changed
-      if (existingItem && existingItem.data.placement.head.kind === "item") {
-        const oldParentId = existingItem.data.placement.head.id;
-        const oldSectionPath = existingItem.data.placement.section.join("/");
+      if (existingItem && existingItem.data.directory.head.kind === "item") {
+        const oldParentId = existingItem.data.directory.head.id;
+        const oldSectionPath = existingItem.data.directory.section.join("/");
 
         const parentChanged = oldParentId.toString() !== parentId.toString();
-        const newSectionPath = item.data.placement.section.join("/");
+        const newSectionPath = item.data.directory.section.join("/");
         const sectionChanged = oldSectionPath !== newSectionPath;
 
         if (parentChanged || sectionChanged) {
@@ -642,7 +642,7 @@ export const createFileSystemItemRepository = (
       }
 
       // Save new parent edge file
-      const sectionPath = item.data.placement.section.join("/");
+      const sectionPath = item.data.directory.section.join("/");
 
       // Edge directory: .index/graph/parents/<parentId>/section1/section2/...
       const edgeDir = sectionPath
@@ -692,14 +692,14 @@ export const createFileSystemItemRepository = (
           }),
         );
       }
-    } else if (item.data.placement.head.kind === "permanent") {
-      // Permanent placement - save edge file in .index/graph/permanent/
-      const sectionPath = item.data.placement.section.join("/");
+    } else if (item.data.directory.head.kind === "permanent") {
+      // Permanent directory - save edge file in .index/graph/permanent/
+      const sectionPath = item.data.directory.section.join("/");
 
       // Delete old permanent edge if section changed
-      if (existingItem && existingItem.data.placement.head.kind === "permanent") {
-        const oldSectionPath = existingItem.data.placement.section.join("/");
-        const newSectionPath = item.data.placement.section.join("/");
+      if (existingItem && existingItem.data.directory.head.kind === "permanent") {
+        const oldSectionPath = existingItem.data.directory.section.join("/");
+        const newSectionPath = item.data.directory.section.join("/");
 
         if (oldSectionPath !== newSectionPath) {
           const oldEdgeDir = oldSectionPath
@@ -784,12 +784,12 @@ export const createFileSystemItemRepository = (
     const item = itemResult.value;
 
     if (item) {
-      // Delete edge based on placement
-      if (isDirectlyUnderDate(item.data.placement)) {
+      // Delete edge based on directory
+      if (isDirectlyUnderDate(item.data.directory)) {
         // Delete top-level edge if item was directly under a date
-        if (item.data.placement.head.kind === "date") {
-          const dateStr = item.data.placement.head.date.toString();
-          const topLevelResult = await deletePlacementEdge(
+        if (item.data.directory.head.kind === "date") {
+          const dateStr = item.data.directory.head.date.toString();
+          const topLevelResult = await deleteDirectoryEdge(
             dependencies.root,
             dateStr,
             id,
@@ -798,10 +798,10 @@ export const createFileSystemItemRepository = (
             return topLevelResult;
           }
         }
-      } else if (item.data.placement.head.kind === "item") {
+      } else if (item.data.directory.head.kind === "item") {
         // Delete parent edge if item was under a parent item
-        const parentId = item.data.placement.head.id;
-        const sectionPath = item.data.placement.section.join("/");
+        const parentId = item.data.directory.head.id;
+        const sectionPath = item.data.directory.section.join("/");
 
         const edgeDir = sectionPath
           ? join(
@@ -828,9 +828,9 @@ export const createFileSystemItemRepository = (
             );
           }
         }
-      } else if (item.data.placement.head.kind === "permanent") {
-        // Delete permanent edge if item was under permanent placement
-        const sectionPath = item.data.placement.section.join("/");
+      } else if (item.data.directory.head.kind === "permanent") {
+        // Delete permanent edge if item was under permanent directory
+        const sectionPath = item.data.directory.section.join("/");
 
         const edgeDir = sectionPath
           ? join(dependencies.root, ".index", "graph", "permanent", sectionPath)
@@ -868,9 +868,9 @@ export const createFileSystemItemRepository = (
     return Result.ok(undefined);
   };
 
-  const listByPlacement = async (
-    range: PlacementRange,
-  ): Promise<ListByPlacementResult> => {
+  const listByDirectory = async (
+    range: DirectoryRange,
+  ): Promise<ListByDirectoryResult> => {
     // Query edge references from index instead of scanning all files
     const edgeRefsResult = await queryEdgeReferences(dependencies.root, range);
     if (edgeRefsResult.type === "error") {
@@ -879,7 +879,7 @@ export const createFileSystemItemRepository = (
 
     const items: Item[] = [];
 
-    // Load only the items that match the placement range
+    // Load only the items that match the directory range
     for (const edgeRef of edgeRefsResult.value) {
       const itemIdStr = edgeRef.itemId.toString();
 
@@ -931,6 +931,6 @@ export const createFileSystemItemRepository = (
     load,
     save,
     delete: remove,
-    listByPlacement,
+    listByDirectory,
   };
 };

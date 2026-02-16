@@ -100,7 +100,7 @@ mm n --body "Note content" "Weekly Review"
 Options:
 
 - `-b, --body <body>` - Body text
-- `-p, --parent <path>` - Parent container (default: today)
+- `-d, --dir <dir>` - Directory locator (e.g., /2025-11-03, /alias, ./1, permanent)
 - `-c, --context <context>` - Context tag
 - `-a, --alias <slug>` - Human-readable alias
 - `-e, --edit` - Open editor after creation
@@ -123,13 +123,13 @@ mm t "Fix bug" --due-at "17:00" --context work
 Options:
 
 - `-b, --body <body>` - Body text
-- `-p, --parent <path>` - Parent container (default: today)
+- `-d, --dir <dir>` - Directory locator (e.g., /2025-11-03, /alias, ./1)
 - `-c, --context <context>` - Context tag
 - `-a, --alias <slug>` - Human-readable alias
-- `-d, --due-at <datetime>` - Due date/time in one of these formats:
+- `--due-at <datetime>` - Due date/time in one of these formats:
   - ISO 8601 with timezone: `2025-01-20T17:00:00Z` or `2025-01-20T17:00:00+09:00`
   - ISO 8601 local time: `2025-01-20T17:00` (interpreted as local time)
-  - Time only: `17:00` or `17:00:00` (uses parent placement date or today)
+  - Time only: `17:00` or `17:00:00` (uses parent directory date or today)
 - `-e, --edit` - Open editor after creation
 
 #### `event [title]`
@@ -150,19 +150,19 @@ mm event "Lunch" --start-at "12:00" --duration 1h
 Options:
 
 - `-b, --body <body>` - Body text
-- `-p, --parent <path>` - Parent container (default: today)
+- `-d, --dir <dir>` - Directory locator (e.g., /2025-11-03, /alias, ./1)
 - `-c, --context <context>` - Context tag
 - `-a, --alias <slug>` - Human-readable alias
 - `-s, --start-at <datetime>` - Start date/time in one of these formats:
   - ISO 8601 with timezone: `2025-01-15T14:00:00Z` or `2025-01-15T14:00:00+09:00`
   - ISO 8601 local time: `2025-01-15T14:00` (interpreted as local time)
-  - Time only: `14:00` or `14:00:00` (uses parent placement date or today)
-- `-d, --duration <duration>` - Duration (e.g., 30m, 2h, 1h30m)
+  - Time only: `14:00` or `14:00:00` (uses parent directory date or today)
+- `--duration <duration>` - Duration (e.g., 30m, 2h, 1h30m)
 - `-e, --edit` - Open editor after creation
 
-**Note:** For events with `--start-at`, the date portion must match the parent placement date for
-calendar-based placements (e.g., `/2025-01-15`). This validation is skipped for item-based
-placements.
+**Note:** For events with `--start-at`, the date portion must match the parent directory date for
+calendar-based directories (e.g., `/2025-01-15`). This validation is skipped for item-based
+directories.
 
 ### Managing Item Status
 
@@ -209,10 +209,10 @@ mm reopen task-a
 mm reopen task-a task-b
 ```
 
-#### `move <ids...> <placement>`
+#### `move <ids...> <directory>`
 
-Move one or more items to a new placement. Items maintain their physical location; only logical
-placement changes. Alias: `mv`
+Move one or more items to a new directory. Items maintain their physical location; only logical
+directory changes. Alias: `mv`
 
 ```sh
 # Move item to head of today
@@ -238,7 +238,7 @@ mm mv task-a 2025-01-20
 mm mv task-a task-b task-c head:today
 ```
 
-Placement formats:
+Directory formats:
 
 - `head:<path>` - Move to head (first position) of the target container
 - `tail:<path>` - Move to tail (last position) of the target container
@@ -247,7 +247,7 @@ Placement formats:
 - `<path>` - Move to the target container (date or item alias)
 
 When moving multiple items, they are placed in the order specified. The first item goes to the
-target placement, and subsequent items are placed after the previous one.
+target directory, and subsequent items are placed after the previous one.
 
 #### `snooze <ids...> [until]`
 
@@ -282,7 +282,7 @@ Datetime formats:
 
 - ISO 8601 with timezone: `2025-01-20T17:00:00Z` or `2025-01-20T17:00:00+09:00`
 - ISO 8601 local time: `2025-01-20T17:00` (interpreted as local time)
-- Time only: `17:00` or `17:00:00` (uses parent placement date or today)
+- Time only: `17:00` or `17:00:00` (uses parent directory date or today)
 
 #### `remove <ids...>`
 
@@ -590,8 +590,7 @@ Then restart your shell or run `source ~/.bashrc`.
 ### What Gets Completed
 
 - **Commands**: All mm commands (`note`, `task`, `edit`, `list`, `move`, `close`, etc.)
-- **Flags**: Context-aware flag completion for each command (e.g., `--context`, `--parent`,
-  `--alias`)
+- **Flags**: Context-aware flag completion for each command (e.g., `--context`, `--dir`, `--alias`)
 - **Aliases**: Recently used item aliases when editing or moving items (cached from recent
   operations)
 - **Context tags**: Recently used tags when specifying `--context` (cached from recent operations)

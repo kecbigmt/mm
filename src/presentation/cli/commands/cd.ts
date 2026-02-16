@@ -7,32 +7,32 @@ import {
 import { parsePathExpression } from "../path_parser.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import {
-  formatPlacementForDisplay,
-  PlacementDisplayDependencies,
-} from "../../../domain/services/placement_display_service.ts";
+  DirectoryDisplayDependencies,
+  formatDirectoryForDisplay,
+} from "../../../domain/services/directory_display_service.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
-import { Placement } from "../../../domain/primitives/mod.ts";
+import { Directory } from "../../../domain/primitives/mod.ts";
 
-type SaveAndDisplayDeps = CwdSaveDependencies & PlacementDisplayDependencies;
+type SaveAndDisplayDeps = CwdSaveDependencies & DirectoryDisplayDependencies;
 
 /**
- * Saves the placement to session and displays it.
+ * Saves the directory to session and displays it.
  * Returns true on success, false on error (errors are logged to stderr).
  */
-async function saveAndDisplayPlacement(
-  placement: Placement,
+async function saveAndDisplayDirectory(
+  dir: Directory,
   deps: SaveAndDisplayDeps,
   debug: boolean,
-  previousPlacement?: Placement,
+  previousDirectory?: Directory,
 ): Promise<boolean> {
-  const saveResult = await CwdResolutionService.setCwd(placement, deps, previousPlacement);
+  const saveResult = await CwdResolutionService.setCwd(dir, deps, previousDirectory);
   if (saveResult.type === "error") {
     console.error(formatError(saveResult.error, debug));
     return false;
   }
 
-  const displayResult = await formatPlacementForDisplay(placement, deps);
+  const displayResult = await formatDirectoryForDisplay(dir, deps);
   if (displayResult.type === "error") {
     console.error(formatError(displayResult.error, debug));
     return false;
@@ -75,21 +75,21 @@ export function createCdCommand() {
 
       if (isHome) {
         // Navigate to today's date (home) - matching bash cd behavior
-        const todayPlacementResult = CwdResolutionService.createTodayPlacement(now, deps.timezone);
-        if (todayPlacementResult.type === "error") {
-          console.error(formatError(todayPlacementResult.error, debug));
+        const todayDirectoryResult = CwdResolutionService.createTodayDirectory(now, deps.timezone);
+        if (todayDirectoryResult.type === "error") {
+          console.error(formatError(todayDirectoryResult.error, debug));
           return;
         }
 
         // Load current cwd to save as previous
         const cwdResult = await CwdResolutionService.getCwd(cwdDeps);
-        const currentPlacement = cwdResult.type === "ok" ? cwdResult.value.placement : undefined;
+        const currentDirectory = cwdResult.type === "ok" ? cwdResult.value.directory : undefined;
 
-        await saveAndDisplayPlacement(
-          todayPlacementResult.value,
+        await saveAndDisplayDirectory(
+          todayDirectoryResult.value,
           cwdDeps,
           debug,
-          currentPlacement,
+          currentDirectory,
         );
         return;
       }
@@ -105,20 +105,20 @@ export function createCdCommand() {
 
         // Load current cwd to save as previous (for toggle behavior)
         const cwdResult = await CwdResolutionService.getCwd(cwdDeps);
-        const currentPlacement = cwdResult.type === "ok" ? cwdResult.value.placement : undefined;
+        const currentDirectory = cwdResult.type === "ok" ? cwdResult.value.directory : undefined;
 
-        await saveAndDisplayPlacement(previousResult.value, cwdDeps, debug, currentPlacement);
+        await saveAndDisplayDirectory(previousResult.value, cwdDeps, debug, currentDirectory);
         return;
       }
 
-      // Get current placement
-      const cwdPlacementResult = await CwdResolutionService.getCwd(cwdDeps);
-      if (cwdPlacementResult.type === "error") {
-        console.error(formatError(cwdPlacementResult.error, debug));
+      // Get current directory
+      const cwdDirectoryResult = await CwdResolutionService.getCwd(cwdDeps);
+      if (cwdDirectoryResult.type === "error") {
+        console.error(formatError(cwdDirectoryResult.error, debug));
         return;
       }
-      if (cwdPlacementResult.value.warning) {
-        console.error(`Warning: ${cwdPlacementResult.value.warning}`);
+      if (cwdDirectoryResult.value.warning) {
+        console.error(`Warning: ${cwdDirectoryResult.value.warning}`);
       }
 
       // Parse path expression
@@ -137,20 +137,20 @@ export function createCdCommand() {
         prefixCandidates: () => deps.cacheUpdateService.getAliases(),
       });
 
-      // Resolve expression to placement
-      const placementResult = await pathResolver.resolvePath(
-        cwdPlacementResult.value.placement,
+      // Resolve expression to directory
+      const directoryResult = await pathResolver.resolvePath(
+        cwdDirectoryResult.value.directory,
         exprResult.value,
       );
 
-      if (placementResult.type === "error") {
-        console.error(formatError(placementResult.error, debug));
+      if (directoryResult.type === "error") {
+        console.error(formatError(directoryResult.error, debug));
         return;
       }
 
-      // Validate placement (for item placements, check existence)
-      const validateResult = await CwdResolutionService.validatePlacement(
-        placementResult.value,
+      // Validate directory (for item directories, check existence)
+      const validateResult = await CwdResolutionService.validateDirectory(
+        directoryResult.value,
         {
           itemRepository: deps.itemRepository,
         },
@@ -161,11 +161,11 @@ export function createCdCommand() {
         return;
       }
 
-      await saveAndDisplayPlacement(
+      await saveAndDisplayDirectory(
         validateResult.value,
         cwdDeps,
         debug,
-        cwdPlacementResult.value.placement,
+        cwdDirectoryResult.value.directory,
       );
     });
 }

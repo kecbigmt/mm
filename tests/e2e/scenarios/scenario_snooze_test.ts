@@ -104,7 +104,7 @@ describe("Scenario: Snooze Feature", () => {
     );
   });
 
-  it("snoozes item to tomorrow and auto-moves placement", async () => {
+  it("snoozes item to tomorrow and auto-moves directory", async () => {
     await runCommand(ctx.testHome, ["cd", "today"]);
 
     // Create a task
@@ -124,7 +124,7 @@ describe("Scenario: Snooze Feature", () => {
     const snoozeResult = await runCommand(ctx.testHome, ["snooze", taskId, "tomorrow"]);
     assertEquals(snoozeResult.success, true, `Snooze failed: ${snoozeResult.stderr}`);
 
-    // Verify item was moved to tomorrow (use --logical to see placement date)
+    // Verify item was moved to tomorrow (use --logical to see directory date)
     const whereResult = await runCommand(ctx.testHome, ["where", taskId, "--logical"]);
     assertEquals(whereResult.success, true, `where failed: ${whereResult.stderr}`);
 
@@ -321,7 +321,7 @@ describe("Scenario: Snooze Feature", () => {
     const snoozeTomorrowResult = await runCommand(ctx.testHome, ["snooze", task1Id, "tomorrow"]);
     assertEquals(snoozeTomorrowResult.success, true, "Snooze to tomorrow should succeed");
 
-    // Step 11: Verify Task 1 moved to tomorrow (use --logical to see placement date)
+    // Step 11: Verify Task 1 moved to tomorrow (use --logical to see directory date)
     const whereResult = await runCommand(ctx.testHome, ["where", task1Id, "--logical"]);
     assertEquals(whereResult.success, true, "where should succeed");
     const [year, month, day] = today.split("-").map(Number);

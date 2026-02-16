@@ -10,7 +10,7 @@
  * - Focus: Scalability is the most critical performance characteristic
  * - Coverage: This benchmark validates the edge index optimization
  *
- * For comprehensive performance testing, use placement_query_bench.ts locally.
+ * For comprehensive performance testing, use directory_query_bench.ts locally.
  *
  * Run with: deno bench --allow-read --allow-write --allow-env --allow-run tests/performance/ci/
  */
@@ -23,7 +23,7 @@ import { cleanupTestEnvironment, runCommand, setupTestEnvironment } from "../../
 const createItems = async (testHome: string, count: number, date: string) => {
   const promises = [];
   for (let i = 0; i < count; i++) {
-    promises.push(runCommand(testHome, ["note", `Item ${i}`, "-p", date]));
+    promises.push(runCommand(testHome, ["note", `Item ${i}`, "-d", date]));
   }
   const results = await Promise.all(promises);
 

@@ -41,7 +41,7 @@ const baseSnapshot = (
   title: "Test item",
   icon: "note",
   status: "open",
-  placement: "2024-09-20",
+  directory: "2024-09-20",
   rank: "a",
   createdAt: "2024-09-20T12:00:00Z",
   updatedAt: "2024-09-20T12:00:00Z",
@@ -54,7 +54,7 @@ Deno.test("parseItem parses full snapshot payload", () => {
     title: "Detailed item",
     icon: "task",
     status: "closed",
-    placement: "2024-09-21",
+    directory: "2024-09-21",
     rank: "b1",
     alias: "focus-work",
     project: PROJECT_UUID_1,
@@ -78,7 +78,7 @@ Deno.test("parseItem parses full snapshot payload", () => {
   assertEquals(item.data.icon.toString(), "task");
   assertEquals(item.data.status.toString(), "closed");
   assertEquals(item.data.rank.toString(), "b1");
-  assertEquals(item.data.placement.toString(), "2024-09-21");
+  assertEquals(item.data.directory.toString(), "2024-09-21");
   assertEquals(item.data.alias?.toString(), "focus-work");
   assertEquals(item.data.project?.toString(), PROJECT_UUID_1);
   assertEquals(item.data.contexts?.length, 2);
@@ -116,18 +116,18 @@ Deno.test("parseItem parses edges collection", () => {
   const roundTrip = item.toJSON();
   assert(roundTrip.edges !== undefined, "edges should be serialized");
   assertEquals(roundTrip.edges?.length, 1);
-  assertEquals(roundTrip.placement, "2024-09-20");
+  assertEquals(roundTrip.directory, "2024-09-20");
 });
 
-Deno.test("parseItem requires placement metadata", () => {
-  const { placement: _placement, ...legacySnapshot } = baseSnapshot();
+Deno.test("parseItem requires directory metadata", () => {
+  const { directory: _directory, ...legacySnapshot } = baseSnapshot();
   const result = parseItem(legacySnapshot as unknown as Parameters<typeof parseItem>[0]);
   if (result.type !== "error") {
-    throw new Error("expected placement validation error");
+    throw new Error("expected directory validation error");
   }
   assert(
-    result.error.issues.some((issue) => issue.path[0] === "placement"),
-    "placement issues should be reported",
+    result.error.issues.some((issue) => issue.path[0] === "directory"),
+    "directory issues should be reported",
   );
 });
 
@@ -156,29 +156,29 @@ Deno.test("Item.reopen clears closed state", () => {
   assertEquals(closed.data.status.toString(), "closed");
 });
 
-Deno.test("Item.relocate updates placement and rank", async () => {
-  const { parsePlacement } = await import("../primitives/placement.ts");
+Deno.test("Item.relocate updates directory and rank", async () => {
+  const { parseDirectory } = await import("../primitives/directory.ts");
   const base = unwrapOk(parseItem(baseSnapshot()), "parse item");
   const targetRank = unwrapOk(parseItemRank("b1"), "parse rank");
-  const targetPlacement = unwrapOk(
-    parsePlacement("019965a7-2789-740a-b8c1-1415904fd109/1"),
-    "parse placement",
+  const targetDirectory = unwrapOk(
+    parseDirectory("019965a7-2789-740a-b8c1-1415904fd109/1"),
+    "parse directory",
   );
   const relocateAt = unwrapOk(parseDateTime("2024-09-21T10:00:00Z"), "parse relocate timestamp");
 
-  const relocated = base.relocate(targetPlacement, targetRank, relocateAt);
+  const relocated = base.relocate(targetDirectory, targetRank, relocateAt);
   assertEquals(relocated.data.rank.toString(), "b1");
   assertEquals(
-    relocated.data.placement.toString(),
+    relocated.data.directory.toString(),
     "019965a7-2789-740a-b8c1-1415904fd109/1",
   );
   assert(relocated.data.updatedAt.equals(relocateAt), "updatedAt should match relocate timestamp");
 
-  const unchanged = relocated.relocate(targetPlacement, targetRank, relocateAt);
+  const unchanged = relocated.relocate(targetDirectory, targetRank, relocateAt);
   assertEquals(
     unchanged,
     relocated,
-    "relocating to same placement and rank should return same instance",
+    "relocating to same directory and rank should return same instance",
   );
 });
 
@@ -198,14 +198,14 @@ Deno.test("parseItem trims body", () => {
 });
 
 Deno.test("Item.toJSON reflects current data", async () => {
-  const { parsePlacement } = await import("../primitives/placement.ts");
+  const { parseDirectory } = await import("../primitives/directory.ts");
   const base = unwrapOk(parseItem(baseSnapshot({ body: "Body" })), "parse item");
   const alias = unwrapOk(parseAliasSlug("focus"), "parse alias");
   const project = unwrapOk(parseItemId(PROJECT_UUID_1), "parse project");
   const context1 = unwrapOk(parseItemId(CONTEXT_UUID_1), "parse context1");
   const context2 = unwrapOk(parseItemId(CONTEXT_UUID_2), "parse context2");
   const relocateAt = unwrapOk(parseDateTime("2024-09-22T10:00:00Z"), "parse relocateAt");
-  const newPlacement = unwrapOk(parsePlacement("2024-09-22"), "parse placement");
+  const newDirectory = unwrapOk(parseDirectory("2024-09-22"), "parse directory");
   const newRank = unwrapOk(parseItemRank("b2"), "parse rank");
   const startAt = unwrapOk(parseDateTime("2024-09-22T11:00:00Z"), "parse startAt");
   const dueAt = unwrapOk(parseDateTime("2024-09-22T12:30:00Z"), "parse dueAt");
@@ -215,7 +215,7 @@ Deno.test("Item.toJSON reflects current data", async () => {
     .setAlias(alias, relocateAt)
     .setProject(project, relocateAt)
     .setContexts([context1, context2], relocateAt)
-    .relocate(newPlacement, newRank, relocateAt)
+    .relocate(newDirectory, newRank, relocateAt)
     .close(relocateAt);
 
   const snapshot = scheduled.toJSON();
@@ -228,7 +228,7 @@ Deno.test("Item.toJSON reflects current data", async () => {
   assertEquals(snapshot.contexts?.[1], CONTEXT_UUID_2);
   assertEquals(snapshot.status, "closed");
   assertEquals(snapshot.closedAt, relocateAt.toString());
-  assertEquals(snapshot.placement, newPlacement.toString());
+  assertEquals(snapshot.directory, newDirectory.toString());
   assertEquals(snapshot.rank, newRank.toString());
   assertEquals(snapshot.startAt, startAt.toString());
   assertEquals(snapshot.dueAt, dueAt.toString());

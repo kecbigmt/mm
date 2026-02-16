@@ -10,6 +10,8 @@ import {
   AliasSlugValidationError,
   DateTime,
   DateTimeValidationError,
+  Directory,
+  DirectoryValidationError,
   Duration,
   DurationValidationError,
   ItemIcon,
@@ -26,15 +28,13 @@ import {
   ItemTitleValidationError,
   parseAliasSlug,
   parseDateTime,
+  parseDirectory,
   parseDuration,
   parseItemIcon,
   parseItemId,
   parseItemRank,
   parseItemStatus,
   parseItemTitle,
-  parsePlacement,
-  Placement,
-  PlacementValidationError,
 } from "../primitives/mod.ts";
 import { Edge, EdgeSnapshot, isItemEdge, ItemEdge, parseEdge } from "./edge.ts";
 
@@ -43,7 +43,7 @@ export type ItemData = Readonly<{
   readonly title: ItemTitle;
   readonly icon: ItemIcon;
   readonly status: ItemStatus;
-  readonly placement: Placement;
+  readonly directory: Directory;
   readonly rank: ItemRank;
   readonly createdAt: DateTime;
   readonly updatedAt: DateTime;
@@ -65,7 +65,7 @@ export type Item = Readonly<{
   itemEdges(): ReadonlyArray<ItemEdge>;
   close(closedAt: DateTime): Item;
   reopen(reopenedAt: DateTime): Item;
-  relocate(placement: Placement, rank: ItemRank, occurredAt: DateTime): Item;
+  relocate(directory: Directory, rank: ItemRank, occurredAt: DateTime): Item;
   retitle(title: ItemTitle, updatedAt: DateTime): Item;
   changeIcon(icon: ItemIcon, updatedAt: DateTime): Item;
   setBody(body: string | undefined, updatedAt: DateTime): Item;
@@ -90,7 +90,7 @@ export type ItemSnapshot = Readonly<{
   readonly title: string;
   readonly icon: string;
   readonly status: string;
-  readonly placement: string;
+  readonly directory: string;
   readonly rank: string;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -161,19 +161,19 @@ const instantiate = (
 
   const relocate = function (
     this: Item,
-    placement: Placement,
+    directory: Directory,
     rank: ItemRank,
     occurredAt: DateTime,
   ): Item {
-    const samePlacement = this.data.placement.equals(placement);
+    const sameDirectory = this.data.directory.equals(directory);
     const sameRank = this.data.rank.compare(rank) === 0;
-    if (samePlacement && sameRank) {
+    if (sameDirectory && sameRank) {
       return this;
     }
     return instantiate(
       {
         ...this.data,
-        placement,
+        directory,
         rank,
         updatedAt: occurredAt,
       },
@@ -349,7 +349,7 @@ const instantiate = (
       title: this.data.title.toString(),
       icon: this.data.icon.toString(),
       status: this.data.status.toString(),
-      placement: this.data.placement.toString(),
+      directory: this.data.directory.toString(),
       rank: this.data.rank.toString(),
       createdAt: this.data.createdAt.toString(),
       updatedAt: this.data.updatedAt.toString(),
@@ -398,7 +398,7 @@ const prefixIssues = (
     | DateTimeValidationError
     | DurationValidationError
     | ItemRankValidationError
-    | PlacementValidationError,
+    | DirectoryValidationError,
 ): ValidationIssue[] =>
   error.issues.map((issue: ValidationIssue) =>
     createValidationIssue(issue.message, {
@@ -424,7 +424,7 @@ export const parseItem = (
   const titleResult = parseItemTitle(snapshot.title);
   const iconResult = parseItemIcon(snapshot.icon);
   const statusResult = parseItemStatus(snapshot.status);
-  const placementResult = parsePlacement(snapshot.placement);
+  const directoryResult = parseDirectory(snapshot.directory);
   const rankResult = parseItemRank(snapshot.rank);
   const createdAtResult = parseDateTime(snapshot.createdAt);
   const updatedAtResult = parseDateTime(snapshot.updatedAt);
@@ -441,8 +441,8 @@ export const parseItem = (
   if (statusResult.type === "error") {
     issues.push(...prefixIssues("status", statusResult.error));
   }
-  if (placementResult.type === "error") {
-    issues.push(...prefixIssues("placement", placementResult.error));
+  if (directoryResult.type === "error") {
+    issues.push(...prefixIssues("directory", directoryResult.error));
   }
   if (rankResult.type === "error") {
     issues.push(...prefixIssues("rank", rankResult.error));
@@ -581,7 +581,7 @@ export const parseItem = (
   const title = Result.unwrap(titleResult);
   const icon = Result.unwrap(iconResult);
   const status = Result.unwrap(statusResult);
-  const placement = Result.unwrap(placementResult);
+  const directory = Result.unwrap(directoryResult);
   const rank = Result.unwrap(rankResult);
   const createdAt = Result.unwrap(createdAtResult);
   const updatedAt = Result.unwrap(updatedAtResult);
@@ -591,7 +591,7 @@ export const parseItem = (
     title,
     icon,
     status,
-    placement,
+    directory,
     rank,
     createdAt,
     updatedAt,

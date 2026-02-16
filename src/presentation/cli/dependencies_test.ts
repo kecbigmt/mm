@@ -5,7 +5,7 @@ import { loadCliDependencies, resolveWorkspaceRootFromSources } from "./dependen
 const writeWorkspace = async (root: string) => {
   await Deno.mkdir(root, { recursive: true });
   const payload = JSON.stringify(
-    { schema: "mm.workspace/1", migration: 2, timezone: "Asia/Tokyo" },
+    { schema: "mm.workspace/1", migration: 3, timezone: "Asia/Tokyo" },
     null,
     2,
   );

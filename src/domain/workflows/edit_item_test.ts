@@ -14,8 +14,8 @@ import {
   itemRankFromString,
   itemStatusOpen,
   itemTitleFromString,
+  parseDirectory,
   parseDuration,
-  parsePlacement,
   timezoneIdentifierFromString,
 } from "../primitives/mod.ts";
 import { createRepositoryError } from "../repositories/repository_error.ts";
@@ -58,14 +58,14 @@ const createTestItem = (
   createdAt: DateTime,
 ): Item => {
   const itemTitle = Result.unwrap(itemTitleFromString(title));
-  const placement = Result.unwrap(parsePlacement("2024-01-01"));
+  const directory = Result.unwrap(parseDirectory("2024-01-01"));
   const rank = Result.unwrap(itemRankFromString("a0"));
   return createItem({
     id,
     title: itemTitle,
     icon: createItemIcon("note"),
     status: itemStatusOpen(),
-    placement,
+    directory,
     rank,
     createdAt,
     updatedAt: createdAt,
@@ -88,7 +88,7 @@ Deno.test("EditItemWorkflow - should update item title", async () => {
     },
     save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -142,7 +142,7 @@ Deno.test("EditItemWorkflow - should update item via alias", async () => {
     },
     save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -193,7 +193,7 @@ Deno.test("EditItemWorkflow - should update multiple fields", async () => {
     },
     save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -236,7 +236,7 @@ Deno.test("EditItemWorkflow - should return error for non-existent item", async 
       ),
     save: (_item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -288,7 +288,7 @@ Deno.test("EditItemWorkflow - should handle invalid title", async () => {
     },
     save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -340,7 +340,7 @@ Deno.test("EditItemWorkflow - should update alias index when alias changes", asy
     },
     save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -404,7 +404,7 @@ Deno.test("EditItemWorkflow - should delete alias index when alias is cleared", 
     },
     save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -467,7 +467,7 @@ Deno.test("EditItemWorkflow - should save alias index when alias is added", asyn
     },
     save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -530,7 +530,7 @@ Deno.test("EditItemWorkflow - should preserve existing schedule fields on partia
     },
     save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -591,7 +591,7 @@ Deno.test("EditItemWorkflow - should reject alias collision", async () => {
     },
     save: (_item: Item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -626,10 +626,10 @@ Deno.test("EditItemWorkflow - should reject alias collision", async () => {
   }
 });
 
-Deno.test("EditItemWorkflow - should use placement date for time-only startAt", async () => {
+Deno.test("EditItemWorkflow - should use directory date for time-only startAt", async () => {
   const itemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd120"));
   const now = Result.unwrap(dateTimeFromDate(new Date()));
-  const placement = Result.unwrap(parsePlacement("2025-02-10"));
+  const directory = Result.unwrap(parseDirectory("2025-02-10"));
   const rank = Result.unwrap(itemRankFromString("a0"));
 
   const originalItem = createItem({
@@ -637,7 +637,7 @@ Deno.test("EditItemWorkflow - should use placement date for time-only startAt", 
     title: Result.unwrap(itemTitleFromString("Event")),
     icon: createItemIcon("event"),
     status: itemStatusOpen(),
-    placement,
+    directory,
     rank,
     createdAt: now,
     updatedAt: now,
@@ -647,7 +647,7 @@ Deno.test("EditItemWorkflow - should use placement date for time-only startAt", 
     load: (_id) => Promise.resolve(Result.ok(originalItem)),
     save: (_item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: (_range) => Promise.resolve(Result.ok([])),
+    listByDirectory: (_range) => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -672,7 +672,7 @@ Deno.test("EditItemWorkflow - should use placement date for time-only startAt", 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertExists(result.value.item.data.startAt);
-    // Should use placement date (2025-02-10) instead of today
+    // Should use directory date (2025-02-10) instead of today
     const isoString = result.value.item.data.startAt.data.iso;
     // Time-only input is interpreted in system timezone
     // Verify the date portion is correct (UTC representation)
@@ -680,10 +680,10 @@ Deno.test("EditItemWorkflow - should use placement date for time-only startAt", 
   }
 });
 
-Deno.test("EditItemWorkflow - should use placement date for time-only dueAt", async () => {
+Deno.test("EditItemWorkflow - should use directory date for time-only dueAt", async () => {
   const itemId = Result.unwrap(itemIdFromString("019965a7-2789-740a-b8c1-1415904fd120"));
   const now = Result.unwrap(dateTimeFromDate(new Date()));
-  const placement = Result.unwrap(parsePlacement("2025-02-15"));
+  const directory = Result.unwrap(parseDirectory("2025-02-15"));
   const rank = Result.unwrap(itemRankFromString("a0"));
 
   const originalItem = createItem({
@@ -691,7 +691,7 @@ Deno.test("EditItemWorkflow - should use placement date for time-only dueAt", as
     title: Result.unwrap(itemTitleFromString("Task")),
     icon: createItemIcon("task"),
     status: itemStatusOpen(),
-    placement,
+    directory,
     rank,
     createdAt: now,
     updatedAt: now,
@@ -701,7 +701,7 @@ Deno.test("EditItemWorkflow - should use placement date for time-only dueAt", as
     load: (_id) => Promise.resolve(Result.ok(originalItem)),
     save: (_item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: (_range) => Promise.resolve(Result.ok([])),
+    listByDirectory: (_range) => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -726,7 +726,7 @@ Deno.test("EditItemWorkflow - should use placement date for time-only dueAt", as
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertExists(result.value.item.data.dueAt);
-    // Should use placement date (2025-02-15) instead of today
+    // Should use directory date (2025-02-15) instead of today
     const isoString = result.value.item.data.dueAt.data.iso;
     // Time-only input is interpreted in system timezone
     // Verify the date portion is correct (UTC representation)
@@ -739,7 +739,7 @@ Deno.test("EditItemWorkflow - time-only startAt uses workspace timezone (PST)", 
   const title = Result.unwrap(itemTitleFromString("Event"));
   const icon = createItemIcon("event");
   const status = itemStatusOpen();
-  const placement = Result.unwrap(parsePlacement("2025-02-10"));
+  const directory = Result.unwrap(parseDirectory("2025-02-10"));
   const rank = Result.unwrap(itemRankFromString("a"));
   const now = Result.unwrap(dateTimeFromDate(new Date("2025-02-10T12:00:00Z")));
 
@@ -748,7 +748,7 @@ Deno.test("EditItemWorkflow - time-only startAt uses workspace timezone (PST)", 
     title,
     icon,
     status,
-    placement,
+    directory,
     rank,
     createdAt: now,
     updatedAt: now,
@@ -758,7 +758,7 @@ Deno.test("EditItemWorkflow - time-only startAt uses workspace timezone (PST)", 
     load: (_id) => Promise.resolve(Result.ok(originalItem)),
     save: (_item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: (_range) => Promise.resolve(Result.ok([])),
+    listByDirectory: (_range) => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -787,7 +787,7 @@ Deno.test("EditItemWorkflow - time-only startAt uses workspace timezone (PST)", 
   if (result.type === "ok") {
     assertExists(result.value.item.data.startAt);
     const isoString = result.value.item.data.startAt.data.iso;
-    // Placement date is 2025-02-10
+    // Directory date is 2025-02-10
     // Reference date uses noon UTC to ensure stable date in workspace timezone
     // So 09:00 PST on 2025-02-10 = 2025-02-10T17:00:00.000Z
     assertEquals(isoString, "2025-02-10T17:00:00.000Z");
@@ -799,7 +799,7 @@ Deno.test("EditItemWorkflow - time-only dueAt uses workspace timezone (JST)", as
   const title = Result.unwrap(itemTitleFromString("Task"));
   const icon = createItemIcon("task");
   const status = itemStatusOpen();
-  const placement = Result.unwrap(parsePlacement("2025-02-10"));
+  const directory = Result.unwrap(parseDirectory("2025-02-10"));
   const rank = Result.unwrap(itemRankFromString("a"));
   const now = Result.unwrap(dateTimeFromDate(new Date("2025-02-10T12:00:00Z")));
 
@@ -808,7 +808,7 @@ Deno.test("EditItemWorkflow - time-only dueAt uses workspace timezone (JST)", as
     title,
     icon,
     status,
-    placement,
+    directory,
     rank,
     createdAt: now,
     updatedAt: now,
@@ -818,7 +818,7 @@ Deno.test("EditItemWorkflow - time-only dueAt uses workspace timezone (JST)", as
     load: (_id) => Promise.resolve(Result.ok(originalItem)),
     save: (_item) => Promise.resolve(Result.ok(undefined)),
     delete: (_id) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: (_range) => Promise.resolve(Result.ok([])),
+    listByDirectory: (_range) => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -847,7 +847,7 @@ Deno.test("EditItemWorkflow - time-only dueAt uses workspace timezone (JST)", as
   if (result.type === "ok") {
     assertExists(result.value.item.data.dueAt);
     const isoString = result.value.item.data.dueAt.data.iso;
-    // Placement date is 2025-02-10
+    // Directory date is 2025-02-10
     // Reference date uses noon UTC to ensure stable date in workspace timezone
     // So 09:00 JST on 2025-02-10 = 2025-02-10T00:00:00.000Z
     assertEquals(isoString, "2025-02-10T00:00:00.000Z");
@@ -886,7 +886,7 @@ Deno.test("EditItemWorkflow - does not create orphan topics when validation fail
       return Promise.resolve(Result.ok(undefined));
     },
     delete: (_id: ItemId) => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {

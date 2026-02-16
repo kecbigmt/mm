@@ -42,7 +42,7 @@ const createPermanentItem = async (
   const result = await runCommand(testHome, [
     "note",
     title,
-    "--placement",
+    "--dir",
     "permanent",
     "--alias",
     aliasSlug,

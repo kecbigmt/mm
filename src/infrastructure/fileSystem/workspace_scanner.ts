@@ -37,7 +37,7 @@ type ItemFrontmatter = Readonly<{
   icon: string;
   kind?: string;
   status: string;
-  placement: string;
+  directory: string;
   rank: string;
   created_at: string;
   updated_at: string;
@@ -121,7 +121,7 @@ export const createWorkspaceScanner = (workspaceRoot: string): WorkspaceScanner 
         title,
         icon: frontmatter.icon,
         status: frontmatter.status,
-        placement: frontmatter.placement,
+        directory: frontmatter.directory,
         rank: frontmatter.rank,
         createdAt: frontmatter.created_at,
         updatedAt: frontmatter.updated_at,

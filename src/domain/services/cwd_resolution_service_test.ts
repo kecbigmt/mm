@@ -4,7 +4,7 @@ import { createItem } from "../models/item.ts";
 import { itemTitleFromString } from "../primitives/item_title.ts";
 import { dateTimeFromDate } from "../primitives/date_time.ts";
 import { itemIdFromString } from "../primitives/item_id.ts";
-import { parsePlacement } from "../primitives/placement.ts";
+import { parseDirectory } from "../primitives/directory.ts";
 import { itemRankFromString } from "../primitives/item_rank.ts";
 import { createItemStatus } from "../primitives/item_status.ts";
 import { createItemIcon } from "../primitives/item_icon.ts";
@@ -26,7 +26,7 @@ const createMockItemRepository = (
   },
   save: () => Promise.resolve(Result.ok(undefined)),
   delete: () => Promise.resolve(Result.ok(undefined)),
-  listByPlacement: () => Promise.resolve(Result.ok([])),
+  listByDirectory: () => Promise.resolve(Result.ok([])),
 });
 
 // ============================================================================
@@ -67,7 +67,7 @@ Deno.test("CwdResolutionService.getCwd returns today when workspace differs", as
   assertEquals(result.value.warning, undefined);
 });
 
-Deno.test("CwdResolutionService.getCwd returns placement from session when workspace matches", async () => {
+Deno.test("CwdResolutionService.getCwd returns directory from session when workspace matches", async () => {
   const itemRepo = createMockItemRepository(new Map());
   const sessionRepo = createFakeSessionRepository({
     workspace: workspacePath,
@@ -82,11 +82,11 @@ Deno.test("CwdResolutionService.getCwd returns placement from session when works
   });
 
   assert(result.type === "ok", "operation should succeed");
-  assertEquals(result.value.placement.toString(), "2024-12-25");
+  assertEquals(result.value.directory.toString(), "2024-12-25");
   assertEquals(result.value.warning, undefined);
 });
 
-Deno.test("CwdResolutionService.getCwd returns placement from session with sections", async () => {
+Deno.test("CwdResolutionService.getCwd returns directory from session with sections", async () => {
   const itemRepo = createMockItemRepository(new Map());
   const sessionRepo = createFakeSessionRepository({
     workspace: workspacePath,
@@ -101,11 +101,11 @@ Deno.test("CwdResolutionService.getCwd returns placement from session with secti
   });
 
   assert(result.type === "ok", "operation should succeed");
-  assertEquals(result.value.placement.toString(), "2024-12-25/1/3");
+  assertEquals(result.value.directory.toString(), "2024-12-25/1/3");
   assertEquals(result.value.warning, undefined);
 });
 
-Deno.test("CwdResolutionService.getCwd returns placement from session for permanent", async () => {
+Deno.test("CwdResolutionService.getCwd returns directory from session for permanent", async () => {
   const itemRepo = createMockItemRepository(new Map());
   const sessionRepo = createFakeSessionRepository({
     workspace: workspacePath,
@@ -120,11 +120,11 @@ Deno.test("CwdResolutionService.getCwd returns placement from session for perman
   });
 
   assert(result.type === "ok", "operation should succeed");
-  assertEquals(result.value.placement.toString(), "permanent");
+  assertEquals(result.value.directory.toString(), "permanent");
   assertEquals(result.value.warning, undefined);
 });
 
-Deno.test("CwdResolutionService.getCwd returns placement from session for valid item", async () => {
+Deno.test("CwdResolutionService.getCwd returns directory from session for valid item", async () => {
   const itemId = itemIdFromString("019965a7-2789-740a-b8c1-1415904fd108");
   assert(itemId.type === "ok");
 
@@ -134,8 +134,8 @@ Deno.test("CwdResolutionService.getCwd returns placement from session for valid 
   const createdAt = dateTimeFromDate(new Date("2024-01-01"));
   assert(createdAt.type === "ok");
 
-  const placement = parsePlacement("2024-01-01");
-  assert(placement.type === "ok");
+  const directory = parseDirectory("2024-01-01");
+  assert(directory.type === "ok");
 
   const rank = itemRankFromString("a0");
   assert(rank.type === "ok");
@@ -144,7 +144,7 @@ Deno.test("CwdResolutionService.getCwd returns placement from session for valid 
     id: itemId.value,
     title: title.value,
     icon: createItemIcon("note"),
-    placement: placement.value,
+    directory: directory.value,
     rank: rank.value,
     status: createItemStatus("open"),
     createdAt: createdAt.value,
@@ -166,7 +166,7 @@ Deno.test("CwdResolutionService.getCwd returns placement from session for valid 
   });
 
   assert(result.type === "ok", "getCwd should succeed");
-  assertEquals(result.value.placement.toString(), item.data.id.toString());
+  assertEquals(result.value.directory.toString(), item.data.id.toString());
   assertEquals(result.value.warning, undefined);
 });
 
@@ -174,7 +174,7 @@ Deno.test("CwdResolutionService.getCwd falls back to today with warning when cwd
   const itemRepo = createMockItemRepository(new Map());
   const sessionRepo = createFakeSessionRepository({
     workspace: workspacePath,
-    cwd: "not-a-valid-placement",
+    cwd: "not-a-valid-directory",
   });
 
   const result = await CwdResolutionService.getCwd({
@@ -211,12 +211,12 @@ Deno.test("CwdResolutionService.getCwd falls back to today with warning when ite
 // setCwd tests - saves to session file
 // ============================================================================
 
-Deno.test("CwdResolutionService.setCwd saves placement to session", async () => {
+Deno.test("CwdResolutionService.setCwd saves directory to session", async () => {
   const sessionRepo = createFakeSessionRepository(null);
-  const placement = parsePlacement("2024-12-25");
-  assert(placement.type === "ok");
+  const directory = parseDirectory("2024-12-25");
+  assert(directory.type === "ok");
 
-  const result = await CwdResolutionService.setCwd(placement.value, {
+  const result = await CwdResolutionService.setCwd(directory.value, {
     sessionRepository: sessionRepo,
     workspacePath,
   });
@@ -232,10 +232,10 @@ Deno.test("CwdResolutionService.setCwd overwrites existing session", async () =>
     workspace: workspacePath,
     cwd: "2024-01-01",
   });
-  const placement = parsePlacement("permanent");
-  assert(placement.type === "ok");
+  const directory = parseDirectory("permanent");
+  assert(directory.type === "ok");
 
-  const result = await CwdResolutionService.setCwd(placement.value, {
+  const result = await CwdResolutionService.setCwd(directory.value, {
     sessionRepository: sessionRepo,
     workspacePath,
   });
@@ -245,14 +245,14 @@ Deno.test("CwdResolutionService.setCwd overwrites existing session", async () =>
   assertEquals(savedData?.cwd, "permanent");
 });
 
-Deno.test("CwdResolutionService.setCwd saves previousCwd when previousPlacement is provided", async () => {
+Deno.test("CwdResolutionService.setCwd saves previousCwd when previousDirectory is provided", async () => {
   const sessionRepo = createFakeSessionRepository(null);
-  const placement = parsePlacement("permanent");
-  assert(placement.type === "ok");
-  const previous = parsePlacement("2024-12-25");
+  const directory = parseDirectory("permanent");
+  assert(directory.type === "ok");
+  const previous = parseDirectory("2024-12-25");
   assert(previous.type === "ok");
 
-  const result = await CwdResolutionService.setCwd(placement.value, {
+  const result = await CwdResolutionService.setCwd(directory.value, {
     sessionRepository: sessionRepo,
     workspacePath,
   }, previous.value);
@@ -263,12 +263,12 @@ Deno.test("CwdResolutionService.setCwd saves previousCwd when previousPlacement 
   assertEquals(savedData?.previousCwd, "2024-12-25");
 });
 
-Deno.test("CwdResolutionService.setCwd omits previousCwd when previousPlacement is undefined", async () => {
+Deno.test("CwdResolutionService.setCwd omits previousCwd when previousDirectory is undefined", async () => {
   const sessionRepo = createFakeSessionRepository(null);
-  const placement = parsePlacement("2024-12-25");
-  assert(placement.type === "ok");
+  const directory = parseDirectory("2024-12-25");
+  assert(directory.type === "ok");
 
-  const result = await CwdResolutionService.setCwd(placement.value, {
+  const result = await CwdResolutionService.setCwd(directory.value, {
     sessionRepository: sessionRepo,
     workspacePath,
   });
@@ -283,7 +283,7 @@ Deno.test("CwdResolutionService.setCwd omits previousCwd when previousPlacement 
 // getPreviousCwd tests - reads previous directory from session
 // ============================================================================
 
-Deno.test("CwdResolutionService.getPreviousCwd returns previous placement from session", async () => {
+Deno.test("CwdResolutionService.getPreviousCwd returns previous directory from session", async () => {
   const itemRepo = createMockItemRepository(new Map());
   const sessionRepo = createFakeSessionRepository({
     workspace: workspacePath,
@@ -359,7 +359,7 @@ Deno.test("CwdResolutionService.getPreviousCwd returns error when previousCwd is
   const sessionRepo = createFakeSessionRepository({
     workspace: workspacePath,
     cwd: "2024-12-25",
-    previousCwd: "not-a-valid-placement",
+    previousCwd: "not-a-valid-directory",
   });
 
   const result = await CwdResolutionService.getPreviousCwd({
@@ -394,17 +394,17 @@ Deno.test("CwdResolutionService.getPreviousCwd returns error when previous item 
 });
 
 // ============================================================================
-// validatePlacement tests - validates placement without persisting
+// validateDirectory tests - validates directory without persisting
 // ============================================================================
 
-Deno.test("CwdResolutionService.validatePlacement allows date placements", async () => {
+Deno.test("CwdResolutionService.validateDirectory allows date directories", async () => {
   const itemRepo = createMockItemRepository(new Map());
 
-  const datePlacement = parsePlacement("2024-06-15");
-  assert(datePlacement.type === "ok");
+  const dateDirectory = parseDirectory("2024-06-15");
+  assert(dateDirectory.type === "ok");
 
-  const result = await CwdResolutionService.validatePlacement(
-    datePlacement.value,
+  const result = await CwdResolutionService.validateDirectory(
+    dateDirectory.value,
     { itemRepository: itemRepo },
   );
 
@@ -412,14 +412,14 @@ Deno.test("CwdResolutionService.validatePlacement allows date placements", async
   assertEquals(result.value.toString(), "2024-06-15");
 });
 
-Deno.test("CwdResolutionService.validatePlacement allows permanent placements", async () => {
+Deno.test("CwdResolutionService.validateDirectory allows permanent directories", async () => {
   const itemRepo = createMockItemRepository(new Map());
 
-  const permanentPlacement = parsePlacement("permanent");
-  assert(permanentPlacement.type === "ok");
+  const permanentDirectory = parseDirectory("permanent");
+  assert(permanentDirectory.type === "ok");
 
-  const result = await CwdResolutionService.validatePlacement(
-    permanentPlacement.value,
+  const result = await CwdResolutionService.validateDirectory(
+    permanentDirectory.value,
     { itemRepository: itemRepo },
   );
 
@@ -427,14 +427,14 @@ Deno.test("CwdResolutionService.validatePlacement allows permanent placements", 
   assertEquals(result.value.toString(), "permanent");
 });
 
-Deno.test("CwdResolutionService.validatePlacement rejects non-existent item", async () => {
+Deno.test("CwdResolutionService.validateDirectory rejects non-existent item directory", async () => {
   const itemRepo = createMockItemRepository(new Map());
 
-  const nonExistentItemPlacement = parsePlacement("019965a7-2789-740a-b8c1-1415904fd108");
-  assert(nonExistentItemPlacement.type === "ok");
+  const nonExistentItemDirectory = parseDirectory("019965a7-2789-740a-b8c1-1415904fd108");
+  assert(nonExistentItemDirectory.type === "ok");
 
-  const result = await CwdResolutionService.validatePlacement(
-    nonExistentItemPlacement.value,
+  const result = await CwdResolutionService.validateDirectory(
+    nonExistentItemDirectory.value,
     { itemRepository: itemRepo },
   );
 
@@ -442,7 +442,7 @@ Deno.test("CwdResolutionService.validatePlacement rejects non-existent item", as
   assertEquals(result.error.kind, "ValidationError");
 });
 
-Deno.test("CwdResolutionService.validatePlacement allows valid item paths", async () => {
+Deno.test("CwdResolutionService.validateDirectory allows valid item paths", async () => {
   const itemId = itemIdFromString("019965a7-2789-740a-b8c1-1415904fd108");
   assert(itemId.type === "ok");
 
@@ -452,8 +452,8 @@ Deno.test("CwdResolutionService.validatePlacement allows valid item paths", asyn
   const createdAt = dateTimeFromDate(new Date("2024-01-01"));
   assert(createdAt.type === "ok");
 
-  const placement = parsePlacement("2024-01-01");
-  assert(placement.type === "ok");
+  const directory = parseDirectory("2024-01-01");
+  assert(directory.type === "ok");
 
   const rank = itemRankFromString("a0");
   assert(rank.type === "ok");
@@ -462,7 +462,7 @@ Deno.test("CwdResolutionService.validatePlacement allows valid item paths", asyn
     id: itemId.value,
     title: title.value,
     icon: createItemIcon("note"),
-    placement: placement.value,
+    directory: directory.value,
     rank: rank.value,
     status: createItemStatus("open"),
     createdAt: createdAt.value,
@@ -472,11 +472,11 @@ Deno.test("CwdResolutionService.validatePlacement allows valid item paths", asyn
   const items = new Map([[item.data.id.toString(), item]]);
   const itemRepo = createMockItemRepository(items);
 
-  const itemPlacement = parsePlacement(item.data.id.toString());
-  assert(itemPlacement.type === "ok");
+  const itemDirectory = parseDirectory(item.data.id.toString());
+  assert(itemDirectory.type === "ok");
 
-  const result = await CwdResolutionService.validatePlacement(
-    itemPlacement.value,
+  const result = await CwdResolutionService.validateDirectory(
+    itemDirectory.value,
     { itemRepository: itemRepo },
   );
 
@@ -484,7 +484,7 @@ Deno.test("CwdResolutionService.validatePlacement allows valid item paths", asyn
   assertEquals(result.value.toString(), item.data.id.toString());
 });
 
-Deno.test("CwdResolutionService.validatePlacement allows paths with numeric sections", async () => {
+Deno.test("CwdResolutionService.validateDirectory allows paths with numeric sections", async () => {
   const itemId = itemIdFromString("019965a7-2789-740a-b8c1-1415904fd108");
   assert(itemId.type === "ok");
 
@@ -494,8 +494,8 @@ Deno.test("CwdResolutionService.validatePlacement allows paths with numeric sect
   const createdAt = dateTimeFromDate(new Date("2024-01-01"));
   assert(createdAt.type === "ok");
 
-  const placement = parsePlacement("2024-01-01");
-  assert(placement.type === "ok");
+  const directory = parseDirectory("2024-01-01");
+  assert(directory.type === "ok");
 
   const rank = itemRankFromString("a0");
   assert(rank.type === "ok");
@@ -507,7 +507,7 @@ Deno.test("CwdResolutionService.validatePlacement allows paths with numeric sect
     id: itemId.value,
     title: title.value,
     icon: createItemIcon("note"),
-    placement: placement.value,
+    directory: directory.value,
     rank: rank.value,
     status: createItemStatus("open"),
     createdAt: createdAt.value,
@@ -518,14 +518,14 @@ Deno.test("CwdResolutionService.validatePlacement allows paths with numeric sect
   const items = new Map([[item.data.id.toString(), item]]);
   const itemRepo = createMockItemRepository(items);
 
-  const placementWithSection = parsePlacement(`${item.data.id.toString()}/1`);
-  assert(placementWithSection.type === "ok");
+  const directoryWithSection = parseDirectory(`${item.data.id.toString()}/1`);
+  assert(directoryWithSection.type === "ok");
 
-  const result = await CwdResolutionService.validatePlacement(
-    placementWithSection.value,
+  const result = await CwdResolutionService.validateDirectory(
+    directoryWithSection.value,
     { itemRepository: itemRepo },
   );
 
-  assert(result.type === "ok", "should accept placements with numeric sections");
+  assert(result.type === "ok", "should accept directories with numeric sections");
   assertEquals(result.value.toString(), `${item.data.id.toString()}/1`);
 });

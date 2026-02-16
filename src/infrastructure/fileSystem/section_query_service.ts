@@ -4,8 +4,8 @@ import {
   createRepositoryError,
   RepositoryError,
 } from "../../domain/repositories/repository_error.ts";
-import type { Placement } from "../../domain/primitives/placement.ts";
-import { createPlacement } from "../../domain/primitives/placement.ts";
+import type { Directory } from "../../domain/primitives/directory.ts";
+import { createDirectory } from "../../domain/primitives/directory.ts";
 import type {
   SectionQueryService,
   SectionSummary,
@@ -30,7 +30,7 @@ export const createFileSystemSectionQueryService = (
   const { root } = deps;
 
   const listSections = async (
-    parent: Placement,
+    parent: Directory,
   ): Promise<Result<ReadonlyArray<SectionSummary>, RepositoryError>> => {
     const directory = buildDirectoryPath(root, parent);
 
@@ -47,13 +47,13 @@ export const createFileSystemSectionQueryService = (
           continue;
         }
 
-        const childPlacement = createPlacement(parent.head, [...parent.section, sectionNum]);
+        const childDirectory = createDirectory(parent.head, [...parent.section, sectionNum]);
         const childDir = join(directory, entry.name);
 
         const counts = await countDirectChildren(childDir);
         if (counts.itemCount > 0 || counts.sectionCount > 0) {
           summaries.push({
-            placement: childPlacement,
+            directory: childDirectory,
             itemCount: counts.itemCount,
             sectionCount: counts.sectionCount,
           });
@@ -61,8 +61,8 @@ export const createFileSystemSectionQueryService = (
       }
 
       summaries.sort((a, b) => {
-        const aLast = a.placement.section[a.placement.section.length - 1] ?? 0;
-        const bLast = b.placement.section[b.placement.section.length - 1] ?? 0;
+        const aLast = a.directory.section[a.directory.section.length - 1] ?? 0;
+        const bLast = b.directory.section[b.directory.section.length - 1] ?? 0;
         return aLast - bLast;
       });
 
@@ -83,22 +83,22 @@ export const createFileSystemSectionQueryService = (
   return { listSections };
 };
 
-const buildDirectoryPath = (root: string, placement: Placement): string => {
-  if (placement.head.kind === "date") {
-    const dateStr = placement.head.date.toString();
-    const sectionPath = placement.section.join("/");
+const buildDirectoryPath = (root: string, dir: Directory): string => {
+  if (dir.head.kind === "date") {
+    const dateStr = dir.head.date.toString();
+    const sectionPath = dir.section.join("/");
     return sectionPath
       ? join(root, ".index", "graph", "dates", dateStr, sectionPath)
       : join(root, ".index", "graph", "dates", dateStr);
-  } else if (placement.head.kind === "item") {
-    const itemId = placement.head.id.toString();
-    const sectionPath = placement.section.join("/");
+  } else if (dir.head.kind === "item") {
+    const itemId = dir.head.id.toString();
+    const sectionPath = dir.section.join("/");
     return sectionPath
       ? join(root, ".index", "graph", "parents", itemId, sectionPath)
       : join(root, ".index", "graph", "parents", itemId);
   } else {
-    // permanent placement
-    const sectionPath = placement.section.join("/");
+    // permanent directory
+    const sectionPath = dir.section.join("/");
     return sectionPath
       ? join(root, ".index", "graph", "permanent", sectionPath)
       : join(root, ".index", "graph", "permanent");

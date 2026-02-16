@@ -48,10 +48,10 @@ describe("Scenario 10: Navigation", () => {
 
     // Create hierarchy: A -> B -> C
     await runCommand(ctx.testHome, ["note", "A", "--alias", "a"], { sessionDir: ctx.sessionDir });
-    await runCommand(ctx.testHome, ["note", "B", "--parent", "a", "--alias", "b"], {
+    await runCommand(ctx.testHome, ["note", "B", "--dir", "a", "--alias", "b"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "C", "--parent", "b", "--alias", "c"], {
+    await runCommand(ctx.testHome, ["note", "C", "--dir", "b", "--alias", "c"], {
       sessionDir: ctx.sessionDir,
     });
 
@@ -95,7 +95,7 @@ describe("Scenario 10: Navigation", () => {
     await runCommand(ctx.testHome, ["note", "Chapter", "--alias", "chapter"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "chapter/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 1", "--dir", "chapter/1"], {
       sessionDir: ctx.sessionDir,
     });
 
@@ -125,16 +125,16 @@ describe("Scenario 10: Navigation", () => {
     await runCommand(ctx.testHome, ["note", "Parent", "--alias", "parent"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Child1", "--parent", "parent"], {
+    await runCommand(ctx.testHome, ["note", "Child1", "--dir", "parent"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Child2", "--parent", "parent"], {
+    await runCommand(ctx.testHome, ["note", "Child2", "--dir", "parent"], {
       sessionDir: ctx.sessionDir,
     });
     await runCommand(ctx.testHome, [
       "note",
       "Grandchild",
-      "--parent",
+      "--dir",
       "parent",
       "--alias",
       "grandchild",
@@ -218,7 +218,7 @@ describe("Scenario 10: Navigation", () => {
     const cdToday = await runCd(ctx.testHome, "today");
     assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
     await runCommand(ctx.testHome, ["note", "A", "--alias", "a"], { sessionDir: ctx.sessionDir });
-    await runCommand(ctx.testHome, ["note", "B", "--parent", "a", "--alias", "b"], {
+    await runCommand(ctx.testHome, ["note", "B", "--dir", "a", "--alias", "b"], {
       sessionDir: ctx.sessionDir,
     });
 
@@ -239,7 +239,7 @@ describe("Scenario 10: Navigation", () => {
     const cdToday = await runCd(ctx.testHome, "today");
     assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
     await runCommand(ctx.testHome, ["note", "A", "--alias", "a"], { sessionDir: ctx.sessionDir });
-    await runCommand(ctx.testHome, ["note", "B", "--parent", "a", "--alias", "b"], {
+    await runCommand(ctx.testHome, ["note", "B", "--dir", "a", "--alias", "b"], {
       sessionDir: ctx.sessionDir,
     });
 
@@ -258,13 +258,13 @@ describe("Scenario 10: Navigation", () => {
 
     // Create hierarchy: A -> B -> C, A -> D
     await runCommand(ctx.testHome, ["note", "A", "--alias", "a"], { sessionDir: ctx.sessionDir });
-    await runCommand(ctx.testHome, ["note", "B", "--parent", "a", "--alias", "b"], {
+    await runCommand(ctx.testHome, ["note", "B", "--dir", "a", "--alias", "b"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "C", "--parent", "b", "--alias", "c"], {
+    await runCommand(ctx.testHome, ["note", "C", "--dir", "b", "--alias", "c"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "D", "--parent", "a", "--alias", "d"], {
+    await runCommand(ctx.testHome, ["note", "D", "--dir", "a", "--alias", "d"], {
       sessionDir: ctx.sessionDir,
     });
 
@@ -291,13 +291,13 @@ describe("Scenario 10: Navigation", () => {
     await runCommand(ctx.testHome, ["note", "Root", "--alias", "root"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Branch1", "--parent", "root", "--alias", "branch1"], {
+    await runCommand(ctx.testHome, ["note", "Branch1", "--dir", "root", "--alias", "branch1"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Branch2", "--parent", "root", "--alias", "branch2"], {
+    await runCommand(ctx.testHome, ["note", "Branch2", "--dir", "root", "--alias", "branch2"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Leaf", "--parent", "branch1", "--alias", "leaf"], {
+    await runCommand(ctx.testHome, ["note", "Leaf", "--dir", "branch1", "--alias", "leaf"], {
       sessionDir: ctx.sessionDir,
     });
 

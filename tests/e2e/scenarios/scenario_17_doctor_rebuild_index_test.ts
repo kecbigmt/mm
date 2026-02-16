@@ -13,7 +13,7 @@
  *   - Run `mm doctor rebuild-index`
  *   - Verify index is correctly rebuilt
  *   - Verify aliases are rebuilt for items with alias field
- *   - Test with items that have parent placements
+ *   - Test with items that have parent directories
  *
  * Design Reference:
  *   See docs/specs/002_doctor/design.md
@@ -168,7 +168,7 @@ describe("Scenario 17: Doctor rebuild-index", () => {
     assertEquals(aliasCount, 1, "Should have 1 alias file");
   });
 
-  it("rebuilds index with items under parent placement", async () => {
+  it("rebuilds index with items under parent directory", async () => {
     await runCommand(ctx.testHome, ["cd", "today"]);
 
     // Create parent item
@@ -186,7 +186,7 @@ describe("Scenario 17: Doctor rebuild-index", () => {
     const createChild = await runCommand(ctx.testHome, [
       "note",
       "Child item",
-      "-p",
+      "-d",
       "parent",
     ]);
     assertEquals(createChild.success, true, `Failed to create child: ${createChild.stderr}`);
@@ -254,7 +254,7 @@ describe("Scenario 17: Doctor rebuild-index", () => {
     const createResult1 = await runCommand(ctx.testHome, [
       "note",
       "Item on date 1",
-      "-p",
+      "-d",
       "/2025-01-15",
     ]);
     assertEquals(createResult1.success, true, `Failed to create note 1: ${createResult1.stderr}`);
@@ -262,7 +262,7 @@ describe("Scenario 17: Doctor rebuild-index", () => {
     const createResult2 = await runCommand(ctx.testHome, [
       "note",
       "Item on date 2",
-      "-p",
+      "-d",
       "/2025-01-16",
     ]);
     assertEquals(createResult2.success, true, `Failed to create note 2: ${createResult2.stderr}`);
@@ -325,13 +325,13 @@ describe("Scenario 17: Doctor rebuild-index", () => {
   it("displays correct edge type counts", async () => {
     await runCommand(ctx.testHome, ["cd", "today"]);
 
-    // Create items with different placements
+    // Create items with different directories
     await runCommand(ctx.testHome, ["note", "Date item 1"]);
     await runCommand(ctx.testHome, ["note", "Date item 2"]);
 
     // Create parent and child
     await runCommand(ctx.testHome, ["note", "Parent", "--alias", "parent"]);
-    await runCommand(ctx.testHome, ["note", "Child", "-p", "parent"]);
+    await runCommand(ctx.testHome, ["note", "Child", "-d", "parent"]);
 
     // Get workspace path and delete index
     const workspacePath = join(ctx.testHome, "workspaces", "test-workspace");

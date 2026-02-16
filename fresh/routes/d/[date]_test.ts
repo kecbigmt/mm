@@ -8,7 +8,7 @@ import { parseItemId } from "../../../src/domain/primitives/item_id.ts";
 import { parseItemTitle } from "../../../src/domain/primitives/item_title.ts";
 import { parseItemIcon } from "../../../src/domain/primitives/item_icon.ts";
 import { parseItemStatus } from "../../../src/domain/primitives/item_status.ts";
-import { parsePlacement } from "../../../src/domain/primitives/placement.ts";
+import { parseDirectory } from "../../../src/domain/primitives/directory.ts";
 import { parseItemRank } from "../../../src/domain/primitives/item_rank.ts";
 import { parseDateTime } from "../../../src/domain/primitives/date_time.ts";
 import { parseTimezoneIdentifier } from "../../../src/domain/primitives/timezone_identifier.ts";
@@ -17,7 +17,7 @@ import { Result } from "../../../src/shared/result.ts";
 const createTestItem = (opts: {
   id: string;
   title: string;
-  placement: string;
+  directory: string;
   rank: string;
 }) => {
   return createItem({
@@ -25,7 +25,7 @@ const createTestItem = (opts: {
     title: Result.unwrap(parseItemTitle(opts.title)),
     icon: Result.unwrap(parseItemIcon("note")),
     status: Result.unwrap(parseItemStatus("open")),
-    placement: Result.unwrap(parsePlacement(opts.placement)),
+    directory: Result.unwrap(parseDirectory(opts.directory)),
     rank: Result.unwrap(parseItemRank(opts.rank)),
     createdAt: Result.unwrap(parseDateTime("2026-02-04T10:00:00Z")),
     updatedAt: Result.unwrap(parseDateTime("2026-02-04T10:00:00Z")),
@@ -95,7 +95,7 @@ Deno.test("[date].tsx", async (t) => {
     const item = createTestItem({
       id: "019a85fc-67c4-7a54-be8e-305bae009f9e",
       title: "Test Task",
-      placement: "2026-02-04",
+      directory: "2026-02-04",
       rank: "aaa",
     });
     const repoWithItems = new InMemoryItemRepository([item]);
@@ -121,19 +121,19 @@ Deno.test("[date].tsx", async (t) => {
     const item1 = createTestItem({
       id: "019a85fc-67c4-7a54-be8e-305bae009f9e",
       title: "First Task",
-      placement: "2026-02-04",
+      directory: "2026-02-04",
       rank: "aaa",
     });
     const item2 = createTestItem({
       id: "019a85fc-67c4-7a54-be8e-305bae009f9f",
       title: "Second Task",
-      placement: "2026-02-04",
+      directory: "2026-02-04",
       rank: "bbb",
     });
     const item3 = createTestItem({
       id: "019a85fc-67c4-7a54-be8e-305bae009fa0",
       title: "Third Task",
-      placement: "2026-02-04",
+      directory: "2026-02-04",
       rank: "ccc",
     });
     // Add in wrong order to test sorting
@@ -165,7 +165,7 @@ Deno.test("[date].tsx", async (t) => {
     const item = createTestItem({
       id: "019a85fc-67c4-7a54-be8e-305bae009f9e",
       title: "Test Task",
-      placement: "2026-02-04",
+      directory: "2026-02-04",
       rank: "aaa",
     });
     const repoWithItems = new InMemoryItemRepository([item]);

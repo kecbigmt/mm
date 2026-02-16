@@ -9,9 +9,9 @@ import type { ItemRepository } from "../repositories/item_repository.ts";
 import type { RepositoryError } from "../repositories/repository_error.ts";
 import type { DateTime, ItemId, TimezoneIdentifier } from "../primitives/mod.ts";
 import { createDurationFromHours } from "../primitives/duration.ts";
-import { parsePlacement } from "../primitives/placement.ts";
+import { parseDirectory } from "../primitives/directory.ts";
 import type { RankService } from "../services/rank_service.ts";
-import { createSingleRange } from "../primitives/placement_range.ts";
+import { createSingleRange } from "../primitives/directory_range.ts";
 
 export type SnoozeItemInput = Readonly<{
   itemId: ItemId;
@@ -40,7 +40,7 @@ export type SnoozeItemResult = Readonly<{
  * Snoozes an item until a future datetime.
  * - If clear flag is true, unsnoozes the item
  * - If snoozeUntil is undefined, defaults to 8h from occurredAt
- * - If snoozeUntil date is after the current placement date, moves item to that date
+ * - If snoozeUntil date is after the current directory date, moves item to that date
  */
 const execute = async (
   input: SnoozeItemInput,
@@ -107,22 +107,22 @@ const execute = async (
   const lookup = new Map(parts.map((part) => [part.type, part.value]));
   const snoozeUntilDay = `${lookup.get("year")}-${lookup.get("month")}-${lookup.get("day")}`;
 
-  const currentPlacementStr = snoozedItem.data.placement.toString();
+  const currentDirectoryStr = snoozedItem.data.directory.toString();
 
-  // Check if current placement is a date (not an item UUID)
-  const isDatePlacement = /^\d{4}-\d{2}-\d{2}$/.test(currentPlacementStr);
-  if (isDatePlacement && snoozeUntilDay > currentPlacementStr) {
+  // Check if current directory is a date (not an item UUID)
+  const isDateDirectory = /^\d{4}-\d{2}-\d{2}$/.test(currentDirectoryStr);
+  if (isDateDirectory && snoozeUntilDay > currentDirectoryStr) {
     // Move item to snoozeUntil date at the bottom (after all existing items)
-    const newPlacementResult = parsePlacement(snoozeUntilDay);
-    if (newPlacementResult.type === "error") {
+    const newDirectoryResult = parseDirectory(snoozeUntilDay);
+    if (newDirectoryResult.type === "error") {
       return Result.error(
-        createValidationError("SnoozeItem", newPlacementResult.error.issues),
+        createValidationError("SnoozeItem", newDirectoryResult.error.issues),
       );
     }
 
     // Get existing items at the target date to determine rank
-    const targetRange = createSingleRange(newPlacementResult.value);
-    const targetItemsResult = await itemRepository.listByPlacement(targetRange);
+    const targetRange = createSingleRange(newDirectoryResult.value);
+    const targetItemsResult = await itemRepository.listByDirectory(targetRange);
     if (targetItemsResult.type === "error") {
       return Result.error(targetItemsResult.error);
     }
@@ -136,7 +136,7 @@ const execute = async (
     }
 
     snoozedItem = snoozedItem.relocate(
-      newPlacementResult.value,
+      newDirectoryResult.value,
       rankResult.value,
       occurredAt,
     );

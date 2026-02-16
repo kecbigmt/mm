@@ -1,19 +1,19 @@
 import { CalendarDay } from "./calendar_day.ts";
-import { Placement } from "./placement.ts";
+import { Directory } from "./directory.ts";
 
 /**
- * PlacementRange represents a range of placements for querying items
+ * DirectoryRange represents a range of directories for querying items
  *
  * Three kinds:
- * - single: A single placement (e.g., `mm ls 2025-11-15`)
+ * - single: A single directory (e.g., `mm ls 2025-11-15`)
  * - dateRange: A range of date shelves (e.g., `mm ls 2025-11-15..2025-11-30`)
  * - numericRange: A range of numeric sections under the same parent
  *                 (e.g., `mm ls book/1/1..5`)
  */
-export type PlacementRange =
+export type DirectoryRange =
   | Readonly<{
     readonly kind: "single";
-    readonly at: Placement;
+    readonly at: Directory;
   }>
   | Readonly<{
     readonly kind: "dateRange";
@@ -22,15 +22,15 @@ export type PlacementRange =
   }>
   | Readonly<{
     readonly kind: "numericRange";
-    readonly parent: Placement;
+    readonly parent: Directory;
     readonly from: number;
     readonly to: number;
   }>;
 
 /**
- * Create a single placement range
+ * Create a single directory range
  */
-export const createSingleRange = (at: Placement): PlacementRange =>
+export const createSingleRange = (at: Directory): DirectoryRange =>
   Object.freeze({
     kind: "single" as const,
     at,
@@ -42,7 +42,7 @@ export const createSingleRange = (at: Placement): PlacementRange =>
 export const createDateRange = (
   from: CalendarDay,
   to: CalendarDay,
-): PlacementRange =>
+): DirectoryRange =>
   Object.freeze({
     kind: "dateRange" as const,
     from,
@@ -53,10 +53,10 @@ export const createDateRange = (
  * Create a numeric range
  */
 export const createNumericRange = (
-  parent: Placement,
+  parent: Directory,
   from: number,
   to: number,
-): PlacementRange => {
+): DirectoryRange => {
   if (!Number.isInteger(from) || from < 1) {
     throw new Error(`from must be a positive integer, got ${from}`);
   }
@@ -76,25 +76,25 @@ export const createNumericRange = (
 };
 
 /**
- * Check if a range is a single placement
+ * Check if a range is a single directory
  */
-export const isSingleRange = (range: PlacementRange): range is Extract<
-  PlacementRange,
+export const isSingleRange = (range: DirectoryRange): range is Extract<
+  DirectoryRange,
   { kind: "single" }
 > => range.kind === "single";
 
 /**
  * Check if a range is a date range
  */
-export const isDateRange = (range: PlacementRange): range is Extract<
-  PlacementRange,
+export const isDateRange = (range: DirectoryRange): range is Extract<
+  DirectoryRange,
   { kind: "dateRange" }
 > => range.kind === "dateRange";
 
 /**
  * Check if a range is a numeric range
  */
-export const isNumericRange = (range: PlacementRange): range is Extract<
-  PlacementRange,
+export const isNumericRange = (range: DirectoryRange): range is Extract<
+  DirectoryRange,
   { kind: "numericRange" }
 > => range.kind === "numericRange";

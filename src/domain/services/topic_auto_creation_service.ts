@@ -5,7 +5,7 @@ import { Alias, createAlias } from "../models/alias.ts";
 import {
   AliasSlug,
   createItemIcon,
-  createPermanentPlacement,
+  createPermanentDirectory,
   DateTime,
   itemStatusOpen,
   itemTitleFromString,
@@ -84,11 +84,11 @@ export const buildTopicItem = async (
   }
   const title = titleResult.value;
 
-  // Get rank for permanent placement
-  const permanentPlacement = createPermanentPlacement();
-  const siblingsResult = await deps.itemRepository.listByPlacement({
+  // Get rank for permanent directory
+  const permanentDirectory = createPermanentDirectory();
+  const siblingsResult = await deps.itemRepository.listByDirectory({
     kind: "single",
-    at: permanentPlacement,
+    at: permanentDirectory,
   });
   if (siblingsResult.type === "error") {
     return Result.error({ kind: "repository", error: siblingsResult.error });
@@ -113,7 +113,7 @@ export const buildTopicItem = async (
     title,
     icon: createItemIcon("topic"),
     status: itemStatusOpen(),
-    placement: permanentPlacement,
+    directory: permanentDirectory,
     rank: rankResult.value,
     createdAt,
     updatedAt: createdAt,

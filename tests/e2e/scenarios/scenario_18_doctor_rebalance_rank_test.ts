@@ -7,7 +7,7 @@
  *
  * Overview:
  *   This scenario tests rank rebalancing operations:
- *   - Create multiple items in the same placement
+ *   - Create multiple items in the same directory
  *   - Run `doctor rebalance-rank` command
  *   - Verify command completes successfully
  *   - Verify item ordering is preserved
@@ -49,7 +49,7 @@ describe("Scenario 18: Doctor rebalance-rank", () => {
     await cleanupTestEnvironment(ctx);
   });
 
-  it("rebalances ranks for items in same date placement", async () => {
+  it("rebalances ranks for items in same date directory", async () => {
     await runCommand(ctx.testHome, ["cd", "today"]);
 
     // Create multiple items
@@ -158,17 +158,17 @@ describe("Scenario 18: Doctor rebalance-rank", () => {
     }
   });
 
-  it("requires placement argument", async () => {
-    // Run rebalance-rank without placement argument should fail
+  it("requires directory argument", async () => {
+    // Run rebalance-rank without directory argument should fail
     const rebalanceResult = await runCommand(ctx.testHome, ["doctor", "rebalance-rank"]);
     assertEquals(
       rebalanceResult.success,
       false,
-      "Should fail when no placement argument provided",
+      "Should fail when no directory argument provided",
     );
   });
 
-  it("handles non-existent placement gracefully", async () => {
+  it("handles non-existent directory gracefully", async () => {
     // Run rebalance-rank on non-existent date
     const rebalanceResult = await runCommand(ctx.testHome, [
       "doctor",
@@ -178,7 +178,7 @@ describe("Scenario 18: Doctor rebalance-rank", () => {
     assertEquals(
       rebalanceResult.success,
       false,
-      "Should fail when no items found in placement",
+      "Should fail when no items found in directory",
     );
 
     // Should report no items found

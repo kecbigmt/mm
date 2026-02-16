@@ -6,7 +6,7 @@ export type RawItemFrontmatter = Record<string, unknown> & {
   id: string;
   icon: string;
   status: string;
-  placement: string;
+  directory: string;
   rank: string;
   created_at: string;
   updated_at: string;

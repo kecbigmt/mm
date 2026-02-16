@@ -3,7 +3,7 @@ import { rebuildFromItems } from "./index_rebuilder.ts";
 import { createItem, ItemData } from "../../domain/models/item.ts";
 import { parseItemId } from "../../domain/primitives/item_id.ts";
 import { parseItemRank } from "../../domain/primitives/item_rank.ts";
-import { parsePlacement } from "../../domain/primitives/placement.ts";
+import { parseDirectory } from "../../domain/primitives/directory.ts";
 import { parseDateTime } from "../../domain/primitives/date_time.ts";
 import { parseItemTitle } from "../../domain/primitives/item_title.ts";
 import { parseItemIcon } from "../../domain/primitives/item_icon.ts";
@@ -14,12 +14,12 @@ import { Result } from "../../shared/result.ts";
 // Helper to create a test item
 const createTestItem = (
   id: string,
-  placement: string,
+  directory: string,
   rank: string,
   options: { alias?: string; createdAt?: string } = {},
 ) => {
   const itemId = Result.unwrap(parseItemId(id));
-  const itemPlacement = Result.unwrap(parsePlacement(placement));
+  const itemDirectory = Result.unwrap(parseDirectory(directory));
   const itemRank = Result.unwrap(parseItemRank(rank));
   const createdAt = Result.unwrap(parseDateTime(options.createdAt ?? "2025-01-15T10:00:00Z"));
   const title = Result.unwrap(parseItemTitle("Test Item"));
@@ -31,7 +31,7 @@ const createTestItem = (
     title,
     icon,
     status: itemStatusOpen(),
-    placement: itemPlacement,
+    directory: itemDirectory,
     rank: itemRank,
     createdAt,
     updatedAt: createdAt,
@@ -53,7 +53,7 @@ Deno.test("rebuildFromItems - empty items array returns empty result", async () 
   }
 });
 
-Deno.test("rebuildFromItems - single item with date placement", async () => {
+Deno.test("rebuildFromItems - single item with date directory", async () => {
   const item = createTestItem(
     "019a85fc-67c4-7a54-be8e-305bae009f9e",
     "2025-01-15",
@@ -75,7 +75,7 @@ Deno.test("rebuildFromItems - single item with date placement", async () => {
   }
 });
 
-Deno.test("rebuildFromItems - single item with date section placement", async () => {
+Deno.test("rebuildFromItems - single item with date section directory", async () => {
   const item = createTestItem(
     "019a85fc-67c4-7a54-be8e-305bae009f9e",
     "2025-01-15/1/3",
@@ -91,7 +91,7 @@ Deno.test("rebuildFromItems - single item with date section placement", async ()
   }
 });
 
-Deno.test("rebuildFromItems - single item with parent placement", async () => {
+Deno.test("rebuildFromItems - single item with parent directory", async () => {
   const item = createTestItem(
     "019a85fc-67c4-7a54-be8e-305bae009f9e",
     "019a8603-1234-7890-abcd-1234567890ab",
@@ -107,7 +107,7 @@ Deno.test("rebuildFromItems - single item with parent placement", async () => {
   }
 });
 
-Deno.test("rebuildFromItems - single item with parent section placement", async () => {
+Deno.test("rebuildFromItems - single item with parent section directory", async () => {
   const item = createTestItem(
     "019a85fc-67c4-7a54-be8e-305bae009f9e",
     "019a8603-1234-7890-abcd-1234567890ab/1/2",
@@ -184,7 +184,7 @@ Deno.test("rebuildFromItems - item with alias", async () => {
   }
 });
 
-Deno.test("rebuildFromItems - multiple items with mixed placements", async () => {
+Deno.test("rebuildFromItems - multiple items with mixed directories", async () => {
   const item1 = createTestItem(
     "019a85fc-67c4-7a54-be8e-305bae009f9e",
     "2025-01-15",

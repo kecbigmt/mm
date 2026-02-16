@@ -1,6 +1,6 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { createPermanentPlacement, dateTimeFromDate } from "../../../domain/primitives/mod.ts";
+import { createPermanentDirectory, dateTimeFromDate } from "../../../domain/primitives/mod.ts";
 import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { parsePathExpression } from "../path_parser.ts";
@@ -31,8 +31,10 @@ export function createNoteCommand() {
     .arguments("[title:string]")
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .option("-b, --body <body:string>", "Body text")
-    .option("-p, --parent <parent:string>", "Parent locator (e.g., /2025-11-03, /alias, ./1)")
-    .option("--placement <placement:string>", "Placement type (permanent)")
+    .option(
+      "-d, --dir <dir:string>",
+      "Directory locator (e.g., /2025-11-03, /alias, ./1, permanent)",
+    )
     .option("--project <project:string>", "Project reference (alias)")
     .option("-c, --context <context:string>", "Context tag (repeatable)", { collect: true })
     .option("-a, --alias <alias:string>", "Alias for the item")
@@ -64,22 +66,7 @@ export function createNoteCommand() {
         : "Untitled";
 
       const now = new Date();
-      const parentArg = typeof options.parent === "string" ? options.parent : undefined;
-      const placementArg = typeof options.placement === "string" ? options.placement : undefined;
-
-      // Handle --placement option
-      if (placementArg) {
-        if (placementArg !== "permanent") {
-          console.error(
-            `Invalid placement value: "${placementArg}". Only "permanent" is supported.`,
-          );
-          return;
-        }
-        if (parentArg) {
-          console.error("Cannot use both --parent and --placement options together.");
-          return;
-        }
-      }
+      const dirArg = typeof options.dir === "string" ? options.dir : undefined;
 
       const cwdResult = await CwdResolutionService.getCwd({
         sessionRepository: deps.sessionRepository,
@@ -95,17 +82,17 @@ export function createNoteCommand() {
         console.error(`Warning: ${cwdResult.value.warning}`);
       }
 
-      // Resolve parent placement
-      let parentPlacement = cwdResult.value.placement;
+      // Resolve parent directory
+      let parentDirectory = cwdResult.value.directory;
 
-      if (placementArg === "permanent") {
-        // Use permanent placement
-        parentPlacement = createPermanentPlacement();
-      } else if (parentArg) {
-        const exprResult = parsePathExpression(parentArg);
+      if (dirArg === "permanent") {
+        // Use permanent directory
+        parentDirectory = createPermanentDirectory();
+      } else if (dirArg) {
+        const exprResult = parsePathExpression(dirArg);
         if (exprResult.type === "error") {
           console.error(
-            "Invalid parent expression:",
+            "Invalid directory expression:",
             exprResult.error.issues.map((i) => i.message).join(", "),
           );
           return;
@@ -120,19 +107,19 @@ export function createNoteCommand() {
         });
 
         const resolveResult = await pathResolver.resolvePath(
-          cwdResult.value.placement,
+          cwdResult.value.directory,
           exprResult.value,
         );
 
         if (resolveResult.type === "error") {
           console.error(
-            "Failed to resolve parent:",
+            "Failed to resolve directory:",
             resolveResult.error.issues.map((i) => i.message).join(", "),
           );
           return;
         }
 
-        parentPlacement = resolveResult.value;
+        parentDirectory = resolveResult.value;
       }
 
       const createdAtResult = dateTimeFromDate(now);
@@ -155,7 +142,7 @@ export function createNoteCommand() {
         project: projectOption,
         contexts: contextOption,
         alias: aliasOption,
-        parentPlacement: parentPlacement,
+        parentDirectory: parentDirectory,
         createdAt: createdAtResult.value,
         timezone: deps.timezone,
       }, {
@@ -188,7 +175,7 @@ export function createNoteCommand() {
 
       const label = formatItemLabel(item);
       console.log(
-        `✅ Created note [${label}] ${item.data.title.toString()} at ${parentPlacement.toString()}`,
+        `✅ Created note [${label}] ${item.data.title.toString()} at ${parentDirectory.toString()}`,
       );
 
       // Auto-commit if enabled

@@ -14,18 +14,18 @@ const formatItemLabel = (
 
 export function createMoveCommand() {
   return new Command()
-    .description("Move items to a new placement")
+    .description("Move items to a new directory")
     .arguments("<args...:string>")
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .action(async (options: Record<string, unknown>, ...args: string[]) => {
-      // Parse arguments: all but last are item refs, last is placement
+      // Parse arguments: all but last are item refs, last is directory
       if (args.length < 2) {
-        console.error("Error: At least one item id and a placement are required");
+        console.error("Error: At least one item id and a directory are required");
         return;
       }
 
       const itemRefs = args.slice(0, -1);
-      const placement = args[args.length - 1];
+      const destination = args[args.length - 1];
 
       const debug = isDebugMode();
       const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
@@ -77,13 +77,13 @@ export function createMoveCommand() {
       let previousItemId: string | null = null;
 
       for (const itemRef of itemRefs) {
-        const targetExpression = previousItemId ? `after:${previousItemId}` : placement;
+        const targetExpression = previousItemId ? `after:${previousItemId}` : destination;
 
         const workflowResult = await MoveItemWorkflow.execute(
           {
             itemExpression: itemRef,
             targetExpression,
-            cwd: cwdResult.value.placement,
+            cwd: cwdResult.value.directory,
             today: now,
             occurredAt: occurredAtResult.value,
             timezone: deps.timezone,
@@ -106,7 +106,7 @@ export function createMoveCommand() {
 
         const label = formatItemLabel(item);
         console.log(
-          `✅ Moved [${label}] ${item.data.title.toString()} to ${item.data.placement.toString()}`,
+          `✅ Moved [${label}] ${item.data.title.toString()} to ${item.data.directory.toString()}`,
         );
       }
 
@@ -118,8 +118,8 @@ export function createMoveCommand() {
         stateRepository: deps.stateRepository,
       };
       const commitMessage = itemRefs.length === 1
-        ? `move item to ${placement}`
-        : `move ${itemRefs.length} items to ${placement}`;
+        ? `move item to ${destination}`
+        : `move ${itemRefs.length} items to ${destination}`;
       await executeAutoCommit(autoCommitDeps, commitMessage);
     });
 }

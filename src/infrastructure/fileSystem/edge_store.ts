@@ -180,18 +180,18 @@ export const readEdgeCollection = async (
 };
 
 /**
- * Placement edge (top-level date sections)
- * Stores rank for items placed directly under date sections
+ * Directory edge (top-level date sections)
+ * Stores rank for items placed directly under date directories
  */
-export type PlacementEdgeSnapshot = Readonly<{
+export type DirectoryEdgeSnapshot = Readonly<{
   schema: string;
   rank: string;
 }>;
 
 /**
- * Save a placement edge for an item at a top-level date section
+ * Save a directory edge for an item at a top-level date section
  */
-export const savePlacementEdge = async (
+export const saveDirectoryEdge = async (
   workspaceRoot: string,
   dateStr: string,
   itemId: ItemId,
@@ -205,7 +205,7 @@ export const savePlacementEdge = async (
     return ensureResult;
   }
 
-  const snapshot: PlacementEdgeSnapshot = {
+  const snapshot: DirectoryEdgeSnapshot = {
     schema: EDGE_SCHEMA,
     rank: rank.toString(),
   };
@@ -217,7 +217,7 @@ export const savePlacementEdge = async (
     return Result.ok(undefined);
   } catch (error) {
     return Result.error(
-      createRepositoryError("item", "save", "failed to write placement edge", {
+      createRepositoryError("item", "save", "failed to write directory edge", {
         identifier: itemId.toString(),
         cause: error,
       }),
@@ -226,9 +226,9 @@ export const savePlacementEdge = async (
 };
 
 /**
- * Delete a placement edge for an item
+ * Delete a directory edge for an item
  */
-export const deletePlacementEdge = async (
+export const deleteDirectoryEdge = async (
   workspaceRoot: string,
   dateStr: string,
   itemId: ItemId,
@@ -250,7 +250,7 @@ export const deletePlacementEdge = async (
       return Result.ok(undefined);
     }
     return Result.error(
-      createRepositoryError("item", "delete", "failed to delete placement edge", {
+      createRepositoryError("item", "delete", "failed to delete directory edge", {
         identifier: itemId.toString(),
         cause: error,
       }),

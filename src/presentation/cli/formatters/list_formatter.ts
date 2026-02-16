@@ -31,7 +31,7 @@ export type ItemIdResolver = (id: string) => string | undefined;
  * which are shared across all items in a single list render).
  */
 export type ItemLineContext = Readonly<{
-  /** Date string (YYYY-MM-DD) for the item's placement day, used in print mode */
+  /** Date string (YYYY-MM-DD) for the item's directory day, used in print mode */
   dateStr?: string;
   /** Resolver for project/context ItemId UUIDs to display aliases */
   resolveItemId?: ItemIdResolver;
@@ -223,7 +223,7 @@ const formatItemLinePrintMode = (
   if (dateStr) {
     parts.push(isEvent ? formatDateTimeForPrint(dateStr, item, timezone) : dateStr);
   } else if (isEvent) {
-    // For events without dateStr (e.g., permanent placement), still emit time if available
+    // For events without dateStr (e.g., permanent directory), still emit time if available
     const timeStr = formatEventTimeString(item, timezone);
     if (timeStr) {
       parts.push(timeStr);

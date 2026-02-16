@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
 import { createFileSystemSectionQueryService } from "./section_query_service.ts";
-import { createDatePlacement, createItemPlacement } from "../../domain/primitives/placement.ts";
+import { createDateDirectory, createItemDirectory } from "../../domain/primitives/directory.ts";
 import { parseCalendarDay } from "../../domain/primitives/calendar_day.ts";
 import { parseItemId } from "../../domain/primitives/item_id.ts";
 import { Result } from "../../shared/result.ts";
@@ -36,9 +36,9 @@ Deno.test({
     await withTempWorkspace(async (root) => {
       const service = createFileSystemSectionQueryService({ root });
       const date = unwrapOk(parseCalendarDay("2025-01-15"), "parse date");
-      const placement = createDatePlacement(date, []);
+      const directory = createDateDirectory(date, []);
 
-      const result = await service.listSections(placement);
+      const result = await service.listSections(directory);
       const summaries = unwrapOk(result, "list sections");
 
       assertEquals(summaries, []);
@@ -68,18 +68,18 @@ Deno.test({
 
       const service = createFileSystemSectionQueryService({ root });
       const date = unwrapOk(parseCalendarDay("2025-01-15"), "parse date");
-      const placement = createDatePlacement(date, []);
+      const directory = createDateDirectory(date, []);
 
-      const result = await service.listSections(placement);
+      const result = await service.listSections(directory);
       const summaries = unwrapOk(result, "list sections");
 
       assertEquals(summaries.length, 2);
 
-      assertEquals(summaries[0].placement.section, [1]);
+      assertEquals(summaries[0].directory.section, [1]);
       assertEquals(summaries[0].itemCount, 1);
       assertEquals(summaries[0].sectionCount, 0);
 
-      assertEquals(summaries[1].placement.section, [2]);
+      assertEquals(summaries[1].directory.section, [2]);
       assertEquals(summaries[1].itemCount, 1);
       assertEquals(summaries[1].sectionCount, 1);
     });
@@ -102,13 +102,13 @@ Deno.test({
 
       const service = createFileSystemSectionQueryService({ root });
       const itemId = unwrapOk(parseItemId(parentId), "parse item id");
-      const placement = createItemPlacement(itemId, []);
+      const directory = createItemDirectory(itemId, []);
 
-      const result = await service.listSections(placement);
+      const result = await service.listSections(directory);
       const summaries = unwrapOk(result, "list sections");
 
       assertEquals(summaries.length, 1);
-      assertEquals(summaries[0].placement.section, [1]);
+      assertEquals(summaries[0].directory.section, [1]);
       assertEquals(summaries[0].itemCount, 1);
       assertEquals(summaries[0].sectionCount, 0);
     });
@@ -126,9 +126,9 @@ Deno.test({
 
       const service = createFileSystemSectionQueryService({ root });
       const date = unwrapOk(parseCalendarDay("2025-01-15"), "parse date");
-      const placement = createDatePlacement(date, []);
+      const directory = createDateDirectory(date, []);
 
-      const result = await service.listSections(placement);
+      const result = await service.listSections(directory);
       const summaries = unwrapOk(result, "list sections");
 
       assertEquals(summaries, []);
@@ -163,15 +163,15 @@ Deno.test({
 
       const service = createFileSystemSectionQueryService({ root });
       const date = unwrapOk(parseCalendarDay("2025-01-15"), "parse date");
-      const placement = createDatePlacement(date, []);
+      const directory = createDateDirectory(date, []);
 
-      const result = await service.listSections(placement);
+      const result = await service.listSections(directory);
       const summaries = unwrapOk(result, "list sections");
 
       assertEquals(summaries.length, 3);
-      assertEquals(summaries[0].placement.section, [2]);
-      assertEquals(summaries[1].placement.section, [5]);
-      assertEquals(summaries[2].placement.section, [10]);
+      assertEquals(summaries[0].directory.section, [2]);
+      assertEquals(summaries[1].directory.section, [5]);
+      assertEquals(summaries[2].directory.section, [10]);
     });
   },
 });
@@ -191,13 +191,13 @@ Deno.test({
 
       const service = createFileSystemSectionQueryService({ root });
       const date = unwrapOk(parseCalendarDay("2025-01-15"), "parse date");
-      const placement = createDatePlacement(date, [1]);
+      const directory = createDateDirectory(date, [1]);
 
-      const result = await service.listSections(placement);
+      const result = await service.listSections(directory);
       const summaries = unwrapOk(result, "list sections");
 
       assertEquals(summaries.length, 1);
-      assertEquals(summaries[0].placement.section, [1, 2]);
+      assertEquals(summaries[0].directory.section, [1, 2]);
       assertEquals(summaries[0].itemCount, 1);
     });
   },

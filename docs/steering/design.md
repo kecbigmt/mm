@@ -13,9 +13,9 @@ mm is a personal knowledge operating system with a built-in MCP server.
 It provides a Unix-like path interface (cd, ls, pwd) over a knowledge graph while keeping
 human-editable content in plain text with Git-friendly diffs. The system is built from two
 primitives: **Item** (an addressable entity like note, task, or event) and **Section** (a numbered
-or dated shelf under a parent). Items can have children. Each Item has exactly one active
-placement. Items are created under date sections, never moved physically; moves update frontmatter
-(placement, rank) which serves as the single source of truth.
+or dated shelf under a parent). Items can have children. Each Item has exactly one active directory.
+Items are created under date sections, never moved physically; moves update frontmatter (directory,
+rank) which serves as the single source of truth.
 
 ## 2) Goals / Non-Goals
 
@@ -23,15 +23,15 @@ placement. Items are created under date sections, never moved physically; moves 
 
 - **Simple diffs, conflict-resistant Git workflow**: UUID v7-based file names (timestamp-embedded)
   and date-partitioned directories minimize merge conflicts. Frontmatter as single source of truth
-  (placement, rank) allows conflict-free moves. Git-ignored rebuildable `.index/` eliminates index
+  (directory, rank) allows conflict-free moves. Git-ignored rebuildable `.index/` eliminates index
   conflicts. Optional Git sync supports offline-first workflow with rebase-based synchronization.
-- One mental model: Items placed under Items, split by Sections; single active placement per Item.
+- One mental model: Items placed under Items, split by Sections; single active directory per Item.
 - Fast navigation by date, numbering paths, or aliases.
 - Deterministic ordering via ranks (LexoRank).
 
 **Non-Goals**
 
-- Multi-placement (no simultaneous presence in multiple parents).
+- Multi-directory (no simultaneous presence in multiple parents).
 - Cross-platform symlinks.
 - Timezone migrations (workspace TZ is fixed).
 
@@ -41,15 +41,15 @@ placement. Items are created under date sections, never moved physically; moves 
 
 - **Identity**: UUID v7 (timestamp-embedded).
 - **Content**: Single `.md` file with **YAML Frontmatter + Markdown body**.
-- **Frontmatter fields**: `id`, `kind`, `status`, `placement`, `rank`, `created_at`, `updated_at`,
+- **Frontmatter fields**: `id`, `kind`, `status`, `directory`, `rank`, `created_at`, `updated_at`,
   optional `alias`, `tags`, `schema`, `extra`.
 - **Body**: Markdown content; title is the first H1.
-- Exactly **one active placement** in the logical graph.
+- Exactly **one active directory** in the logical graph.
 - Created under the **date section** matching its creation date.
-- Can be **moved** to another placement; the physical file location remains under its original date;
-  frontmatter (`placement`, `rank`) is updated. After move, it is excluded from the original date's
+- Can be **moved** to another directory; the physical file location remains under its original date;
+  frontmatter (`directory`, `rank`) is updated. After move, it is excluded from the original date's
   listing.
-- Has **rank (LexoRank)** for ordering within its placement.
+- Has **rank (LexoRank)** for ordering within its directory.
 - May also act as a parent (can have children).
 - State transitions: `close`, `reopen`.
 - Kinds: `note`, `task`, `event`.
@@ -62,23 +62,23 @@ placement. Items are created under date sections, never moved physically; moves 
 - **Top level of the graph is Calendar (year/month/day)**; Items are initially placed under their
   creation date section.
 
-### Path vs Placement
+### Path vs Directory
 
 - **Path**: User-facing expression that may contain syntactic sugar (relative dates like `today`,
   aliases, navigation tokens like `.` or `..`). Used for CLI input.
-- **Placement**: Normalized, absolute logical position stored in Item's frontmatter. Contains only
+- **Directory**: Normalized, absolute logical position stored in Item's frontmatter. Contains only
   absolute dates (`YYYY-MM-DD`) and UUIDs (no aliases, no relative tokens). This is the canonical
   representation in the domain model.
 
-All user-provided paths are resolved to placement before being stored in frontmatter.
+All user-provided paths are resolved to a directory before being stored in frontmatter.
 
 ### Workspace
 
 - Holds one graph of Items plus alias/context metadata.
 - Fixed timezone for date partitioning (e.g., `"Asia/Tokyo"`). Changing TZ would require full
   re-partition; **not supported**.
-- Optional Git sync configuration (`sync.vcs`, `sync.enabled`, `sync.mode`,
-  `sync.git.remote`, `sync.git.branch`):
+- Optional Git sync configuration (`sync.vcs`, `sync.enabled`, `sync.mode`, `sync.git.remote`,
+  `sync.git.branch`):
   - `mode="auto-commit"`: auto-commit after state changes (local only).
   - `mode="auto-sync"`: auto-commit + pull(rebase) + push after state changes.
 
@@ -90,7 +90,7 @@ All user-provided paths are resolved to placement before being stored in frontma
   items/
     YYYY/MM/DD/
       <uuidv7>.md                         # Single file: YAML Frontmatter + Markdown body
-                                          # Frontmatter: id, kind, status, placement, rank,
+                                          # Frontmatter: id, kind, status, directory, rank,
                                           #              created_at, updated_at, alias?, tags?, schema, ...
                                           # Body: Markdown content
   .index/                                 # Cache/index (Git-ignored, rebuildable)
@@ -118,28 +118,28 @@ All user-provided paths are resolved to placement before being stored in frontma
 
 - **Single file per Item**: `<uuid>.md` contains both metadata (Frontmatter) and content (Markdown
   body).
-- **Frontmatter is authoritative**: The Item's `placement` and `rank` in Frontmatter are the single
+- **Frontmatter is authoritative**: The Item's `directory` and `rank` in Frontmatter are the single
   source of truth.
-- **`.index/graph` is rebuildable cache**: Edge files mirror Frontmatter placement for efficient
+- **`.index/graph` is rebuildable cache**: Edge files mirror Frontmatter directory for efficient
   traversal; regenerated via `mm doctor rebuild-index`.
 - **Git-ignored index**: `.index/` directory is not committed; each machine rebuilds it locally.
 
 ## 5) Ordering & Ranks
 
-- **Frontmatter `rank`**: ordering within the Item's current placement (stored in `placement`
+- **Frontmatter `rank`**: ordering within the Item's current directory (stored in `directory`
   field).
 - **Edge files**: mirror the `rank` from Frontmatter for efficient traversal.
 - LexoRank (string) supports stable insertions (`head`, `tail`, `before:<id>`, `after:<id>`).
   Periodic rebalancing may be performed by maintenance (`mm doctor rebalance-rank <paths...>`).
 
-## 6) Movement & Placement
+## 6) Movement & Directory
 
-- Items have **one active placement** at a time.
-- Move updates **Frontmatter `placement` and `rank`** fields so that:
+- Items have **one active directory** at a time.
+- Move updates **Frontmatter `directory` and `rank`** fields so that:
   - the item **disappears** from its original day listing,
-  - appears in the new placement.
+  - appears in the new directory.
 - Physical path stays under original `YYYY/MM/DD/<uuidv7>.md`.
-- Edge files in `.index/graph` are rebuilt to reflect the new placement.
+- Edge files in `.index/graph` are rebuilt to reflect the new directory.
 
 ## 7) Aliases & Contexts
 
@@ -166,22 +166,22 @@ All user-provided paths are resolved to placement before being stored in frontma
 ## 10) Listing & Sorting
 
 - `list` default sort: **rank asc**, tie-break by `created_at` asc.
-- Calendar listings exclude items that have been moved to another placement.
+- Calendar listings exclude items that have been moved to another directory.
 
 ## 11) Validation (pre-save / doctor)
 
 **Frontmatter validation:**
 
-- Required fields present: `id`, `kind`, `status`, `placement`, `rank`, `created_at`, `updated_at`,
+- Required fields present: `id`, `kind`, `status`, `directory`, `rank`, `created_at`, `updated_at`,
   `schema`.
 - `id` matches filename `<uuid>.md` and is valid UUID v7.
 - `kind` is one of allowed values (e.g., `note`, `task`, `event`).
 - `status` is one of allowed values (e.g., `open`, `closed`).
-- `placement` is normalized (no relative tokens like `today`, no aliases; only absolute dates and
+- `directory` is normalized (no relative tokens like `today`, no aliases; only absolute dates and
   UUIDs).
 - `rank` is valid LexoRank format.
 - `created_at`, `updated_at` are valid ISO-8601 timestamps.
-- `schema` is present (e.g., `mm.item.frontmatter/4`).
+- `schema` is present (e.g., `mm.item.frontmatter/5`).
 - `alias` (if present) follows alias rules (no reserved tokens, unique canonical_key).
 - YAML is valid and parseable; UTF-8 (NFC), LF newlines.
 
@@ -190,12 +190,13 @@ All user-provided paths are resolved to placement before being stored in frontma
 - Every `*.edge.json` points to an existing **Item** (no edge→edge).
 - No duplicate edges (same container + same target).
 - No cycles (an Item cannot be a descendant of itself).
-- Edge files are consistent with Frontmatter `placement` and `rank`.
+- Edge files are consistent with Frontmatter `directory` and `rank`.
 
 **Maintenance:**
 
 - `mm doctor check`: Validate workspace integrity (inspection only, no modifications).
-- `mm doctor migrate`: Migrate workspace data to the latest version. See [migration.md](migration.md).
+- `mm doctor migrate`: Migrate workspace data to the latest version. See
+  [migration.md](migration.md).
 - `mm doctor rebuild-index`: Rebuild `.index/graph` and `.index/aliases` from all Frontmatter data.
 - `mm doctor rebalance-rank <paths...>`: Rebalance LexoRank values for items in specified paths to
   restore insertion headroom.
@@ -203,7 +204,7 @@ All user-provided paths are resolved to placement before being stored in frontma
 ## 12) Git Workflow & Conflict Strategy
 
 - **Git-managed files**:
-  - `items/**/*.md` — Item files (Frontmatter + Markdown body; includes authoritative `placement`,
+  - `items/**/*.md` — Item files (Frontmatter + Markdown body; includes authoritative `directory`,
     `rank`, and all metadata)
   - `workspace.json`, `tags/*.tag.json`
 - **Git-ignored files** (`.gitignore` includes `.index/`):
@@ -211,7 +212,7 @@ All user-provided paths are resolved to placement before being stored in frontma
   - `.state.json` — Local session state
   - Edge files are **rebuildable** from Frontmatter via `mm doctor rebuild-index`
 - **Conflict resolution**:
-  - Changes to Frontmatter are typically line-local (placement, rank, status fields).
+  - Changes to Frontmatter are typically line-local (directory, rank, status fields).
   - Frontmatter conflicts surface as YAML diffs and are resolved by reindexing.
   - After `git pull`, if `.index/graph` is out-of-sync, run `mm doctor rebuild-index` to regenerate
     the index from merged Frontmatter.
@@ -220,7 +221,7 @@ All user-provided paths are resolved to placement before being stored in frontma
 
 - Unknown path token → show parse help with examples.
 - Move to invalid position (e.g., before id in another parent/section) → explain required context
-  (use path-qualified placement).
+  (use path-qualified directory).
 
 ## 14) Future Work (optional)
 

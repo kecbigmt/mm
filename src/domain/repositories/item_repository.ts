@@ -1,13 +1,13 @@
 import { Result } from "../../shared/result.ts";
 import { Item } from "../models/item.ts";
-import { ItemId, PlacementRange } from "../primitives/mod.ts";
+import { DirectoryRange, ItemId } from "../primitives/mod.ts";
 import { RepositoryError } from "./repository_error.ts";
 
 export interface ItemRepository {
   load(id: ItemId): Promise<Result<Item | undefined, RepositoryError>>;
   save(item: Item): Promise<Result<void, RepositoryError>>;
   delete(id: ItemId): Promise<Result<void, RepositoryError>>;
-  listByPlacement(
-    range: PlacementRange,
+  listByDirectory(
+    range: DirectoryRange,
   ): Promise<Result<ReadonlyArray<Item>, RepositoryError>>;
 }

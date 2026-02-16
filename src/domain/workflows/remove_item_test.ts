@@ -24,11 +24,11 @@ async function createTestItem(id: string, alias?: string) {
   const validId = id.length < 36 ? `0193d6c0-${id.padStart(4, "0")}-7000-8000-000000000000` : id;
   const itemId = Result.unwrap(itemIdFromString(validId));
   const title = Result.unwrap(itemTitleFromString("Test Item"));
-  const { parsePlacement } = await import("../primitives/placement.ts");
+  const { parseDirectory } = await import("../primitives/directory.ts");
   const icon = createItemIcon("note");
   const itemStatus = itemStatusOpen();
   const rank = Result.unwrap(itemRankFromString("a0"));
-  const placement = Result.unwrap(parsePlacement("2024-01-01"));
+  const directory = Result.unwrap(parseDirectory("2024-01-01"));
   const now = Result.unwrap(dateTimeFromDate(new Date()));
 
   return createItem({
@@ -36,7 +36,7 @@ async function createTestItem(id: string, alias?: string) {
     title,
     icon,
     status: itemStatus,
-    placement,
+    directory,
     rank,
     createdAt: now,
     updatedAt: now,

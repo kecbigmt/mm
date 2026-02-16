@@ -7,13 +7,13 @@ import { parseRangeExpression } from "../path_parser.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import {
   createDateRange,
-  type PlacementRange,
-} from "../../../domain/primitives/placement_range.ts";
+  type DirectoryRange,
+} from "../../../domain/primitives/directory_range.ts";
 import { parseCalendarDay } from "../../../domain/primitives/calendar_day.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/date_time.ts";
 import { Result } from "../../../shared/result.ts";
 import { formatDateStringForTimezone } from "../../../shared/timezone_format.ts";
-import { createPlacement } from "../../../domain/primitives/placement.ts";
+import { createDirectory } from "../../../domain/primitives/directory.ts";
 import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import type { RangeExpression } from "../../../domain/primitives/path_types.ts";
 import type { SectionSummary } from "../../../domain/services/section_query_service.ts";
@@ -65,18 +65,18 @@ const addDaysToDateString = (dateStr: string, days: number): string => {
 };
 
 /**
- * Create a placement for today's date in the given timezone.
+ * Create a directory for today's date in the given timezone.
  */
-const createTodayPlacement = (
+const createTodayDirectory = (
   now: Date,
   timezone: Parameters<typeof formatDateStringForTimezone>[1],
-): ReturnType<typeof createPlacement> => {
+): ReturnType<typeof createDirectory> => {
   const todayStr = formatDateStringForTimezone(now, timezone);
   const todayResult = parseCalendarDay(todayStr);
   if (todayResult.type === "error") {
     throw new Error("Failed to compute today's date");
   }
-  return createPlacement({ kind: "date", date: todayResult.value }, []);
+  return createDirectory({ kind: "date", date: todayResult.value }, []);
 };
 
 /**
@@ -129,10 +129,10 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   const statusFilter: ListItemsStatusFilter = options.all ? "all" : "open";
   const isPrintMode = options.print === true;
 
-  // Resolve PlacementRange and effective expression for workflow
-  let placementRange: PlacementRange;
+  // Resolve directory range and effective expression for workflow
+  let directoryRange: DirectoryRange;
   let effectiveExpression: string | undefined;
-  let cwd: ReturnType<typeof createPlacement> | undefined;
+  let cwd: ReturnType<typeof createDirectory> | undefined;
   let cwdFromSession = false; // Track if cwd was loaded from session (vs placeholder)
 
   if (locatorArg) {
@@ -168,12 +168,12 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
         console.error(`Warning: ${cwdResult.value.warning}`);
       }
 
-      cwd = cwdResult.value.placement;
+      cwd = cwdResult.value.directory;
       cwdFromSession = true;
     } else {
       // Use today's date as cwd placeholder for path resolution
       // cwdFromSession stays false - base date won't be extracted from this
-      cwd = createTodayPlacement(now, deps.timezone);
+      cwd = createTodayDirectory(now, deps.timezone);
     }
 
     const pathResolver = createPathResolver({
@@ -191,7 +191,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
       return;
     }
 
-    placementRange = resolveResult.value;
+    directoryRange = resolveResult.value;
     effectiveExpression = locatorArg;
   } else {
     // No locator - need cwd to determine default behavior
@@ -213,13 +213,13 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
       console.error(`Warning: ${cwdResult.value.warning}`);
     }
 
-    cwd = cwdResult.value.placement;
+    cwd = cwdResult.value.directory;
     cwdFromSession = true;
 
     // If cwd is an item-head or permanent section, use cwd as the target
     // Otherwise, default to today-7d..today+7d date range
     if (cwd.head.kind === "item" || cwd.head.kind === "permanent") {
-      placementRange = { kind: "single", at: cwd };
+      directoryRange = { kind: "single", at: cwd };
       effectiveExpression = ".";
     } else {
       const todayStr = cwd.head.kind === "date"
@@ -236,7 +236,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
         return;
       }
 
-      placementRange = createDateRange(fromResult.value, toResult.value);
+      directoryRange = createDateRange(fromResult.value, toResult.value);
       // Build expression for workflow
       effectiveExpression = `${fromDateStr}..${toDateStr}`;
     }
@@ -279,10 +279,10 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
 
   // Query sections for numeric ranges
   let sections: ReadonlyArray<SectionSummary> = [];
-  if (placementRange.kind === "numericRange" || placementRange.kind === "single") {
-    const parent = placementRange.kind === "numericRange"
-      ? placementRange.parent
-      : placementRange.at;
+  if (directoryRange.kind === "numericRange" || directoryRange.kind === "single") {
+    const parent = directoryRange.kind === "numericRange"
+      ? directoryRange.parent
+      : directoryRange.at;
 
     const sectionsResult = await profileAsync(
       "sectionQueryService.listSections",
@@ -307,24 +307,24 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
 
   // For item-head ranges, try to get the parent item's alias
   if (
-    (placementRange.kind === "numericRange" || placementRange.kind === "single") &&
-    (placementRange.kind === "numericRange"
-      ? placementRange.parent.head.kind === "item"
-      : placementRange.at.head.kind === "item")
+    (directoryRange.kind === "numericRange" || directoryRange.kind === "single") &&
+    (directoryRange.kind === "numericRange"
+      ? directoryRange.parent.head.kind === "item"
+      : directoryRange.at.head.kind === "item")
   ) {
-    const parentId = placementRange.kind === "numericRange"
-      ? placementRange.parent.head.kind === "item" ? placementRange.parent.head.id.toString() : null
-      : placementRange.at.head.kind === "item"
-      ? placementRange.at.head.id.toString()
+    const parentId = directoryRange.kind === "numericRange"
+      ? directoryRange.parent.head.kind === "item" ? directoryRange.parent.head.id.toString() : null
+      : directoryRange.at.head.kind === "item"
+      ? directoryRange.at.head.id.toString()
       : null;
 
     if (parentId && !aliasMap.has(parentId)) {
-      // Get the parent item ID from the placement range
-      const parentItemId = placementRange.kind === "numericRange" &&
-          placementRange.parent.head.kind === "item"
-        ? placementRange.parent.head.id
-        : placementRange.kind === "single" && placementRange.at.head.kind === "item"
-        ? placementRange.at.head.id
+      // Get the parent item ID from the directory range
+      const parentItemId = directoryRange.kind === "numericRange" &&
+          directoryRange.parent.head.kind === "item"
+        ? directoryRange.parent.head.id
+        : directoryRange.kind === "single" && directoryRange.at.head.kind === "item"
+        ? directoryRange.at.head.id
         : null;
 
       if (parentItemId) {
@@ -392,7 +392,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
 
   // Build display label function for item sections
   const getDisplayLabel = (
-    parent: ReturnType<typeof createPlacement>,
+    parent: ReturnType<typeof createDirectory>,
     sectionPrefix: number,
   ): string => {
     let headStr: string;
@@ -419,7 +419,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   const partitionResult = profileSync("buildPartitions", () =>
     buildPartitions({
       items,
-      range: placementRange,
+      range: directoryRange,
       sections,
       getDisplayLabel,
     }));
@@ -445,9 +445,9 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   const baseDate = cwdFromSession && cwd?.head.kind === "date" ? cwd.head.date : undefined;
 
   // Determine effective depth for section expansion
-  // Default: 1 for item-head single placements, 0 for date ranges/numeric ranges
-  const isItemHeadSingle = placementRange.kind === "single" &&
-    placementRange.at.head.kind !== "date";
+  // Default: 1 for item-head single directories, 0 for date ranges/numeric ranges
+  const isItemHeadSingle = directoryRange.kind === "single" &&
+    directoryRange.at.head.kind !== "date";
   const effectiveDepth = options.depth !== undefined ? options.depth : isItemHeadSingle ? 1 : 0;
 
   const formatterOptions: ListFormatterOptions = {
@@ -459,8 +459,8 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
   // Build item line formatter that captures shared context (alias resolution, prefix highlighting)
   const formatItems = (itemList: ReadonlyArray<Item>, lines: string[]) => {
     for (const item of itemList) {
-      const dateStr = item.data.placement.head.kind === "date"
-        ? item.data.placement.head.date.toString()
+      const dateStr = item.data.directory.head.kind === "date"
+        ? item.data.directory.head.date.toString()
         : undefined;
       const alias = item.data.alias?.toString();
       const prefixLen = alias ? getPrefixLength(alias) : undefined;

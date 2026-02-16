@@ -30,7 +30,7 @@ export function createConfig(): string {
 export function createItemContent(
   id: string,
   title: string,
-  placement: string,
+  directory: string,
   rank: string,
   options: {
     alias?: string;
@@ -50,11 +50,11 @@ export function createItemContent(
     `id: "${id}"`,
     `icon: "${icon}"`,
     `status: "${status}"`,
-    `placement: "${placement}"`,
+    `directory: "${directory}"`,
     `rank: "${rank}"`,
     `created_at: "${createdAt}"`,
     `updated_at: "${updatedAt}"`,
-    'schema: "mm.item.frontmatter/4"',
+    'schema: "mm.item.frontmatter/5"',
   ];
 
   if (options.alias) {
@@ -135,18 +135,18 @@ export async function createItemFile(
   id: string,
   options: {
     title?: string;
-    placement?: string;
+    directory?: string;
     rank?: string;
     alias?: string;
     dateDir?: string;
   } = {},
 ): Promise<void> {
   const title = options.title ?? "Test Item";
-  const placement = options.placement ?? "2025-01-15";
+  const directory = options.directory ?? "2025-01-15";
   const rank = options.rank ?? "aaa";
   const dateDir = options.dateDir ?? "2025/01/15";
 
-  const content = createItemContent(id, title, placement, rank, { alias: options.alias });
+  const content = createItemContent(id, title, directory, rank, { alias: options.alias });
   const filePath = join(workspaceRoot, "items", dateDir, `${id}.md`);
   await writeFile(filePath, content);
 }

@@ -86,26 +86,26 @@ export const rebalanceGroup = (
 };
 
 /**
- * Group items by their placement (parent + section)
+ * Group items by their directory (parent + section)
  *
- * Items are grouped by their placement string, which includes:
+ * Items are grouped by their directory string, which includes:
  * - Parent (date YYYY-MM-DD or item UUID)
  * - Section path (e.g., /1/3)
  *
  * This allows rebalancing siblings within the same container/section.
  */
-export type PlacementGroup = Readonly<{
-  placementKey: string;
+export type DirectoryGroup = Readonly<{
+  directoryKey: string;
   siblings: ReadonlyArray<Item>;
 }>;
 
-export const groupByPlacement = (
+export const groupByDirectory = (
   items: ReadonlyArray<Item>,
-): ReadonlyArray<PlacementGroup> => {
+): ReadonlyArray<DirectoryGroup> => {
   const groups = new Map<string, Item[]>();
 
   for (const item of items) {
-    const key = item.data.placement.toString();
+    const key = item.data.directory.toString();
     const group = groups.get(key);
     if (group) {
       group.push(item);
@@ -114,10 +114,10 @@ export const groupByPlacement = (
     }
   }
 
-  const result: PlacementGroup[] = [];
-  for (const [placementKey, siblings] of groups) {
+  const result: DirectoryGroup[] = [];
+  for (const [directoryKey, siblings] of groups) {
     result.push({
-      placementKey,
+      directoryKey,
       siblings: Object.freeze(siblings),
     });
   }

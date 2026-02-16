@@ -9,7 +9,7 @@ import { parseItemId } from "../../domain/primitives/item_id.ts";
  */
 function createTestItem(
   id: string,
-  placement: string,
+  directory: string,
   rank: string,
   options?: { alias?: string },
 ): Item {
@@ -18,7 +18,7 @@ function createTestItem(
     title: "Test Item",
     icon: "note",
     status: "open",
-    placement,
+    directory,
     rank,
     createdAt: "2025-01-15T10:00:00Z",
     updatedAt: "2025-01-15T10:00:00Z",
@@ -158,7 +158,7 @@ Deno.test("checkIndexIntegrity - detects simple cycle (A -> B -> A)", () => {
   const idA = "019a85fc-67c4-7a54-be8e-305bae009f9e";
   const idB = "019a8603-1234-7890-abcd-1234567890ab";
 
-  // A's placement is under B, B's placement is under A = cycle
+  // A's directory is under B, B's directory is under A = cycle
   const items = new Map<string, Item>([
     [idA, createTestItem(idA, idB, "a")],
     [idB, createTestItem(idB, idA, "b")],
@@ -176,7 +176,7 @@ Deno.test("checkIndexIntegrity - detects simple cycle (A -> B -> A)", () => {
 Deno.test("checkIndexIntegrity - detects self-loop (A -> A)", () => {
   const idA = "019a85fc-67c4-7a54-be8e-305bae009f9e";
 
-  // A's placement is under itself = self-loop cycle
+  // A's directory is under itself = self-loop cycle
   const items = new Map<string, Item>([
     [idA, createTestItem(idA, idA, "a")],
   ]);
@@ -352,7 +352,7 @@ Deno.test("checkIndexIntegrity - detects edge in wrong location (stale edge)", (
 
   // Item was moved from 2025-01-10 to 2025-01-15, but edge file is still at old location
   const items = new Map<string, Item>([
-    [id1, createTestItem(id1, "2025-01-15", "a")], // Current placement
+    [id1, createTestItem(id1, "2025-01-15", "a")], // Current directory
   ]);
 
   // Edge is at old location (2025-01-10) instead of new location (2025-01-15)
@@ -378,9 +378,9 @@ Deno.test("checkIndexIntegrity - detects edge in wrong location (parent to date)
   const id1 = "019a85fc-67c4-7a54-be8e-305bae009f9e";
   const parentId = "019a8603-1234-7890-abcd-1234567890ab";
 
-  // Item was moved from under parent to date placement
+  // Item was moved from under parent to date directory
   const items = new Map<string, Item>([
-    [id1, createTestItem(id1, "2025-01-15", "a")], // Current placement under date
+    [id1, createTestItem(id1, "2025-01-15", "a")], // Current directory under date
     [parentId, createTestItem(parentId, "2025-01-15", "b")],
   ]);
 

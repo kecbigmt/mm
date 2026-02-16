@@ -601,7 +601,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
     const pageResult = await runCommand(ctx.testHome, [
       "note",
       "Page 1",
-      "--parent",
+      "--dir",
       projectAlias ? `${projectAlias}/1/1` : `${projectId}/1/1`,
     ]);
     assertEquals(pageResult.success, true, `Failed to add page: ${pageResult.stderr}`);
@@ -824,7 +824,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
     const _sibling1 = await runCommand(ctx.testHome, [
       "note",
       "Sibling 1",
-      "--parent",
+      "--dir",
       projectAlias ? `${projectAlias}/2` : `${projectId}/2`,
     ]);
     const sibling1Id = await getLatestItemIdFromDate(ctx.testHome, "test-workspace", todayDate);
@@ -832,7 +832,7 @@ describe("Scenario 15: Git-friendly diffs", () => {
     const _sibling2 = await runCommand(ctx.testHome, [
       "note",
       "Sibling 2",
-      "--parent",
+      "--dir",
       projectAlias ? `${projectAlias}/2` : `${projectId}/2`,
     ]);
     const sibling2Id = await getLatestItemIdFromDate(ctx.testHome, "test-workspace", todayDate);

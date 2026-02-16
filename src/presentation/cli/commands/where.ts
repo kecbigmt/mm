@@ -6,11 +6,11 @@ import { isDebugMode } from "../debug.ts";
 import { createItemLocatorService } from "../../../domain/services/item_locator_service.ts";
 import type { Item } from "../../../domain/models/item.ts";
 
-/** Build a logical path string from an item's placement and optional alias. */
+/** Build a logical path string from an item's directory and optional alias. */
 function buildLogicalPath(item: Item): string {
-  const placement = item.data.placement.toString();
+  const dir = item.data.directory.toString();
   const alias = item.data.alias?.toString();
-  return alias ? `/${placement}/${alias}` : `/${placement}`;
+  return alias ? `/${dir}/${alias}` : `/${dir}`;
 }
 
 export function createWhereCommand() {

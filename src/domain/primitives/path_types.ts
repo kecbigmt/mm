@@ -13,11 +13,11 @@ export type PathToken =
   | Readonly<{ readonly kind: "relativeDate"; readonly expr: string }> // "today", "td", "+2w", "~mon"
   | Readonly<{ readonly kind: "idOrAlias"; readonly value: string }> // UUID or alias
   | Readonly<{ readonly kind: "numeric"; readonly value: number }> // section number
-  | Readonly<{ readonly kind: "permanent" }>; // "permanent" for permanent placement
+  | Readonly<{ readonly kind: "permanent" }>; // "permanent" for permanent directory
 
 /**
  * PathExpression represents a path input with potential syntactic sugar
- * This is the raw user input before resolution to a canonical Placement
+ * This is the raw user input before resolution to a canonical Directory
  *
  * Examples:
  * - "/2025-11-15" → { isAbsolute: true, segments: [{ kind: "relativeDate", expr: "2025-11-15" }] }

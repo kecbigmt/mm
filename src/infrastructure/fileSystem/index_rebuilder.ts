@@ -63,36 +63,36 @@ const computeAliasHash = async (canonicalKey: string): Promise<string> => {
 };
 
 /**
- * Get the directory path for an edge based on placement
+ * Get the directory path for an edge based on item directory
  */
 const getEdgeDirectoryPath = (item: Item): string => {
-  const placement = item.data.placement;
-  const head = placement.head;
+  const dir = item.data.directory;
+  const head = dir.head;
 
   if (head.kind === "date") {
-    // Date placement: dates/YYYY-MM-DD or dates/YYYY-MM-DD/1/3
+    // Date directory: dates/YYYY-MM-DD or dates/YYYY-MM-DD/1/3
     const dateStr = head.date.toString();
-    if (placement.section.length === 0) {
+    if (dir.section.length === 0) {
       return `dates/${dateStr}`;
     } else {
-      const sectionPath = placement.section.join("/");
+      const sectionPath = dir.section.join("/");
       return `dates/${dateStr}/${sectionPath}`;
     }
   } else if (head.kind === "item") {
-    // Item placement: parents/<parent-uuid> or parents/<parent-uuid>/1/3
+    // Item directory: parents/<parent-uuid> or parents/<parent-uuid>/1/3
     const parentId = head.id.toString();
-    if (placement.section.length === 0) {
+    if (dir.section.length === 0) {
       return `parents/${parentId}`;
     } else {
-      const sectionPath = placement.section.join("/");
+      const sectionPath = dir.section.join("/");
       return `parents/${parentId}/${sectionPath}`;
     }
   } else {
-    // Permanent placement: permanent or permanent/1/3
-    if (placement.section.length === 0) {
+    // Permanent directory: permanent or permanent/1/3
+    if (dir.section.length === 0) {
       return `permanent`;
     } else {
-      const sectionPath = placement.section.join("/");
+      const sectionPath = dir.section.join("/");
       return `permanent/${sectionPath}`;
     }
   }
@@ -102,7 +102,7 @@ const getEdgeDirectoryPath = (item: Item): string => {
  * Rebuild index from items
  *
  * Process:
- * 1. Parse each Item's placement field
+ * 1. Parse each Item's directory field
  * 2. Extract parent (date or UUID) and section path
  * 3. Group Items by (parent, section)
  * 4. Sort by rank (with created_at tiebreak)
@@ -132,7 +132,7 @@ export const rebuildFromItems = async (
       createdAt: item.data.createdAt,
     };
 
-    // Get directory path for this item's placement
+    // Get directory path for this item's directory
     const dirPath = getEdgeDirectoryPath(item);
 
     // Add to edges map

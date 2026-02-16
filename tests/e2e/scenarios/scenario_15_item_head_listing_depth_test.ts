@@ -41,8 +41,8 @@ describe("Scenario 15: Item-head listing with depth expansion", () => {
     await runCommand(ctx.testHome, ["note", "Book", "--alias", "book"], opts);
 
     // Create items under sections
-    await runCommand(ctx.testHome, ["note", "Chapter 1 Note", "--parent", "book/1"], opts);
-    await runCommand(ctx.testHome, ["note", "Chapter 2 Note", "--parent", "book/2"], opts);
+    await runCommand(ctx.testHome, ["note", "Chapter 1 Note", "--dir", "book/1"], opts);
+    await runCommand(ctx.testHome, ["note", "Chapter 2 Note", "--dir", "book/2"], opts);
 
     // Navigate to book
     await runCd(ctx.testHome, "book", opts);

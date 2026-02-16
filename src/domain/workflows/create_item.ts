@@ -6,6 +6,8 @@ import {
   CalendarDay,
   createItemIcon,
   DateTime,
+  Directory,
+  DirectoryRange,
   Duration,
   isCalendarDay,
   ItemId,
@@ -13,8 +15,6 @@ import {
   itemTitleFromString,
   parseAliasSlug,
   parseDateTime,
-  Placement,
-  PlacementRange,
   TimezoneIdentifier,
 } from "../primitives/mod.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
@@ -38,7 +38,7 @@ export type CreateItemInput = Readonly<{
   project?: string;
   contexts?: readonly string[];
   alias?: string;
-  parentPlacement: Placement;
+  parentDirectory: Directory;
   createdAt: DateTime;
   timezone: TimezoneIdentifier;
   // Scheduling fields
@@ -117,43 +117,43 @@ const extractDateFromDateTime = (dateTime: DateTime, timezone: TimezoneIdentifie
 };
 
 /**
- * Extracts the date string from a Placement if it's a date-based placement
- * Returns null for item-based placements
+ * Extracts the date string from a Directory if it's a date-based directory
+ * Returns null for item-based directories
  */
-const extractDateFromPlacement = (placement: Placement): string | null => {
-  if (placement.head.kind === "date") {
-    return placement.head.date.toString();
+const extractDateFromDirectory = (directory: Directory): string | null => {
+  if (directory.head.kind === "date") {
+    return directory.head.date.toString();
   }
   return null;
 };
 
 /**
- * Validates that the event's startAt date matches the parent placement date
- * Only validates for calendar-based placements (date kind)
- * Skips validation for item-based placements (item kind)
+ * Validates that the event's startAt date matches the parent directory date
+ * Only validates for calendar-based directories (date kind)
+ * Skips validation for item-based directories (item kind)
  *
  * Date comparison is done in the workspace timezone to handle day boundaries correctly
  */
 const validateEventDateConsistency = (
   startAt: DateTime,
-  parentPlacement: Placement,
+  parentDirectory: Directory,
   timezone: TimezoneIdentifier,
 ): Result<void, DateConsistencyValidationError> => {
   const startDate = extractDateFromDateTime(startAt, timezone);
-  const placementDate = extractDateFromPlacement(parentPlacement);
+  const directoryDate = extractDateFromDirectory(parentDirectory);
 
-  // Skip validation for item-based placements
-  if (placementDate === null) {
+  // Skip validation for item-based directories
+  if (directoryDate === null) {
     return Result.ok(undefined);
   }
 
-  if (startDate !== placementDate) {
+  if (startDate !== directoryDate) {
     return Result.error({
       kind: "date_consistency",
-      message: "event startAt date must match placement date",
+      message: "event startAt date must match directory date",
       issues: [
         createValidationIssue(
-          `startAt date '${startDate}' does not match placement date '${placementDate}'`,
+          `startAt date '${startDate}' does not match directory date '${directoryDate}'`,
           {
             code: "date_time_inconsistency",
             path: ["startAt"],
@@ -368,7 +368,7 @@ export const CreateItemWorkflow = {
     if (input.itemType === "event" && input.startAt) {
       const consistencyResult = validateEventDateConsistency(
         input.startAt,
-        input.parentPlacement,
+        input.parentDirectory,
         input.timezone,
       );
       if (consistencyResult.type === "error") {
@@ -396,9 +396,9 @@ export const CreateItemWorkflow = {
     const resolvedId = id as ItemId;
     const resolvedTitle = title!;
 
-    // Query siblings at the parent placement
-    const range: PlacementRange = { kind: "single", at: input.parentPlacement };
-    const siblingsResult = await deps.itemRepository.listByPlacement(range);
+    // Query siblings at the parent directory
+    const range: DirectoryRange = { kind: "single", at: input.parentDirectory };
+    const siblingsResult = await deps.itemRepository.listByDirectory(range);
     if (siblingsResult.type === "error") {
       return Result.error(repositoryFailure(siblingsResult.error));
     }
@@ -447,7 +447,7 @@ export const CreateItemWorkflow = {
       title: resolvedTitle,
       icon: createItemIcon(input.itemType),
       status: itemStatusOpen(),
-      placement: input.parentPlacement,
+      directory: input.parentDirectory,
       rank: rankResult.value,
       createdAt: input.createdAt,
       updatedAt: input.createdAt,

@@ -12,7 +12,7 @@ import { parsePathExpression } from "../../presentation/cli/path_parser.ts";
 import { createAlias } from "../models/alias.ts";
 import { createItem } from "../models/item.ts";
 import {
-  createDatePlacement,
+  createDateDirectory,
   createItemIcon,
   dateTimeFromDate,
   itemIdFromString,
@@ -20,10 +20,10 @@ import {
   parseAliasSlug,
   parseCalendarDay,
   parseDateTime,
+  parseDirectory,
   parseItemId,
   parseItemRank,
   parseItemTitle,
-  parsePlacement,
   parseTimezoneIdentifier,
 } from "../primitives/mod.ts";
 import { Result } from "../../shared/result.ts";
@@ -33,13 +33,13 @@ import type { ItemRepository } from "../repositories/item_repository.ts";
 const TODAY = new Date("2026-02-11T00:00:00Z");
 
 const makeItem = (
-  overrides: Partial<{ id: string; title: string; placement: string; alias: string }>,
+  overrides: Partial<{ id: string; title: string; directory: string; alias: string }>,
 ) => {
   const id = Result.unwrap(parseItemId(overrides.id ?? "019a0000-0000-7000-8000-000000000099"));
   const title = Result.unwrap(parseItemTitle(overrides.title ?? "Test item"));
   const icon = createItemIcon("task");
   const status = itemStatusOpen();
-  const placement = Result.unwrap(parsePlacement(overrides.placement ?? "2026-02-11"));
+  const directory = Result.unwrap(parseDirectory(overrides.directory ?? "2026-02-11"));
   const rank = Result.unwrap(parseItemRank("0|aaaaaa:"));
   const createdAt = Result.unwrap(parseDateTime("2026-02-10T09:00:00Z"));
   const updatedAt = Result.unwrap(parseDateTime("2026-02-10T09:00:00Z"));
@@ -50,7 +50,7 @@ const makeItem = (
     title,
     icon,
     status,
-    placement,
+    directory,
     rank,
     createdAt,
     updatedAt,
@@ -63,7 +63,7 @@ const setup = () => {
   const aliasRepository = new InMemoryAliasRepository();
   const now = Result.unwrap(dateTimeFromDate(TODAY));
   const today = Result.unwrap(parseCalendarDay("2026-02-11"));
-  const cwd = createDatePlacement(today, []);
+  const cwd = createDateDirectory(today, []);
   const timezone = Result.unwrap(parseTimezoneIdentifier("UTC"));
 
   const addAlias = (slug: string, itemId: string) => {
@@ -75,7 +75,7 @@ const setup = () => {
   };
 
   const addItem = (
-    overrides: Partial<{ id: string; title: string; placement: string; alias: string }>,
+    overrides: Partial<{ id: string; title: string; directory: string; alias: string }>,
   ) => {
     const item = makeItem(overrides);
     itemRepository.set(item);
@@ -101,7 +101,7 @@ Deno.test("PathResolver priority - recent item alias in priority set resolves sh
   // bace-x7q is placed today (within ±7 days) → in priority set
   addItem({
     id: "019a0000-0000-7000-8000-000000000001",
-    placement: "2026-02-11",
+    directory: "2026-02-11",
     alias: "bace-x7q",
   });
   addAlias("bace-x7q", "019a0000-0000-7000-8000-000000000001");
@@ -109,7 +109,7 @@ Deno.test("PathResolver priority - recent item alias in priority set resolves sh
   // bace-y2m is placed 30 days ago (outside ±7 days) → NOT in priority set
   addItem({
     id: "019a0000-0000-7000-8000-000000000002",
-    placement: "2026-01-12",
+    directory: "2026-01-12",
     alias: "bace-y2m",
   });
   addAlias("bace-y2m", "019a0000-0000-7000-8000-000000000002");
@@ -117,7 +117,7 @@ Deno.test("PathResolver priority - recent item alias in priority set resolves sh
   // kuno-p3r is placed today → in priority set
   addItem({
     id: "019a0000-0000-7000-8000-000000000003",
-    placement: "2026-02-11",
+    directory: "2026-02-11",
     alias: "kuno-p3r",
   });
   addAlias("kuno-p3r", "019a0000-0000-7000-8000-000000000003");
@@ -142,7 +142,7 @@ Deno.test("PathResolver priority - empty priority set falls back to all items", 
   // Item placed 30 days ago → NOT in priority set
   addItem({
     id: "019a0000-0000-7000-8000-000000000001",
-    placement: "2026-01-12",
+    directory: "2026-01-12",
     alias: "bace-x7q",
   });
   addAlias("bace-x7q", "019a0000-0000-7000-8000-000000000001");
@@ -169,14 +169,14 @@ Deno.test("PathResolver priority - ambiguous within priority set returns error",
   // Both bace-x7q and bace-y2m placed today → both in priority set
   addItem({
     id: "019a0000-0000-7000-8000-000000000001",
-    placement: "2026-02-11",
+    directory: "2026-02-11",
     alias: "bace-x7q",
   });
   addAlias("bace-x7q", "019a0000-0000-7000-8000-000000000001");
 
   addItem({
     id: "019a0000-0000-7000-8000-000000000002",
-    placement: "2026-02-11",
+    directory: "2026-02-11",
     alias: "bace-y2m",
   });
   addAlias("bace-y2m", "019a0000-0000-7000-8000-000000000002");
@@ -197,7 +197,7 @@ Deno.test("PathResolver priority - ambiguous in all-items tier when no priority 
   // kuno-p3r placed today → in priority set
   addItem({
     id: "019a0000-0000-7000-8000-000000000003",
-    placement: "2026-02-11",
+    directory: "2026-02-11",
     alias: "kuno-p3r",
   });
   addAlias("kuno-p3r", "019a0000-0000-7000-8000-000000000003");
@@ -205,14 +205,14 @@ Deno.test("PathResolver priority - ambiguous in all-items tier when no priority 
   // bace-x7q and bace-y2m placed 30 days ago → NOT in priority set
   addItem({
     id: "019a0000-0000-7000-8000-000000000001",
-    placement: "2026-01-12",
+    directory: "2026-01-12",
     alias: "bace-x7q",
   });
   addAlias("bace-x7q", "019a0000-0000-7000-8000-000000000001");
 
   addItem({
     id: "019a0000-0000-7000-8000-000000000002",
-    placement: "2026-01-12",
+    directory: "2026-01-12",
     alias: "bace-y2m",
   });
   addAlias("bace-y2m", "019a0000-0000-7000-8000-000000000002");
@@ -235,7 +235,7 @@ Deno.test("PathResolver priority - exact alias match still works", async () => {
 
   addItem({
     id: "019a0000-0000-7000-8000-000000000001",
-    placement: "2026-02-11",
+    directory: "2026-02-11",
     alias: "bace-x7q",
   });
   addAlias("bace-x7q", "019a0000-0000-7000-8000-000000000001");
@@ -259,12 +259,12 @@ Deno.test("PathResolver priority - recent item without alias excluded from prior
   const { addAlias, addItem, createResolver, cwd } = setup();
 
   // Recent item WITHOUT alias → should not affect priority set
-  addItem({ id: "019a0000-0000-7000-8000-000000000010", placement: "2026-02-11" });
+  addItem({ id: "019a0000-0000-7000-8000-000000000010", directory: "2026-02-11" });
 
   // bace-x7q placed 30 days ago → only in all items
   addItem({
     id: "019a0000-0000-7000-8000-000000000001",
-    placement: "2026-01-12",
+    directory: "2026-01-12",
     alias: "bace-x7q",
   });
   addAlias("bace-x7q", "019a0000-0000-7000-8000-000000000001");
@@ -287,15 +287,15 @@ Deno.test("PathResolver priority - degrades gracefully when item repository fail
   const aliasRepository = new InMemoryAliasRepository();
   const now = Result.unwrap(dateTimeFromDate(TODAY));
   const today = Result.unwrap(parseCalendarDay("2026-02-11"));
-  const cwd = createDatePlacement(today, []);
+  const cwd = createDateDirectory(today, []);
   const timezone = Result.unwrap(parseTimezoneIdentifier("UTC"));
 
-  // Item repository that fails on listByPlacement
+  // Item repository that fails on listByDirectory
   const failingItemRepository: ItemRepository = {
     load: () => Promise.resolve(Result.ok(undefined)),
     save: () => Promise.resolve(Result.ok(undefined)),
     delete: () => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () =>
+    listByDirectory: () =>
       Promise.resolve(
         Result.error(createRepositoryError("item", "list", "simulated failure")),
       ),

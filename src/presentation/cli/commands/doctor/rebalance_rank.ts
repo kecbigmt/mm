@@ -8,7 +8,7 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../../dependencies.ts";
 import {
-  groupByPlacement,
+  groupByDirectory,
   ItemRankUpdate,
   rebalanceGroup,
 } from "../../../../infrastructure/fileSystem/rank_rebalancer.ts";
@@ -80,9 +80,9 @@ export const rebalanceRankCommand = new Command()
         continue;
       }
 
-      // Resolve to PlacementRange
+      // Resolve to DirectoryRange
       const resolveResult = await pathResolver.resolveRange(
-        cwdResult.value.placement,
+        cwdResult.value.directory,
         rangeExprResult.value,
       );
       if (resolveResult.type === "error") {
@@ -91,7 +91,7 @@ export const rebalanceRankCommand = new Command()
       }
 
       // Query items efficiently using index
-      const itemsResult = await deps.itemRepository.listByPlacement(resolveResult.value);
+      const itemsResult = await deps.itemRepository.listByDirectory(resolveResult.value);
       if (itemsResult.type === "error") {
         resolveErrors.push(`"${pathExpr}": ${itemsResult.error.message}`);
         continue;
@@ -126,8 +126,8 @@ export const rebalanceRankCommand = new Command()
 
     console.log(`✓ Found ${items.length} items in target paths`);
 
-    // Group by placement (items are already filtered to target paths)
-    const groups = groupByPlacement(items);
+    // Group by directory (items are already filtered to target paths)
+    const groups = groupByDirectory(items);
 
     // Rebalance each group
     const allUpdates: ItemRankUpdate[] = [];
@@ -136,14 +136,14 @@ export const rebalanceRankCommand = new Command()
     for (const group of groups) {
       const result = rebalanceGroup(group.siblings, deps.rankService);
       if (result.type === "error") {
-        console.error(`Error rebalancing group ${group.placementKey}: ${result.error.message}`);
+        console.error(`Error rebalancing group ${group.directoryKey}: ${result.error.message}`);
         continue;
       }
 
       if (result.value.length > 0) {
         allUpdates.push(...result.value);
         groupSummaries.push({
-          key: group.placementKey,
+          key: group.directoryKey,
           count: result.value.length,
         });
       }
@@ -176,13 +176,13 @@ export const rebalanceRankCommand = new Command()
     // Display results
     console.log(`✓ Rebalanced ${allUpdates.length} items`);
 
-    // Show placement breakdown (first 10)
+    // Show directory breakdown (first 10)
     const sortedSummaries = groupSummaries.sort((a, b) => b.count - a.count);
     for (const summary of sortedSummaries.slice(0, 10)) {
       console.log(`  - ${summary.key}: ${summary.count} items`);
     }
     if (sortedSummaries.length > 10) {
-      console.log(`  - ... and ${sortedSummaries.length - 10} more placements`);
+      console.log(`  - ... and ${sortedSummaries.length - 10} more directories`);
     }
 
     console.log("\nRank rebalance complete.\n");

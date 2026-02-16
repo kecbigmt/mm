@@ -74,10 +74,10 @@ export const formatItemDetail = (item: Item, resolveItemId?: ItemIdResolver): st
     }
   }
 
-  // Date (from placement)
-  const placement = item.data.placement;
-  if (placement.head.kind === "date") {
-    const dateStr = placement.head.date.toString();
+  // Date (from directory)
+  const dir = item.data.directory;
+  if (dir.head.kind === "date") {
+    const dateStr = dir.head.date.toString();
     metaParts.push(dim(`on:${dateStr}`));
   }
 
