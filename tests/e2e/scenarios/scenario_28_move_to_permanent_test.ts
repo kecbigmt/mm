@@ -1,13 +1,13 @@
 /**
- * E2E Test: Move to Permanent Placement
+ * E2E Test: Move to Permanent Directory
  *
  * Purpose:
- *   Verify that items can be moved to/from permanent placement using `mm mv`.
+ *   Verify that items can be moved to/from permanent directory using `mm mv`.
  *
  * Overview:
  *   This scenario tests:
- *   - Moving date-based items to permanent placement
- *   - Moving permanent items back to date placement
+ *   - Moving date-based items to permanent directory
+ *   - Moving permanent items back to date directory
  *   - Listing behavior after moves
  *   - Moving multiple items at once
  *   - Error handling for invalid references
@@ -27,7 +27,7 @@ import {
   type TestContext,
 } from "../helpers.ts";
 
-describe("E2E: Move to Permanent Placement", () => {
+describe("E2E: Move to Permanent Directory", () => {
   let ctx: TestContext;
 
   beforeEach(async () => {
@@ -39,7 +39,7 @@ describe("E2E: Move to Permanent Placement", () => {
     await cleanupTestEnvironment(ctx);
   });
 
-  describe("Moving to permanent placement", () => {
+  describe("Moving to permanent directory", () => {
     it("moves date-based item to permanent with mm mv <item> permanent", async () => {
       // Create a date-based note with alias
       const createResult = await runCommand(ctx.testHome, [
@@ -123,7 +123,7 @@ describe("E2E: Move to Permanent Placement", () => {
       await runCommand(ctx.testHome, [
         "note",
         "Permanent Note",
-        "--placement",
+        "--dir",
         "permanent",
         "--alias",
         "perm-note",
@@ -149,7 +149,7 @@ describe("E2E: Move to Permanent Placement", () => {
       await runCommand(ctx.testHome, [
         "note",
         "Permanent Note",
-        "--placement",
+        "--dir",
         "permanent",
         "--alias",
         "perm-note",

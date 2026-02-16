@@ -26,7 +26,7 @@ const createTestItem = async (
     title: "Test Item",
     icon: "note",
     status: "open",
-    placement: "2025-12-02",
+    directory: "2025-12-02",
     rank: "a",
     createdAt: "2025-12-02T09:00:00Z",
     updatedAt: "2025-12-02T09:00:00Z",
@@ -63,12 +63,12 @@ Deno.test("SnoozeItemWorkflow: snoozes item with default duration (8h)", async (
     const snoozedItem = result.value.item;
     // Should be snoozed until 18:00 (10:00 + 8h)
     assertEquals(snoozedItem.data.snoozeUntil?.toString(), "2025-12-02T18:00:00.000Z");
-    // Placement should remain 2025-12-02 (snoozeUntil is same day)
-    assertEquals(snoozedItem.data.placement.toString(), "2025-12-02");
+    // Directory should remain 2025-12-02 (snoozeUntil is same day)
+    assertEquals(snoozedItem.data.directory.toString(), "2025-12-02");
   }
 });
 
-Deno.test("SnoozeItemWorkflow: snoozes item to tomorrow and moves placement", async () => {
+Deno.test("SnoozeItemWorkflow: snoozes item to tomorrow and moves directory", async () => {
   const itemRepository = new InMemoryItemRepository();
   const rankService = createTestRankService();
 
@@ -95,8 +95,8 @@ Deno.test("SnoozeItemWorkflow: snoozes item to tomorrow and moves placement", as
     const snoozedItem = result.value.item;
     // Should be snoozed until tomorrow 00:00
     assertEquals(snoozedItem.data.snoozeUntil?.toString(), "2025-12-03T00:00:00.000Z");
-    // Placement should be moved to 2025-12-03
-    assertEquals(snoozedItem.data.placement.toString(), "2025-12-03");
+    // Directory should be moved to 2025-12-03
+    assertEquals(snoozedItem.data.directory.toString(), "2025-12-03");
   }
 });
 

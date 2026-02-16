@@ -31,12 +31,12 @@ export function createEventCommand() {
     .arguments("[title:string]")
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .option("-b, --body <body:string>", "Body text")
-    .option("-p, --parent <parent:string>", "Parent locator (e.g., /2025-11-03, /alias, ./1)")
+    .option("-d, --dir <dir:string>", "Directory locator (e.g., /2025-11-03, /alias, ./1)")
     .option("--project <project:string>", "Project reference (alias)")
     .option("-c, --context <context:string>", "Context tag (repeatable)", { collect: true })
     .option("-a, --alias <alias:string>", "Alias for the item")
     .option("-s, --start-at <startAt:string>", "Start date/time (ISO 8601 format)")
-    .option("-d, --duration <duration:string>", "Duration (e.g., 30m, 2h, 1h30m)")
+    .option("--duration <duration:string>", "Duration (e.g., 30m, 2h, 1h30m)")
     .option("-e, --edit", "Open editor after creation")
     .action(async (options: Record<string, unknown>, title?: string) => {
       const debug = isDebugMode();
@@ -65,7 +65,7 @@ export function createEventCommand() {
         : "Untitled";
 
       const now = new Date();
-      const parentArg = typeof options.parent === "string" ? options.parent : undefined;
+      const dirArg = typeof options.dir === "string" ? options.dir : undefined;
 
       const cwdResult = await CwdResolutionService.getCwd({
         sessionRepository: deps.sessionRepository,
@@ -81,14 +81,14 @@ export function createEventCommand() {
         console.error(`Warning: ${cwdResult.value.warning}`);
       }
 
-      // Resolve parent placement
-      let parentPlacement = cwdResult.value.placement;
+      // Resolve parent directory
+      let parentDirectory = cwdResult.value.directory;
 
-      if (parentArg) {
-        const exprResult = parsePathExpression(parentArg);
+      if (dirArg) {
+        const exprResult = parsePathExpression(dirArg);
         if (exprResult.type === "error") {
           console.error(
-            "Invalid parent expression:",
+            "Invalid directory expression:",
             exprResult.error.issues.map((i) => i.message).join(", "),
           );
           return;
@@ -103,19 +103,19 @@ export function createEventCommand() {
         });
 
         const resolveResult = await pathResolver.resolvePath(
-          cwdResult.value.placement,
+          cwdResult.value.directory,
           exprResult.value,
         );
 
         if (resolveResult.type === "error") {
           console.error(
-            "Failed to resolve parent:",
+            "Failed to resolve directory:",
             resolveResult.error.issues.map((i) => i.message).join(", "),
           );
           return;
         }
 
-        parentPlacement = resolveResult.value;
+        parentDirectory = resolveResult.value;
       }
 
       const createdAtResult = dateTimeFromDate(now);
@@ -132,14 +132,14 @@ export function createEventCommand() {
       const aliasOption = typeof options.alias === "string" ? options.alias : undefined;
 
       // Parse startAt if provided
-      // For time-only formats (HH:MM), use parent placement date as reference
+      // For time-only formats (HH:MM), use parent directory date as reference
       let startAt = undefined;
       if (typeof options.startAt === "string") {
-        // Extract reference date from parent placement for time-only formats
+        // Extract reference date from parent directory for time-only formats
         // Use noon UTC to avoid day shifts when formatting in workspace timezone
         let referenceDate = now;
-        if (parentPlacement.head.kind === "date") {
-          const dateStr = parentPlacement.head.date.toString();
+        if (parentDirectory.head.kind === "date") {
+          const dateStr = parentDirectory.head.date.toString();
           const [year, month, day] = dateStr.split("-").map(Number);
           referenceDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
         }
@@ -177,7 +177,7 @@ export function createEventCommand() {
         alias: aliasOption,
         startAt,
         duration,
-        parentPlacement: parentPlacement,
+        parentDirectory: parentDirectory,
         createdAt: createdAtResult.value,
         timezone: deps.timezone,
       }, {
@@ -197,7 +197,7 @@ export function createEventCommand() {
           if (hasDateConsistency) {
             console.error("Event date/time consistency error:");
             console.error(
-              "The start time's date must match the parent placement date.",
+              "The start time's date must match the parent directory date.",
             );
           }
           console.error(formatError(workflowResult.error, debug));
@@ -220,7 +220,7 @@ export function createEventCommand() {
 
       const label = formatItemLabel(item);
       console.log(
-        `✅ Created event [${label}] ${item.data.title.toString()} at ${parentPlacement.toString()}`,
+        `✅ Created event [${label}] ${item.data.title.toString()} at ${parentDirectory.toString()}`,
       );
 
       // Auto-commit if enabled

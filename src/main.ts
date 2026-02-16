@@ -55,7 +55,7 @@ async function main() {
       "where",
       createWhereCommand().description("Print the physical file path for an item"),
     )
-    .command("move", createMoveCommand().description("Move items to a new placement")).alias("mv")
+    .command("move", createMoveCommand().description("Move items to a new directory")).alias("mv")
     .command("snooze", createSnoozeCommand().description("Snooze item until a future datetime"))
     .alias("sn")
     .command("doctor", createDoctorCommand().description("Workspace validation and maintenance"))

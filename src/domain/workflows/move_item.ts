@@ -7,7 +7,7 @@ import {
 import { Item } from "../models/item.ts";
 import { DateTime } from "../primitives/date_time.ts";
 import { ItemRank } from "../primitives/item_rank.ts";
-import { Placement } from "../primitives/placement.ts";
+import { Directory } from "../primitives/directory.ts";
 import { parseTimezoneIdentifier, TimezoneIdentifier } from "../primitives/timezone_identifier.ts";
 import { parsePathExpression } from "../../presentation/cli/path_parser.ts";
 import { createPathResolver, PathResolver } from "../services/path_resolver.ts";
@@ -18,8 +18,8 @@ import { RankService } from "../services/rank_service.ts";
 
 export type MoveItemInput = Readonly<{
   itemExpression: string; // PathExpression to identify the item
-  targetExpression: string; // PathExpression for target placement
-  cwd: Placement;
+  targetExpression: string; // PathExpression for target directory
+  cwd: Directory;
   timezone?: TimezoneIdentifier;
   today?: Date;
   occurredAt: DateTime;
@@ -40,17 +40,17 @@ export type MoveItemResult = Readonly<{
   item: Item;
 }>;
 
-type TargetPlacementAndRank = Readonly<{
-  placement: Placement;
+type TargetDirectoryAndRank = Readonly<{
+  directory: Directory;
   rank: ItemRank;
 }>;
 
-async function resolvePlacementExpression(
+async function resolveDirectoryExpression(
   expression: string,
   expressionType: string,
-  cwd: Placement,
+  cwd: Directory,
   pathResolver: PathResolver,
-): Promise<Result<Placement, MoveItemValidationError>> {
+): Promise<Result<Directory, MoveItemValidationError>> {
   const exprResult = parsePathExpression(expression);
   if (exprResult.type === "error") {
     return Result.error(
@@ -68,13 +68,13 @@ async function resolvePlacementExpression(
     );
   }
 
-  const placementResult = await pathResolver.resolvePath(cwd, exprResult.value);
-  if (placementResult.type === "error") {
+  const directoryResult = await pathResolver.resolvePath(cwd, exprResult.value);
+  if (directoryResult.type === "error") {
     return Result.error(
       createValidationError("MoveItem", [
         createValidationIssue(
           `failed to resolve ${expressionType}: ${
-            placementResult.error.issues.map((i) => i.message).join(", ")
+            directoryResult.error.issues.map((i) => i.message).join(", ")
           }`,
           {
             code: "target_resolution_failed",
@@ -85,15 +85,15 @@ async function resolvePlacementExpression(
     );
   }
 
-  return Result.ok(placementResult.value);
+  return Result.ok(directoryResult.value);
 }
 
-async function loadItemFromPlacement(
-  placement: Placement,
+async function loadItemFromDirectory(
+  directory: Directory,
   itemRepository: ItemRepository,
   errorCode: string,
 ): Promise<Result<Item, MoveItemValidationError | RepositoryError>> {
-  if (placement.head.kind !== "item") {
+  if (directory.head.kind !== "item") {
     return Result.error(
       createValidationError("MoveItem", [
         createValidationIssue("item expression must resolve to an item, not a date", {
@@ -104,7 +104,7 @@ async function loadItemFromPlacement(
     );
   }
 
-  const loadResult = await itemRepository.load(placement.head.id);
+  const loadResult = await itemRepository.load(directory.head.id);
   if (loadResult.type === "error") {
     return Result.error(loadResult.error);
   }
@@ -124,12 +124,12 @@ async function loadItemFromPlacement(
 }
 
 async function loadSiblings(
-  placement: Placement,
+  directory: Directory,
   itemRepository: ItemRepository,
 ): Promise<Result<ReadonlyArray<Item>, RepositoryError>> {
-  return await itemRepository.listByPlacement({
+  return await itemRepository.listByDirectory({
     kind: "single",
-    at: placement,
+    at: directory,
   });
 }
 
@@ -138,24 +138,24 @@ async function loadSiblings(
  * Places item before all existing items.
  */
 async function calculateRankForHead(
-  placementExpr: string,
-  cwd: Placement,
+  directoryExpr: string,
+  cwd: Directory,
   pathResolver: PathResolver,
   deps: MoveItemDependencies,
-): Promise<Result<TargetPlacementAndRank, MoveItemError>> {
-  const placementResult = await resolvePlacementExpression(
-    placementExpr,
-    "head: placement",
+): Promise<Result<TargetDirectoryAndRank, MoveItemError>> {
+  const directoryResult = await resolveDirectoryExpression(
+    directoryExpr,
+    "head: directory",
     cwd,
     pathResolver,
   );
-  if (placementResult.type === "error") {
-    return Result.error(placementResult.error);
+  if (directoryResult.type === "error") {
+    return Result.error(directoryResult.error);
   }
 
-  const targetPlacement = placementResult.value;
+  const targetDirectory = directoryResult.value;
 
-  const siblingsResult = await loadSiblings(targetPlacement, deps.itemRepository);
+  const siblingsResult = await loadSiblings(targetDirectory, deps.itemRepository);
   if (siblingsResult.type === "error") {
     return Result.error(siblingsResult.error);
   }
@@ -168,7 +168,7 @@ async function calculateRankForHead(
   }
 
   return Result.ok({
-    placement: targetPlacement,
+    directory: targetDirectory,
     rank: rankResult.value,
   });
 }
@@ -178,24 +178,24 @@ async function calculateRankForHead(
  * Places item after all existing items.
  */
 async function calculateRankForTail(
-  placementExpr: string,
-  cwd: Placement,
+  directoryExpr: string,
+  cwd: Directory,
   pathResolver: PathResolver,
   deps: MoveItemDependencies,
-): Promise<Result<TargetPlacementAndRank, MoveItemError>> {
-  const placementResult = await resolvePlacementExpression(
-    placementExpr,
-    "tail: placement",
+): Promise<Result<TargetDirectoryAndRank, MoveItemError>> {
+  const directoryResult = await resolveDirectoryExpression(
+    directoryExpr,
+    "tail: directory",
     cwd,
     pathResolver,
   );
-  if (placementResult.type === "error") {
-    return Result.error(placementResult.error);
+  if (directoryResult.type === "error") {
+    return Result.error(directoryResult.error);
   }
 
-  const targetPlacement = placementResult.value;
+  const targetDirectory = directoryResult.value;
 
-  const siblingsResult = await loadSiblings(targetPlacement, deps.itemRepository);
+  const siblingsResult = await loadSiblings(targetDirectory, deps.itemRepository);
   if (siblingsResult.type === "error") {
     return Result.error(siblingsResult.error);
   }
@@ -208,7 +208,7 @@ async function calculateRankForTail(
   }
 
   return Result.ok({
-    placement: targetPlacement,
+    directory: targetDirectory,
     rank: rankResult.value,
   });
 }
@@ -218,22 +218,22 @@ async function calculateRankForTail(
  */
 async function calculateRankForAfter(
   itemExpr: string,
-  cwd: Placement,
+  cwd: Directory,
   pathResolver: PathResolver,
   deps: MoveItemDependencies,
-): Promise<Result<TargetPlacementAndRank, MoveItemError>> {
-  const refPlacementResult = await resolvePlacementExpression(
+): Promise<Result<TargetDirectoryAndRank, MoveItemError>> {
+  const refDirectoryResult = await resolveDirectoryExpression(
     itemExpr,
     "after: item",
     cwd,
     pathResolver,
   );
-  if (refPlacementResult.type === "error") {
-    return Result.error(refPlacementResult.error);
+  if (refDirectoryResult.type === "error") {
+    return Result.error(refDirectoryResult.error);
   }
 
-  const refItemResult = await loadItemFromPlacement(
-    refPlacementResult.value,
+  const refItemResult = await loadItemFromDirectory(
+    refDirectoryResult.value,
     deps.itemRepository,
     "invalid_reference_item",
   );
@@ -242,9 +242,9 @@ async function calculateRankForAfter(
   }
 
   const refItem = refItemResult.value;
-  const targetPlacement = refItem.data.placement;
+  const targetDirectory = refItem.data.directory;
 
-  const siblingsResult = await loadSiblings(targetPlacement, deps.itemRepository);
+  const siblingsResult = await loadSiblings(targetDirectory, deps.itemRepository);
   if (siblingsResult.type === "error") {
     return Result.error(siblingsResult.error);
   }
@@ -257,7 +257,7 @@ async function calculateRankForAfter(
   }
 
   return Result.ok({
-    placement: targetPlacement,
+    directory: targetDirectory,
     rank: rankResult.value,
   });
 }
@@ -267,22 +267,22 @@ async function calculateRankForAfter(
  */
 async function calculateRankForBefore(
   itemExpr: string,
-  cwd: Placement,
+  cwd: Directory,
   pathResolver: PathResolver,
   deps: MoveItemDependencies,
-): Promise<Result<TargetPlacementAndRank, MoveItemError>> {
-  const refPlacementResult = await resolvePlacementExpression(
+): Promise<Result<TargetDirectoryAndRank, MoveItemError>> {
+  const refDirectoryResult = await resolveDirectoryExpression(
     itemExpr,
     "before: item",
     cwd,
     pathResolver,
   );
-  if (refPlacementResult.type === "error") {
-    return Result.error(refPlacementResult.error);
+  if (refDirectoryResult.type === "error") {
+    return Result.error(refDirectoryResult.error);
   }
 
-  const refItemResult = await loadItemFromPlacement(
-    refPlacementResult.value,
+  const refItemResult = await loadItemFromDirectory(
+    refDirectoryResult.value,
     deps.itemRepository,
     "invalid_reference_item",
   );
@@ -291,9 +291,9 @@ async function calculateRankForBefore(
   }
 
   const refItem = refItemResult.value;
-  const targetPlacement = refItem.data.placement;
+  const targetDirectory = refItem.data.directory;
 
-  const siblingsResult = await loadSiblings(targetPlacement, deps.itemRepository);
+  const siblingsResult = await loadSiblings(targetDirectory, deps.itemRepository);
   if (siblingsResult.type === "error") {
     return Result.error(siblingsResult.error);
   }
@@ -306,20 +306,20 @@ async function calculateRankForBefore(
   }
 
   return Result.ok({
-    placement: targetPlacement,
+    directory: targetDirectory,
     rank: rankResult.value,
   });
 }
 
 /**
- * Default behavior when no positioning prefix is specified: moves item to tail of target placement.
+ * Default behavior when no positioning prefix is specified: moves item to tail of target directory.
  */
-async function calculateRankForRegularPlacement(
+async function calculateRankForRegularDirectory(
   targetExpression: string,
-  cwd: Placement,
+  cwd: Directory,
   pathResolver: PathResolver,
   deps: MoveItemDependencies,
-): Promise<Result<TargetPlacementAndRank, MoveItemError>> {
+): Promise<Result<TargetDirectoryAndRank, MoveItemError>> {
   const targetExprResult = parsePathExpression(targetExpression);
   if (targetExprResult.type === "error") {
     return Result.error(
@@ -337,13 +337,13 @@ async function calculateRankForRegularPlacement(
     );
   }
 
-  const targetPlacementResult = await pathResolver.resolvePath(cwd, targetExprResult.value);
-  if (targetPlacementResult.type === "error") {
+  const targetDirectoryResult = await pathResolver.resolvePath(cwd, targetExprResult.value);
+  if (targetDirectoryResult.type === "error") {
     return Result.error(
       createValidationError("MoveItem", [
         createValidationIssue(
           `failed to resolve target: ${
-            targetPlacementResult.error.issues.map((i) => i.message).join(", ")
+            targetDirectoryResult.error.issues.map((i) => i.message).join(", ")
           }`,
           {
             code: "target_resolution_failed",
@@ -354,9 +354,9 @@ async function calculateRankForRegularPlacement(
     );
   }
 
-  const targetPlacement = targetPlacementResult.value;
+  const targetDirectory = targetDirectoryResult.value;
 
-  const siblingsResult = await loadSiblings(targetPlacement, deps.itemRepository);
+  const siblingsResult = await loadSiblings(targetDirectory, deps.itemRepository);
   if (siblingsResult.type === "error") {
     return Result.error(siblingsResult.error);
   }
@@ -369,7 +369,7 @@ async function calculateRankForRegularPlacement(
   }
 
   return Result.ok({
-    placement: targetPlacement,
+    directory: targetDirectory,
     rank: rankResult.value,
   });
 }
@@ -377,20 +377,20 @@ async function calculateRankForRegularPlacement(
 /**
  * Routes to appropriate rank calculation strategy based on target expression prefix.
  */
-async function determineTargetPlacementAndRank(
+async function determineTargetDirectoryAndRank(
   targetExpression: string,
-  cwd: Placement,
+  cwd: Directory,
   pathResolver: PathResolver,
   deps: MoveItemDependencies,
-): Promise<Result<TargetPlacementAndRank, MoveItemError>> {
+): Promise<Result<TargetDirectoryAndRank, MoveItemError>> {
   if (targetExpression.startsWith("head:")) {
-    const placementExpr = targetExpression.slice(5);
-    return await calculateRankForHead(placementExpr, cwd, pathResolver, deps);
+    const directoryExpr = targetExpression.slice(5);
+    return await calculateRankForHead(directoryExpr, cwd, pathResolver, deps);
   }
 
   if (targetExpression.startsWith("tail:")) {
-    const placementExpr = targetExpression.slice(5);
-    return await calculateRankForTail(placementExpr, cwd, pathResolver, deps);
+    const directoryExpr = targetExpression.slice(5);
+    return await calculateRankForTail(directoryExpr, cwd, pathResolver, deps);
   }
 
   if (targetExpression.startsWith("after:")) {
@@ -403,7 +403,7 @@ async function determineTargetPlacementAndRank(
     return await calculateRankForBefore(itemExpr, cwd, pathResolver, deps);
   }
 
-  return await calculateRankForRegularPlacement(targetExpression, cwd, pathResolver, deps);
+  return await calculateRankForRegularDirectory(targetExpression, cwd, pathResolver, deps);
 }
 
 export const MoveItemWorkflow = {
@@ -449,16 +449,16 @@ export const MoveItemWorkflow = {
       );
     }
 
-    const itemPlacementResult = await pathResolver.resolvePath(
+    const itemDirectoryResult = await pathResolver.resolvePath(
       input.cwd,
       itemExprResult.value,
     );
-    if (itemPlacementResult.type === "error") {
+    if (itemDirectoryResult.type === "error") {
       return Result.error(
         createValidationError("MoveItem", [
           createValidationIssue(
             `failed to resolve item: ${
-              itemPlacementResult.error.issues.map((i) => i.message).join(", ")
+              itemDirectoryResult.error.issues.map((i) => i.message).join(", ")
             }`,
             {
               code: "item_resolution_failed",
@@ -469,8 +469,8 @@ export const MoveItemWorkflow = {
       );
     }
 
-    const itemResult = await loadItemFromPlacement(
-      itemPlacementResult.value,
+    const itemResult = await loadItemFromDirectory(
+      itemDirectoryResult.value,
       deps.itemRepository,
       "not_an_item",
     );
@@ -480,8 +480,8 @@ export const MoveItemWorkflow = {
 
     const item = itemResult.value;
 
-    // Determine target placement and rank
-    const targetResult = await determineTargetPlacementAndRank(
+    // Determine target directory and rank
+    const targetResult = await determineTargetDirectoryAndRank(
       input.targetExpression,
       input.cwd,
       pathResolver,
@@ -493,7 +493,7 @@ export const MoveItemWorkflow = {
 
     // Relocate and save
     const relocated = item.relocate(
-      targetResult.value.placement,
+      targetResult.value.directory,
       targetResult.value.rank,
       input.occurredAt,
     );

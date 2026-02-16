@@ -9,7 +9,7 @@ import type { SectionStub } from "./build_partitions.ts";
 import type { ListFormatterOptions } from "../formatters/list_formatter.ts";
 import type { Item } from "../../../domain/models/item.ts";
 import { parseItem } from "../../../domain/models/item.ts";
-import { parsePlacement, type Placement } from "../../../domain/primitives/placement.ts";
+import { type Directory, parseDirectory } from "../../../domain/primitives/directory.ts";
 import { type DateTime, parseDateTime } from "../../../domain/primitives/date_time.ts";
 import {
   parseTimezoneIdentifier,
@@ -26,15 +26,15 @@ const unwrap = <T, E>(result: { type: "ok"; value: T } | { type: "error"; error:
 
 const makeTimezone = (): TimezoneIdentifier => unwrap(parseTimezoneIdentifier("UTC"));
 const makeDateTime = (): DateTime => unwrap(parseDateTime("2025-02-10T12:00:00Z"));
-const makePlacement = (s: string): Placement => unwrap(parsePlacement(s));
+const makeDirectory = (s: string): Directory => unwrap(parseDirectory(s));
 
-const makeItem = (id: string, placement: string, title: string, status = "open"): Item =>
+const makeItem = (id: string, directory: string, title: string, status = "open"): Item =>
   unwrap(parseItem({
     id,
     title,
     icon: "note",
     status,
-    placement,
+    directory,
     rank: "a",
     createdAt: "2025-02-10T12:00:00Z",
     updatedAt: "2025-02-10T12:00:00Z",
@@ -49,23 +49,23 @@ const makeOptions = (): ListFormatterOptions => ({
 const PARENT_ID = "019965a7-9999-740a-b8c1-1415904fd108";
 
 /**
- * Build mock deps that return specified items and sections per placement.
+ * Build mock deps that return specified items and sections per directory.
  */
 const makeDeps = (
-  itemsByPlacement: Map<string, ReadonlyArray<Item>>,
-  sectionsByPlacement: Map<string, ReadonlyArray<SectionSummary>>,
+  itemsByDirectory: Map<string, ReadonlyArray<Item>>,
+  sectionsByDirectory: Map<string, ReadonlyArray<SectionSummary>>,
 ): ExpandStubsDeps => ({
   itemRepository: {
     load: () => Promise.resolve(Result.ok(undefined)),
     save: () => Promise.resolve(Result.ok(undefined)),
     delete: () => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: (range) => {
+    listByDirectory: (range) => {
       const key = range.kind === "single"
         ? `${range.at.head.kind === "item" ? range.at.head.id.toString() : ""}/${
           range.at.section.join("/")
         }`
         : "";
-      const items = itemsByPlacement.get(key) ?? [];
+      const items = itemsByDirectory.get(key) ?? [];
       return Promise.resolve(Result.ok(items));
     },
   },
@@ -74,7 +74,7 @@ const makeDeps = (
       const key = `${parent.head.kind === "item" ? parent.head.id.toString() : ""}/${
         parent.section.join("/")
       }`;
-      const sections = sectionsByPlacement.get(key) ?? [];
+      const sections = sectionsByDirectory.get(key) ?? [];
       return Promise.resolve(Result.ok(sections));
     },
   },
@@ -95,7 +95,7 @@ const openOnly: ItemFilterFn = (item) => !item.data.status.isClosed();
 
 Deno.test("expandStubs: depth 0 renders stubs without expansion", async () => {
   const stubs: SectionStub[] = [{
-    placement: makePlacement(`${PARENT_ID}/1`),
+    directory: makeDirectory(`${PARENT_ID}/1`),
     relativePath: "1/",
     itemCount: 3,
     sectionCount: 1,
@@ -115,9 +115,9 @@ Deno.test("expandStubs: depth 0 renders stubs without expansion", async () => {
 // =============================================================================
 
 Deno.test("expandStubs: depth 1 expands stubs into header + items", async () => {
-  const sectionPlacement = makePlacement(`${PARENT_ID}/1`);
+  const sectionDirectory = makeDirectory(`${PARENT_ID}/1`);
   const stubs: SectionStub[] = [{
-    placement: sectionPlacement,
+    directory: sectionDirectory,
     relativePath: "1/",
     itemCount: 2,
     sectionCount: 0,
@@ -126,10 +126,10 @@ Deno.test("expandStubs: depth 1 expands stubs into header + items", async () => 
   const item1 = makeItem("019965a7-0001-740a-b8c1-1415904fd108", `${PARENT_ID}/1`, "Note A");
   const item2 = makeItem("019965a7-0002-740a-b8c1-1415904fd108", `${PARENT_ID}/1`, "Note B");
 
-  const itemsByPlacement = new Map([
+  const itemsByDirectory = new Map([
     [`${PARENT_ID}/1`, [item1, item2]],
   ]);
-  const deps = makeDeps(itemsByPlacement, new Map());
+  const deps = makeDeps(itemsByDirectory, new Map());
   const lines: string[] = [];
 
   await expandStubs(stubs, 1, lines, deps, makeOptions(), collectTitles, acceptAll);
@@ -145,9 +145,9 @@ Deno.test("expandStubs: depth 1 expands stubs into header + items", async () => 
 // =============================================================================
 
 Deno.test("expandStubs: respects status filter", async () => {
-  const sectionPlacement = makePlacement(`${PARENT_ID}/1`);
+  const sectionDirectory = makeDirectory(`${PARENT_ID}/1`);
   const stubs: SectionStub[] = [{
-    placement: sectionPlacement,
+    directory: sectionDirectory,
     relativePath: "1/",
     itemCount: 2,
     sectionCount: 0,
@@ -161,10 +161,10 @@ Deno.test("expandStubs: respects status filter", async () => {
     "closed",
   );
 
-  const itemsByPlacement = new Map([
+  const itemsByDirectory = new Map([
     [`${PARENT_ID}/1`, [openItem, closedItem]],
   ]);
-  const deps = makeDeps(itemsByPlacement, new Map());
+  const deps = makeDeps(itemsByDirectory, new Map());
   const lines: string[] = [];
 
   await expandStubs(stubs, 1, lines, deps, makeOptions(), collectTitles, openOnly);
@@ -179,9 +179,9 @@ Deno.test("expandStubs: respects status filter", async () => {
 // =============================================================================
 
 Deno.test("expandStubs: depth 1 renders sub-sections as stubs at boundary", async () => {
-  const sectionPlacement = makePlacement(`${PARENT_ID}/1`);
+  const sectionDirectory = makeDirectory(`${PARENT_ID}/1`);
   const stubs: SectionStub[] = [{
-    placement: sectionPlacement,
+    directory: sectionDirectory,
     relativePath: "1/",
     itemCount: 1,
     sectionCount: 2,
@@ -190,28 +190,28 @@ Deno.test("expandStubs: depth 1 renders sub-sections as stubs at boundary", asyn
   const item = makeItem("019965a7-0001-740a-b8c1-1415904fd108", `${PARENT_ID}/1`, "Note");
 
   const subSection1: SectionSummary = {
-    placement: makePlacement(`${PARENT_ID}/1/1`),
+    directory: makeDirectory(`${PARENT_ID}/1/1`),
     itemCount: 3,
     sectionCount: 0,
   };
   const subSection2: SectionSummary = {
-    placement: makePlacement(`${PARENT_ID}/1/2`),
+    directory: makeDirectory(`${PARENT_ID}/1/2`),
     itemCount: 0,
     sectionCount: 0, // Empty, should be excluded
   };
   const subSection3: SectionSummary = {
-    placement: makePlacement(`${PARENT_ID}/1/3`),
+    directory: makeDirectory(`${PARENT_ID}/1/3`),
     itemCount: 1,
     sectionCount: 1,
   };
 
-  const itemsByPlacement = new Map([
+  const itemsByDirectory = new Map([
     [`${PARENT_ID}/1`, [item]],
   ]);
-  const sectionsByPlacement = new Map([
+  const sectionsByDirectory = new Map([
     [`${PARENT_ID}/1`, [subSection1, subSection2, subSection3]],
   ]);
-  const deps = makeDeps(itemsByPlacement, sectionsByPlacement);
+  const deps = makeDeps(itemsByDirectory, sectionsByDirectory);
   const lines: string[] = [];
 
   await expandStubs(stubs, 1, lines, deps, makeOptions(), collectTitles, acceptAll);
@@ -228,16 +228,16 @@ Deno.test("expandStubs: depth 1 renders sub-sections as stubs at boundary", asyn
 // =============================================================================
 
 Deno.test("expandStubs: depth 2 recursively expands sub-sections", async () => {
-  const sectionPlacement = makePlacement(`${PARENT_ID}/1`);
+  const sectionDirectory = makeDirectory(`${PARENT_ID}/1`);
   const stubs: SectionStub[] = [{
-    placement: sectionPlacement,
+    directory: sectionDirectory,
     relativePath: "1/",
     itemCount: 0,
     sectionCount: 1,
   }];
 
   const subSection: SectionSummary = {
-    placement: makePlacement(`${PARENT_ID}/1/1`),
+    directory: makeDirectory(`${PARENT_ID}/1/1`),
     itemCount: 1,
     sectionCount: 0,
   };
@@ -248,14 +248,14 @@ Deno.test("expandStubs: depth 2 recursively expands sub-sections", async () => {
     "Deep note",
   );
 
-  const itemsByPlacement = new Map([
+  const itemsByDirectory = new Map([
     [`${PARENT_ID}/1`, []],
     [`${PARENT_ID}/1/1`, [deepItem]],
   ]);
-  const sectionsByPlacement = new Map([
+  const sectionsByDirectory = new Map([
     [`${PARENT_ID}/1`, [subSection]],
   ]);
-  const deps = makeDeps(itemsByPlacement, sectionsByPlacement);
+  const deps = makeDeps(itemsByDirectory, sectionsByDirectory);
   const lines: string[] = [];
 
   await expandStubs(stubs, 2, lines, deps, makeOptions(), collectTitles, acceptAll);
@@ -272,7 +272,7 @@ Deno.test("expandStubs: depth 2 recursively expands sub-sections", async () => {
 
 Deno.test("expandStubs: logs warning to stderr when item query fails", async () => {
   const stubs: SectionStub[] = [{
-    placement: makePlacement(`${PARENT_ID}/1`),
+    directory: makeDirectory(`${PARENT_ID}/1`),
     relativePath: "1/",
     itemCount: 1,
     sectionCount: 0,
@@ -283,7 +283,7 @@ Deno.test("expandStubs: logs warning to stderr when item query fails", async () 
       load: () => Promise.resolve(Result.ok(undefined)),
       save: () => Promise.resolve(Result.ok(undefined)),
       delete: () => Promise.resolve(Result.ok(undefined)),
-      listByPlacement: () =>
+      listByDirectory: () =>
         Promise.resolve(
           Result.error(createRepositoryError("item", "list", "disk read failed")),
         ),

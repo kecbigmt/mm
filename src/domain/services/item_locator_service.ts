@@ -59,7 +59,7 @@ export const createItemLocatorService = (
       return [];
     }
 
-    const itemsResult = await deps.itemRepository.listByPlacement(
+    const itemsResult = await deps.itemRepository.listByDirectory(
       createDateRange(fromDay.value, toDay.value),
     );
     if (itemsResult.type === "error") {

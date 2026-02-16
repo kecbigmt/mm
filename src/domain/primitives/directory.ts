@@ -8,25 +8,25 @@ import {
 import { CalendarDay, parseCalendarDay } from "./calendar_day.ts";
 import { ItemId, parseItemId } from "./item_id.ts";
 
-const PLACEMENT_KIND = "Placement" as const;
+const DIRECTORY_KIND = "Directory" as const;
 
 /**
- * PlacementHead represents the direct parent of an item
+ * DirectoryHead represents the direct parent of an item
  * - date: Item is placed under a date shelf (calendar container)
  * - item: Item is placed under another item (UUID parent)
  * - permanent: Item is placed outside the date hierarchy (permanent notes)
  */
-export type PlacementHead =
+export type DirectoryHead =
   | Readonly<{ readonly kind: "date"; readonly date: CalendarDay }>
   | Readonly<{ readonly kind: "item"; readonly id: ItemId }>
   | Readonly<{ readonly kind: "permanent" }>;
 
 /**
- * Placement represents the canonical, absolute position of an item
+ * Directory represents the canonical, absolute position of an item
  * - head: Direct parent (date shelf or parent item UUID)
  * - section: Numeric section chain (e.g., [], [1], [1, 3])
  *
- * Important: Placement is LOCAL - it only knows about the direct parent
+ * Important: Directory is LOCAL - it only knows about the direct parent
  * and section, not the full path to root. To get the full path, you need
  * to traverse parent relationships.
  *
@@ -36,31 +36,31 @@ export type PlacementHead =
  * - Under item: { head: { kind: "item", id: "<uuid>" }, section: [] }
  * - Under item/section: { head: { kind: "item", id: "<uuid>" }, section: [1, 3] }
  */
-export type Placement = Readonly<{
-  readonly kind: typeof PLACEMENT_KIND;
-  readonly head: PlacementHead;
+export type Directory = Readonly<{
+  readonly kind: typeof DIRECTORY_KIND;
+  readonly head: DirectoryHead;
   readonly section: ReadonlyArray<number>;
   toString(): string;
   toJSON(): string;
-  equals(other: Placement): boolean;
-  parent(): Placement | null;
+  equals(other: Directory): boolean;
+  parent(): Directory | null;
 }>;
 
-export type PlacementValidationError = ValidationError<typeof PLACEMENT_KIND>;
+export type DirectoryValidationError = ValidationError<typeof DIRECTORY_KIND>;
 
 const instantiate = (
-  head: PlacementHead,
+  head: DirectoryHead,
   section: ReadonlyArray<number>,
-): Placement => {
+): Directory => {
   const frozenSection = Object.freeze([...section]);
 
-  const toString = function (this: Placement): string {
-    return serializePlacement(this);
+  const toString = function (this: Directory): string {
+    return serializeDirectory(this);
   };
 
   const toJSON = toString;
 
-  const equals = function (this: Placement, other: Placement): boolean {
+  const equals = function (this: Directory, other: Directory): boolean {
     // Compare heads
     if (this.head.kind !== other.head.kind) {
       return false;
@@ -83,7 +83,7 @@ const instantiate = (
     return this.section.every((seg, idx) => seg === other.section[idx]);
   };
 
-  const parent = function (this: Placement): Placement | null {
+  const parent = function (this: Directory): Directory | null {
     if (this.section.length === 0) {
       return null; // Already at the direct parent
     }
@@ -92,7 +92,7 @@ const instantiate = (
   };
 
   return Object.freeze({
-    kind: PLACEMENT_KIND,
+    kind: DIRECTORY_KIND,
     head: Object.freeze(head),
     section: frozenSection,
     toString,
@@ -104,11 +104,11 @@ const instantiate = (
 
 const buildError = (
   issues: ReadonlyArray<ValidationIssue>,
-): Result<Placement, PlacementValidationError> =>
-  Result.error(createValidationError(PLACEMENT_KIND, issues));
+): Result<Directory, DirectoryValidationError> =>
+  Result.error(createValidationError(DIRECTORY_KIND, issues));
 
 /**
- * Serialize a Placement to a PlacementString
+ * Serialize a Directory to a DirectoryString
  *
  * Format: <head>[/<section>]*
  * - head: YYYY-MM-DD (date), UUID (item), or "permanent"
@@ -119,55 +119,55 @@ const buildError = (
  * - "2025-11-15/1/3" → date shelf, section [1, 3]
  * - "019a85fc-67c4-7a54-be8e-305bae009f9e" → item parent
  * - "019a85fc-67c4-7a54-be8e-305bae009f9e/1" → item parent, section [1]
- * - "permanent" → permanent placement
- * - "permanent/1" → permanent placement with section
+ * - "permanent" → permanent directory
+ * - "permanent/1" → permanent directory with section
  */
-export const serializePlacement = (placement: Placement): string => {
+export const serializeDirectory = (directory: Directory): string => {
   let headStr: string;
-  switch (placement.head.kind) {
+  switch (directory.head.kind) {
     case "date":
-      headStr = placement.head.date.toString();
+      headStr = directory.head.date.toString();
       break;
     case "item":
-      headStr = placement.head.id.toString();
+      headStr = directory.head.id.toString();
       break;
     case "permanent":
       headStr = "permanent";
       break;
   }
 
-  if (placement.section.length === 0) {
+  if (directory.section.length === 0) {
     return headStr;
   }
 
-  const sectionStr = placement.section.join("/");
+  const sectionStr = directory.section.join("/");
   return `${headStr}/${sectionStr}`;
 };
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/u;
 
 /**
- * Parse a PlacementString to a Placement
+ * Parse a DirectoryString to a Directory
  *
- * PlacementString format: <head>[/<section>]*
+ * DirectoryString format: <head>[/<section>]*
  * - First segment must be a date (YYYY-MM-DD) or UUID
  * - Remaining segments must be positive integers (sections)
  * - No leading `/`
  */
-export const parsePlacement = (
+export const parseDirectory = (
   input: unknown,
-): Result<Placement, PlacementValidationError> => {
-  // Allow passing through existing Placement objects
+): Result<Directory, DirectoryValidationError> => {
+  // Allow passing through existing Directory objects
   if (typeof input === "object" && input !== null) {
-    const candidate = input as Partial<Placement>;
-    if (candidate.kind === PLACEMENT_KIND && typeof candidate.toString === "function") {
-      return Result.ok(candidate as Placement);
+    const candidate = input as Partial<Directory>;
+    if (candidate.kind === DIRECTORY_KIND && typeof candidate.toString === "function") {
+      return Result.ok(candidate as Directory);
     }
   }
 
   if (typeof input !== "string") {
     return buildError([
-      createValidationIssue("placement must be a string", {
+      createValidationIssue("directory must be a string", {
         path: ["value"],
         code: "type",
       }),
@@ -177,17 +177,17 @@ export const parsePlacement = (
   const trimmed = input.trim();
   if (trimmed.length === 0) {
     return buildError([
-      createValidationIssue("placement cannot be empty", {
+      createValidationIssue("directory cannot be empty", {
         path: ["value"],
         code: "empty",
       }),
     ]);
   }
 
-  // Placement strings should not start with /
+  // Directory strings should not start with /
   if (trimmed.startsWith("/")) {
     return buildError([
-      createValidationIssue("placement should not start with '/'", {
+      createValidationIssue("directory should not start with '/'", {
         path: ["value"],
         code: "format",
       }),
@@ -197,7 +197,7 @@ export const parsePlacement = (
   const segments = trimmed.split("/").filter((s) => s.length > 0);
   if (segments.length === 0) {
     return buildError([
-      createValidationIssue("placement must have at least a head segment", {
+      createValidationIssue("directory must have at least a head segment", {
         path: ["value"],
         code: "empty",
       }),
@@ -207,7 +207,7 @@ export const parsePlacement = (
   const [headSegment, ...sectionSegments] = segments;
 
   // Parse head (date, item UUID, or "permanent")
-  let head: PlacementHead;
+  let head: DirectoryHead;
 
   if (headSegment === "permanent") {
     head = { kind: "permanent" };
@@ -264,12 +264,12 @@ export const parsePlacement = (
 };
 
 /**
- * Create a Placement from components
+ * Create a Directory from components
  */
-export const createPlacement = (
-  head: PlacementHead,
+export const createDirectory = (
+  head: DirectoryHead,
   section: ReadonlyArray<number> = [],
-): Placement => {
+): Directory => {
   // Validate section contains only positive integers
   for (let i = 0; i < section.length; i++) {
     if (!Number.isInteger(section[i]) || section[i] < 1) {
@@ -280,27 +280,27 @@ export const createPlacement = (
 };
 
 /**
- * Create a date placement
+ * Create a date directory
  */
-export const createDatePlacement = (
+export const createDateDirectory = (
   date: CalendarDay,
   section: ReadonlyArray<number> = [],
-): Placement => createPlacement({ kind: "date", date }, section);
+): Directory => createDirectory({ kind: "date", date }, section);
 
 /**
- * Create an item placement
+ * Create an item directory
  */
-export const createItemPlacement = (
+export const createItemDirectory = (
   id: ItemId,
   section: ReadonlyArray<number> = [],
-): Placement => createPlacement({ kind: "item", id }, section);
+): Directory => createDirectory({ kind: "item", id }, section);
 
 /**
- * Create a permanent placement
+ * Create a permanent directory
  */
-export const createPermanentPlacement = (
+export const createPermanentDirectory = (
   section: ReadonlyArray<number> = [],
-): Placement => createPlacement({ kind: "permanent" }, section);
+): Directory => createDirectory({ kind: "permanent" }, section);
 
-export const isPlacement = (value: unknown): value is Placement =>
-  typeof value === "object" && value !== null && (value as Placement).kind === PLACEMENT_KIND;
+export const isDirectory = (value: unknown): value is Directory =>
+  typeof value === "object" && value !== null && (value as Directory).kind === DIRECTORY_KIND;

@@ -6,18 +6,18 @@ import {
 } from "../../shared/errors.ts";
 import { PathExpression, PathToken, RangeExpression } from "../primitives/path_types.ts";
 import {
-  createDatePlacement,
+  createDateDirectory,
   createDateRange,
-  createItemPlacement,
+  createDirectory,
+  createItemDirectory,
   createNumericRange,
-  createPermanentPlacement,
-  createPlacement,
+  createPermanentDirectory,
   createSingleRange,
+  Directory,
+  DirectoryRange,
   parseAliasSlug,
   parseCalendarDay,
   parseItemId,
-  Placement,
-  PlacementRange,
   TimezoneIdentifier,
 } from "../primitives/mod.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
@@ -46,30 +46,30 @@ const addDaysToDateString = (dateStr: string, days: number): string => {
 export type PathResolverError = ValidationError<typeof PATH_RESOLVER_ERROR_KIND>;
 
 /**
- * PathResolver converts CLI path expressions to canonical Placements
+ * PathResolver converts CLI path expressions to canonical Directorys
  *
  * Responsibilities:
  * - Resolve relative date tokens (today, +2w, ~mon) to absolute dates
  * - Resolve aliases to UUIDs
  * - Resolve relative navigation (., ..) based on CWD
- * - Convert RangeExpression to PlacementRange
+ * - Convert RangeExpression to DirectoryRange
  */
 export interface PathResolver {
   /**
-   * Resolve a PathExpression to a canonical Placement
+   * Resolve a PathExpression to a canonical Directory
    */
   resolvePath(
-    cwd: Placement,
+    cwd: Directory,
     expr: PathExpression,
-  ): Promise<Result<Placement, PathResolverError>>;
+  ): Promise<Result<Directory, PathResolverError>>;
 
   /**
-   * Resolve a RangeExpression to a canonical PlacementRange
+   * Resolve a RangeExpression to a canonical DirectoryRange
    */
   resolveRange(
-    cwd: Placement,
+    cwd: Directory,
     expr: RangeExpression,
-  ): Promise<Result<PlacementRange, PathResolverError>>;
+  ): Promise<Result<DirectoryRange, PathResolverError>>;
 }
 
 export type PathResolverDependencies = Readonly<{
@@ -101,7 +101,7 @@ export const createPathResolver = (
       return [];
     }
 
-    const itemsResult = await itemRepository.listByPlacement(
+    const itemsResult = await itemRepository.listByDirectory(
       createDateRange(fromDay.value, toDay.value),
     );
     if (itemsResult.type === "error") {
@@ -116,7 +116,7 @@ export const createPathResolver = (
   /** Try prefix resolution against all known aliases, with priority set from recent items */
   const resolveAliasByPrefix = async (
     token: string,
-  ): Promise<Result<Placement, PathResolverError>> => {
+  ): Promise<Result<Directory, PathResolverError>> => {
     let prefixResult: ReturnType<typeof resolvePrefix>;
 
     if (dependencies.prefixCandidates) {
@@ -148,7 +148,7 @@ export const createPathResolver = (
       if (slugResult.type === "ok") {
         const loadResult = await aliasRepository.load(slugResult.value);
         if (loadResult.type === "ok" && loadResult.value) {
-          return Result.ok(createItemPlacement(loadResult.value.data.itemId, []));
+          return Result.ok(createItemDirectory(loadResult.value.data.itemId, []));
         }
       }
     }
@@ -176,8 +176,8 @@ export const createPathResolver = (
 
   const resolveToken = async (
     token: PathToken,
-    context: { cwd: Placement; stack: Placement },
-  ): Promise<Result<Placement | null, PathResolverError>> => {
+    context: { cwd: Directory; stack: Directory },
+  ): Promise<Result<Directory | null, PathResolverError>> => {
     switch (token.kind) {
       case "dot":
         // Current location - no change
@@ -192,7 +192,7 @@ export const createPathResolver = (
 
         // No more sections - try navigating to parent item
         if (context.stack.head.kind === "item") {
-          // Load the item to get its placement (parent)
+          // Load the item to get its directory (parent)
           const itemResult = await itemRepository.load(context.stack.head.id);
           if (itemResult.type === "error") {
             return Result.error(
@@ -223,8 +223,8 @@ export const createPathResolver = (
             );
           }
 
-          // Navigate to the item's placement (its parent)
-          return Result.ok(item.data.placement);
+          // Navigate to the item's directory (its parent)
+          return Result.ok(item.data.directory);
         }
 
         // Date or permanent head with no sections - cannot go higher
@@ -245,20 +245,20 @@ export const createPathResolver = (
             createValidationError(PATH_RESOLVER_ERROR_KIND, dateResult.error.issues),
           );
         }
-        return Result.ok(createDatePlacement(dateResult.value, []));
+        return Result.ok(createDateDirectory(dateResult.value, []));
       }
 
       case "numeric": {
         // Append numeric section to current stack
         const newSection = [...context.stack.section, token.value];
-        return Result.ok(createPlacement(context.stack.head, newSection));
+        return Result.ok(createDirectory(context.stack.head, newSection));
       }
 
       case "idOrAlias": {
         // Try parsing as UUID first
         const idResult = parseItemId(token.value);
         if (idResult.type === "ok") {
-          return Result.ok(createItemPlacement(idResult.value, []));
+          return Result.ok(createItemDirectory(idResult.value, []));
         }
 
         // Try parsing as alias
@@ -295,7 +295,7 @@ export const createPathResolver = (
 
         const alias = loadResult.value;
         if (alias) {
-          return Result.ok(createItemPlacement(alias.data.itemId, []));
+          return Result.ok(createItemDirectory(alias.data.itemId, []));
         }
 
         // Exact alias not found -- fall back to prefix resolution
@@ -303,15 +303,15 @@ export const createPathResolver = (
       }
 
       case "permanent": {
-        return Result.ok(createPermanentPlacement([]));
+        return Result.ok(createPermanentDirectory([]));
       }
     }
   };
 
   const resolvePath = async (
-    cwd: Placement,
+    cwd: Directory,
     expr: PathExpression,
-  ): Promise<Result<Placement, PathResolverError>> => {
+  ): Promise<Result<Directory, PathResolverError>> => {
     // Validate absolute paths require a head segment
     if (expr.isAbsolute) {
       if (expr.segments.length === 0) {
@@ -349,8 +349,8 @@ export const createPathResolver = (
       }
     }
 
-    let stack: Placement = expr.isAbsolute
-      ? createDatePlacement(
+    let stack: Directory = expr.isAbsolute
+      ? createDateDirectory(
         Result.unwrap(parseCalendarDay("1970-01-01")), // temp placeholder, will be replaced by first token
         [],
       )
@@ -371,9 +371,9 @@ export const createPathResolver = (
   };
 
   const resolveRange = async (
-    cwd: Placement,
+    cwd: Directory,
     expr: RangeExpression,
-  ): Promise<Result<PlacementRange, PathResolverError>> => {
+  ): Promise<Result<DirectoryRange, PathResolverError>> => {
     if (expr.kind === "single") {
       // Check if this is a period keyword (this-week, this-month, etc.)
       // Period keywords should expand to date ranges, not single dates
@@ -436,11 +436,11 @@ export const createPathResolver = (
       }
 
       if (!headsEqual) {
-        // Different parent placements - return error
+        // Different parent directories - return error
         return Result.error(
           createValidationError(PATH_RESOLVER_ERROR_KIND, [
             createValidationIssue(
-              "numeric range endpoints must share the same parent placement",
+              "numeric range endpoints must share the same parent directory",
               { code: "range_different_parents" },
             ),
           ]),
@@ -491,7 +491,7 @@ export const createPathResolver = (
           );
         }
 
-        const parent = createPlacement(from.head, fromSectionPrefix);
+        const parent = createDirectory(from.head, fromSectionPrefix);
         return Result.ok(createNumericRange(parent, fromLast, toLast));
       }
     }

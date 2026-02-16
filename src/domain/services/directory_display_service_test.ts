@@ -1,13 +1,13 @@
 import { assert, assertEquals } from "@std/assert";
 import {
-  formatPlacementForDisplay,
-  placementToResolvedGraphPath,
-} from "./placement_display_service.ts";
+  directoryToResolvedGraphPath,
+  formatDirectoryForDisplay,
+} from "./directory_display_service.ts";
 import { createItem } from "../models/item.ts";
 import { itemTitleFromString } from "../primitives/item_title.ts";
 import { dateTimeFromDate } from "../primitives/date_time.ts";
 import { itemIdFromString } from "../primitives/item_id.ts";
-import { createPermanentPlacement, parsePlacement } from "../primitives/placement.ts";
+import { createPermanentDirectory, parseDirectory } from "../primitives/directory.ts";
 import { itemRankFromString } from "../primitives/item_rank.ts";
 import { createItemStatus } from "../primitives/item_status.ts";
 import { createItemIcon } from "../primitives/item_icon.ts";
@@ -26,29 +26,29 @@ const createMockItemRepository = (
   },
   save: () => Promise.resolve(Result.ok(undefined)),
   delete: () => Promise.resolve(Result.ok(undefined)),
-  listByPlacement: () => Promise.resolve(Result.ok([])),
+  listByDirectory: () => Promise.resolve(Result.ok([])),
 });
 
 // ============================================================================
-// Criterion 1: Display permanent placement as /permanent
+// Criterion 1: Display permanent directory as /permanent
 // ============================================================================
 
-Deno.test("placementToResolvedGraphPath - converts permanent placement to /permanent", async () => {
-  const placement = createPermanentPlacement();
+Deno.test("directoryToResolvedGraphPath - converts permanent directory to /permanent", async () => {
+  const directory = createPermanentDirectory();
   const itemRepo = createMockItemRepository(new Map());
 
-  const result = await placementToResolvedGraphPath(placement, { itemRepository: itemRepo });
+  const result = await directoryToResolvedGraphPath(directory, { itemRepository: itemRepo });
 
   assert(result.type === "ok", "operation should succeed");
   assertEquals(result.value.segments.length, 1);
   assertEquals(result.value.segments[0].kind, "permanent");
 });
 
-Deno.test("formatPlacementForDisplay - formats permanent placement as /permanent", async () => {
-  const placement = createPermanentPlacement();
+Deno.test("formatDirectoryForDisplay - formats permanent directory as /permanent", async () => {
+  const directory = createPermanentDirectory();
   const itemRepo = createMockItemRepository(new Map());
 
-  const result = await formatPlacementForDisplay(placement, { itemRepository: itemRepo });
+  const result = await formatDirectoryForDisplay(directory, { itemRepository: itemRepo });
 
   assert(result.type === "ok", "operation should succeed");
   assertEquals(result.value, "/permanent");
@@ -58,7 +58,7 @@ Deno.test("formatPlacementForDisplay - formats permanent placement as /permanent
 // Criterion 2: Display permanent items with alias as /permanent/<alias>
 // ============================================================================
 
-Deno.test("formatPlacementForDisplay - formats permanent item with alias as /permanent/<alias>", async () => {
+Deno.test("formatDirectoryForDisplay - formats permanent item with alias as /permanent/<alias>", async () => {
   const itemId = unwrap(itemIdFromString("019bdfaa-9922-7d88-9794-b8b013cd5609"));
   const items = new Map<string, ReturnType<typeof createItem>>();
 
@@ -67,7 +67,7 @@ Deno.test("formatPlacementForDisplay - formats permanent item with alias as /per
     title: unwrap(itemTitleFromString("My Topic")),
     icon: createItemIcon("note"),
     status: createItemStatus("open"),
-    placement: createPermanentPlacement(),
+    directory: createPermanentDirectory(),
     rank: unwrap(itemRankFromString("aaa")),
     createdAt: unwrap(dateTimeFromDate(new Date("2026-01-21T00:00:00Z"))),
     updatedAt: unwrap(dateTimeFromDate(new Date("2026-01-21T00:00:00Z"))),
@@ -77,10 +77,10 @@ Deno.test("formatPlacementForDisplay - formats permanent item with alias as /per
 
   const itemRepo = createMockItemRepository(items);
 
-  // Placement is "under" the permanent item (item head pointing to the permanent item)
-  const itemPlacement = unwrap(parsePlacement(itemId.toString()));
+  // Directory is "under" the permanent item (item head pointing to the permanent item)
+  const itemDirectory = unwrap(parseDirectory(itemId.toString()));
 
-  const result = await formatPlacementForDisplay(itemPlacement, { itemRepository: itemRepo });
+  const result = await formatDirectoryForDisplay(itemDirectory, { itemRepository: itemRepo });
 
   assert(result.type === "ok", "operation should succeed");
   assertEquals(result.value, "/permanent/my-topic");
@@ -90,7 +90,7 @@ Deno.test("formatPlacementForDisplay - formats permanent item with alias as /per
 // Criterion 2b: Display permanent items without alias as /permanent/<uuid>
 // ============================================================================
 
-Deno.test("formatPlacementForDisplay - formats permanent item without alias as /permanent/<uuid>", async () => {
+Deno.test("formatDirectoryForDisplay - formats permanent item without alias as /permanent/<uuid>", async () => {
   const itemId = unwrap(itemIdFromString("019bdfaa-9922-7d88-9794-b8b013cd5609"));
   const items = new Map<string, ReturnType<typeof createItem>>();
 
@@ -99,7 +99,7 @@ Deno.test("formatPlacementForDisplay - formats permanent item without alias as /
     title: unwrap(itemTitleFromString("My Topic")),
     icon: createItemIcon("note"),
     status: createItemStatus("open"),
-    placement: createPermanentPlacement(),
+    directory: createPermanentDirectory(),
     rank: unwrap(itemRankFromString("aaa")),
     createdAt: unwrap(dateTimeFromDate(new Date("2026-01-21T00:00:00Z"))),
     updatedAt: unwrap(dateTimeFromDate(new Date("2026-01-21T00:00:00Z"))),
@@ -109,24 +109,24 @@ Deno.test("formatPlacementForDisplay - formats permanent item without alias as /
 
   const itemRepo = createMockItemRepository(items);
 
-  // Placement is "under" the permanent item (item head pointing to the permanent item)
-  const itemPlacement = unwrap(parsePlacement(itemId.toString()));
+  // Directory is "under" the permanent item (item head pointing to the permanent item)
+  const itemDirectory = unwrap(parseDirectory(itemId.toString()));
 
-  const result = await formatPlacementForDisplay(itemPlacement, { itemRepository: itemRepo });
+  const result = await formatDirectoryForDisplay(itemDirectory, { itemRepository: itemRepo });
 
   assert(result.type === "ok", "operation should succeed");
   assertEquals(result.value, "/permanent/019bdfaa-9922-7d88-9794-b8b013cd5609");
 });
 
 // ============================================================================
-// Criterion 3: No regression for date placements
+// Criterion 3: No regression for date directories
 // ============================================================================
 
-Deno.test("formatPlacementForDisplay - formats date placement correctly (no regression)", async () => {
-  const placement = Result.unwrap(parsePlacement("2026-01-21"));
+Deno.test("formatDirectoryForDisplay - formats date directory correctly (no regression)", async () => {
+  const directory = Result.unwrap(parseDirectory("2026-01-21"));
   const itemRepo = createMockItemRepository(new Map());
 
-  const result = await formatPlacementForDisplay(placement, { itemRepository: itemRepo });
+  const result = await formatDirectoryForDisplay(directory, { itemRepository: itemRepo });
 
   assert(result.type === "ok", "operation should succeed");
   assertEquals(result.value, "/2026-01-21");

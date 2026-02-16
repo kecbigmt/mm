@@ -72,7 +72,7 @@ _mm() {
         'list:List items'
         'edit:Edit an item'
         'show:Show item details'
-        'move:Move items to a new placement'
+        'move:Move items to a new directory'
         'close:Close items'
         'reopen:Reopen closed items'
         'remove:Remove items'
@@ -96,7 +96,7 @@ _mm() {
     local -a note_flags
     note_flags=(
         '--body[Body text]:body:'
-        '--parent[Parent locator]:parent:'
+        '--dir[Directory locator]:dir:'
         '--context[Context tag]:context:->context_tags'
         '--alias[Alias for the item]:alias:'
         '--edit[Open editor after creation]'
@@ -105,7 +105,7 @@ _mm() {
     local -a task_flags
     task_flags=(
         '--body[Body text]:body:'
-        '--parent[Parent locator]:parent:'
+        '--dir[Directory locator]:dir:'
         '--context[Context tag]:context:->context_tags'
         '--alias[Alias for the item]:alias:'
         '--edit[Open editor after creation]'
@@ -114,7 +114,7 @@ _mm() {
     local -a event_flags
     event_flags=(
         '--body[Body text]:body:'
-        '--parent[Parent locator]:parent:'
+        '--dir[Directory locator]:dir:'
         '--context[Context tag]:context:->context_tags'
         '--alias[Alias for the item]:alias:'
         '--edit[Open editor after creation]'
@@ -420,7 +420,7 @@ _mm() {
     if [[ "$cur" == -* ]]; then
         case "$cmd" in
             note|task|event|n|t|ev)
-                local flags="--body --parent --context --alias --edit $common_flags"
+                local flags="--body --dir --context --alias --edit $common_flags"
                 COMPREPLY=($(compgen -W "$flags" -- "$cur"))
                 ;;
             list|ls)

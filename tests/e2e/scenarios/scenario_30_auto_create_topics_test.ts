@@ -85,7 +85,7 @@ describe("E2E: Auto-creation of Project/Context Topics", () => {
       );
     });
 
-    it("auto-created topics have correct properties (icon: topic, placement: permanent)", async () => {
+    it("auto-created topics have correct properties (icon: topic, directory: permanent)", async () => {
       // Create a note with a non-existent project alias
       await runCommand(ctx.testHome, [
         "note",
@@ -112,7 +112,7 @@ describe("E2E: Auto-creation of Project/Context Topics", () => {
         `Topic title should be the alias. Got: ${showResult.stdout}`,
       );
 
-      // Verify it's in permanent placement by listing permanent items
+      // Verify it's in permanent directory by listing permanent items
       const lsResult = await runCommand(ctx.testHome, ["ls", "permanent"]);
       assertEquals(lsResult.success, true);
       assertEquals(
@@ -213,7 +213,7 @@ describe("E2E: Auto-creation of Project/Context Topics", () => {
       const createExistingResult = await runCommand(ctx.testHome, [
         "note",
         "Existing Context",
-        "--placement",
+        "--dir",
         "permanent",
         "--alias",
         "existing-ctx",
@@ -249,7 +249,7 @@ describe("E2E: Auto-creation of Project/Context Topics", () => {
       await runCommand(ctx.testHome, [
         "note",
         "Existing Project",
-        "--placement",
+        "--dir",
         "permanent",
         "--alias",
         "existing-proj",
@@ -257,7 +257,7 @@ describe("E2E: Auto-creation of Project/Context Topics", () => {
       await runCommand(ctx.testHome, [
         "note",
         "Existing Context",
-        "--placement",
+        "--dir",
         "permanent",
         "--alias",
         "existing-ctx",

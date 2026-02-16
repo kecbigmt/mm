@@ -7,7 +7,7 @@ import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import { parseItemTitle } from "../../../domain/primitives/item_title.ts";
 import { parseItemRank } from "../../../domain/primitives/item_rank.ts";
 import { DateTime, parseDateTime } from "../../../domain/primitives/date_time.ts";
-import { parsePlacement } from "../../../domain/primitives/placement.ts";
+import { parseDirectory } from "../../../domain/primitives/directory.ts";
 import { parseAliasSlug } from "../../../domain/primitives/alias_slug.ts";
 import { parseDuration } from "../../../domain/primitives/duration.ts";
 import { CalendarDay, parseCalendarDay } from "../../../domain/primitives/calendar_day.ts";
@@ -39,7 +39,7 @@ const makeItem = (
     title: string;
     icon: "note" | "task" | "event";
     status: "open" | "closed";
-    placement: string;
+    directory: string;
     alias: string;
     project: string;
     contexts: string[];
@@ -53,7 +53,7 @@ const makeItem = (
   const title = Result.unwrap(parseItemTitle(overrides.title ?? "Test item"));
   const icon = createItemIcon(overrides.icon ?? "note");
   const status = overrides.status === "closed" ? itemStatusClosed() : itemStatusOpen();
-  const placement = Result.unwrap(parsePlacement(overrides.placement ?? "2025-02-10"));
+  const dir = Result.unwrap(parseDirectory(overrides.directory ?? "2025-02-10"));
   const rank = Result.unwrap(parseItemRank("0|aaaaaa:"));
   const createdAt = Result.unwrap(parseDateTime("2025-02-10T09:00:00Z"));
   const updatedAt = Result.unwrap(parseDateTime("2025-02-10T09:00:00Z"));
@@ -77,7 +77,7 @@ const makeItem = (
     title,
     icon,
     status,
-    placement,
+    directory: dir,
     rank,
     createdAt,
     updatedAt,
@@ -511,7 +511,7 @@ Deno.test("formatDateHeader - -8d shows ~8d label (beyond weekday range)", () =>
 
 Deno.test("formatSectionStub - formats stub with counts (colored mode)", () => {
   const summary: SectionSummary = {
-    placement: Result.unwrap(parsePlacement("019a85fc-67c4-7a54-be8e-305bae009f9e/1")),
+    directory: Result.unwrap(parseDirectory("019a85fc-67c4-7a54-be8e-305bae009f9e/1")),
     itemCount: 3,
     sectionCount: 2,
   };
@@ -526,7 +526,7 @@ Deno.test("formatSectionStub - formats stub with counts (colored mode)", () => {
 
 Deno.test("formatSectionStub - formats stub with counts (print mode)", () => {
   const summary: SectionSummary = {
-    placement: Result.unwrap(parsePlacement("019a85fc-67c4-7a54-be8e-305bae009f9e/1")),
+    directory: Result.unwrap(parseDirectory("019a85fc-67c4-7a54-be8e-305bae009f9e/1")),
     itemCount: 3,
     sectionCount: 2,
   };
@@ -541,7 +541,7 @@ Deno.test("formatSectionStub - formats stub with counts (print mode)", () => {
 
 Deno.test("formatSectionStub - formats stub with zero sections", () => {
   const summary: SectionSummary = {
-    placement: Result.unwrap(parsePlacement("019a85fc-67c4-7a54-be8e-305bae009f9e/2")),
+    directory: Result.unwrap(parseDirectory("019a85fc-67c4-7a54-be8e-305bae009f9e/2")),
     itemCount: 1,
     sectionCount: 0,
   };
@@ -663,7 +663,7 @@ Deno.test("formatDateHeader - print mode produces no ANSI escape codes", () => {
 
 Deno.test("formatSectionStub - print mode produces no ANSI escape codes", () => {
   const summary: SectionSummary = {
-    placement: Result.unwrap(parsePlacement("019a85fc-67c4-7a54-be8e-305bae009f9e/1")),
+    directory: Result.unwrap(parseDirectory("019a85fc-67c4-7a54-be8e-305bae009f9e/1")),
     itemCount: 2,
     sectionCount: 1,
   };
@@ -1018,7 +1018,7 @@ Deno.test("formatItemLine - print mode event without time uses date only", () =>
 });
 
 Deno.test("formatItemLine - print mode event without dateStr still shows time", () => {
-  // For events in non-date placements (e.g., permanent), time should still appear
+  // For events in non-date directories (e.g., permanent), time should still appear
   const item = makeItem({
     icon: "event",
     alias: "perm-evt",
@@ -1031,7 +1031,7 @@ Deno.test("formatItemLine - print mode event without dateStr still shows time", 
     timezone: makeTimezone(),
     now: DEFAULT_NOW,
   };
-  // No dateStr provided (non-date placement)
+  // No dateStr provided (non-date directory)
   const result = formatItemLine(item, options);
   // Should still include time: perm-evt:event 15:30-16:00 Permanent event
   assertEquals(result, "perm-evt:event 15:30-16:00 Permanent event");

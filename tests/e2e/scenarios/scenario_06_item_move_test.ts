@@ -2,12 +2,12 @@
  * E2E Test Scenario 6: Item Movement (Move)
  *
  * Purpose:
- *   Verify that item placement changes (mv command) work correctly,
- *   including head/tail placement, relative positioning, and cross-parent moves.
+ *   Verify that item movement (mv command) works correctly,
+ *   including head/tail positioning, relative positioning, and cross-parent moves.
  *
  * Overview:
  *   This scenario tests item movement operations:
- *   - Move items using head: placement
+ *   - Move items using head: positioning
  *   - Move items using after: and before: relative positioning
  *   - Move items to different parent/section locations
  *   - Verify physical files remain unchanged (only edges are updated)
@@ -43,7 +43,7 @@ describe("Scenario 6: Item movement (move)", () => {
     await cleanupTestEnvironment(ctx);
   });
 
-  it("moves item to head using head: placement", async () => {
+  it("moves item to head using head: positioning", async () => {
     const cdToday = await runCd(ctx.testHome, "today");
     assertEquals(cdToday.success, true, `cd today failed: ${cdToday.stderr}`);
 

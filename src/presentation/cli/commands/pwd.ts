@@ -1,7 +1,7 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
-import { formatPlacementForDisplay } from "../../../domain/services/placement_display_service.ts";
+import { formatDirectoryForDisplay } from "../../../domain/services/directory_display_service.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 
@@ -40,8 +40,8 @@ export function createPwdCommand() {
         console.error(`Warning: ${cwdResult.value.warning}`);
       }
 
-      // Display placement with aliases
-      const displayResult = await formatPlacementForDisplay(cwdResult.value.placement, {
+      // Display directory with aliases
+      const displayResult = await formatDirectoryForDisplay(cwdResult.value.directory, {
         itemRepository: deps.itemRepository,
       });
       if (displayResult.type === "error") {

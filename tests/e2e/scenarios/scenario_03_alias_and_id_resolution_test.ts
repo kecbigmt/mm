@@ -170,7 +170,7 @@ describe("Scenario 3: Alias and ID resolution", () => {
     const cdResult = await runCd(ctx.testHome, "important-memo", opts);
     assertEquals(cdResult.success, true, `cd command failed: ${cdResult.stderr}`);
 
-    // cd returns the raw placement (UUID), but pwd displays with alias
+    // cd returns the raw directory (UUID), but pwd displays with alias
     assertEquals(
       cdResult.success === true,
       true,

@@ -4,8 +4,8 @@ import {
   isDateExpression,
   resolveRelativeDate,
 } from "../../../src/domain/services/date_resolver.ts";
-import { createDatePlacement } from "../../../src/domain/primitives/placement.ts";
-import { createSingleRange } from "../../../src/domain/primitives/placement_range.ts";
+import { createDateDirectory } from "../../../src/domain/primitives/directory.ts";
+import { createSingleRange } from "../../../src/domain/primitives/directory_range.ts";
 import type { Item } from "../../../src/domain/models/item.ts";
 import type { CalendarDay } from "../../../src/domain/primitives/calendar_day.ts";
 import type { TimezoneIdentifier } from "../../../src/domain/primitives/timezone_identifier.ts";
@@ -76,9 +76,9 @@ export const handler = {
     }
 
     if (itemRepository && resolvedDay) {
-      const placement = createDatePlacement(resolvedDay);
-      const range = createSingleRange(placement);
-      const result = await itemRepository.listByPlacement(range);
+      const directory = createDateDirectory(resolvedDay);
+      const range = createSingleRange(directory);
+      const result = await itemRepository.listByDirectory(range);
       if (result.type === "ok") {
         items = result.value;
       }

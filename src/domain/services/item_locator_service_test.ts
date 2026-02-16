@@ -14,7 +14,7 @@ import {
 import { itemIdFromString } from "../primitives/item_id.ts";
 import { itemTitleFromString } from "../primitives/item_title.ts";
 import { itemRankFromString } from "../primitives/item_rank.ts";
-import { parsePlacement } from "../primitives/placement.ts";
+import { parseDirectory } from "../primitives/directory.ts";
 import { Result } from "../../shared/result.ts";
 
 const setup = () => {
@@ -30,7 +30,7 @@ const setup = () => {
       title: Result.unwrap(itemTitleFromString("Test Item")),
       icon: createItemIcon("note"),
       status: itemStatusOpen(),
-      placement: Result.unwrap(parsePlacement("2026-02-11")),
+      directory: Result.unwrap(parseDirectory("2026-02-11")),
       rank: Result.unwrap(itemRankFromString("a0")),
       createdAt: now,
       updatedAt: now,

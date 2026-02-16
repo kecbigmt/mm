@@ -5,7 +5,7 @@ import { CreateItemWorkflow } from "./create_item.ts";
 import { Result } from "../../shared/result.ts";
 import {
   dateTimeFromDate,
-  parsePlacement,
+  parseDirectory,
   timezoneIdentifierFromString,
 } from "../primitives/mod.ts";
 import { createIdGenerationService } from "../services/id_generation_service.ts";
@@ -38,14 +38,14 @@ describe("MoveItemWorkflow", () => {
     const aliasRepository = new InMemoryAliasRepository();
     const aliasAutoGenerator = createTestAliasAutoGenerator();
     const rankService = createTestRankService();
-    const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
+    const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
     const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
     // Create items A, B, C, D
     const itemAResult = await CreateItemWorkflow.execute({
       title: "Item A",
       itemType: "note",
-      parentPlacement,
+      parentDirectory,
       createdAt,
       timezone: TEST_TIMEZONE,
     }, {
@@ -62,7 +62,7 @@ describe("MoveItemWorkflow", () => {
     const itemBResult = await CreateItemWorkflow.execute({
       title: "Item B",
       itemType: "note",
-      parentPlacement,
+      parentDirectory,
       createdAt,
       timezone: TEST_TIMEZONE,
     }, {
@@ -79,7 +79,7 @@ describe("MoveItemWorkflow", () => {
     const itemCResult = await CreateItemWorkflow.execute({
       title: "Item C",
       itemType: "note",
-      parentPlacement,
+      parentDirectory,
       createdAt,
       timezone: TEST_TIMEZONE,
     }, {
@@ -96,7 +96,7 @@ describe("MoveItemWorkflow", () => {
     const itemDResult = await CreateItemWorkflow.execute({
       title: "Item D",
       itemType: "note",
-      parentPlacement,
+      parentDirectory,
       createdAt,
       timezone: TEST_TIMEZONE,
     }, {
@@ -111,9 +111,9 @@ describe("MoveItemWorkflow", () => {
     assertExists(itemD);
 
     // Verify initial order: A, B, C, D
-    const initialListResult = await itemRepository.listByPlacement({
+    const initialListResult = await itemRepository.listByDirectory({
       kind: "single",
-      at: parentPlacement,
+      at: parentDirectory,
     });
     assertEquals(initialListResult.type, "ok");
     if (initialListResult.type === "ok") {
@@ -131,7 +131,7 @@ describe("MoveItemWorkflow", () => {
     const moveResult = await MoveItemWorkflow.execute({
       itemExpression: itemD.data.id.toString(),
       targetExpression: `after:${itemA.data.id.toString()}`,
-      cwd: parentPlacement,
+      cwd: parentDirectory,
       occurredAt: createdAt,
     }, {
       itemRepository,
@@ -142,9 +142,9 @@ describe("MoveItemWorkflow", () => {
     assertEquals(moveResult.type, "ok");
 
     // Verify final order: A, D, B, C
-    const finalListResult = await itemRepository.listByPlacement({
+    const finalListResult = await itemRepository.listByDirectory({
       kind: "single",
-      at: parentPlacement,
+      at: parentDirectory,
     });
     assertEquals(finalListResult.type, "ok");
     if (finalListResult.type === "ok") {
@@ -180,14 +180,14 @@ describe("MoveItemWorkflow", () => {
     const aliasRepository = new InMemoryAliasRepository();
     const aliasAutoGenerator = createTestAliasAutoGenerator();
     const rankService = createTestRankService();
-    const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
+    const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
     const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
     // Create items A, B, C, D
     const itemAResult = await CreateItemWorkflow.execute({
       title: "Item A",
       itemType: "note",
-      parentPlacement,
+      parentDirectory,
       createdAt,
       timezone: TEST_TIMEZONE,
     }, {
@@ -204,7 +204,7 @@ describe("MoveItemWorkflow", () => {
     const itemBResult = await CreateItemWorkflow.execute({
       title: "Item B",
       itemType: "note",
-      parentPlacement,
+      parentDirectory,
       createdAt,
       timezone: TEST_TIMEZONE,
     }, {
@@ -221,7 +221,7 @@ describe("MoveItemWorkflow", () => {
     const itemCResult = await CreateItemWorkflow.execute({
       title: "Item C",
       itemType: "note",
-      parentPlacement,
+      parentDirectory,
       createdAt,
       timezone: TEST_TIMEZONE,
     }, {
@@ -238,7 +238,7 @@ describe("MoveItemWorkflow", () => {
     const itemDResult = await CreateItemWorkflow.execute({
       title: "Item D",
       itemType: "note",
-      parentPlacement,
+      parentDirectory,
       createdAt,
       timezone: TEST_TIMEZONE,
     }, {
@@ -256,7 +256,7 @@ describe("MoveItemWorkflow", () => {
     const moveResult = await MoveItemWorkflow.execute({
       itemExpression: itemA.data.id.toString(),
       targetExpression: `before:${itemD.data.id.toString()}`,
-      cwd: parentPlacement,
+      cwd: parentDirectory,
       occurredAt: createdAt,
     }, {
       itemRepository,
@@ -267,9 +267,9 @@ describe("MoveItemWorkflow", () => {
     assertEquals(moveResult.type, "ok");
 
     // Verify final order: B, C, A, D
-    const finalListResult = await itemRepository.listByPlacement({
+    const finalListResult = await itemRepository.listByDirectory({
       kind: "single",
-      at: parentPlacement,
+      at: parentDirectory,
     });
     assertEquals(finalListResult.type, "ok");
     if (finalListResult.type === "ok") {

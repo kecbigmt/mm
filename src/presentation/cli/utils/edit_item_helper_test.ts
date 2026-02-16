@@ -15,7 +15,7 @@ import {
   itemRankFromString,
   itemStatusOpen,
   itemTitleFromString,
-  parsePlacement,
+  parseDirectory,
 } from "../../../domain/primitives/mod.ts";
 
 const createTestItem = (
@@ -25,7 +25,7 @@ const createTestItem = (
 ): Item => {
   const itemId = Result.unwrap(itemIdFromString(id));
   const itemTitle = Result.unwrap(itemTitleFromString(title));
-  const placement = Result.unwrap(parsePlacement("2024-01-01"));
+  const directory = Result.unwrap(parseDirectory("2024-01-01"));
   const rank = Result.unwrap(itemRankFromString("a0"));
   const now = Result.unwrap(dateTimeFromDate(new Date()));
   const aliasSlug = alias ? Result.unwrap(aliasSlugFromString(alias)) : undefined;
@@ -35,7 +35,7 @@ const createTestItem = (
     title: itemTitle,
     icon: createItemIcon("note"),
     status: itemStatusOpen(),
-    placement,
+    directory,
     rank,
     alias: aliasSlug,
     createdAt: now,
@@ -54,7 +54,7 @@ Deno.test("handlePostEditUpdates - updates cache with reloaded item", async () =
     load: () => Promise.resolve(Result.ok(updatedItem)),
     save: () => Promise.resolve(Result.ok(undefined)),
     delete: () => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -100,7 +100,7 @@ Deno.test("handlePostEditUpdates - adds new alias when alias changed from undefi
     load: () => Promise.resolve(Result.ok(updatedItem)),
     save: () => Promise.resolve(Result.ok(undefined)),
     delete: () => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -148,7 +148,7 @@ Deno.test("handlePostEditUpdates - deletes old alias and adds new alias when cha
     load: () => Promise.resolve(Result.ok(updatedItem)),
     save: () => Promise.resolve(Result.ok(undefined)),
     delete: () => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -198,7 +198,7 @@ Deno.test("handlePostEditUpdates - does not modify aliases when unchanged", asyn
     load: () => Promise.resolve(Result.ok(updatedItem)),
     save: () => Promise.resolve(Result.ok(undefined)),
     delete: () => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -252,7 +252,7 @@ Deno.test("handlePostEditUpdates - throws error when alias collision detected", 
     load: () => Promise.resolve(Result.ok(updatedItem)),
     save: () => Promise.resolve(Result.ok(undefined)),
     delete: () => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -297,7 +297,7 @@ Deno.test("handlePostEditUpdates - throws error when item reload fails", async (
       ),
     save: () => Promise.resolve(Result.ok(undefined)),
     delete: () => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {
@@ -339,7 +339,7 @@ Deno.test("handlePostEditUpdates - throws error when item not found after reload
     load: () => Promise.resolve(Result.ok(undefined)),
     save: () => Promise.resolve(Result.ok(undefined)),
     delete: () => Promise.resolve(Result.ok(undefined)),
-    listByPlacement: () => Promise.resolve(Result.ok([])),
+    listByDirectory: () => Promise.resolve(Result.ok([])),
   };
 
   const mockAliasRepository: AliasRepository = {

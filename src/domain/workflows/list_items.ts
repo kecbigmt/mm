@@ -1,9 +1,9 @@
 import { Result } from "../../shared/result.ts";
 import { createValidationError, ValidationError } from "../../shared/errors.ts";
 import { Item } from "../models/item.ts";
-import { Placement } from "../primitives/placement.ts";
+import { Directory } from "../primitives/directory.ts";
 import { parseTimezoneIdentifier, TimezoneIdentifier } from "../primitives/timezone_identifier.ts";
-import { createSingleRange } from "../primitives/placement_range.ts";
+import { createSingleRange } from "../primitives/directory_range.ts";
 import { parseRangeExpression } from "../../presentation/cli/path_parser.ts";
 import { createPathResolver } from "../services/path_resolver.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
@@ -17,7 +17,7 @@ export type ListItemsStatusFilter = "open" | "closed" | "all";
 
 export type ListItemsInput = Readonly<{
   expression?: string; // PathExpression or RangeExpression as string
-  cwd: Placement;
+  cwd: Directory;
   timezone?: TimezoneIdentifier;
   today?: Date;
   status?: ListItemsStatusFilter; // default: "open"
@@ -62,7 +62,7 @@ export const ListItemsWorkflow = {
       prefixCandidates: deps.prefixCandidates,
     });
 
-    let placementRange;
+    let directoryRange;
 
     if (input.expression) {
       // Parse expression
@@ -73,7 +73,7 @@ export const ListItemsWorkflow = {
         );
       }
 
-      // Resolve to PlacementRange
+      // Resolve to DirectoryRange
       const resolveResult = await profileAsync(
         "workflow:resolveRange",
         () => pathResolver.resolveRange(input.cwd, rangeExprResult.value),
@@ -84,16 +84,16 @@ export const ListItemsWorkflow = {
         );
       }
 
-      placementRange = resolveResult.value;
+      directoryRange = resolveResult.value;
     } else {
       // No expression - use cwd as single range
-      placementRange = createSingleRange(input.cwd);
+      directoryRange = createSingleRange(input.cwd);
     }
 
-    // Query items using PlacementRange
+    // Query items using DirectoryRange
     const itemsResult = await profileAsync(
-      "workflow:listByPlacement",
-      () => deps.itemRepository.listByPlacement(placementRange),
+      "workflow:listByDirectory",
+      () => deps.itemRepository.listByDirectory(directoryRange),
     );
     if (itemsResult.type === "error") {
       return Result.error(itemsResult.error);

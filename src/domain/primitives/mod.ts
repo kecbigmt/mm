@@ -71,18 +71,18 @@ export { isTagSlug, parseTagSlug, tagSlugFromString } from "./tag_slug.ts";
 export type { WorkspaceName, WorkspaceNameValidationError } from "./workspace_name.ts";
 export { isWorkspaceName, parseWorkspaceName, workspaceNameFromString } from "./workspace_name.ts";
 
-export type { Placement, PlacementHead, PlacementValidationError } from "./placement.ts";
+export type { Directory, DirectoryHead, DirectoryValidationError } from "./directory.ts";
 export {
-  createDatePlacement,
-  createItemPlacement,
-  createPermanentPlacement,
-  createPlacement,
-  isPlacement,
-  parsePlacement,
-  serializePlacement,
-} from "./placement.ts";
+  createDateDirectory,
+  createDirectory,
+  createItemDirectory,
+  createPermanentDirectory,
+  isDirectory,
+  parseDirectory,
+  serializeDirectory,
+} from "./directory.ts";
 
-export type { PlacementRange } from "./placement_range.ts";
+export type { DirectoryRange } from "./directory_range.ts";
 export {
   createDateRange,
   createNumericRange,
@@ -90,7 +90,7 @@ export {
   isDateRange,
   isNumericRange,
   isSingleRange,
-} from "./placement_range.ts";
+} from "./directory_range.ts";
 
 export type { ResolvedGraphPath, ResolvedSegment } from "./resolved_graph_path.ts";
 export { createResolvedGraphPath, formatResolvedGraphPath } from "./resolved_graph_path.ts";

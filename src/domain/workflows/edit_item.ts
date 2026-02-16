@@ -305,11 +305,11 @@ export const EditItemWorkflow = {
     };
     let hasScheduleUpdates = false;
 
-    // Extract reference date from item placement for time-only formats
+    // Extract reference date from item directory for time-only formats
     // Use a neutral time (noon UTC) to avoid day shifts when formatting in workspace timezone
     let referenceDate = input.updatedAt.toDate();
-    if (updatedItem.data.placement.head.kind === "date") {
-      const dateStr = updatedItem.data.placement.head.date.toString();
+    if (updatedItem.data.directory.head.kind === "date") {
+      const dateStr = updatedItem.data.directory.head.date.toString();
       const [year, month, day] = dateStr.split("-").map(Number);
       // Use noon UTC to ensure the date remains stable when formatted in any timezone
       referenceDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));

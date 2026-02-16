@@ -46,7 +46,7 @@ const createPermanentItem = async (
   const result = await runCommand(testHome, [
     "note",
     title,
-    "--placement",
+    "--dir",
     "permanent",
     "--alias",
     aliasSlug,
@@ -126,7 +126,7 @@ describe("E2E: Item creation", () => {
 
       const { frontmatter, body } = parseResult.value;
 
-      assertEquals(frontmatter.schema, "mm.item.frontmatter/4");
+      assertEquals(frontmatter.schema, "mm.item.frontmatter/5");
       assertEquals(typeof frontmatter.id, "string");
       assertEquals(frontmatter.status, "open");
       assertEquals(typeof frontmatter.created_at, "string");
@@ -159,7 +159,7 @@ describe("E2E: Item creation", () => {
       assertEquals(lsResult.stdout, "(empty)", "Should show (empty) when no items exist");
     });
 
-    it("creates item in specific parent with --parent", async () => {
+    it("creates item in specific directory with --dir", async () => {
       await runCommand(ctx.testHome, ["note", "Parent item"]);
       const today = await getCurrentDateFromCli(ctx.testHome);
       const parentId = await getLatestItemId(ctx.testHome, "test-workspace", today);
@@ -167,7 +167,7 @@ describe("E2E: Item creation", () => {
       const result = await runCommand(ctx.testHome, [
         "note",
         "Child item",
-        "--parent",
+        "--dir",
         `./${parentId}`,
       ]);
       assertEquals(result.success, true, `Failed to create child: ${result.stderr}`);
@@ -295,7 +295,7 @@ describe("E2E: Item creation", () => {
       assertEquals(frontmatter.due_at?.startsWith(dueAt.slice(0, -1)), true);
     });
 
-    it("uses parent placement date for time-only due-at format", async () => {
+    it("uses parent directory date for time-only due-at format", async () => {
       const today = await getCurrentDateFromCli(ctx.testHome);
       const result = await runCommand(ctx.testHome, [
         "task",
@@ -396,7 +396,7 @@ describe("E2E: Item creation", () => {
       assertEquals(frontmatter.duration, "2h");
     });
 
-    it("uses parent placement date for time-only start-at format", async () => {
+    it("uses parent directory date for time-only start-at format", async () => {
       const today = await getCurrentDateFromCli(ctx.testHome);
       const result = await runCommand(ctx.testHome, [
         "event",
@@ -427,7 +427,7 @@ describe("E2E: Item creation", () => {
       }
     });
 
-    it("rejects event with mismatched startAt date for calendar placement", async () => {
+    it("rejects event with mismatched startAt date for calendar directory", async () => {
       const today = await getCurrentDateFromCli(ctx.testHome);
       const [year, month, day] = today.split("-").map(Number);
       const nextDate = new Date(year, month - 1, day + 1);
@@ -441,7 +441,7 @@ describe("E2E: Item creation", () => {
         "Mismatched event",
         "--start-at",
         startAt,
-        "--parent",
+        "--dir",
         `/${tomorrowStr}`,
       ]);
 
@@ -452,7 +452,7 @@ describe("E2E: Item creation", () => {
       );
     });
 
-    it("accepts event with item-based placement (no date validation)", async () => {
+    it("accepts event with item-based directory (no date validation)", async () => {
       await runCommand(ctx.testHome, ["note", "Parent item"]);
       const today = await getCurrentDateFromCli(ctx.testHome);
       const parentId = await getLatestItemId(ctx.testHome, "test-workspace", today);
@@ -465,14 +465,14 @@ describe("E2E: Item creation", () => {
         "Event under item",
         "--start-at",
         tomorrowStr,
-        "--parent",
+        "--dir",
         `./${parentId}`,
       ]);
 
       assertEquals(
         result.success,
         true,
-        `Should accept event with item placement: ${result.stderr}`,
+        `Should accept event with item directory: ${result.stderr}`,
       );
       assertEquals(result.stdout.includes("Created event"), true);
     });

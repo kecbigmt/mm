@@ -1,5 +1,5 @@
 import { Result } from "../../shared/result.ts";
-import { Placement } from "../primitives/placement.ts";
+import { Directory } from "../primitives/directory.ts";
 import {
   createResolvedGraphPath,
   formatResolvedGraphPath,
@@ -16,40 +16,40 @@ import {
 import { AliasSlug } from "../primitives/alias_slug.ts";
 import { ItemId } from "../primitives/item_id.ts";
 
-export type PlacementDisplayDependencies = Readonly<{
+export type DirectoryDisplayDependencies = Readonly<{
   readonly itemRepository: ItemRepository;
 }>;
 
-export type PlacementDisplayError =
+export type DirectoryDisplayError =
   | RepositoryError
-  | ValidationError<"PlacementDisplay">;
+  | ValidationError<"DirectoryDisplay">;
 
 /**
- * Converts a Placement to a ResolvedGraphPath for display purposes
+ * Converts a Directory to a ResolvedGraphPath for display purposes
  * This function looks up aliases for items to provide user-friendly paths
  * and traverses up to the root date to build a complete path
  */
-export async function placementToResolvedGraphPath(
-  placement: Placement,
-  deps: PlacementDisplayDependencies,
-): Promise<Result<ResolvedGraphPath, PlacementDisplayError>> {
+export async function directoryToResolvedGraphPath(
+  directory: Directory,
+  deps: DirectoryDisplayDependencies,
+): Promise<Result<ResolvedGraphPath, DirectoryDisplayError>> {
   const segments: ResolvedSegment[] = [];
 
-  // Build path from root to current placement
+  // Build path from root to current directory
   // If head is an item, we need to traverse up to find the root date
-  let currentPlacement = placement;
+  let currentDirectory = directory;
   const pathStack: Array<{ id: ItemId; alias?: AliasSlug; section: ReadonlyArray<number> }> = [];
 
   // Traverse up to the root (date or permanent)
-  while (currentPlacement.head.kind === "item") {
-    const itemId = currentPlacement.head.id;
+  while (currentDirectory.head.kind === "item") {
+    const itemId = currentDirectory.head.id;
     const itemResult = await deps.itemRepository.load(itemId);
     if (itemResult.type === "error") {
       return Result.error(itemResult.error);
     }
     if (!itemResult.value) {
       return Result.error(
-        createValidationError("PlacementDisplay", [
+        createValidationError("DirectoryDisplay", [
           createValidationIssue(
             `Item not found: ${itemId.toString()}`,
             { code: "item_not_found", path: ["value"] },
@@ -61,18 +61,18 @@ export async function placementToResolvedGraphPath(
     pathStack.push({
       id: itemId,
       alias: itemResult.value.data.alias,
-      section: currentPlacement.section,
+      section: currentDirectory.section,
     });
 
-    // Move to parent placement
-    currentPlacement = itemResult.value.data.placement;
+    // Move to parent directory
+    currentDirectory = itemResult.value.data.directory;
   }
 
-  // Now currentPlacement has a date or permanent head - this is our root
-  if (currentPlacement.head.kind === "date") {
+  // Now currentDirectory has a date or permanent head - this is our root
+  if (currentDirectory.head.kind === "date") {
     segments.push({
       kind: "date",
-      date: currentPlacement.head.date,
+      date: currentDirectory.head.date,
     });
   } else {
     // permanent head
@@ -82,7 +82,7 @@ export async function placementToResolvedGraphPath(
   }
 
   // Add root sections (if any)
-  for (const sectionIndex of currentPlacement.section) {
+  for (const sectionIndex of currentDirectory.section) {
     segments.push({
       kind: "section",
       index: sectionIndex,
@@ -112,13 +112,13 @@ export async function placementToResolvedGraphPath(
 }
 
 /**
- * Formats a Placement as a user-friendly string with aliases
+ * Formats a Directory as a user-friendly string with aliases
  */
-export async function formatPlacementForDisplay(
-  placement: Placement,
-  deps: PlacementDisplayDependencies,
-): Promise<Result<string, PlacementDisplayError>> {
-  const graphPathResult = await placementToResolvedGraphPath(placement, deps);
+export async function formatDirectoryForDisplay(
+  directory: Directory,
+  deps: DirectoryDisplayDependencies,
+): Promise<Result<string, DirectoryDisplayError>> {
+  const graphPathResult = await directoryToResolvedGraphPath(directory, deps);
   if (graphPathResult.type === "error") {
     return Result.error(graphPathResult.error);
   }

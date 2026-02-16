@@ -1,6 +1,6 @@
 import { Result } from "../../shared/result.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
-import type { Placement } from "../primitives/placement.ts";
+import type { Directory } from "../primitives/directory.ts";
 
 /**
  * Summary of a section's direct children.
@@ -8,8 +8,8 @@ import type { Placement } from "../primitives/placement.ts";
  * Used by the partition builder to generate stub lines without loading item bodies.
  */
 export type SectionSummary = Readonly<{
-  /** Placement identifying this section (head + section path) */
-  placement: Placement;
+  /** Directory identifying this section (head + section path) */
+  directory: Directory;
   /** Number of direct item children under this section */
   itemCount: number;
   /** Number of direct child sections under this section */
@@ -17,7 +17,7 @@ export type SectionSummary = Readonly<{
 }>;
 
 /**
- * Read-only service to list section summaries under a parent placement.
+ * Read-only service to list section summaries under a parent directory.
  *
  * This service reads from the graph index to provide section metadata without
  * loading item bodies. Used by the `mm ls` command to generate section stub
@@ -25,12 +25,12 @@ export type SectionSummary = Readonly<{
  */
 export interface SectionQueryService {
   /**
-   * List direct child sections under a parent placement.
+   * List direct child sections under a parent directory.
    *
-   * @param parent - The parent placement to query (date head or item head with optional section path)
+   * @param parent - The parent directory to query (date head or item head with optional section path)
    * @returns Array of section summaries for direct children (not recursive)
    */
   listSections(
-    parent: Placement,
+    parent: Directory,
   ): Promise<Result<ReadonlyArray<SectionSummary>, RepositoryError>>;
 }

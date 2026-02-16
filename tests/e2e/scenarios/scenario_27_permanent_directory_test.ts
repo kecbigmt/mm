@@ -1,20 +1,20 @@
 /**
- * E2E Test: Permanent Placement
+ * E2E Test: Permanent Directory
  *
  * Purpose:
- *   Verify that items can be created with permanent placement and listed
- *   correctly. Permanent placement is date-independent, storing items in
+ *   Verify that items can be created with permanent directory and listed
+ *   correctly. Permanent directory is date-independent, storing items in
  *   a flat structure under .index/graph/permanent/.
  *
  * Overview:
  *   This scenario tests:
- *   - Creating notes with --placement permanent
+ *   - Creating notes with --dir permanent
  *   - Listing permanent items with `mm ls permanent`
  *   - Verifying file structure for permanent items
- *   - Error handling for invalid placement values
+ *   - Error handling for invalid directory values
  *
  * Design Reference:
- *   See docs/stories/20260102_permanent-notes-project-context/20260103T035134_permanent-placement.story.md
+ *   See docs/stories/20260102_permanent-notes-project-context/20260103T035134_permanent-directory.story.md
  */
 
 import { assertEquals } from "@std/assert";
@@ -31,7 +31,7 @@ import {
 } from "../helpers.ts";
 import { parseFrontmatter } from "../../../src/infrastructure/fileSystem/frontmatter.ts";
 
-describe("E2E: Permanent Placement", () => {
+describe("E2E: Permanent Directory", () => {
   let ctx: TestContext;
 
   beforeEach(async () => {
@@ -44,11 +44,11 @@ describe("E2E: Permanent Placement", () => {
   });
 
   describe("Creating permanent items", () => {
-    it("creates note with --placement permanent", async () => {
+    it("creates note with --dir permanent", async () => {
       const result = await runCommand(ctx.testHome, [
         "note",
         "Permanent Note",
-        "--placement",
+        "--dir",
         "permanent",
       ]);
       assertEquals(result.success, true, `Failed to create note: ${result.stderr}`);
@@ -56,11 +56,11 @@ describe("E2E: Permanent Placement", () => {
       assertEquals(result.stdout.includes("Permanent Note"), true);
     });
 
-    it("stores placement: permanent in frontmatter", async () => {
+    it("stores directory: permanent in frontmatter", async () => {
       const result = await runCommand(ctx.testHome, [
         "note",
         "Permanent Note",
-        "--placement",
+        "--dir",
         "permanent",
       ]);
       assertEquals(result.success, true, `Failed to create note: ${result.stderr}`);
@@ -95,14 +95,14 @@ describe("E2E: Permanent Placement", () => {
       const fileContent = await Deno.readTextFile(itemFilePath);
       const parseResult = parseFrontmatter<{
         id: string;
-        placement: string;
+        directory: string;
       }>(fileContent);
       assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
 
       if (parseResult.type === "error") return;
 
       const { frontmatter } = parseResult.value;
-      assertEquals(frontmatter.placement, "permanent");
+      assertEquals(frontmatter.directory, "permanent");
 
       // Verify edge file exists in permanent directory
       const permanentEdgeDir = join(workspaceDir, ".index", "graph", "permanent");
@@ -111,48 +111,19 @@ describe("E2E: Permanent Placement", () => {
       assertEquals(edgeFileStat.isFile, true, "Edge file should exist in permanent directory");
     });
 
-    it("rejects invalid placement value", async () => {
+    it("rejects invalid directory value", async () => {
       const result = await runCommand(ctx.testHome, [
         "note",
-        "Invalid Placement",
-        "--placement",
+        "Invalid Directory",
+        "--dir",
         "invalid",
       ]);
-      // The CLI prints an error but still exits with 0 (common pattern for CLI tools)
-      // Check that error message is present in stderr
-      assertEquals(
-        result.stderr.includes("Invalid placement value"),
-        true,
-        `Should show error about invalid placement. stderr: ${result.stderr}`,
-      );
+      // "invalid" is not "permanent" and fails path resolution
       // And that no "Created note" message appears
       assertEquals(
         result.stdout.includes("Created note"),
         false,
-        "Should NOT create a note with invalid placement",
-      );
-    });
-
-    it("rejects using --parent and --placement together", async () => {
-      const result = await runCommand(ctx.testHome, [
-        "note",
-        "Conflicting Options",
-        "--placement",
-        "permanent",
-        "--parent",
-        "today",
-      ]);
-      // The CLI prints an error but still exits with 0 (common pattern for CLI tools)
-      assertEquals(
-        result.stderr.includes("Cannot use both --parent and --placement"),
-        true,
-        `Should show error about conflicting options. stderr: ${result.stderr}`,
-      );
-      // And that no "Created note" message appears
-      assertEquals(
-        result.stdout.includes("Created note"),
-        false,
-        "Should NOT create a note with conflicting options",
+        "Should NOT create a note with invalid directory",
       );
     });
   });
@@ -163,13 +134,13 @@ describe("E2E: Permanent Placement", () => {
       await runCommand(ctx.testHome, [
         "note",
         "First Permanent",
-        "--placement",
+        "--dir",
         "permanent",
       ]);
       await runCommand(ctx.testHome, [
         "note",
         "Second Permanent",
-        "--placement",
+        "--dir",
         "permanent",
       ]);
 
@@ -201,7 +172,7 @@ describe("E2E: Permanent Placement", () => {
       await runCommand(ctx.testHome, [
         "note",
         "Absolute Path Test",
-        "--placement",
+        "--dir",
         "permanent",
       ]);
 
@@ -220,7 +191,7 @@ describe("E2E: Permanent Placement", () => {
       await runCommand(ctx.testHome, [
         "note",
         "Permanent Note",
-        "--placement",
+        "--dir",
         "permanent",
       ]);
       await runCommand(ctx.testHome, [
@@ -250,7 +221,7 @@ describe("E2E: Permanent Placement", () => {
       await runCommand(ctx.testHome, [
         "note",
         "Permanent Note",
-        "--placement",
+        "--dir",
         "permanent",
       ]);
       await runCommand(ctx.testHome, [

@@ -2,7 +2,7 @@ import { assertEquals } from "@std/assert";
 import { ListItemsWorkflow } from "./list_items.ts";
 import { parseItem } from "../models/item.ts";
 import { Result } from "../../shared/result.ts";
-import { parsePlacement, timezoneIdentifierFromString } from "../primitives/mod.ts";
+import { parseDirectory, timezoneIdentifierFromString } from "../primitives/mod.ts";
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
 import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.ts";
 
@@ -17,7 +17,7 @@ const createTestItem = async (
     title: "Test Item",
     icon: "note",
     status: "open",
-    placement: "2025-12-02",
+    directory: "2025-12-02",
     rank: "a",
     createdAt: "2025-12-02T09:00:00Z",
     updatedAt: "2025-12-02T09:00:00Z",
@@ -45,7 +45,7 @@ Deno.test("ListItemsWorkflow: hides snoozed items by default", async () => {
     title: "Normal Item",
   });
 
-  const cwd = Result.unwrap(parsePlacement("2025-12-02"));
+  const cwd = Result.unwrap(parseDirectory("2025-12-02"));
 
   const result = await ListItemsWorkflow.execute({
     cwd,
@@ -82,7 +82,7 @@ Deno.test("ListItemsWorkflow: shows snoozed items with status=all", async () => 
     title: "Normal Item",
   });
 
-  const cwd = Result.unwrap(parsePlacement("2025-12-02"));
+  const cwd = Result.unwrap(parseDirectory("2025-12-02"));
 
   const result = await ListItemsWorkflow.execute({
     cwd,
@@ -112,7 +112,7 @@ Deno.test("ListItemsWorkflow: shows items with past snoozeUntil", async () => {
     snoozeUntil: "2025-12-02T08:00:00Z", // before current time
   });
 
-  const cwd = Result.unwrap(parsePlacement("2025-12-02"));
+  const cwd = Result.unwrap(parseDirectory("2025-12-02"));
 
   const result = await ListItemsWorkflow.execute({
     cwd,
@@ -143,7 +143,7 @@ Deno.test("ListItemsWorkflow: shows items with snoozeUntil equal to current time
     snoozeUntil: "2025-12-02T10:00:00Z", // exactly current time
   });
 
-  const cwd = Result.unwrap(parsePlacement("2025-12-02"));
+  const cwd = Result.unwrap(parseDirectory("2025-12-02"));
 
   const result = await ListItemsWorkflow.execute({
     cwd,

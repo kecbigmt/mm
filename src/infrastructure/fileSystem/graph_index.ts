@@ -1,7 +1,7 @@
 import { join } from "@std/path";
 import { Result } from "../../shared/result.ts";
 import { createRepositoryError, RepositoryError } from "../../domain/repositories/mod.ts";
-import type { PlacementRange } from "../../domain/primitives/placement_range.ts";
+import type { DirectoryRange } from "../../domain/primitives/directory_range.ts";
 import type { ItemId } from "../../domain/primitives/item_id.ts";
 import { parseItemId } from "../../domain/primitives/item_id.ts";
 import { parseItemRank } from "../../domain/primitives/item_rank.ts";
@@ -18,9 +18,9 @@ export type EdgeReference = Readonly<{
 }>;
 
 /**
- * Read placement edge file (date-based placement)
+ * Read directory edge file (date-based directory)
  */
-const readPlacementEdge = async (
+const readDirectoryEdge = async (
   workspaceRoot: string,
   dateStr: string,
   fileName: string,
@@ -46,7 +46,7 @@ const readPlacementEdge = async (
     const rankResult = parseItemRank(data.rank);
     if (rankResult.type === "error") {
       return Result.error(
-        createRepositoryError("item", "list", "invalid rank in placement edge", {
+        createRepositoryError("item", "list", "invalid rank in directory edge", {
           identifier: itemIdStr,
           cause: rankResult.error,
         }),
@@ -60,14 +60,14 @@ const readPlacementEdge = async (
   } catch (error) {
     if (error instanceof SyntaxError) {
       return Result.error(
-        createRepositoryError("item", "list", "placement edge file is invalid JSON", {
+        createRepositoryError("item", "list", "directory edge file is invalid JSON", {
           identifier: fileName,
           cause: error,
         }),
       );
     }
     return Result.error(
-      createRepositoryError("item", "list", "failed to read placement edge file", {
+      createRepositoryError("item", "list", "failed to read directory edge file", {
         identifier: fileName,
         cause: error,
       }),
@@ -76,7 +76,7 @@ const readPlacementEdge = async (
 };
 
 /**
- * Read parent edge file (item-based placement)
+ * Read parent edge file (item-based directory)
  */
 const readParentEdge = async (
   edgeFilePath: string,
@@ -145,7 +145,7 @@ const listDateEdges = async (
         continue;
       }
 
-      const edgeResult = await readPlacementEdge(workspaceRoot, dateStr, entry.name);
+      const edgeResult = await readDirectoryEdge(workspaceRoot, dateStr, entry.name);
       if (edgeResult.type === "error") {
         return edgeResult;
       }
@@ -156,7 +156,7 @@ const listDateEdges = async (
     return Result.ok(edges);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
-      // No edge directory means no items at this placement
+      // No edge directory means no items at this directory
       return Result.ok([]);
     }
     return Result.error(
@@ -200,7 +200,7 @@ const listParentEdges = async (
     return Result.ok(edges);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
-      // No edge directory means no items at this placement
+      // No edge directory means no items at this directory
       return Result.ok([]);
     }
     return Result.error(
@@ -213,7 +213,7 @@ const listParentEdges = async (
 };
 
 /**
- * List edge references for items under permanent placement
+ * List edge references for items under permanent directory
  */
 const listPermanentEdges = async (
   workspaceRoot: string,
@@ -243,7 +243,7 @@ const listPermanentEdges = async (
     return Result.ok(edges);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
-      // No edge directory means no items at this placement
+      // No edge directory means no items at this directory
       return Result.ok([]);
     }
     return Result.error(
@@ -311,12 +311,12 @@ const readPermanentEdge = async (
 };
 
 /**
- * Query edge references for items matching a placement range
+ * Query edge references for items matching a directory range
  *
  * This function reads edge files from the .index/graph directory instead of
  * scanning all item files. The edge files contain item IDs and ranks, which
  * allows us to:
- * 1. Quickly find which items match the placement range
+ * 1. Quickly find which items match the directory range
  * 2. Get their ranks for sorting
  * 3. Return only the item IDs that need to be loaded
  *
@@ -324,11 +324,11 @@ const readPermanentEdge = async (
  */
 export const queryEdgeReferences = async (
   workspaceRoot: string,
-  range: PlacementRange,
+  range: DirectoryRange,
 ): Promise<Result<ReadonlyArray<EdgeReference>, RepositoryError>> => {
   switch (range.kind) {
     case "single": {
-      // Single placement: query exact location
+      // Single directory: query exact location
       if (range.at.head.kind === "date") {
         const dateStr = range.at.head.date.toString();
         const sectionPath = range.at.section.join("/");
@@ -349,7 +349,7 @@ export const queryEdgeReferences = async (
         const sectionPath = range.at.section.join("/");
         return await listParentEdges(workspaceRoot, parentId, sectionPath);
       } else {
-        // Permanent placement
+        // Permanent directory
         const sectionPath = range.at.section.join("/");
         return await listPermanentEdges(workspaceRoot, sectionPath);
       }
@@ -387,7 +387,7 @@ export const queryEdgeReferences = async (
       if (range.parent.head.kind === "item") {
         const parentId = range.parent.head.id;
 
-        // Build base section path from parent placement
+        // Build base section path from parent directory
         const baseSectionPath = range.parent.section.join("/");
 
         // Query each numeric section in range

@@ -58,7 +58,7 @@ describe("Scenario 9: Numeric section range listing", () => {
     const page1Result = await runCommand(ctx.testHome, [
       "note",
       "Page 1",
-      "--parent",
+      "--dir",
       "book/1",
     ], { sessionDir: ctx.sessionDir });
     assertEquals(page1Result.success, true, `Failed to create page1: ${page1Result.stderr}`);
@@ -66,7 +66,7 @@ describe("Scenario 9: Numeric section range listing", () => {
     const page2Result = await runCommand(ctx.testHome, [
       "note",
       "Page 2",
-      "--parent",
+      "--dir",
       "book/2",
     ], { sessionDir: ctx.sessionDir });
     assertEquals(page2Result.success, true, `Failed to create page2: ${page2Result.stderr}`);
@@ -74,7 +74,7 @@ describe("Scenario 9: Numeric section range listing", () => {
     const page3Result = await runCommand(ctx.testHome, [
       "note",
       "Page 3",
-      "--parent",
+      "--dir",
       "book/3",
     ], { sessionDir: ctx.sessionDir });
     assertEquals(page3Result.success, true, `Failed to create page3: ${page3Result.stderr}`);
@@ -82,7 +82,7 @@ describe("Scenario 9: Numeric section range listing", () => {
     const page4Result = await runCommand(ctx.testHome, [
       "note",
       "Page 4",
-      "--parent",
+      "--dir",
       "book/4",
     ], { sessionDir: ctx.sessionDir });
     assertEquals(page4Result.success, true, `Failed to create page4: ${page4Result.stderr}`);
@@ -90,7 +90,7 @@ describe("Scenario 9: Numeric section range listing", () => {
     const page5Result = await runCommand(ctx.testHome, [
       "note",
       "Page 5",
-      "--parent",
+      "--dir",
       "book/5",
     ], { sessionDir: ctx.sessionDir });
     assertEquals(page5Result.success, true, `Failed to create page5: ${page5Result.stderr}`);
@@ -104,19 +104,19 @@ describe("Scenario 9: Numeric section range listing", () => {
     await runCommand(ctx.testHome, ["note", "Book", "--alias", "book"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "book/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 1", "--dir", "book/1"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "book/2"], {
+    await runCommand(ctx.testHome, ["note", "Page 2", "--dir", "book/2"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "book/3"], {
+    await runCommand(ctx.testHome, ["note", "Page 3", "--dir", "book/3"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 4", "--parent", "book/4"], {
+    await runCommand(ctx.testHome, ["note", "Page 4", "--dir", "book/4"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 5", "--parent", "book/5"], {
+    await runCommand(ctx.testHome, ["note", "Page 5", "--dir", "book/5"], {
       sessionDir: ctx.sessionDir,
     });
 
@@ -145,19 +145,19 @@ describe("Scenario 9: Numeric section range listing", () => {
     await runCommand(ctx.testHome, ["note", "Book", "--alias", "book"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "book/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 1", "--dir", "book/1"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "book/2"], {
+    await runCommand(ctx.testHome, ["note", "Page 2", "--dir", "book/2"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "book/3"], {
+    await runCommand(ctx.testHome, ["note", "Page 3", "--dir", "book/3"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 4", "--parent", "book/4"], {
+    await runCommand(ctx.testHome, ["note", "Page 4", "--dir", "book/4"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 5", "--parent", "book/5"], {
+    await runCommand(ctx.testHome, ["note", "Page 5", "--dir", "book/5"], {
       sessionDir: ctx.sessionDir,
     });
 
@@ -186,19 +186,19 @@ describe("Scenario 9: Numeric section range listing", () => {
     await runCommand(ctx.testHome, ["note", "Book", "--alias", "book"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "book/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 1", "--dir", "book/1"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "book/2"], {
+    await runCommand(ctx.testHome, ["note", "Page 2", "--dir", "book/2"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "book/3"], {
+    await runCommand(ctx.testHome, ["note", "Page 3", "--dir", "book/3"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 4", "--parent", "book/4"], {
+    await runCommand(ctx.testHome, ["note", "Page 4", "--dir", "book/4"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 5", "--parent", "book/5"], {
+    await runCommand(ctx.testHome, ["note", "Page 5", "--dir", "book/5"], {
       sessionDir: ctx.sessionDir,
     });
 
@@ -247,11 +247,11 @@ describe("Scenario 9: Numeric section range listing", () => {
     assertEquals(bookResult.success, true, "Book creation should succeed");
 
     // Step 3-7: Create pages under different sections
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "book/1"], opts);
-    await runCommand(ctx.testHome, ["note", "Page 2", "--parent", "book/2"], opts);
-    await runCommand(ctx.testHome, ["note", "Page 3", "--parent", "book/3"], opts);
-    await runCommand(ctx.testHome, ["note", "Page 4", "--parent", "book/4"], opts);
-    await runCommand(ctx.testHome, ["note", "Page 5", "--parent", "book/5"], opts);
+    await runCommand(ctx.testHome, ["note", "Page 1", "--dir", "book/1"], opts);
+    await runCommand(ctx.testHome, ["note", "Page 2", "--dir", "book/2"], opts);
+    await runCommand(ctx.testHome, ["note", "Page 3", "--dir", "book/3"], opts);
+    await runCommand(ctx.testHome, ["note", "Page 4", "--dir", "book/4"], opts);
+    await runCommand(ctx.testHome, ["note", "Page 5", "--dir", "book/5"], opts);
 
     // Step 8: List items using range 1..3
     const ls1Result = await runCommand(ctx.testHome, ["ls", "book/1..3"], opts);
@@ -314,7 +314,7 @@ describe("Scenario 9: Numeric section range listing", () => {
     await runCommand(ctx.testHome, ["note", "Book", "--alias", "book"], {
       sessionDir: ctx.sessionDir,
     });
-    await runCommand(ctx.testHome, ["note", "Page 1", "--parent", "book/1"], {
+    await runCommand(ctx.testHome, ["note", "Page 1", "--dir", "book/1"], {
       sessionDir: ctx.sessionDir,
     });
 

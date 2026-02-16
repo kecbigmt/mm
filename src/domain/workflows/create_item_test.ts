@@ -11,8 +11,8 @@ import {
   itemStatusOpen,
   itemTitleFromString,
   parseCalendarDay,
+  parseDirectory,
   parseDuration,
-  parsePlacement,
   timezoneIdentifierFromString,
 } from "../primitives/mod.ts";
 import { RankService } from "../services/rank_service.ts";
@@ -50,7 +50,7 @@ const createExistingItem = (id: string, rank: string, section: string): Item => 
   const title = Result.unwrap(itemTitleFromString("Existing"));
   const icon = createItemIcon("note");
   const status = itemStatusOpen();
-  const placement = Result.unwrap(parsePlacement(section));
+  const directory = Result.unwrap(parseDirectory(section));
   const itemRank = Result.unwrap(itemRankFromString(rank));
   const createdAt = Result.unwrap(parseDateTime("2024-09-20T12:00:00Z"));
 
@@ -59,7 +59,7 @@ const createExistingItem = (id: string, rank: string, section: string): Item => 
     title,
     icon,
     status,
-    placement,
+    directory,
     rank: itemRank,
     createdAt,
     updatedAt: createdAt,
@@ -73,13 +73,13 @@ Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async 
   const rankService = createTestRankService();
   const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
 
-  const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
+  const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
   const result = await CreateItemWorkflow.execute({
     title: "New note",
     itemType: "note",
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -97,8 +97,8 @@ Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async 
   // Verify a rank was assigned (actual value depends on implementation)
   assertExists(result.value.item.data.rank);
 
-  const listResult = await repository.listByPlacement(
-    { kind: "single", at: Result.unwrap(parsePlacement("2024-09-20")) },
+  const listResult = await repository.listByDirectory(
+    { kind: "single", at: Result.unwrap(parseDirectory("2024-09-20")) },
   );
   if (listResult.type !== "ok") {
     throw new Error(`expected ok list result, received ${JSON.stringify(listResult.error)}`);
@@ -120,13 +120,13 @@ Deno.test("CreateItemWorkflow appends rank after existing siblings", async () =>
   );
   Result.unwrap(await repository.save(existing));
 
-  const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
+  const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T13:00:00Z")));
 
   const result = await CreateItemWorkflow.execute({
     title: "Follow-up",
     itemType: "note",
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -148,8 +148,8 @@ Deno.test("CreateItemWorkflow appends rank after existing siblings", async () =>
   );
   assertEquals(rankComparison > 0, true);
 
-  const listResult = await repository.listByPlacement(
-    { kind: "single", at: Result.unwrap(parsePlacement("2024-09-20")) },
+  const listResult = await repository.listByDirectory(
+    { kind: "single", at: Result.unwrap(parseDirectory("2024-09-20")) },
   );
   if (listResult.type !== "ok") {
     throw new Error(`expected ok list result, received ${JSON.stringify(listResult.error)}`);
@@ -171,14 +171,14 @@ Deno.test("CreateItemWorkflow saves alias when provided", async () => {
   const rankService = createTestRankService();
   const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
 
-  const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
+  const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
   const result = await CreateItemWorkflow.execute({
     title: "Chapter 1",
     itemType: "note",
     alias: "chapter1",
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -213,7 +213,7 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
   const idService1 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
   const idService2 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd121");
 
-  const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
+  const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
   // Create first item with alias
@@ -221,7 +221,7 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
     title: "First",
     itemType: "note",
     alias: "chapter1",
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -241,7 +241,7 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
     title: "Second",
     itemType: "note",
     alias: "chapter1",
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -273,7 +273,7 @@ Deno.test("CreateItemWorkflow rejects alias with same canonical key (uppercase)"
   const idService1 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
   const idService2 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd121");
 
-  const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
+  const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
   // Create first item with lowercase alias
@@ -281,7 +281,7 @@ Deno.test("CreateItemWorkflow rejects alias with same canonical key (uppercase)"
     title: "First",
     itemType: "note",
     alias: "test-item",
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -301,7 +301,7 @@ Deno.test("CreateItemWorkflow rejects alias with same canonical key (uppercase)"
     title: "Second",
     itemType: "note",
     alias: "TEST-ITEM",
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -333,7 +333,7 @@ Deno.test("CreateItemWorkflow rejects alias with same canonical key (diacritics)
   const idService1 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
   const idService2 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd121");
 
-  const parentPlacement = Result.unwrap(parsePlacement("2024-09-20"));
+  const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
   // Create first item with ASCII alias
@@ -341,7 +341,7 @@ Deno.test("CreateItemWorkflow rejects alias with same canonical key (diacritics)
     title: "First",
     itemType: "note",
     alias: "test-item",
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -361,7 +361,7 @@ Deno.test("CreateItemWorkflow rejects alias with same canonical key (diacritics)
     title: "Second",
     itemType: "note",
     alias: "tëst-item",
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -393,7 +393,7 @@ Deno.test("CreateItemWorkflow - creates task with dueAt", async () => {
   const rankService = createTestRankService();
   const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
 
-  const parentPlacement = Result.unwrap(parsePlacement("2025-01-15"));
+  const parentDirectory = Result.unwrap(parseDirectory("2025-01-15"));
   const createdAt = Result.unwrap(parseDateTime("2025-01-15T10:00:00Z"));
   const dueAt = Result.unwrap(parseDateTime("2025-01-20T23:59:59Z"));
 
@@ -401,7 +401,7 @@ Deno.test("CreateItemWorkflow - creates task with dueAt", async () => {
     title: "Review PR",
     itemType: "task",
     dueAt,
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -426,7 +426,7 @@ Deno.test("CreateItemWorkflow - creates event with startAt and duration", async 
   const rankService = createTestRankService();
   const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
 
-  const parentPlacement = Result.unwrap(parsePlacement("2025-01-15"));
+  const parentDirectory = Result.unwrap(parseDirectory("2025-01-15"));
   const createdAt = Result.unwrap(parseDateTime("2025-01-15T10:00:00Z"));
   const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z"));
   const duration = Result.unwrap(parseDuration("2h"));
@@ -436,7 +436,7 @@ Deno.test("CreateItemWorkflow - creates event with startAt and duration", async 
     itemType: "event",
     startAt,
     duration,
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -462,7 +462,7 @@ Deno.test("CreateItemWorkflow - rejects event with mismatched startAt date", asy
   const rankService = createTestRankService();
   const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
 
-  const parentPlacement = Result.unwrap(parsePlacement("2025-01-16"));
+  const parentDirectory = Result.unwrap(parseDirectory("2025-01-16"));
   const createdAt = Result.unwrap(parseDateTime("2025-01-16T10:00:00Z"));
   const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z")); // Wrong date
 
@@ -470,7 +470,7 @@ Deno.test("CreateItemWorkflow - rejects event with mismatched startAt date", asy
     title: "Team meeting",
     itemType: "event",
     startAt,
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -499,7 +499,7 @@ Deno.test("CreateItemWorkflow - accepts event when startAt crosses UTC day bound
 
   // Use PST (UTC-8) timezone
   const pstTimezone = Result.unwrap(timezoneIdentifierFromString("America/Los_Angeles"));
-  const parentPlacement = Result.unwrap(parsePlacement("2025-01-15"));
+  const parentDirectory = Result.unwrap(parseDirectory("2025-01-15"));
   const createdAt = Result.unwrap(parseDateTime("2025-01-15T10:00:00-08:00"));
 
   // 20:00 in PST on 2025-01-15 = 04:00 UTC on 2025-01-16 (crosses day boundary)
@@ -510,7 +510,7 @@ Deno.test("CreateItemWorkflow - accepts event when startAt crosses UTC day bound
     title: "Evening event",
     itemType: "event",
     startAt,
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: pstTimezone,
   }, {
@@ -532,7 +532,7 @@ Deno.test("CreateItemWorkflow - accepts event when startAt crosses UTC day bound
   }
 });
 
-Deno.test("CreateItemWorkflow - allows event with different date for item placement", async () => {
+Deno.test("CreateItemWorkflow - allows event with different date for item directory", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -544,7 +544,7 @@ Deno.test("CreateItemWorkflow - allows event with different date for item placem
   const parentItemResult = await CreateItemWorkflow.execute({
     title: "Project",
     itemType: "note",
-    parentPlacement: Result.unwrap(parsePlacement("2025-01-10")),
+    parentDirectory: Result.unwrap(parseDirectory("2025-01-10")),
     createdAt: Result.unwrap(parseDateTime("2025-01-10T10:00:00Z")),
     timezone: TEST_TIMEZONE,
   }, {
@@ -560,15 +560,15 @@ Deno.test("CreateItemWorkflow - allows event with different date for item placem
   }
 
   const parentId = parentItemResult.value.item.data.id;
-  const itemPlacement = Result.unwrap(parsePlacement(parentId.toString()));
-  const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z")); // Different date - OK for item placement
+  const itemDirectory = Result.unwrap(parseDirectory(parentId.toString()));
+  const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z")); // Different date - OK for item directory
 
-  // Create event under item placement with different date
+  // Create event under item directory with different date
   const result = await CreateItemWorkflow.execute({
     title: "Team meeting",
     itemType: "event",
     startAt,
-    parentPlacement: itemPlacement,
+    parentDirectory: itemDirectory,
     createdAt: Result.unwrap(parseDateTime("2025-01-15T10:00:00Z")),
     timezone: TEST_TIMEZONE,
   }, {
@@ -579,7 +579,7 @@ Deno.test("CreateItemWorkflow - allows event with different date for item placem
     idGenerationService: idService2,
   });
 
-  // Should succeed because validation is skipped for item placements
+  // Should succeed because validation is skipped for item directorys
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     assertEquals(result.value.item.data.startAt, startAt);
@@ -593,7 +593,7 @@ Deno.test("CreateItemWorkflow - creates task with CalendarDay dueAt (converts to
   const rankService = createTestRankService();
   const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
 
-  const parentPlacement = Result.unwrap(parsePlacement("2025-01-15"));
+  const parentDirectory = Result.unwrap(parseDirectory("2025-01-15"));
   const createdAt = Result.unwrap(parseDateTime("2025-01-15T10:00:00Z"));
   const dueAtDay = Result.unwrap(parseCalendarDay("2025-01-20"));
 
@@ -601,7 +601,7 @@ Deno.test("CreateItemWorkflow - creates task with CalendarDay dueAt (converts to
     title: "Review PR",
     itemType: "task",
     dueAt: dueAtDay,
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -630,7 +630,7 @@ Deno.test("CreateItemWorkflow - creates task with CalendarDay dueAt in JST timez
   const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
 
   const jstTimezone = Result.unwrap(timezoneIdentifierFromString("Asia/Tokyo"));
-  const parentPlacement = Result.unwrap(parsePlacement("2025-01-20"));
+  const parentDirectory = Result.unwrap(parseDirectory("2025-01-20"));
   const createdAt = Result.unwrap(parseDateTime("2025-01-20T10:00:00+09:00"));
   const dueAtDay = Result.unwrap(parseCalendarDay("2025-01-20"));
 
@@ -638,7 +638,7 @@ Deno.test("CreateItemWorkflow - creates task with CalendarDay dueAt in JST timez
     title: "Review PR",
     itemType: "task",
     dueAt: dueAtDay,
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: jstTimezone,
   }, {
@@ -667,7 +667,7 @@ Deno.test("CreateItemWorkflow - does not create orphan topics when validation fa
   const rankService = createTestRankService();
   const idService = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
 
-  const parentPlacement = Result.unwrap(parsePlacement("2025-01-15"));
+  const parentDirectory = Result.unwrap(parseDirectory("2025-01-15"));
   const createdAt = Result.unwrap(parseDateTime("2025-01-15T10:00:00Z"));
 
   // Try to create an item with:
@@ -679,7 +679,7 @@ Deno.test("CreateItemWorkflow - does not create orphan topics when validation fa
     title: "First item",
     itemType: "note",
     alias: "taken-alias",
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -694,12 +694,12 @@ Deno.test("CreateItemWorkflow - does not create orphan topics when validation fa
     throw new Error("First item creation should succeed");
   }
 
-  // Check initial state: no items in permanent placement
-  const { createPermanentPlacement } = await import("../primitives/mod.ts");
-  const permanentPlacement = createPermanentPlacement();
-  const initialPermanentItems = await repository.listByPlacement({
+  // Check initial state: no items in permanent directory
+  const { createPermanentDirectory } = await import("../primitives/mod.ts");
+  const permanentDirectory = createPermanentDirectory();
+  const initialPermanentItems = await repository.listByDirectory({
     kind: "single",
-    at: permanentPlacement,
+    at: permanentDirectory,
   });
   if (initialPermanentItems.type !== "ok") {
     throw new Error("Failed to list permanent items");
@@ -714,7 +714,7 @@ Deno.test("CreateItemWorkflow - does not create orphan topics when validation fa
     itemType: "note",
     project: "new-project",
     alias: "taken-alias", // This conflicts with first item
-    parentPlacement,
+    parentDirectory,
     createdAt,
     timezone: TEST_TIMEZONE,
   }, {
@@ -734,10 +734,10 @@ Deno.test("CreateItemWorkflow - does not create orphan topics when validation fa
     );
   }
 
-  // Verify NO orphan topic was created in the permanent placement
-  const finalPermanentItems = await repository.listByPlacement({
+  // Verify NO orphan topic was created in the permanent directory
+  const finalPermanentItems = await repository.listByDirectory({
     kind: "single",
-    at: permanentPlacement,
+    at: permanentDirectory,
   });
   if (finalPermanentItems.type !== "ok") {
     throw new Error("Failed to list permanent items");

@@ -1,8 +1,8 @@
 import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
 import { queryEdgeReferences } from "./graph_index.ts";
-import { createDateRange, createSingleRange } from "../../domain/primitives/placement_range.ts";
-import { createDatePlacement, createItemPlacement } from "../../domain/primitives/placement.ts";
+import { createDateRange, createSingleRange } from "../../domain/primitives/directory_range.ts";
+import { createDateDirectory, createItemDirectory } from "../../domain/primitives/directory.ts";
 import { parseCalendarDay } from "../../domain/primitives/calendar_day.ts";
 import { parseItemId } from "../../domain/primitives/item_id.ts";
 import { parseItemRank } from "../../domain/primitives/item_rank.ts";
@@ -24,8 +24,8 @@ Deno.test({
     const root = await Deno.makeTempDir({ prefix: "mm-graph-" });
     try {
       const date = unwrapOk(parseCalendarDay("2024-09-20"), "parse date");
-      const placement = createDatePlacement(date, []);
-      const range = createSingleRange(placement);
+      const directory = createDateDirectory(date, []);
+      const range = createSingleRange(directory);
 
       const result = await queryEdgeReferences(root, range);
 
@@ -40,7 +40,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "graph_index: queryEdgeReferences reads date placement edges",
+  name: "graph_index: queryEdgeReferences reads date directory edges",
   permissions: { read: true, write: true },
   async fn() {
     const root = await Deno.makeTempDir({ prefix: "mm-graph-" });
@@ -63,8 +63,8 @@ Deno.test({
       );
       await Deno.writeTextFile(edgeFile, `${edgeContent}\n`);
 
-      const placement = createDatePlacement(date, []);
-      const range = createSingleRange(placement);
+      const directory = createDateDirectory(date, []);
+      const range = createSingleRange(directory);
 
       const result = await queryEdgeReferences(root, range);
 
@@ -81,7 +81,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "graph_index: queryEdgeReferences reads parent placement edges",
+  name: "graph_index: queryEdgeReferences reads parent directory edges",
   permissions: { read: true, write: true },
   async fn() {
     const root = await Deno.makeTempDir({ prefix: "mm-graph-" });
@@ -109,8 +109,8 @@ Deno.test({
       );
       await Deno.writeTextFile(edgeFile, `${edgeContent}\n`);
 
-      const placement = createItemPlacement(parentId, []);
-      const range = createSingleRange(placement);
+      const directory = createItemDirectory(parentId, []);
+      const range = createSingleRange(directory);
 
       const result = await queryEdgeReferences(root, range);
 

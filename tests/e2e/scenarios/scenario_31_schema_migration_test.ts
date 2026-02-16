@@ -2,7 +2,7 @@
  * E2E Test: Schema Migration (mm doctor migrate)
  *
  * Tests the schema migration workflow:
- * - New workspace has migration: 2 (AC#1)
+ * - New workspace has migration: 3 (AC#1)
  * - Commands blocked when migration version is outdated (AC#2)
  * - Migration dry-run mode (AC#8)
  * - Migration execution with permanent item creation (AC#6)
@@ -33,7 +33,7 @@ describe("Schema Migration", () => {
   });
 
   describe("AC#1: Workspace Schema Version Tracking", () => {
-    it("new workspace has mm.workspace/1 schema and migration 2", async () => {
+    it("new workspace has mm.workspace/1 schema and migration 3", async () => {
       const initResult = await initWorkspace(ctx.testHome, "home");
       assertEquals(initResult.success, true, `Init failed: ${initResult.stderr}`);
 
@@ -42,13 +42,13 @@ describe("Schema Migration", () => {
         await Deno.readTextFile(join(workspacePath, "workspace.json")),
       );
       assertEquals(workspaceJson.schema, "mm.workspace/1");
-      assertEquals(workspaceJson.migration, 2);
+      assertEquals(workspaceJson.migration, 3);
     });
   });
 
   describe("AC#2: Workspace-level Schema Detection", () => {
     it("blocks commands when migration version is missing (defaults to 1)", async () => {
-      // Create workspace first (will have migration: 2)
+      // Create workspace first (will have migration: 3)
       const initResult = await initWorkspace(ctx.testHome, "home");
       assertEquals(initResult.success, true, `Init failed: ${initResult.stderr}`);
 
@@ -70,7 +70,7 @@ describe("Schema Migration", () => {
     });
 
     it("allows mm doctor migrate when migration version is outdated", async () => {
-      // Create workspace first (will have migration: 2)
+      // Create workspace first (will have migration: 3)
       const initResult = await initWorkspace(ctx.testHome, "home");
       assertEquals(initResult.success, true, `Init failed: ${initResult.stderr}`);
 
@@ -113,7 +113,7 @@ describe("Schema Migration", () => {
   });
 
   describe("AC#7: Frontmatter Update", () => {
-    it("updates schema from /3 to /4 on save", async () => {
+    it("updates schema from /3 to /5 on save", async () => {
       const initResult = await initWorkspace(ctx.testHome, "home");
       assertEquals(initResult.success, true, `Init failed: ${initResult.stderr}`);
 
@@ -161,8 +161,8 @@ describe("Schema Migration", () => {
 
       const content = await Deno.readTextFile(itemFile);
       assert(
-        content.includes("schema: mm.item.frontmatter/4"),
-        `Expected schema /4, got content: ${content.substring(0, 300)}`,
+        content.includes("schema: mm.item.frontmatter/5"),
+        `Expected schema /5, got content: ${content.substring(0, 300)}`,
       );
     });
   });
@@ -368,20 +368,20 @@ schema: "mm.item.frontmatter/3"
         `Migration failed (exit ${output.code}):\nstdout: ${stdout}\nstderr: ${stderr}`,
       );
 
-      // Verify workspace.json has migration: 2 and schema: mm.workspace/1
+      // Verify workspace.json has migration: 3 and schema: mm.workspace/1
       const wsJsonAfter = JSON.parse(await Deno.readTextFile(wsJsonPath));
       assertEquals(
         wsJsonAfter.schema,
         "mm.workspace/1",
         "Workspace schema should remain mm.workspace/1",
       );
-      assertEquals(wsJsonAfter.migration, 2, "Migration version should be 2");
+      assertEquals(wsJsonAfter.migration, 3, "Migration version should be 3");
 
       // Verify item1 frontmatter updated
       const item1After = await Deno.readTextFile(join(itemDir, `${item1Id}.md`));
       assert(
-        item1After.includes("mm.item.frontmatter/4"),
-        `Item 1 should have schema /4: ${item1After.substring(0, 300)}`,
+        item1After.includes("mm.item.frontmatter/5"),
+        `Item 1 should have schema /5: ${item1After.substring(0, 300)}`,
       );
       // project should now be a UUID, not "alpha-project"
       assert(
@@ -392,8 +392,8 @@ schema: "mm.item.frontmatter/3"
       // Verify item2 frontmatter updated
       const item2After = await Deno.readTextFile(join(itemDir, `${item2Id}.md`));
       assert(
-        item2After.includes("mm.item.frontmatter/4"),
-        `Item 2 should have schema /4: ${item2After.substring(0, 300)}`,
+        item2After.includes("mm.item.frontmatter/5"),
+        `Item 2 should have schema /5: ${item2After.substring(0, 300)}`,
       );
       assert(
         !item2After.includes("beta-context"),
@@ -434,7 +434,7 @@ schema: "mm.item.frontmatter/3"
                     fileEntry.name,
                   ),
                 );
-                if (content.includes("placement: permanent")) {
+                if (content.includes("directory: permanent")) {
                   permanentItemCount++;
                 }
               }

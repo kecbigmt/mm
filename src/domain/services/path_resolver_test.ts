@@ -9,10 +9,10 @@ import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.t
 import { parsePathExpression } from "../../presentation/cli/path_parser.ts";
 import { createItem } from "../models/item.ts";
 import {
-  createDatePlacement,
+  createDateDirectory,
+  createItemDirectory,
   createItemIcon,
-  createItemPlacement,
-  createPermanentPlacement,
+  createPermanentDirectory,
   dateTimeFromDate,
   itemIdFromString,
   itemRankFromString,
@@ -39,8 +39,8 @@ Deno.test("PathResolver - navigates to parent item using ../", async () => {
   const parentId = Result.unwrap(itemIdFromString("019a0000-0000-7000-8000-000000000001"));
   const childId = Result.unwrap(itemIdFromString("019a0000-0000-7000-8000-000000000002"));
 
-  const parentPlacement = createDatePlacement(today, []);
-  const childPlacement = createItemPlacement(parentId, []);
+  const parentDirectory = createDateDirectory(today, []);
+  const childDirectory = createItemDirectory(parentId, []);
 
   const now = Result.unwrap(dateTimeFromDate(new Date("2025-11-16T00:00:00Z")));
   const parent = createItem({
@@ -48,7 +48,7 @@ Deno.test("PathResolver - navigates to parent item using ../", async () => {
     title: Result.unwrap(itemTitleFromString("Parent")),
     icon: createItemIcon("note"),
     status: itemStatusOpen(),
-    placement: parentPlacement,
+    directory: parentDirectory,
     rank: Result.unwrap(itemRankFromString("a0")),
     createdAt: now,
     updatedAt: now,
@@ -58,7 +58,7 @@ Deno.test("PathResolver - navigates to parent item using ../", async () => {
     title: Result.unwrap(itemTitleFromString("Child")),
     icon: createItemIcon("note"),
     status: itemStatusOpen(),
-    placement: childPlacement,
+    directory: childDirectory,
     rank: Result.unwrap(itemRankFromString("a0")),
     createdAt: now,
     updatedAt: now,
@@ -69,11 +69,11 @@ Deno.test("PathResolver - navigates to parent item using ../", async () => {
 
   // Navigate from child using ../
   const expr = Result.unwrap(parsePathExpression("../"));
-  const result = await pathResolver.resolvePath(childPlacement, expr);
+  const result = await pathResolver.resolvePath(childDirectory, expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
-    assertEquals(result.value.toString(), parentPlacement.toString());
+    assertEquals(result.value.toString(), parentDirectory.toString());
   }
 });
 
@@ -93,9 +93,9 @@ Deno.test("PathResolver - navigates multiple levels using ../../", async () => {
   const childId = Result.unwrap(itemIdFromString("019a0000-0000-7000-8000-000000000002"));
   const grandchildId = Result.unwrap(itemIdFromString("019a0000-0000-7000-8000-000000000003"));
 
-  const parentPlacement = createDatePlacement(today, []);
-  const childPlacement = createItemPlacement(parentId, []);
-  const grandchildPlacement = createItemPlacement(childId, []);
+  const parentDirectory = createDateDirectory(today, []);
+  const childDirectory = createItemDirectory(parentId, []);
+  const grandchildDirectory = createItemDirectory(childId, []);
 
   const now = Result.unwrap(dateTimeFromDate(new Date("2025-11-16T00:00:00Z")));
   await itemRepository.save(createItem({
@@ -103,7 +103,7 @@ Deno.test("PathResolver - navigates multiple levels using ../../", async () => {
     title: Result.unwrap(itemTitleFromString("Parent")),
     icon: createItemIcon("note"),
     status: itemStatusOpen(),
-    placement: parentPlacement,
+    directory: parentDirectory,
     rank: Result.unwrap(itemRankFromString("a0")),
     createdAt: now,
     updatedAt: now,
@@ -113,7 +113,7 @@ Deno.test("PathResolver - navigates multiple levels using ../../", async () => {
     title: Result.unwrap(itemTitleFromString("Child")),
     icon: createItemIcon("note"),
     status: itemStatusOpen(),
-    placement: childPlacement,
+    directory: childDirectory,
     rank: Result.unwrap(itemRankFromString("a0")),
     createdAt: now,
     updatedAt: now,
@@ -123,7 +123,7 @@ Deno.test("PathResolver - navigates multiple levels using ../../", async () => {
     title: Result.unwrap(itemTitleFromString("Grandchild")),
     icon: createItemIcon("note"),
     status: itemStatusOpen(),
-    placement: grandchildPlacement,
+    directory: grandchildDirectory,
     rank: Result.unwrap(itemRankFromString("a0")),
     createdAt: now,
     updatedAt: now,
@@ -131,11 +131,11 @@ Deno.test("PathResolver - navigates multiple levels using ../../", async () => {
 
   // Navigate from grandchild using ../../
   const expr = Result.unwrap(parsePathExpression("../../"));
-  const result = await pathResolver.resolvePath(grandchildPlacement, expr);
+  const result = await pathResolver.resolvePath(grandchildDirectory, expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
-    assertEquals(result.value.toString(), parentPlacement.toString());
+    assertEquals(result.value.toString(), parentDirectory.toString());
   }
 });
 
@@ -153,8 +153,8 @@ Deno.test("PathResolver - removes section first with ../", async () => {
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
   const parentId = Result.unwrap(itemIdFromString("019a0000-0000-7000-8000-000000000001"));
 
-  const parentPlacement = createDatePlacement(today, []);
-  const currentPlacement = createItemPlacement(parentId, [1]);
+  const parentDirectory = createDateDirectory(today, []);
+  const currentDirectory = createItemDirectory(parentId, [1]);
 
   const now = Result.unwrap(dateTimeFromDate(new Date("2025-11-16T00:00:00Z")));
   await itemRepository.save(createItem({
@@ -162,7 +162,7 @@ Deno.test("PathResolver - removes section first with ../", async () => {
     title: Result.unwrap(itemTitleFromString("Parent")),
     icon: createItemIcon("note"),
     status: itemStatusOpen(),
-    placement: parentPlacement,
+    directory: parentDirectory,
     rank: Result.unwrap(itemRankFromString("a0")),
     createdAt: now,
     updatedAt: now,
@@ -170,12 +170,12 @@ Deno.test("PathResolver - removes section first with ../", async () => {
 
   // Navigate from parent/1 using ../
   const expr = Result.unwrap(parsePathExpression("../"));
-  const result = await pathResolver.resolvePath(currentPlacement, expr);
+  const result = await pathResolver.resolvePath(currentDirectory, expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
     // Should remove the section first, going to parent (no sections)
-    assertEquals(result.value.toString(), createItemPlacement(parentId, []).toString());
+    assertEquals(result.value.toString(), createItemDirectory(parentId, []).toString());
   }
 });
 
@@ -191,10 +191,10 @@ Deno.test("PathResolver - returns error when navigating above date root", async 
   });
 
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
-  const rootPlacement = createDatePlacement(today, []);
+  const rootDirectory = createDateDirectory(today, []);
 
   const expr = Result.unwrap(parsePathExpression("../"));
-  const result = await pathResolver.resolvePath(rootPlacement, expr);
+  const result = await pathResolver.resolvePath(rootDirectory, expr);
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
@@ -214,10 +214,10 @@ Deno.test("PathResolver - returns error when parent item does not exist", async 
   });
 
   const nonExistentId = Result.unwrap(itemIdFromString("019a0000-0000-7000-8000-000000000999"));
-  const childPlacement = createItemPlacement(nonExistentId, []);
+  const childDirectory = createItemDirectory(nonExistentId, []);
 
   const expr = Result.unwrap(parsePathExpression("../"));
-  const result = await pathResolver.resolvePath(childPlacement, expr);
+  const result = await pathResolver.resolvePath(childDirectory, expr);
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
@@ -241,7 +241,7 @@ Deno.test("PathResolver - returns error for reversed numeric range (5..3)", asyn
   // Try to resolve range using absolute path 2025-11-16/5..3 (reversed)
   const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-16/5..3"));
-  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+  const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
@@ -265,7 +265,7 @@ Deno.test("PathResolver - returns error for large reversed numeric range (10..1)
   // Try to resolve range 2025-11-16/10..1 (large reversed range)
   const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-16/10..1"));
-  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+  const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
@@ -289,7 +289,7 @@ Deno.test("PathResolver - returns error for adjacent reversed numeric range (2..
   // Try to resolve range 2025-11-16/2..1 (adjacent reversed)
   const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-16/2..1"));
-  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+  const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
@@ -312,7 +312,7 @@ Deno.test("PathResolver - returns error for absolute path with no segments (/)",
 
   // Try to resolve absolute path with no segments (/)
   const expr = Result.unwrap(parsePathExpression("/"));
-  const result = await pathResolver.resolvePath(createDatePlacement(today, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(today, []), expr);
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
@@ -335,7 +335,7 @@ Deno.test("PathResolver - returns error for absolute path starting with numeric 
 
   // Try to resolve absolute path starting with numeric section (/1)
   const expr = Result.unwrap(parsePathExpression("/1"));
-  const result = await pathResolver.resolvePath(createDatePlacement(today, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(today, []), expr);
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
@@ -358,7 +358,7 @@ Deno.test("PathResolver - returns error for absolute path starting with dotdot (
 
   // Try to resolve absolute path starting with dotdot (/../)
   const expr = Result.unwrap(parsePathExpression("/../"));
-  const result = await pathResolver.resolvePath(createDatePlacement(today, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(today, []), expr);
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
@@ -381,7 +381,7 @@ Deno.test("PathResolver - returns error for absolute path starting with dot (/./
 
   // Try to resolve absolute path starting with dot (/.)
   const expr = Result.unwrap(parsePathExpression("/."));
-  const result = await pathResolver.resolvePath(createDatePlacement(today, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(today, []), expr);
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
@@ -405,7 +405,7 @@ Deno.test("PathResolver - returns error for different date parents", async () =>
   // Try to resolve range with different date parents (2025-11-15/1..2025-11-16/3)
   const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-15/1..2025-11-16/3"));
-  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+  const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
@@ -428,8 +428,8 @@ Deno.test("PathResolver - returns error for different item parents", async () =>
   const itemA = Result.unwrap(itemIdFromString("019a0000-0000-7000-8000-000000000001"));
   const itemB = Result.unwrap(itemIdFromString("019a0000-0000-7000-8000-000000000002"));
 
-  const placementA = createDatePlacement(today, []);
-  const placementB = createDatePlacement(today, []);
+  const directoryA = createDateDirectory(today, []);
+  const directoryB = createDateDirectory(today, []);
   const now = Result.unwrap(dateTimeFromDate(new Date("2025-11-16T00:00:00Z")));
 
   await itemRepository.save(createItem({
@@ -437,7 +437,7 @@ Deno.test("PathResolver - returns error for different item parents", async () =>
     title: Result.unwrap(itemTitleFromString("Item A")),
     icon: createItemIcon("note"),
     status: itemStatusOpen(),
-    placement: placementA,
+    directory: directoryA,
     rank: Result.unwrap(itemRankFromString("a0")),
     createdAt: now,
     updatedAt: now,
@@ -448,7 +448,7 @@ Deno.test("PathResolver - returns error for different item parents", async () =>
     title: Result.unwrap(itemTitleFromString("Item B")),
     icon: createItemIcon("note"),
     status: itemStatusOpen(),
-    placement: placementB,
+    directory: directoryB,
     rank: Result.unwrap(itemRankFromString("a0")),
     createdAt: now,
     updatedAt: now,
@@ -459,7 +459,7 @@ Deno.test("PathResolver - returns error for different item parents", async () =>
   const rangeExpr = Result.unwrap(
     parseRangeExpression(`${itemA.toString()}/1..${itemB.toString()}/3`),
   );
-  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+  const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
@@ -484,7 +484,7 @@ Deno.test("PathResolver - resolveRange expands this-week to Mon-Sun date range",
 
   const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("this-week"));
-  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+  const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -512,7 +512,7 @@ Deno.test("PathResolver - resolveRange expands tw alias to Mon-Sun date range", 
 
   const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("tw"));
-  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+  const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -539,7 +539,7 @@ Deno.test("PathResolver - resolveRange expands next-week to Mon-Sun of next week
 
   const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("next-week"));
-  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+  const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -567,7 +567,7 @@ Deno.test("PathResolver - resolveRange expands this-month to 1st to last day", a
 
   const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("this-month"));
-  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+  const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -595,7 +595,7 @@ Deno.test("PathResolver - resolveRange expands next-month crossing year boundary
 
   const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("next-month"));
-  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+  const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -623,7 +623,7 @@ Deno.test("PathResolver - resolveRange keeps today as single date (not period ke
 
   const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("today"));
-  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+  const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -647,7 +647,7 @@ Deno.test("PathResolver - resolvePath resolves 'today' keyword to current date",
   const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
 
   const expr = Result.unwrap(parsePathExpression("today"));
-  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(cwd, []), expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -672,7 +672,7 @@ Deno.test("PathResolver - resolvePath resolves 'tomorrow' keyword to next day", 
   const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
 
   const expr = Result.unwrap(parsePathExpression("tomorrow"));
-  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(cwd, []), expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -697,7 +697,7 @@ Deno.test("PathResolver - resolvePath resolves 'yesterday' keyword to previous d
   const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
 
   const expr = Result.unwrap(parsePathExpression("yesterday"));
-  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(cwd, []), expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -722,7 +722,7 @@ Deno.test("PathResolver - resolvePath resolves '+1d' to one day forward", async 
   const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
 
   const expr = Result.unwrap(parsePathExpression("+1d"));
-  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(cwd, []), expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -747,7 +747,7 @@ Deno.test("PathResolver - resolvePath resolves '+1w' to one week forward", async
   const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
 
   const expr = Result.unwrap(parsePathExpression("+1w"));
-  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(cwd, []), expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -773,7 +773,7 @@ Deno.test("PathResolver - resolvePath resolves '~1w' to one week backward", asyn
   const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
 
   const expr = Result.unwrap(parsePathExpression("~1w"));
-  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(cwd, []), expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -800,7 +800,7 @@ Deno.test("PathResolver - resolvePath resolves '~mon' to previous Monday", async
   const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
 
   const expr = Result.unwrap(parsePathExpression("~mon"));
-  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(cwd, []), expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -827,7 +827,7 @@ Deno.test("PathResolver - resolvePath resolves '+fri' to next Friday", async () 
   const cwd = Result.unwrap(parseCalendarDay("2025-11-10"));
 
   const expr = Result.unwrap(parsePathExpression("+fri"));
-  const result = await pathResolver.resolvePath(createDatePlacement(cwd, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(cwd, []), expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -839,8 +839,8 @@ Deno.test("PathResolver - resolvePath resolves '+fri' to next Friday", async () 
   }
 });
 
-// Tests for permanent placement
-Deno.test("PathResolver - resolvePath resolves 'permanent' to permanent placement", async () => {
+// Tests for permanent directory
+Deno.test("PathResolver - resolvePath resolves 'permanent' to permanent directory", async () => {
   const itemRepository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
 
@@ -854,7 +854,7 @@ Deno.test("PathResolver - resolvePath resolves 'permanent' to permanent placemen
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
 
   const expr = Result.unwrap(parsePathExpression("permanent"));
-  const result = await pathResolver.resolvePath(createDatePlacement(today, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(today, []), expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -863,7 +863,7 @@ Deno.test("PathResolver - resolvePath resolves 'permanent' to permanent placemen
   }
 });
 
-Deno.test("PathResolver - resolvePath resolves '/permanent' (absolute) to permanent placement", async () => {
+Deno.test("PathResolver - resolvePath resolves '/permanent' (absolute) to permanent directory", async () => {
   const itemRepository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
 
@@ -877,7 +877,7 @@ Deno.test("PathResolver - resolvePath resolves '/permanent' (absolute) to perman
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
 
   const expr = Result.unwrap(parsePathExpression("/permanent"));
-  const result = await pathResolver.resolvePath(createDatePlacement(today, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(today, []), expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -886,7 +886,7 @@ Deno.test("PathResolver - resolvePath resolves '/permanent' (absolute) to perman
   }
 });
 
-Deno.test("PathResolver - resolvePath resolves 'permanent/1' to permanent placement with section", async () => {
+Deno.test("PathResolver - resolvePath resolves 'permanent/1' to permanent directory with section", async () => {
   const itemRepository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
 
@@ -900,7 +900,7 @@ Deno.test("PathResolver - resolvePath resolves 'permanent/1' to permanent placem
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
 
   const expr = Result.unwrap(parsePathExpression("permanent/1"));
-  const result = await pathResolver.resolvePath(createDatePlacement(today, []), expr);
+  const result = await pathResolver.resolvePath(createDateDirectory(today, []), expr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -910,7 +910,7 @@ Deno.test("PathResolver - resolvePath resolves 'permanent/1' to permanent placem
   }
 });
 
-Deno.test("PathResolver - resolveRange resolves 'permanent' to single permanent placement", async () => {
+Deno.test("PathResolver - resolveRange resolves 'permanent' to single permanent directory", async () => {
   const itemRepository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
 
@@ -925,7 +925,7 @@ Deno.test("PathResolver - resolveRange resolves 'permanent' to single permanent 
 
   const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("permanent"));
-  const result = await pathResolver.resolveRange(createDatePlacement(today, []), rangeExpr);
+  const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
@@ -947,10 +947,10 @@ Deno.test("PathResolver - returns error when navigating above permanent root", a
     today: new Date("2025-11-16T00:00:00Z"),
   });
 
-  const permanentPlacement = createPermanentPlacement([]);
+  const permanentDirectory = createPermanentDirectory([]);
 
   const expr = Result.unwrap(parsePathExpression("../"));
-  const result = await pathResolver.resolvePath(permanentPlacement, expr);
+  const result = await pathResolver.resolvePath(permanentDirectory, expr);
 
   assertEquals(result.type, "error");
   if (result.type === "error") {

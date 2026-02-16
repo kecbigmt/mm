@@ -42,7 +42,7 @@ export type IndexIntegrityIssue = Readonly<{
  * 2. No duplicate edges within same (parent, section)
  * 3. No cycles in parent/child graph
  * 4. Alias uniqueness across all Items
- * 5. Edge files match Item frontmatter placement/rank
+ * 5. Edge files match Item frontmatter directory/rank
  *
  * @param items - Successfully parsed items
  * @param edges - Successfully parsed edges
@@ -194,9 +194,9 @@ const detectCycles = (
       return false;
     }
 
-    const placement = item.data.placement;
-    if (placement.head.kind === "item") {
-      const parentId = placement.head.id.toString();
+    const dir = item.data.directory;
+    if (dir.head.kind === "item") {
+      const parentId = dir.head.id.toString();
 
       const parentState = state.get(parentId) ?? 0;
 
@@ -406,31 +406,31 @@ const checkAliasUniqueness = (
 };
 
 /**
- * Derive the expected edge directory pattern from an item's placement
+ * Derive the expected edge directory pattern from an item's directory
  *
  * Returns a pattern like:
- * - "dates/2024-01-15" for date placement
- * - "dates/2024-01-15/1/2" for date placement with sections
- * - "parents/<parent-id>" for item placement
- * - "parents/<parent-id>/1/2" for item placement with sections
+ * - "dates/2024-01-15" for date directory
+ * - "dates/2024-01-15/1/2" for date directory with sections
+ * - "parents/<parent-id>" for item directory
+ * - "parents/<parent-id>/1/2" for item directory with sections
  */
 const deriveExpectedEdgeDirectory = (item: Item): string => {
-  const placement = item.data.placement;
-  const sections = placement.section;
+  const dir = item.data.directory;
+  const sections = dir.section;
 
   let basePath: string;
 
-  if (placement.head.kind === "date") {
-    const date = placement.head.date;
+  if (dir.head.kind === "date") {
+    const date = dir.head.date;
     // Use ISO format (YYYY-MM-DD) to match graph_index storage
     const dateStr = date.data.iso;
     basePath = `dates/${dateStr}`;
-  } else if (placement.head.kind === "item") {
-    // item placement
-    const parentId = placement.head.id.toString();
+  } else if (dir.head.kind === "item") {
+    // item directory
+    const parentId = dir.head.id.toString();
     basePath = `parents/${parentId}`;
   } else {
-    // permanent placement
+    // permanent directory
     basePath = `permanent`;
   }
 
@@ -507,13 +507,13 @@ const checkEdgeItemSync = (
 
     if (!itemEdges || itemEdges.length === 0) {
       // No edge files at all
-      const placement = item.data.placement.toString();
+      const directory = item.data.directory.toString();
       issues.push({
         kind: "MissingEdge",
-        message: `Missing edge file for item ${id} (placement: ${placement})`,
+        message: `Missing edge file for item ${id} (directory: ${directory})`,
         context: {
           itemId: id,
-          placement,
+          directory,
         },
       });
       continue;
@@ -540,7 +540,7 @@ const checkEdgeItemSync = (
             itemId: id,
             expectedDirectory: expectedDir,
             actualDirectory: actualDir,
-            placement: item.data.placement.toString(),
+            directory: item.data.directory.toString(),
           },
         });
       }
@@ -548,13 +548,13 @@ const checkEdgeItemSync = (
 
     // If no edge at correct location, report missing
     if (!hasCorrectLocation) {
-      const placement = item.data.placement.toString();
+      const directory = item.data.directory.toString();
       issues.push({
         kind: "MissingEdge",
-        message: `Missing edge file for item ${id} at expected location (placement: ${placement})`,
+        message: `Missing edge file for item ${id} at expected location (directory: ${directory})`,
         context: {
           itemId: id,
-          placement,
+          directory,
           expectedDirectory: expectedDir,
         },
       });

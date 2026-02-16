@@ -47,7 +47,7 @@ const sampleItemSnapshot = () => ({
   title: "Sample",
   icon: "note",
   status: "open",
-  placement: "2024-09-20",
+  directory: "2024-09-20",
   rank: "a1",
   createdAt: "2024-09-20T12:00:00Z",
   updatedAt: "2024-09-20T12:00:00Z",
@@ -94,14 +94,14 @@ Deno.test({
       assert(yamlContent.includes(`id: ${itemId}`), "frontmatter should contain id");
       // YAML may quote date strings, so check for either quoted or unquoted format
       assert(
-        yamlContent.includes("placement: 2024-09-20") ||
-          yamlContent.includes("placement: '2024-09-20'"),
-        "frontmatter should contain placement",
+        yamlContent.includes("directory: 2024-09-20") ||
+          yamlContent.includes("directory: '2024-09-20'"),
+        "frontmatter should contain directory",
       );
       assert(yamlContent.includes("rank: a1"), "frontmatter should contain rank");
       assert(yamlContent.includes("icon: note"), "frontmatter should contain icon");
       assert(
-        yamlContent.includes("schema: mm.item.frontmatter/4"),
+        yamlContent.includes("schema: mm.item.frontmatter/5"),
         "frontmatter should contain schema",
       );
 

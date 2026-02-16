@@ -4,7 +4,7 @@ import type {
   SectionQueryService,
   SectionSummary,
 } from "../../../domain/services/section_query_service.ts";
-import { createSingleRange } from "../../../domain/primitives/placement_range.ts";
+import { createSingleRange } from "../../../domain/primitives/directory_range.ts";
 import type { SectionStub } from "./build_partitions.ts";
 import {
   formatSectionHeader,
@@ -38,15 +38,15 @@ export type FormatItemsFn = (
 export type ItemFilterFn = (item: Item) => boolean;
 
 /**
- * Convert a SectionSummary to a SectionStub relative to a parent placement.
+ * Convert a SectionSummary to a SectionStub relative to a parent directory.
  */
 const toRelativeStub = (
   summary: SectionSummary,
   parentSectionLength: number,
 ): SectionStub => {
-  const relSection = summary.placement.section.slice(parentSectionLength);
+  const relSection = summary.directory.section.slice(parentSectionLength);
   return {
-    placement: summary.placement,
+    directory: summary.directory,
     relativePath: relSection.join("/") + "/",
     itemCount: summary.itemCount,
     sectionCount: summary.sectionCount,
@@ -91,7 +91,7 @@ export const expandStubs = async (
   for (const stub of stubs) {
     if (remainingDepth <= 0) {
       const stubSummary: SectionSummary = {
-        placement: stub.placement,
+        directory: stub.directory,
         itemCount: stub.itemCount,
         sectionCount: stub.sectionCount,
       };
@@ -102,9 +102,9 @@ export const expandStubs = async (
     // Render as expanded section header
     lines.push(prefix + formatSectionHeader(stub.relativePath, formatterOptions));
 
-    // Query items under this section's placement
-    const sectionRange = createSingleRange(stub.placement);
-    const sectionItemsResult = await deps.itemRepository.listByPlacement(sectionRange);
+    // Query items under this section's directory
+    const sectionRange = createSingleRange(stub.directory);
+    const sectionItemsResult = await deps.itemRepository.listByDirectory(sectionRange);
     if (sectionItemsResult.type === "ok") {
       const sectionItems = sectionItemsResult.value.filter(itemFilter);
       const itemLines: string[] = [];
@@ -120,11 +120,11 @@ export const expandStubs = async (
 
     // Query sub-sections for deeper expansion or stub display
     if (remainingDepth > 1) {
-      const subSectionsResult = await deps.sectionQueryService.listSections(stub.placement);
+      const subSectionsResult = await deps.sectionQueryService.listSections(stub.directory);
       if (subSectionsResult.type === "ok") {
         const subStubs = subSectionsResult.value
           .filter(isNonEmpty)
-          .map((s) => toRelativeStub(s, stub.placement.section.length));
+          .map((s) => toRelativeStub(s, stub.directory.section.length));
         await expandStubs(
           subStubs,
           remainingDepth - 1,
@@ -142,13 +142,13 @@ export const expandStubs = async (
       }
     } else if (stub.sectionCount > 0) {
       // Show sub-sections as stubs at depth boundary
-      const subSectionsResult = await deps.sectionQueryService.listSections(stub.placement);
+      const subSectionsResult = await deps.sectionQueryService.listSections(stub.directory);
       if (subSectionsResult.type === "ok") {
         for (const s of subSectionsResult.value) {
           if (isNonEmpty(s)) {
-            const relSection = s.placement.section.slice(stub.placement.section.length);
+            const relSection = s.directory.section.slice(stub.directory.section.length);
             const subStubSummary: SectionSummary = {
-              placement: s.placement,
+              directory: s.directory,
               itemCount: s.itemCount,
               sectionCount: s.sectionCount,
             };

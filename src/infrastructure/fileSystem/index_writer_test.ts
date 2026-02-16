@@ -75,7 +75,7 @@ Deno.test("writeGraphIndex - writes parent edges with from field", async () => {
   // Create index directory
   await Deno.mkdir(join(workspaceRoot, ".index"), { recursive: true });
 
-  // Create test edges with parent placement
+  // Create test edges with parent directory
   const edges = new Map<string, ReadonlyArray<EdgeData>>();
   edges.set("parents/019a8603-1234-7890-abcd-1234567890ab", [
     createTestEdgeData("019a85fc-67c4-7a54-be8e-305bae009f9e", "aaa"),

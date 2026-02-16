@@ -9,7 +9,7 @@
 
 import { join } from "@std/path";
 import { Result } from "../../shared/result.ts";
-import { DateTime, ItemId, parsePlacement } from "../../domain/primitives/mod.ts";
+import { DateTime, ItemId, parseDirectory } from "../../domain/primitives/mod.ts";
 import { parseFrontmatter, serializeFrontmatter } from "./frontmatter.ts";
 import { ItemRankUpdate } from "./rank_rebalancer.ts";
 
@@ -36,7 +36,7 @@ type ItemFrontmatter = {
   icon: string;
   kind?: string;
   status: string;
-  placement: string;
+  directory: string;
   rank: string;
   created_at: string;
   updated_at: string;
@@ -170,16 +170,16 @@ const updateItemRank = async (
     });
   }
 
-  // Update edge file based on placement
-  const placementResult = parsePlacement(frontmatter.placement);
-  if (placementResult.type === "ok") {
-    const placement = placementResult.value;
+  // Update edge file based on directory
+  const directoryResult = parseDirectory(frontmatter.directory);
+  if (directoryResult.type === "ok") {
+    const directory = directoryResult.value;
     let edgeFilePath: string;
 
-    if (placement.head.kind === "date") {
-      // Date placement: .index/graph/dates/YYYY-MM-DD/<itemId>.edge.json
-      const dateStr = placement.head.date.toString();
-      const sectionPath = placement.section.length > 0 ? placement.section.join("/") : "";
+    if (directory.head.kind === "date") {
+      // Date directory: .index/graph/dates/YYYY-MM-DD/<itemId>.edge.json
+      const dateStr = directory.head.date.toString();
+      const sectionPath = directory.section.length > 0 ? directory.section.join("/") : "";
 
       if (sectionPath) {
         edgeFilePath = join(
@@ -201,10 +201,10 @@ const updateItemRank = async (
           `${itemIdStr}.edge.json`,
         );
       }
-    } else if (placement.head.kind === "item") {
-      // Item placement: .index/graph/parents/<parentId>/<section>/<itemId>.edge.json
-      const parentIdStr = placement.head.id.toString();
-      const sectionPath = placement.section.length > 0 ? placement.section.join("/") : "";
+    } else if (directory.head.kind === "item") {
+      // Item directory: .index/graph/parents/<parentId>/<section>/<itemId>.edge.json
+      const parentIdStr = directory.head.id.toString();
+      const sectionPath = directory.section.length > 0 ? directory.section.join("/") : "";
 
       if (sectionPath) {
         edgeFilePath = join(
@@ -227,8 +227,8 @@ const updateItemRank = async (
         );
       }
     } else {
-      // Permanent placement: .index/graph/permanent/<section>/<itemId>.edge.json
-      const sectionPath = placement.section.length > 0 ? placement.section.join("/") : "";
+      // Permanent directory: .index/graph/permanent/<section>/<itemId>.edge.json
+      const sectionPath = directory.section.length > 0 ? directory.section.join("/") : "";
 
       if (sectionPath) {
         edgeFilePath = join(

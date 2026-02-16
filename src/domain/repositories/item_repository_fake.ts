@@ -1,6 +1,6 @@
 import { Result } from "../../shared/result.ts";
 import { Item } from "../models/item.ts";
-import { ItemId, PlacementRange } from "../primitives/mod.ts";
+import { DirectoryRange, ItemId } from "../primitives/mod.ts";
 import { ItemRepository } from "./item_repository.ts";
 import { RepositoryError } from "./repository_error.ts";
 
@@ -8,26 +8,26 @@ type ItemMap = Map<string, Item>;
 
 const ok = Result.ok;
 
-const matchesPlacementRange = (item: Item, range: PlacementRange): boolean => {
+const matchesDirectoryRange = (item: Item, range: DirectoryRange): boolean => {
   switch (range.kind) {
     case "single": {
-      return item.data.placement.equals(range.at);
+      return item.data.directory.equals(range.at);
     }
     case "dateRange": {
-      // Check if item's placement head is a date within the range
-      if (item.data.placement.head.kind !== "date") {
+      // Check if item's directory head is a date within the range
+      if (item.data.directory.head.kind !== "date") {
         return false;
       }
-      const itemDate = item.data.placement.head.date.toString();
+      const itemDate = item.data.directory.head.date.toString();
       return itemDate >= range.from.toString() && itemDate <= range.to.toString();
     }
     case "numericRange": {
-      // Check if item's placement parent matches and section is within range
-      if (!item.data.placement.parent()?.equals(range.parent)) {
+      // Check if item's directory parent matches and section is within range
+      if (!item.data.directory.parent()?.equals(range.parent)) {
         return false;
       }
       // Get the last section number
-      const lastSection = item.data.placement.section[item.data.placement.section.length - 1];
+      const lastSection = item.data.directory.section[item.data.directory.section.length - 1];
       if (lastSection === undefined) {
         return false;
       }
@@ -36,9 +36,9 @@ const matchesPlacementRange = (item: Item, range: PlacementRange): boolean => {
   }
 };
 
-const cloneAndSortByPlacement = (items: Iterable<Item>, range: PlacementRange): Item[] =>
+const cloneAndSortByDirectory = (items: Iterable<Item>, range: DirectoryRange): Item[] =>
   Array.from(items)
-    .filter((item) => matchesPlacementRange(item, range))
+    .filter((item) => matchesDirectoryRange(item, range))
     .sort((first, second) => first.data.rank.compare(second.data.rank));
 
 export class InMemoryItemRepository implements ItemRepository {
@@ -67,8 +67,8 @@ export class InMemoryItemRepository implements ItemRepository {
     return Promise.resolve(ok(undefined));
   }
 
-  listByPlacement(range: PlacementRange): Promise<Result<ReadonlyArray<Item>, RepositoryError>> {
-    return Promise.resolve(ok(cloneAndSortByPlacement(this.items.values(), range)));
+  listByDirectory(range: DirectoryRange): Promise<Result<ReadonlyArray<Item>, RepositoryError>> {
+    return Promise.resolve(ok(cloneAndSortByDirectory(this.items.values(), range)));
   }
 
   clear(): void {

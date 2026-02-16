@@ -10,7 +10,7 @@ import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.t
 import { parsePathExpression } from "../../presentation/cli/path_parser.ts";
 import { createAlias } from "../models/alias.ts";
 import {
-  createDatePlacement,
+  createDateDirectory,
   dateTimeFromDate,
   itemIdFromString,
   parseAliasSlug,
@@ -24,7 +24,7 @@ const setup = () => {
   const aliasRepository = new InMemoryAliasRepository();
   const now = Result.unwrap(dateTimeFromDate(new Date("2026-02-11T00:00:00Z")));
   const today = Result.unwrap(parseCalendarDay("2026-02-11"));
-  const cwd = createDatePlacement(today, []);
+  const cwd = createDateDirectory(today, []);
   const timezone = Result.unwrap(parseTimezoneIdentifier("UTC"));
 
   const addAlias = (slug: string, itemId: string) => {

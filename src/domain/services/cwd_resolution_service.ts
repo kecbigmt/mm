@@ -6,10 +6,10 @@ import {
   ValidationError,
 } from "../../shared/errors.ts";
 import {
-  createPlacement,
+  createDirectory,
+  Directory,
   parseCalendarDay,
-  parsePlacement,
-  Placement,
+  parseDirectory,
   TimezoneIdentifier,
 } from "../primitives/mod.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
@@ -36,18 +36,18 @@ export type CwdSaveDependencies = Readonly<{
 }>;
 
 export type CwdResult = Readonly<{
-  readonly placement: Placement;
+  readonly directory: Directory;
   readonly warning?: string;
 }>;
 
 /**
- * Creates a placement for today's date in the given timezone.
- * This is the "home" placement, matching bash cd behavior.
+ * Creates a directory for today's date in the given timezone.
+ * This is the "home" directory, matching bash cd behavior.
  */
-const createTodayPlacement = (
+const createTodayDirectory = (
   now: Date,
   timezone: TimezoneIdentifier,
-): Result<Placement, ValidationError<"CwdResolution">> => {
+): Result<Directory, ValidationError<"CwdResolution">> => {
   const dateStr = formatDateStringForTimezone(now, timezone);
   const calendarDayResult = parseCalendarDay(dateStr);
   if (calendarDayResult.type === "error") {
@@ -60,26 +60,26 @@ const createTodayPlacement = (
       ]),
     );
   }
-  return Result.ok(createPlacement({ kind: "date", date: calendarDayResult.value }, []));
+  return Result.ok(createDirectory({ kind: "date", date: calendarDayResult.value }, []));
 };
 
-const defaultCwdPlacement = (now: Date, timezone: TimezoneIdentifier): Placement => {
-  const result = createTodayPlacement(now, timezone);
+const defaultCwdDirectory = (now: Date, timezone: TimezoneIdentifier): Directory => {
+  const result = createTodayDirectory(now, timezone);
   if (result.type === "error") {
-    throw new Error("Failed to create default CWD placement: invalid date");
+    throw new Error("Failed to create default CWD directory: invalid date");
   }
   return result.value;
 };
 
-const resolvePlacementToItem = async (
-  placement: Placement,
+const resolveDirectoryToItem = async (
+  directory: Directory,
   deps: CwdValidationDependencies,
 ): Promise<Item | undefined> => {
-  if (placement.head.kind === "date" || placement.head.kind === "permanent") {
+  if (directory.head.kind === "date" || directory.head.kind === "permanent") {
     return undefined;
   }
 
-  const loadResult = await deps.itemRepository.load(placement.head.id);
+  const loadResult = await deps.itemRepository.load(directory.head.id);
   if (loadResult.type === "ok" && loadResult.value) {
     return loadResult.value;
   }
@@ -89,10 +89,10 @@ const resolvePlacementToItem = async (
 
 export const CwdResolutionService = {
   /**
-   * Creates a placement for today's date in the given timezone.
-   * This is the "home" placement, matching bash cd behavior.
+   * Creates a directory for today's date in the given timezone.
+   * This is the "home" directory, matching bash cd behavior.
    */
-  createTodayPlacement,
+  createTodayDirectory,
 
   async getCwd(
     deps: CwdResolutionDependencies,
@@ -108,42 +108,42 @@ export const CwdResolutionService = {
 
     // No session or workspace mismatch -> default to today
     if (!session || session.workspace !== deps.workspacePath) {
-      return Result.ok({ placement: defaultCwdPlacement(now, deps.timezone) });
+      return Result.ok({ directory: defaultCwdDirectory(now, deps.timezone) });
     }
 
-    const parseResult = parsePlacement(session.cwd);
+    const parseResult = parseDirectory(session.cwd);
     if (parseResult.type === "error") {
       return Result.ok({
-        placement: defaultCwdPlacement(now, deps.timezone),
+        directory: defaultCwdDirectory(now, deps.timezone),
         warning: `Invalid cwd value "${session.cwd}" in session, falling back to today`,
       });
     }
 
-    const placement = parseResult.value;
+    const directory = parseResult.value;
 
-    if (placement.head.kind === "item") {
-      const item = await resolvePlacementToItem(placement, deps);
+    if (directory.head.kind === "item") {
+      const item = await resolveDirectoryToItem(directory, deps);
       if (item === undefined) {
         return Result.ok({
-          placement: defaultCwdPlacement(now, deps.timezone),
+          directory: defaultCwdDirectory(now, deps.timezone),
           warning: `Item in session cwd not found, falling back to today`,
         });
       }
     }
 
-    return Result.ok({ placement });
+    return Result.ok({ directory });
   },
 
   async setCwd(
-    placement: Placement,
+    directory: Directory,
     deps: CwdSaveDependencies,
-    previousPlacement?: Placement,
+    previousDirectory?: Directory,
   ): Promise<Result<void, CwdResolutionError>> {
-    const previousCwd = previousPlacement?.toString();
+    const previousCwd = previousDirectory?.toString();
 
     const saveResult = await deps.sessionRepository.save({
       workspace: deps.workspacePath,
-      cwd: placement.toString(),
+      cwd: directory.toString(),
       previousCwd,
     });
     return saveResult;
@@ -151,7 +151,7 @@ export const CwdResolutionService = {
 
   async getPreviousCwd(
     deps: CwdResolutionDependencies,
-  ): Promise<Result<Placement, CwdResolutionError>> {
+  ): Promise<Result<Directory, CwdResolutionError>> {
     const sessionResult = await deps.sessionRepository.load();
     if (sessionResult.type === "error") {
       return sessionResult;
@@ -170,7 +170,7 @@ export const CwdResolutionService = {
       );
     }
 
-    const parseResult = parsePlacement(session.previousCwd);
+    const parseResult = parseDirectory(session.previousCwd);
     if (parseResult.type === "error") {
       return Result.error(
         createValidationError("CwdResolution", [
@@ -182,11 +182,11 @@ export const CwdResolutionService = {
       );
     }
 
-    const placement = parseResult.value;
+    const directory = parseResult.value;
 
-    // Validate item-backed placements to avoid navigating to deleted items
-    if (placement.head.kind === "item") {
-      const item = await resolvePlacementToItem(placement, deps);
+    // Validate item-backed directories to avoid navigating to deleted items
+    if (directory.head.kind === "item") {
+      const item = await resolveDirectoryToItem(directory, deps);
       if (item === undefined) {
         return Result.error(
           createValidationError("CwdResolution", [
@@ -199,22 +199,22 @@ export const CwdResolutionService = {
       }
     }
 
-    return Result.ok(placement);
+    return Result.ok(directory);
   },
 
-  async validatePlacement(
-    target: Placement,
+  async validateDirectory(
+    target: Directory,
     deps: CwdValidationDependencies,
-  ): Promise<Result<Placement, CwdResolutionError>> {
+  ): Promise<Result<Directory, CwdResolutionError>> {
     if (target.head.kind === "date" || target.head.kind === "permanent") {
       return Result.ok(target);
     }
 
-    const item = await resolvePlacementToItem(target, deps);
+    const item = await resolveDirectoryToItem(target, deps);
     if (item === undefined) {
       return Result.error(
         createValidationError("CwdResolution", [
-          createValidationIssue("target placement does not resolve to a valid item", {
+          createValidationIssue("target directory does not resolve to a valid item", {
             code: "invalid_target",
             path: ["value"],
           }),

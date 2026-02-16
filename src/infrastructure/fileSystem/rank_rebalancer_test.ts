@@ -1,22 +1,22 @@
 import { assertEquals, assertExists } from "@std/assert";
-import { groupByPlacement, rebalanceGroup } from "./rank_rebalancer.ts";
+import { groupByDirectory, rebalanceGroup } from "./rank_rebalancer.ts";
 import { createLexoRankService } from "../lexorank/rank_service.ts";
 import { createItem, Item } from "../../domain/models/item.ts";
 import {
   parseDateTime,
+  parseDirectory,
   parseItemIcon,
   parseItemId,
   parseItemRank,
   parseItemStatus,
   parseItemTitle,
-  parsePlacement,
 } from "../../domain/primitives/mod.ts";
 import { Result } from "../../shared/result.ts";
 
 // Helper to create test items
 const createTestItem = (
   idSuffix: string,
-  placement: string,
+  directory: string,
   rank: string,
   createdAt = "2025-01-15T10:00:00Z",
 ): Item => {
@@ -24,7 +24,7 @@ const createTestItem = (
   const title = Result.unwrap(parseItemTitle("Test Item"));
   const icon = Result.unwrap(parseItemIcon("note"));
   const status = Result.unwrap(parseItemStatus("open"));
-  const placementVal = Result.unwrap(parsePlacement(placement));
+  const directoryVal = Result.unwrap(parseDirectory(directory));
   const rankVal = Result.unwrap(parseItemRank(rank));
   const createdAtVal = Result.unwrap(parseDateTime(createdAt));
   const updatedAtVal = Result.unwrap(parseDateTime(createdAt));
@@ -34,7 +34,7 @@ const createTestItem = (
     title,
     icon,
     status,
-    placement: placementVal,
+    directory: directoryVal,
     rank: rankVal,
     createdAt: createdAtVal,
     updatedAt: updatedAtVal,
@@ -121,7 +121,7 @@ Deno.test("rebalanceGroup - uses createdAt as tiebreak for same ranks", () => {
   }
 });
 
-Deno.test("groupByPlacement - groups items by placement string", () => {
+Deno.test("groupByDirectory - groups items by directory string", () => {
   const items = [
     createTestItem("0001", "2025-01-15", "0|a0:"),
     createTestItem("0002", "2025-01-15", "0|a0:i"),
@@ -129,14 +129,14 @@ Deno.test("groupByPlacement - groups items by placement string", () => {
     createTestItem("0004", "2025-01-15/1", "0|a0:"),
   ];
 
-  const groups = groupByPlacement(items);
+  const groups = groupByDirectory(items);
 
   assertEquals(groups.length, 3);
 
   // Find each group
-  const group2025_01_15 = groups.find((g) => g.placementKey === "2025-01-15");
-  const group2025_01_16 = groups.find((g) => g.placementKey === "2025-01-16");
-  const group2025_01_15_1 = groups.find((g) => g.placementKey === "2025-01-15/1");
+  const group2025_01_15 = groups.find((g) => g.directoryKey === "2025-01-15");
+  const group2025_01_16 = groups.find((g) => g.directoryKey === "2025-01-16");
+  const group2025_01_15_1 = groups.find((g) => g.directoryKey === "2025-01-15/1");
 
   assertExists(group2025_01_15);
   assertExists(group2025_01_16);
@@ -147,12 +147,12 @@ Deno.test("groupByPlacement - groups items by placement string", () => {
   assertEquals(group2025_01_15_1.siblings.length, 1);
 });
 
-Deno.test("groupByPlacement - returns empty array for empty input", () => {
-  const groups = groupByPlacement([]);
+Deno.test("groupByDirectory - returns empty array for empty input", () => {
+  const groups = groupByDirectory([]);
   assertEquals(groups.length, 0);
 });
 
-Deno.test("groupByPlacement - groups items under parent item", () => {
+Deno.test("groupByDirectory - groups items under parent item", () => {
   const parentId = "019a85fc-67c4-7a54-be8e-305bae009f9e";
 
   const items = [
@@ -161,12 +161,12 @@ Deno.test("groupByPlacement - groups items under parent item", () => {
     createTestItem("0003", `${parentId}/1`, "0|a0:"),
   ];
 
-  const groups = groupByPlacement(items);
+  const groups = groupByDirectory(items);
 
   assertEquals(groups.length, 2);
 
-  const groupParent = groups.find((g) => g.placementKey === parentId);
-  const groupSection = groups.find((g) => g.placementKey === `${parentId}/1`);
+  const groupParent = groups.find((g) => g.directoryKey === parentId);
+  const groupSection = groups.find((g) => g.directoryKey === `${parentId}/1`);
 
   assertExists(groupParent);
   assertExists(groupSection);

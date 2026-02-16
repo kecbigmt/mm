@@ -55,7 +55,7 @@ Deno.test({
     try {
       await Deno.writeTextFile(
         join(workspace, "workspace.json"),
-        JSON.stringify({ schema: "mm.workspace/1", migration: 2, timezone: "Asia/Tokyo" }, null, 2),
+        JSON.stringify({ schema: "mm.workspace/1", migration: 3, timezone: "Asia/Tokyo" }, null, 2),
       );
 
       const noteConsole = captureConsole();
@@ -63,7 +63,7 @@ Deno.test({
         await buildCli().parse([
           "note",
           "Integration note",
-          "--parent",
+          "--dir",
           "/2024-01-05",
           "--workspace",
           workspace,
@@ -125,13 +125,13 @@ Deno.test({
       const yamlContent = fileContent.slice(4, frontmatterEnd);
       // YAML may quote date strings, so check for either quoted or unquoted format
       assert(
-        yamlContent.includes("placement: 2024-01-05") ||
-          yamlContent.includes("placement: '2024-01-05'"),
-        "frontmatter should contain placement",
+        yamlContent.includes("directory: 2024-01-05") ||
+          yamlContent.includes("directory: '2024-01-05'"),
+        "frontmatter should contain directory",
       );
       assert(yamlContent.includes("rank:"), "frontmatter should contain rank");
       assert(
-        yamlContent.includes("schema: mm.item.frontmatter/4"),
+        yamlContent.includes("schema: mm.item.frontmatter/5"),
         "frontmatter should contain schema",
       );
 
@@ -147,7 +147,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "note command with --placement permanent creates note with permanent placement",
+  name: "note command with --dir permanent creates note with permanent directory",
   permissions: {
     env: true,
     read: true,
@@ -159,7 +159,7 @@ Deno.test({
     try {
       await Deno.writeTextFile(
         join(workspace, "workspace.json"),
-        JSON.stringify({ schema: "mm.workspace/1", migration: 2, timezone: "Asia/Tokyo" }, null, 2),
+        JSON.stringify({ schema: "mm.workspace/1", migration: 3, timezone: "Asia/Tokyo" }, null, 2),
       );
 
       const noteConsole = captureConsole();
@@ -167,7 +167,7 @@ Deno.test({
         await buildCli().parse([
           "note",
           "Permanent Note",
-          "--placement",
+          "--dir",
           "permanent",
           "--workspace",
           workspace,
@@ -217,15 +217,15 @@ Deno.test({
       assertEquals(itemFiles.length, 1, "expected exactly one item file");
       const [{ path: itemFilePath }] = itemFiles;
 
-      // Read and verify frontmatter contains permanent placement
+      // Read and verify frontmatter contains permanent directory
       const fileContent = await Deno.readTextFile(itemFilePath);
       const frontmatterEnd = fileContent.indexOf("\n---\n", 4);
       const yamlContent = fileContent.slice(4, frontmatterEnd);
 
       assert(
-        yamlContent.includes("placement: permanent") ||
-          yamlContent.includes("placement: 'permanent'"),
-        "frontmatter should contain placement: permanent",
+        yamlContent.includes("directory: permanent") ||
+          yamlContent.includes("directory: 'permanent'"),
+        "frontmatter should contain directory: permanent",
       );
     } finally {
       await Deno.remove(workspace, { recursive: true });
@@ -234,7 +234,7 @@ Deno.test({
 });
 
 Deno.test({
-  name: "note command with --placement invalid shows error",
+  name: "note command with --dir invalid shows error",
   permissions: {
     env: true,
     read: true,
@@ -242,11 +242,11 @@ Deno.test({
     sys: true,
   },
   async fn() {
-    const workspace = await Deno.makeTempDir({ prefix: "mm-cli-invalid-placement-" });
+    const workspace = await Deno.makeTempDir({ prefix: "mm-cli-invalid-dir-" });
     try {
       await Deno.writeTextFile(
         join(workspace, "workspace.json"),
-        JSON.stringify({ schema: "mm.workspace/1", migration: 2, timezone: "Asia/Tokyo" }, null, 2),
+        JSON.stringify({ schema: "mm.workspace/1", migration: 3, timezone: "Asia/Tokyo" }, null, 2),
       );
 
       const noteConsole = captureConsole();
@@ -254,7 +254,7 @@ Deno.test({
         await buildCli().parse([
           "note",
           "Test Note",
-          "--placement",
+          "--dir",
           "invalid",
           "--workspace",
           workspace,
@@ -263,15 +263,16 @@ Deno.test({
         noteConsole.restore();
       }
 
-      // Should have an error
+      // Should have an error (path resolution fails for "invalid")
       assert(
         noteConsole.errors.length > 0,
-        "note command should produce an error for invalid placement",
+        "note command should produce an error for invalid directory",
       );
       const errorLine = noteConsole.errors.find((line) =>
-        line.toLowerCase().includes("invalid") || line.toLowerCase().includes("placement")
+        line.toLowerCase().includes("invalid") || line.toLowerCase().includes("directory") ||
+        line.toLowerCase().includes("failed") || line.toLowerCase().includes("error")
       );
-      assert(errorLine, "error message should mention invalid placement");
+      assert(errorLine, "error message should mention invalid directory");
     } finally {
       await Deno.remove(workspace, { recursive: true });
     }

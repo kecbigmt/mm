@@ -1,8 +1,8 @@
 import type { Item } from "../../../domain/models/item.ts";
-import type { PlacementRange } from "../../../domain/primitives/placement_range.ts";
+import type { DirectoryRange } from "../../../domain/primitives/directory_range.ts";
 import type { SectionSummary } from "../../../domain/services/section_query_service.ts";
 import { type CalendarDay, parseCalendarDay } from "../../../domain/primitives/calendar_day.ts";
-import { createPlacement, type Placement } from "../../../domain/primitives/placement.ts";
+import { createDirectory, type Directory } from "../../../domain/primitives/directory.ts";
 import { profileSync } from "../../../shared/profiler.ts";
 
 /**
@@ -15,7 +15,7 @@ export type PartitionHeader =
   | Readonly<{ readonly kind: "date"; readonly date: CalendarDay }>
   | Readonly<{
     readonly kind: "itemSection";
-    readonly parent: Placement;
+    readonly parent: Directory;
     readonly sectionPrefix: number;
     readonly displayLabel: string;
   }>;
@@ -24,7 +24,7 @@ export type PartitionHeader =
  * A stub line representing a nested section with summary counts.
  */
 export type SectionStub = Readonly<{
-  readonly placement: Placement;
+  readonly directory: Directory;
   readonly relativePath: string;
   readonly itemCount: number;
   readonly sectionCount: number;
@@ -64,10 +64,10 @@ export type PartitionResult = Readonly<{
  */
 export type BuildPartitionsInput = Readonly<{
   readonly items: ReadonlyArray<Item>;
-  readonly range: PlacementRange;
+  readonly range: DirectoryRange;
   readonly sections: ReadonlyArray<SectionSummary>;
   readonly limit?: number;
-  readonly getDisplayLabel?: (parent: Placement, sectionPrefix: number) => string;
+  readonly getDisplayLabel?: (parent: Directory, sectionPrefix: number) => string;
 }>;
 
 const DEFAULT_LIMIT = 100;
@@ -121,18 +121,18 @@ const generateDateRange = (
  */
 const isItemHeadEvent = (item: Item): boolean => {
   return (
-    item.data.icon.toString() === "event" && item.data.placement.head.kind === "item"
+    item.data.icon.toString() === "event" && item.data.directory.head.kind === "item"
   );
 };
 
 /**
- * Build partitions for a single placement (no grouping needed).
+ * Build partitions for a single directory (no grouping needed).
  */
 const buildSinglePartition = (
   items: ReadonlyArray<Item>,
-  at: Placement,
+  at: Directory,
   sections: ReadonlyArray<SectionSummary>,
-  getDisplayLabel?: (parent: Placement, sectionPrefix: number) => string,
+  getDisplayLabel?: (parent: Directory, sectionPrefix: number) => string,
 ): PartitionResult => {
   const warnings: PartitionWarning[] = [];
 
@@ -156,8 +156,8 @@ const buildSinglePartition = (
   const stubs: SectionStub[] = sections
     .filter((s) => s.itemCount > 0 || s.sectionCount > 0)
     .map((s) => ({
-      placement: s.placement,
-      relativePath: s.placement.section.join("/") + "/",
+      directory: s.directory,
+      relativePath: s.directory.section.join("/") + "/",
       itemCount: s.itemCount,
       sectionCount: s.sectionCount,
     }));
@@ -166,7 +166,7 @@ const buildSinglePartition = (
     return { partitions: [], warnings };
   }
 
-  // Determine header based on placement head
+  // Determine header based on directory head
   let header: PartitionHeader;
   if (at.head.kind === "date") {
     header = { kind: "date", date: at.head.date };
@@ -174,8 +174,8 @@ const buildSinglePartition = (
     // Item or permanent head with optional section - use getDisplayLabel if available
     const sectionPrefix = at.section.length > 0 ? at.section[at.section.length - 1] : 0;
     const parent = at.section.length > 0
-      ? createPlacement(at.head, at.section.slice(0, -1))
-      : createPlacement(at.head, []);
+      ? createDirectory(at.head, at.section.slice(0, -1))
+      : createDirectory(at.head, []);
     const headStr = at.head.kind === "item" ? at.head.id.toString() : "permanent";
     const displayLabel = getDisplayLabel
       ? getDisplayLabel(parent, sectionPrefix)
@@ -234,12 +234,12 @@ const buildDateRangePartitions = (
     warnings.push({ kind: "dateRangeCapped", requested, limit });
   }
 
-  // Group items by their placement head date
+  // Group items by their directory head date
   const itemsByDate = profileSync("partition:groupByDate", () => {
     const map = new Map<string, Item[]>();
     for (const item of filteredItems) {
-      if (item.data.placement.head.kind === "date") {
-        const dateStr = item.data.placement.head.date.toString();
+      if (item.data.directory.head.kind === "date") {
+        const dateStr = item.data.directory.head.date.toString();
         const existing = map.get(dateStr) ?? [];
         existing.push(item);
         map.set(dateStr, existing);
@@ -269,16 +269,16 @@ const buildDateRangePartitions = (
 };
 
 /**
- * Build partitions for a numeric range under a parent placement.
+ * Build partitions for a numeric range under a parent directory.
  */
 const buildNumericRangePartitions = (
   items: ReadonlyArray<Item>,
-  parent: Placement,
+  parent: Directory,
   from: number,
   to: number,
   sections: ReadonlyArray<SectionSummary>,
   limit: number,
-  getDisplayLabel?: (parent: Placement, sectionPrefix: number) => string,
+  getDisplayLabel?: (parent: Directory, sectionPrefix: number) => string,
 ): PartitionResult => {
   const warnings: PartitionWarning[] = [];
 
@@ -308,17 +308,17 @@ const buildNumericRangePartitions = (
   // Group items by their section prefix (first segment after parent)
   const itemsByPrefix = new Map<number, Item[]>();
   for (const item of filteredItems) {
-    const placement = item.data.placement;
+    const dir = item.data.directory;
 
     // Check if this item is directly under the parent
-    if (!placementMatchesParent(placement, parent)) {
+    if (!directoryMatchesParent(dir, parent)) {
       continue;
     }
 
     // Get the section prefix (next segment after parent's section)
     const parentSectionLen = parent.section.length;
-    if (placement.section.length > parentSectionLen) {
-      const prefix = placement.section[parentSectionLen];
+    if (dir.section.length > parentSectionLen) {
+      const prefix = dir.section[parentSectionLen];
       if (prefix >= from && prefix <= cappedTo) {
         const existing = itemsByPrefix.get(prefix) ?? [];
         existing.push(item);
@@ -330,10 +330,10 @@ const buildNumericRangePartitions = (
   // Group sections by their prefix
   const sectionsByPrefix = new Map<number, SectionSummary[]>();
   for (const section of sections) {
-    const sectionPlacement = section.placement;
+    const sectionDir = section.directory;
     const parentSectionLen = parent.section.length;
-    if (sectionPlacement.section.length > parentSectionLen) {
-      const prefix = sectionPlacement.section[parentSectionLen];
+    if (sectionDir.section.length > parentSectionLen) {
+      const prefix = sectionDir.section[parentSectionLen];
       if (prefix >= from && prefix <= cappedTo) {
         const existing = sectionsByPrefix.get(prefix) ?? [];
         existing.push(section);
@@ -353,9 +353,9 @@ const buildNumericRangePartitions = (
       .filter((s) => s.itemCount > 0 || s.sectionCount > 0)
       .map((s) => {
         // Relative path from the prefix level
-        const relativeSection = s.placement.section.slice(parent.section.length + 1);
+        const relativeSection = s.directory.section.slice(parent.section.length + 1);
         return {
-          placement: s.placement,
+          directory: s.directory,
           relativePath: relativeSection.join("/") + "/",
           itemCount: s.itemCount,
           sectionCount: s.sectionCount,
@@ -388,22 +388,22 @@ const buildNumericRangePartitions = (
 };
 
 /**
- * Check if a placement's head matches the parent's head.
+ * Check if a directory's head matches the parent's head.
  */
-const placementMatchesParent = (placement: Placement, parent: Placement): boolean => {
-  if (placement.head.kind !== parent.head.kind) {
+const directoryMatchesParent = (dir: Directory, parent: Directory): boolean => {
+  if (dir.head.kind !== parent.head.kind) {
     return false;
   }
 
-  if (placement.head.kind === "date" && parent.head.kind === "date") {
-    return placement.head.date.equals(parent.head.date);
+  if (dir.head.kind === "date" && parent.head.kind === "date") {
+    return dir.head.date.equals(parent.head.date);
   }
 
-  if (placement.head.kind === "item" && parent.head.kind === "item") {
-    return placement.head.id.toString() === parent.head.id.toString();
+  if (dir.head.kind === "item" && parent.head.kind === "item") {
+    return dir.head.id.toString() === parent.head.id.toString();
   }
 
-  if (placement.head.kind === "permanent" && parent.head.kind === "permanent") {
+  if (dir.head.kind === "permanent" && parent.head.kind === "permanent") {
     return true; // Both are permanent, they match
   }
 
@@ -413,7 +413,7 @@ const placementMatchesParent = (placement: Placement, parent: Placement): boolea
 /**
  * Build default display label for item section partition.
  */
-const buildDefaultDisplayLabel = (parent: Placement, sectionPrefix: number): string => {
+const buildDefaultDisplayLabel = (parent: Directory, sectionPrefix: number): string => {
   let headStr: string;
   switch (parent.head.kind) {
     case "date":
@@ -435,7 +435,7 @@ const buildDefaultDisplayLabel = (parent: Placement, sectionPrefix: number): str
 };
 
 /**
- * Build partitions from sorted items based on the placement range.
+ * Build partitions from sorted items based on the directory range.
  *
  * This is a pure function that groups items into display partitions for `mm ls`.
  * It applies range expansion limits, skips empty prefixes, generates section stubs,

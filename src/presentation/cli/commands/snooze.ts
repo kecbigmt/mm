@@ -120,23 +120,23 @@ export function createSnoozeCommand() {
           continue;
         }
 
-        const itemPlacementResult = await pathResolver.resolvePath(
-          cwdResult.value.placement,
+        const itemPathResult = await pathResolver.resolvePath(
+          cwdResult.value.directory,
           itemExprResult.value,
         );
-        if (itemPlacementResult.type === "error") {
-          console.error(`Error processing ${itemRef}: ${itemPlacementResult.error.message}`);
+        if (itemPathResult.type === "error") {
+          console.error(`Error processing ${itemRef}: ${itemPathResult.error.message}`);
           continue;
         }
 
-        if (itemPlacementResult.value.head.kind !== "item") {
+        if (itemPathResult.value.head.kind !== "item") {
           console.error(
             `Error processing ${itemRef}: expression must resolve to an item, not a date`,
           );
           continue;
         }
 
-        const itemId = itemPlacementResult.value.head.id;
+        const itemId = itemPathResult.value.head.id;
 
         const workflowResult = await SnoozeItemWorkflow.execute(
           {
