@@ -86,7 +86,7 @@ All user-provided paths are resolved to placement before being stored in frontma
 
 ```
 /<workspace-root>/
-  workspace.json                          # { timezone: "Asia/Tokyo", sync: {...} }
+  workspace.json                          # { schema, migration, timezone, sync }
   items/
     YYYY/MM/DD/
       <uuidv7>.md                         # Single file: YAML Frontmatter + Markdown body
@@ -181,7 +181,7 @@ All user-provided paths are resolved to placement before being stored in frontma
   UUIDs).
 - `rank` is valid LexoRank format.
 - `created_at`, `updated_at` are valid ISO-8601 timestamps.
-- `schema` is present (e.g., `mm.item.frontmatter/3`).
+- `schema` is present (e.g., `mm.item.frontmatter/4`).
 - `alias` (if present) follows alias rules (no reserved tokens, unique canonical_key).
 - YAML is valid and parseable; UTF-8 (NFC), LF newlines.
 
@@ -195,6 +195,7 @@ All user-provided paths are resolved to placement before being stored in frontma
 **Maintenance:**
 
 - `mm doctor check`: Validate workspace integrity (inspection only, no modifications).
+- `mm doctor migrate`: Migrate workspace data to the latest version. See [migration.md](migration.md).
 - `mm doctor rebuild-index`: Rebuild `.index/graph` and `.index/aliases` from all Frontmatter data.
 - `mm doctor rebalance-rank <paths...>`: Rebalance LexoRank values for items in specified paths to
   restore insertion headroom.

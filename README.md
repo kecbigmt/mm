@@ -533,6 +533,16 @@ inconsistencies, and index sync problems.
 mm doctor check
 ```
 
+#### `doctor migrate`
+
+Migrate workspace data to the latest migration version. Commands are blocked when the workspace is
+outdated. Supports dry-run, Git pre-checks, and interactive confirmation.
+
+```sh
+mm doctor migrate            # Run migration
+mm doctor migrate --dry-run  # Preview without changes
+```
+
 #### `doctor rebuild-index`
 
 Rebuild `.index/` directory from item frontmatter. Use after cloning workspace or when index is
