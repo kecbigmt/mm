@@ -2,6 +2,7 @@ import { Command } from "@cliffy/command";
 import { createCheckCommand } from "./check.ts";
 import { createRebuildIndexCommand } from "./rebuild_index.ts";
 import { rebalanceRankCommand } from "./rebalance_rank.ts";
+import { createMigrateCommand } from "./migrate.ts";
 
 /**
  * Create the parent doctor command with all subcommands
@@ -16,8 +17,10 @@ export const createDoctorCommand = () =>
       console.log("  check           Inspect workspace integrity without modifications");
       console.log("  rebuild-index   Rebuild .index/ from Item frontmatter");
       console.log("  rebalance-rank  Rebalance LexoRank values for siblings");
+      console.log("  migrate         Migrate workspace to latest schema version");
       console.log("\nRun 'mm doctor <command> --help' for more information.");
     })
     .command("check", createCheckCommand())
     .command("rebuild-index", createRebuildIndexCommand())
-    .command("rebalance-rank", rebalanceRankCommand);
+    .command("rebalance-rank", rebalanceRankCommand)
+    .command("migrate", createMigrateCommand());
