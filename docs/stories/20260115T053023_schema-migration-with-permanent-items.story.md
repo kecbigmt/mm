@@ -192,17 +192,151 @@ Aborting migration.
 ---
 
 ### Completed Work Summary
-Not yet started.
 
-### Acceptance Checks
+#### Implementation (Red-Green)
 
-**Status: Pending Product Owner Review**
+**Status: Complete - Ready for Refactor**
 
-Developer verification completed:
-- [List what the developer manually verified]
-- [Note any observations or findings]
+**Implemented:**
+- AC#1 (Workspace Schema Version Tracking): New workspaces get `mm.workspace/2`, migration updates from `/1` to `/2`
+- AC#2 (Workspace-level Schema Detection): Commands blocked when schema is `mm.workspace/1`, except `mm doctor migrate`
+- AC#3 (Item-level Schema Detection): Old-format items with alias strings fail domain `parseItem` validation
+- AC#4 (Pre-checks): Scans items, checks Git for uncommitted/unpushed changes
+- AC#5 (Confirmation): Interactive y/N prompt before migration
+- AC#6 (Permanent Item Creation): Creates permanent items for unique aliases using `buildTopicItem`/`persistPreparedTopic`
+- AC#7 (Frontmatter Update): Replaces alias strings with UUIDs, bumps schema to `mm.item.frontmatter/4`
+- AC#8 (Dry-run Mode): `--dry-run` flag performs analysis without changes
+- AC#9 (Error Handling): Reports errors with item paths and alias names
+- AC#10 (Multi-device Safety): Warning message in confirmation prompt
 
-**Awaiting product owner acceptance testing before marking this user story as complete.**
+**Files Created:**
+- `src/domain/models/workspace_schema.ts` - Schema version constants
+- `src/infrastructure/fileSystem/workspace_schema_reader.ts` - Raw schema reading/writing
+- `src/infrastructure/fileSystem/migration_scanner.ts` - Raw item scanning for migration
+- `src/domain/workflows/migrate_schema.ts` - Migration workflow logic
+- `src/presentation/cli/commands/doctor/migrate.ts` - CLI migrate command
+- `tests/e2e/scenarios/scenario_31_schema_migration_test.ts` - E2E tests
+
+**Files Modified:**
+- `src/infrastructure/fileSystem/workspace_repository.ts` - Use CURRENT_WORKSPACE_SCHEMA constant
+- `src/infrastructure/fileSystem/item_repository.ts` - Use CURRENT_ITEM_SCHEMA constant
+- `src/presentation/cli/commands/doctor/mod.ts` - Register migrate command
+- `src/domain/services/version_control_service.ts` - Added hasUnpushedCommits
+- `src/infrastructure/git/git_client.ts` - Implemented hasUnpushedCommits
+- `src/presentation/cli/dependencies.ts` - Added schema check with skipSchemaCheck option
+- `src/presentation/cli/commands/list.ts` - Fixed error handling to Deno.exit(1)
+- Multiple test files updated for schema /3→/4 and hasUnpushedCommits mock
+
+**Tests:**
+- `tests/e2e/scenarios/scenario_31_schema_migration_test.ts`: AC#1, AC#2, AC#7, AC#8, AC#6+7 full migration
+- Status: All passing (34 passed, 1 pre-existing failure in completions_test)
+
+**Decisions:**
+- Used raw frontmatter scanning (migration_scanner.ts) to read old-format items without domain parsing
+- Leveraged existing `buildTopicItem`/`persistPreparedTopic` for permanent item creation
+- Schema blocking in `loadCliDependencies` with `skipSchemaCheck` option for migrate command
+- Changed `Deno.exit(1)` in list command error path for proper exit codes
+
+**Technical debt:**
+- migration_scanner.ts has manual YAML parsing that could use the existing frontmatter module
+- migrate.ts CLI command is large (~300 lines) and could be split into smaller functions
+- Some duplication between migration_scanner and existing workspace_scanner patterns
+
+**Next:** Refactor
+
+#### Refactoring
+**Status: Complete - Ready for Verify**
+**Applied:**
+- Fix domain/infrastructure layering: Moved pure types (RawItemFrontmatter, RawItemFile, MigrationScanError) and pure functions (looksLikeUuid, itemNeedsAliasMigration, collectAliasStrings, itemNeedsSchemaBump) from infrastructure/migration_scanner.ts to domain/workflows/migrate_schema.ts. Domain no longer imports from infrastructure (loose coupling).
+- Eliminate UUID regex duplication: Extracted shared `looksLikeUuid` function and `resolveAliasValue` helper to replace three inline UUID regex patterns in migrateItemFrontmatter (single responsibility, DRY).
+- Decompose monolithic CLI command: Split migrate.ts action handler (~300 lines) into focused functions: scanItems, findExistingAliases, buildExistingAliasMap, createPermanentItems, updateItemFrontmatter, reportMigrationErrors (single responsibility).
+- Replace ReturnType<typeof ...> with named types (MigrationPlan, MigrationScanResult) in function signatures for clarity.
+- Replace complex extracted type for deps parameter in performGitChecks with explicit VersionControlService and CliDependencies types (coupling reduction).
+- Extract shared file_walker.ts: Eliminated duplicated walkMarkdownFiles/walkEdgeFiles/walkAliasFiles from workspace_scanner.ts and migration_scanner.ts into a single `walkFiles(dir, suffix)` function (DRY, cohesion).
+- Remove unused parseYaml import from E2E test file (lint cleanup).
+**Design:** Domain types now live in domain layer; infrastructure imports from domain (correct dependency direction). CLI command decomposed into phases matching workflow structure.
+**Quality:** Tests passing (34), Linting clean, Formatting clean
+**Next:** Verify
+
+### Verification
+
+**Status: Verified - Ready for Code Review**
+
+**Date:** 2026-02-16
+
+**Test Suite:** All passing (690 passed, 1 pre-existing failure in completions_test.ts)
+- New E2E tests: 12 test steps in scenario_31_schema_migration_test.ts - ALL PASS
+
+**Quality Checks:**
+- Linting: Clean (269 files checked)
+- Formatting: Clean (271 files checked)
+- Debug statements: None (all console output is legitimate presentation layer)
+- TODOs: All contextualized
+
+**Acceptance Criteria Verification:**
+
+**AC#1 (Workspace Schema Version Tracking): PASS**
+- E2E test confirms new workspaces get `mm.workspace/2`
+- Migration updates workspace.json from /1 to /2
+- Evidence: scenario_31_schema_migration_test.ts lines 35-52
+
+**AC#2 (Workspace-level Schema Detection): PASS**
+- Commands blocked when schema is /1 with correct error message
+- `mm doctor migrate` NOT blocked (skipSchemaCheck option)
+- Commands work when schema is /2
+- Evidence: dependencies.ts lines 236-247, E2E tests lines 54-78
+
+**AC#3 (Item-level Schema Detection): PASS**
+- parseItemId() validates UUID format, rejects alias strings
+- Domain parsing fails for old-format items
+- Evidence: item_id.ts lines 46-52, item.ts lines 519-524
+
+**AC#4 (Migration Pre-checks): PASS**
+- Scans items and reports count
+- Checks Git uncommitted changes and unpushed commits
+- Shows appropriate messages
+- Evidence: migrate.ts performGitChecks() lines 282-332
+
+**AC#5 (Confirmation Prompt): PASS**
+- Proper confirmation message with multi-device warning
+- Only 'y' proceeds, any other input cancels
+- Evidence: migrate.ts lines 334-372
+
+**AC#6 (Permanent Item Creation): PASS**
+- E2E test confirms topic items created
+- Collects unique aliases, skips existing
+- Progress messages shown
+- Evidence: E2E test lines 143-185, migrate.ts lines 127-182
+
+**AC#7 (Frontmatter Update): PASS**
+- E2E test confirms schema /3 → /4
+- Alias strings replaced with UUIDs
+- UUIDs unchanged when already present
+- Evidence: E2E test lines 80-115, migrate.ts lines 190-226
+
+**AC#8 (Dry-run Mode): PASS**
+- --dry-run performs analysis without changes
+- Shows "Will create/update" messages
+- Evidence: E2E test lines 117-141, migrate.ts lines 252-279
+
+**AC#9 (Error Handling): PASS**
+- Errors reported with path and alias name
+- First 10 errors shown, summary for more
+- Exit code 1 on errors, schema NOT updated
+- Idempotency: buildMigrationPlan filters existing aliases
+- Evidence: migrate.ts lines 233-248, migrate_schema.ts line 123
+
+**AC#10 (Multi-device Safety): PASS**
+- Warning message includes all required text
+- Evidence: migrate.ts lines 353-356
+
+**Observations:**
+- All 10 acceptance criteria groups verified through E2E tests and code review
+- Pre-existing completions_test.ts failure unrelated to this work (bash/zsh unavailable in NixOS)
+- Implementation follows domain-driven design principles with proper layering
+- Error handling is comprehensive with proper exit codes
+
+**Next:** Code Review
 
 ### Follow-ups / Open Risks
 
