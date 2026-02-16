@@ -32,6 +32,7 @@ import { dateTimeFromDate } from "../../../../domain/primitives/date_time.ts";
 import { Result } from "../../../../shared/result.ts";
 import type { AliasRepository } from "../../../../domain/repositories/alias_repository.ts";
 import type { VersionControlService } from "../../../../domain/services/version_control_service.ts";
+import { executeAutoCommit } from "../../auto_commit_helper.ts";
 
 // --- Progress display helpers ---
 
@@ -463,10 +464,25 @@ export function createMigrateCommand() {
       console.log(`\u2713 Updated workspace schema`);
 
       console.log(`\n\u2713 Migration completed successfully`);
+
+      // Auto-commit/sync if configured
+      await executeAutoCommit(
+        {
+          workspaceRoot,
+          versionControlService: deps.versionControlService,
+          workspaceRepository: deps.workspaceRepository,
+          stateRepository: deps.stateRepository,
+        },
+        `migrate workspace schema to ${CURRENT_WORKSPACE_SCHEMA}`,
+      );
+
       console.log(`\nNext steps:`);
       console.log(
-        `  - Commit the changes: git add -A && git commit -m "chore: migrate to schema v4"`,
+        `  - Verify changes: git status`,
       );
-      console.log(`  - Push to remote: git push`);
+      console.log(
+        `  - If not auto-committed: git add -A && git commit -m "chore: migrate to schema v4"`,
+      );
+      console.log(`  - If not auto-pushed: git push`);
     });
 }
