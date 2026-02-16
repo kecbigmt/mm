@@ -265,10 +265,12 @@ function displayDryRunResults(
   console.log(`\nRun without --dry-run to apply the migration.`);
 }
 
+type GitCheckResult = "ok" | "failed" | "no_git";
+
 async function performGitChecks(
   vcs: VersionControlService,
   workspaceRoot: string,
-): Promise<boolean> {
+): Promise<GitCheckResult> {
   let ok = true;
 
   const uncommittedResult = await vcs.hasUncommittedChanges(workspaceRoot);
@@ -277,12 +279,13 @@ async function performGitChecks(
       uncommittedResult.error.kind === "VersionControlNotAvailableError" ||
       uncommittedResult.error.kind === "VersionControlNotInitializedError"
     ) {
-      console.log("\u2713 Git not detected, skipping Git checks");
-      return true;
+      return "no_git";
     }
     console.log(`\u2717 Error checking Git status: ${uncommittedResult.error.message}`);
-    return false;
+    return "failed";
   }
+
+  console.log("\nChecking Git status...");
 
   if (uncommittedResult.value) {
     console.log(`\u2717 Uncommitted changes detected`);
@@ -306,11 +309,11 @@ async function performGitChecks(
   if (!ok) {
     console.log(`\nPlease commit and push your changes before migrating.`);
     console.log(`This ensures no conflicts occur during multi-device sync.`);
-  } else {
-    console.log(`\u2713 Working directory clean`);
+    return "failed";
   }
 
-  return ok;
+  console.log(`\u2713 Working directory clean`);
+  return "ok";
 }
 
 function displayMigrationSummary(
@@ -318,6 +321,7 @@ function displayMigrationSummary(
   allRefs: ReadonlyArray<string>,
   currentMigration: number,
   targetMigration: number,
+  hasGit: boolean,
 ): void {
   console.log(`\nThis will:`);
   let stepNum = 1;
@@ -335,10 +339,12 @@ function displayMigrationSummary(
     `  ${stepNum}. Update migration version: ${currentMigration} \u2192 ${targetMigration}`,
   );
 
-  console.log(`\n\u26a0\ufe0f  Before migrating:`);
-  console.log(`  - Commit all local changes`);
-  console.log(`  - Push to remote (if using Git sync)`);
-  console.log(`  - Run on ONE device only to avoid conflicts`);
+  if (hasGit) {
+    console.log(`\n\u26a0\ufe0f  Before migrating:`);
+    console.log(`  - Commit all local changes`);
+    console.log(`  - Push to remote (if using Git sync)`);
+    console.log(`  - Run on ONE device only to avoid conflicts`);
+  }
 }
 
 async function promptConfirmation(): Promise<boolean> {
@@ -431,15 +437,15 @@ export function createMigrateCommand() {
       }
 
       // Phase 2: Git checks
-      console.log("\nChecking Git status...");
-      const gitChecksOk = await performGitChecks(deps.versionControlService, workspaceRoot);
-      if (!gitChecksOk) {
+      const gitResult = await performGitChecks(deps.versionControlService, workspaceRoot);
+      if (gitResult === "failed") {
         console.log("\nAborting migration.");
         Deno.exit(1);
       }
 
       // Phase 3: Confirmation prompt
-      displayMigrationSummary(analyses, aliasesToCreate, currentMigration, targetMigration);
+      const hasGit = gitResult === "ok";
+      displayMigrationSummary(analyses, aliasesToCreate, currentMigration, targetMigration, hasGit);
       const confirmed = await promptConfirmation();
       if (!confirmed) {
         console.log("Migration cancelled.");
