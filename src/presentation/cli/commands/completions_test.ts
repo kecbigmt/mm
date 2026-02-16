@@ -245,8 +245,8 @@ Deno.test({
     // Inner _arguments calls need -C so that ->state actions set $state
     assertStringIncludes(
       output,
-      "_arguments -C $create_flags",
-      "create command _arguments should use -C flag",
+      "_arguments -C '1:title:' $create_flags",
+      "create command _arguments should use -C flag with positional title arg",
     );
     assertStringIncludes(
       output,

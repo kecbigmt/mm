@@ -120,7 +120,7 @@ _mm() {
             local cmd="$line[1]"
             case "$cmd" in
                 note|n|task|t|event|ev)
-                    _arguments -C $create_flags $common_flags
+                    _arguments -C '1:title:' $create_flags $common_flags
                     case "$state" in
                         project_aliases|context_aliases)
                             local -a aliases
