@@ -81,20 +81,22 @@ export function createNoteCommand() {
         }
       }
 
-      const cwdResult = await CwdResolutionService.getCwd(
-        {
-          stateRepository: deps.stateRepository,
-          itemRepository: deps.itemRepository,
-        },
-        now,
-      );
+      const cwdResult = await CwdResolutionService.getCwd({
+        sessionRepository: deps.sessionRepository,
+        workspacePath: deps.root,
+        itemRepository: deps.itemRepository,
+        timezone: deps.timezone,
+      });
       if (cwdResult.type === "error") {
         console.error(formatError(cwdResult.error, debug));
         return;
       }
+      if (cwdResult.value.warning) {
+        console.error(`Warning: ${cwdResult.value.warning}`);
+      }
 
       // Resolve parent placement
-      let parentPlacement = cwdResult.value;
+      let parentPlacement = cwdResult.value.placement;
 
       if (placementArg === "permanent") {
         // Use permanent placement
@@ -117,7 +119,7 @@ export function createNoteCommand() {
         });
 
         const resolveResult = await pathResolver.resolvePath(
-          cwdResult.value,
+          cwdResult.value.placement,
           exprResult.value,
         );
 

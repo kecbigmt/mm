@@ -39,6 +39,7 @@ export function createRemoveCommand() {
 
       const workflowResult = await RemoveItemWorkflow.execute({
         itemIds: ids,
+        timezone: deps.timezone,
       }, {
         itemRepository: deps.itemRepository,
         aliasRepository: deps.aliasRepository,

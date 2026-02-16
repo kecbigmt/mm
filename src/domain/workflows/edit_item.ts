@@ -15,7 +15,6 @@ import {
   parseDateTime,
   parseDuration,
   parseItemIcon,
-  parseItemId,
   parseItemTitle,
   TimezoneIdentifier,
 } from "../primitives/mod.ts";
@@ -30,6 +29,7 @@ import {
   PreparedTopic,
   TopicBuildError,
 } from "../services/topic_auto_creation_service.ts";
+import { createItemLocatorService } from "../services/item_locator_service.ts";
 
 export type EditItemInput = Readonly<{
   itemLocator: string;
@@ -82,34 +82,31 @@ export const EditItemWorkflow = {
     const createdTopics: AliasSlug[] = [];
     // Collect prepared topics during validation; persist only after all validation passes
     const pendingTopics: PreparedTopic[] = [];
-    let item: Item | undefined;
-    const uuidResult = parseItemId(input.itemLocator);
 
-    if (uuidResult.type === "ok") {
-      const loadResult = await deps.itemRepository.load(uuidResult.value);
-      if (loadResult.type === "error") {
-        return Result.error(loadResult.error);
-      }
-      item = loadResult.value;
-    } else {
-      const aliasResult = parseAliasSlug(input.itemLocator);
-      if (aliasResult.type === "ok") {
-        const aliasLoadResult = await deps.aliasRepository.load(aliasResult.value);
-        if (aliasLoadResult.type === "error") {
-          return Result.error(aliasLoadResult.error);
-        }
-        const alias = aliasLoadResult.value;
-        if (alias) {
-          const itemLoadResult = await deps.itemRepository.load(alias.data.itemId);
-          if (itemLoadResult.type === "error") {
-            return Result.error(itemLoadResult.error);
-          }
-          item = itemLoadResult.value;
-        }
-      }
-    }
+    const locatorService = createItemLocatorService({
+      itemRepository: deps.itemRepository,
+      aliasRepository: deps.aliasRepository,
+      timezone: input.timezone,
+    });
+    const resolveResult = await locatorService.resolve(input.itemLocator);
 
-    if (!item) {
+    if (resolveResult.type === "error") {
+      const locatorError = resolveResult.error;
+      if (locatorError.kind === "repository_error") {
+        return Result.error(locatorError.error);
+      }
+      if (locatorError.kind === "ambiguous_prefix") {
+        return Result.error(
+          createValidationError("EditItem", [
+            createValidationIssue(
+              `Ambiguous prefix '${locatorError.locator}': matches ${
+                locatorError.candidates.join(", ")
+              }`,
+              { code: "ambiguous_prefix", path: ["itemLocator"] },
+            ),
+          ]),
+        );
+      }
       return Result.error(
         createValidationError("EditItem", [
           createValidationIssue(`Item not found: ${input.itemLocator}`, {
@@ -119,6 +116,8 @@ export const EditItemWorkflow = {
         ]),
       );
     }
+
+    const item = resolveResult.value;
 
     let updatedItem = item;
     const issues: Array<{ field: string; message: string }> = [];

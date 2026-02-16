@@ -124,8 +124,8 @@ describe("Scenario: Snooze Feature", () => {
     const snoozeResult = await runCommand(ctx.testHome, ["snooze", taskId, "tomorrow"]);
     assertEquals(snoozeResult.success, true, `Snooze failed: ${snoozeResult.stderr}`);
 
-    // Verify item was moved to tomorrow
-    const whereResult = await runCommand(ctx.testHome, ["where", taskId]);
+    // Verify item was moved to tomorrow (use --logical to see placement date)
+    const whereResult = await runCommand(ctx.testHome, ["where", taskId, "--logical"]);
     assertEquals(whereResult.success, true, `where failed: ${whereResult.stderr}`);
 
     // Calculate tomorrow's date
@@ -321,8 +321,8 @@ describe("Scenario: Snooze Feature", () => {
     const snoozeTomorrowResult = await runCommand(ctx.testHome, ["snooze", task1Id, "tomorrow"]);
     assertEquals(snoozeTomorrowResult.success, true, "Snooze to tomorrow should succeed");
 
-    // Step 11: Verify Task 1 moved to tomorrow
-    const whereResult = await runCommand(ctx.testHome, ["where", task1Id]);
+    // Step 11: Verify Task 1 moved to tomorrow (use --logical to see placement date)
+    const whereResult = await runCommand(ctx.testHome, ["where", task1Id, "--logical"]);
     assertEquals(whereResult.success, true, "where should succeed");
     const [year, month, day] = today.split("-").map(Number);
     const todayDate = new Date(year, month - 1, day);

@@ -111,7 +111,7 @@ Deno.test({
 
 Deno.test({
   name: "loadCliDependencies uses provided workspace path",
-  permissions: { env: true, read: true, write: true },
+  permissions: { env: true, read: true, write: true, sys: true },
   async fn() {
     const workspace = await Deno.makeTempDir({ prefix: "mm-cli-load-workspace-" });
     try {
@@ -129,7 +129,7 @@ Deno.test({
 
 Deno.test({
   name: "loadCliDependencies resolves current workspace from config",
-  permissions: { env: true, read: true, write: true },
+  permissions: { env: true, read: true, write: true, sys: true },
   async fn() {
     await withTempMmHome(async (home) => {
       const workspacePath = join(home, "workspaces", "home");

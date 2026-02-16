@@ -43,17 +43,20 @@ export const rebalanceRankCommand = new Command()
     console.log(`Target paths: ${paths.join(", ")}\n`);
 
     // Get current CWD for path resolution
-    const cwdResult = await CwdResolutionService.getCwd(
-      {
-        stateRepository: deps.stateRepository,
-        itemRepository: deps.itemRepository,
-      },
-      now,
-    );
+    const cwdResult = await CwdResolutionService.getCwd({
+      sessionRepository: deps.sessionRepository,
+      workspacePath: deps.root,
+      itemRepository: deps.itemRepository,
+      timezone: deps.timezone,
+    });
 
     if (cwdResult.type === "error") {
       console.error(`Error resolving CWD: ${cwdResult.error.message}`);
       Deno.exit(1);
+    }
+
+    if (cwdResult.value.warning) {
+      console.error(`Warning: ${cwdResult.value.warning}`);
     }
 
     // Create path resolver
@@ -78,7 +81,7 @@ export const rebalanceRankCommand = new Command()
 
       // Resolve to PlacementRange
       const resolveResult = await pathResolver.resolveRange(
-        cwdResult.value,
+        cwdResult.value.placement,
         rangeExprResult.value,
       );
       if (resolveResult.type === "error") {

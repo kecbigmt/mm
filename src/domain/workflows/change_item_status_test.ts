@@ -6,6 +6,7 @@ import {
   dateTimeFromDate,
   itemStatusClosed,
   itemStatusOpen,
+  parseTimezoneIdentifier,
 } from "../primitives/mod.ts";
 import { itemIdFromString } from "../primitives/item_id.ts";
 import { itemTitleFromString } from "../primitives/item_title.ts";
@@ -15,6 +16,7 @@ import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.t
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
 
 const createAliasRepository = (): InMemoryAliasRepository => new InMemoryAliasRepository();
+const testTimezone = Result.unwrap(parseTimezoneIdentifier("UTC"));
 
 async function createTestItem(id: string, status: "open" | "closed" = "open") {
   // Use actual UUID v7 format for testing
@@ -52,6 +54,7 @@ Deno.test("ChangeItemStatusWorkflow - close single open item", async () => {
     itemIds: [item.data.id.toString()],
     action: "close",
     occurredAt: now,
+    timezone: testTimezone,
   }, {
     itemRepository: repository,
     aliasRepository: createAliasRepository(),
@@ -76,6 +79,7 @@ Deno.test("ChangeItemStatusWorkflow - reopen single closed item", async () => {
     itemIds: [item.data.id.toString()],
     action: "reopen",
     occurredAt: now,
+    timezone: testTimezone,
   }, {
     itemRepository: repository,
     aliasRepository: createAliasRepository(),
@@ -102,6 +106,7 @@ Deno.test("ChangeItemStatusWorkflow - close multiple items", async () => {
     itemIds: [item1.data.id.toString(), item2.data.id.toString()],
     action: "close",
     occurredAt: now,
+    timezone: testTimezone,
   }, {
     itemRepository: repository,
     aliasRepository: createAliasRepository(),
@@ -127,6 +132,7 @@ Deno.test("ChangeItemStatusWorkflow - idempotent close", async () => {
     itemIds: [item.data.id.toString()],
     action: "close",
     occurredAt: now,
+    timezone: testTimezone,
   }, {
     itemRepository: repository,
     aliasRepository: createAliasRepository(),
@@ -153,6 +159,7 @@ Deno.test("ChangeItemStatusWorkflow - partial failure", async () => {
     itemIds: [item1.data.id.toString(), nonExistentId],
     action: "close",
     occurredAt: now,
+    timezone: testTimezone,
   }, {
     itemRepository: repository,
     aliasRepository: createAliasRepository(),
@@ -175,6 +182,7 @@ Deno.test("ChangeItemStatusWorkflow - empty item list", async () => {
     itemIds: [],
     action: "close",
     occurredAt: now,
+    timezone: testTimezone,
   }, {
     itemRepository: repository,
     aliasRepository: createAliasRepository(),

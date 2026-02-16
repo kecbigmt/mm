@@ -12,6 +12,9 @@ export type ResolvedSegment =
     readonly date: CalendarDay;
   }>
   | Readonly<{
+    readonly kind: "permanent";
+  }>
+  | Readonly<{
     readonly kind: "item";
     readonly id: ItemId;
     readonly alias?: AliasSlug; // Optional alias for display
@@ -22,19 +25,25 @@ export type ResolvedSegment =
   }>;
 
 /**
- * ResolvedGraphPath represents a full path from root (date shelf) to an item
+ * ResolvedGraphPath represents a full path from root to an item
  * This is a view model for displaying paths to users
  *
- * The first segment must always be a date (root)
+ * The first segment must be a date or permanent (root)
  * Subsequent segments can be items or sections
  *
- * Example:
+ * Examples:
  * /2025-11-15/book-item/1/3
  * → [
  *     { kind: "date", date: "2025-11-15" },
  *     { kind: "item", id: "book-uuid", alias: "book" },
  *     { kind: "section", index: 1 },
  *     { kind: "section", index: 3 }
+ *   ]
+ *
+ * /permanent/my-topic
+ * → [
+ *     { kind: "permanent" },
+ *     { kind: "item", id: "topic-uuid", alias: "my-topic" }
  *   ]
  */
 export type ResolvedGraphPath = Readonly<{
@@ -51,8 +60,9 @@ export const createResolvedGraphPath = (
     throw new Error("ResolvedGraphPath must have at least one segment");
   }
 
-  if (segments[0].kind !== "date") {
-    throw new Error("ResolvedGraphPath must start with a date segment");
+  const rootKind = segments[0].kind;
+  if (rootKind !== "date" && rootKind !== "permanent") {
+    throw new Error("ResolvedGraphPath must start with a date or permanent segment");
   }
 
   return Object.freeze({
@@ -71,6 +81,9 @@ export const formatResolvedGraphPath = (path: ResolvedGraphPath): string => {
     switch (segment.kind) {
       case "date":
         parts.push(segment.date.toString());
+        break;
+      case "permanent":
+        parts.push("permanent");
         break;
       case "item":
         parts.push(segment.alias?.toString() ?? segment.id.toString());

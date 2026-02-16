@@ -54,6 +54,7 @@ export function createReopenCommand() {
         itemIds: ids,
         action: "reopen",
         occurredAt: occurredAtResult.value,
+        timezone: deps.timezone,
       }, {
         itemRepository: deps.itemRepository,
         aliasRepository: deps.aliasRepository,
