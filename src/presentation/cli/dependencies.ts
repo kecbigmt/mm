@@ -37,6 +37,8 @@ import { createGitVersionControlService } from "../../infrastructure/git/git_cli
 import { CacheUpdateService } from "../../infrastructure/completion_cache/cache_update_service.ts";
 import { CacheManager } from "../../infrastructure/completion_cache/cache_manager.ts";
 import { profileAsync, profileSync } from "../../shared/profiler.ts";
+import { readWorkspaceSchema } from "../../infrastructure/fileSystem/workspace_schema_reader.ts";
+import { CURRENT_WORKSPACE_SCHEMA } from "../../domain/models/workspace_schema.ts";
 
 export type CliDependencies = Readonly<{
   readonly root: string;
@@ -198,8 +200,13 @@ const determineWorkspaceRoot = async (
   return await determineWorkspaceFromName(repository, parsedName.value);
 };
 
+export type LoadCliDependenciesOptions = Readonly<{
+  skipSchemaCheck?: boolean;
+}>;
+
 export const loadCliDependencies = async (
   workspacePath?: string,
+  options?: LoadCliDependenciesOptions,
 ): Promise<Result<CliDependencies, CliDependencyError>> => {
   const homeResult = profileSync("deps:resolveMmHome", () => resolveMmHome());
   if (homeResult.type === "error") {
@@ -224,6 +231,21 @@ export const loadCliDependencies = async (
   }
 
   const root = rootResult.value;
+
+  // Check workspace schema version before loading full dependencies
+  if (!options?.skipSchemaCheck) {
+    const schemaResult = await readWorkspaceSchema(root);
+    if (
+      schemaResult.type === "ok" && schemaResult.value &&
+      schemaResult.value !== CURRENT_WORKSPACE_SCHEMA
+    ) {
+      return Result.error({
+        type: "workspace",
+        message: `Outdated workspace schema (${schemaResult.value}). Run: mm doctor migrate`,
+      });
+    }
+  }
+
   const workspaceResult = await profileAsync(
     "deps:workspaceRepository.load",
     () => workspaceRepository.load(root),

@@ -120,10 +120,10 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
     if (depsResult.error.type === "repository") {
       console.error(formatError(depsResult.error.error, debug));
     } else {
-      console.error(formatError(depsResult.error, debug));
+      console.error(`Error: ${depsResult.error.message}`);
     }
     profilerFinish();
-    return;
+    Deno.exit(1);
   }
 
   const deps = depsResult.value;
