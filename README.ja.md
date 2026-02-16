@@ -16,9 +16,10 @@ https://github.com/user-attachments/assets/38335df6-951c-4224-845e-61e96ddc007a
 ## 目次
 
 - [ドキュメント](#ドキュメント)
-- [前提条件](#前提条件)
-- [はじめに](#はじめに)
-- [リリース](#リリース)
+- [インストール](#インストール)
+  - [Homebrew (macOS)](#homebrew-macos)
+  - [ソースから](#ソースから)
+  - [ビルド済みバイナリ](#ビルド済みバイナリ)
 - [コマンド](#コマンド)
   - [アイテムの作成](#アイテムの作成)
   - [アイテムステータスの管理](#アイテムステータスの管理)
@@ -33,36 +34,17 @@ https://github.com/user-attachments/assets/38335df6-951c-4224-845e-61e96ddc007a
 
 プロダクト設計の詳細は [docs/steering/design.md](docs/steering/design.md) にあります。
 
-## 前提条件
+## インストール
 
-- macOS または Linux
-- [Deno](https://deno.com/) v2.x以降
-- Git（オプション、同期機能を使う場合に必要）
-
-## 利用方法
-
-まず、リポジトリをクローンします：
+### Homebrew (macOS)
 
 ```sh
-git clone https://github.com/kecbigmt/mm.git
-cd mm
+brew install kecbigmt/tap/mm
 ```
 
-### インストールせず試したいとき
+Denoランタイムを内蔵しているため、バイナリサイズは約86 MBになります。
 
-```sh
-deno task exec workspace init my-workspace
-deno task exec note "最初のノート"
-deno task exec list
-```
-
-### インストールしたいとき
-
-```sh
-deno task install
-```
-
-インストール後、どこからでも `mm` コマンドが使えるようになります：
+インストール後：
 
 ```sh
 mm workspace init my-workspace
@@ -70,13 +52,23 @@ mm note "最初のノート"
 mm list
 ```
 
-または、`deno task compile` でスタンドアロンバイナリをビルドすることもできます。
+### ソースから
 
-### リリース
+前提条件: [Deno](https://deno.com/) v2.x以降、Git（オプション、同期機能を使う場合に必要）
 
-**macOS Apple Silicon** 向けのビルド済みバイナリは
-[GitHub Releases](https://github.com/kecbigmt/mm/releases) で公開しています。必要なバージョンの
-`mm-<version>-darwin-arm64` をダウンロードしてください。`mm --version`
+```sh
+git clone https://github.com/kecbigmt/mm.git
+cd mm
+deno task install
+```
+
+または、`deno task compile` でスタンドアロンバイナリをビルドしたり、`deno task exec`
+でインストールせずに試すこともできます。
+
+### ビルド済みバイナリ
+
+**macOS**（Apple Silicon / Intel）向けのバイナリは
+[GitHub Releases](https://github.com/kecbigmt/mm/releases) で公開しています。`mm --version`
 で表示されるバージョンはリリースタグと一致します。
 
 **シェル補完（オプション）**: Zsh/Bash用のタブ補完を有効にするには、シェル設定に
