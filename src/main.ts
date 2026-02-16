@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write --allow-env --allow-run
+#!/usr/bin/env -S deno run --allow-read --allow-write --allow-env --allow-run --allow-net
 
 import { Command } from "@cliffy/command";
 import { bold } from "@std/fmt/colors";
@@ -22,6 +22,7 @@ import { createSyncCommand } from "./presentation/cli/commands/sync.ts";
 import { createConfigCommand } from "./presentation/cli/commands/config.ts";
 import { createCompletionsCommand } from "./presentation/cli/commands/completions.ts";
 import { VERSION } from "./version.ts";
+import { checkForUpdate } from "./infrastructure/update_checker.ts";
 
 /**
  * Default action for `mm` with no arguments.
@@ -67,6 +68,13 @@ async function main() {
     );
 
   await cli.parse(Deno.args);
+
+  const mmHome = Deno.env.get("MM_HOME") ||
+    (Deno.env.get("HOME") ? `${Deno.env.get("HOME")}/.mm` : null);
+  if (mmHome) {
+    const message = await checkForUpdate(VERSION, mmHome);
+    if (message) console.error(message);
+  }
 }
 
 if (import.meta.main) {

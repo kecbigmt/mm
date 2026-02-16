@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "exec": "deno run --allow-read --allow-write --allow-env --allow-run --allow-sys src/main.ts",
+    "exec": "deno run --allow-read --allow-write --allow-env --allow-run --allow-net --allow-sys src/main.ts",
     "test": "deno task test:all",
     "test:file": "deno test --allow-read --allow-write --allow-env --allow-run --allow-sys",
     "test:unit": "deno test --fail-fast=1 --allow-read --allow-write --allow-env --allow-run --allow-sys src/",
@@ -10,8 +10,8 @@
     "bench": "deno bench --allow-read --allow-write --allow-env --allow-run --allow-sys",
     "bench:unit": "deno bench --allow-read --allow-write --allow-env --allow-sys src/",
     "bench:e2e": "deno bench --allow-read --allow-write --allow-env --allow-run --allow-sys tests/performance/",
-    "compile": "deno compile --config=deno.json --allow-read --allow-write --allow-env --allow-run --allow-sys --output=mm src/main.ts",
-    "install": "deno install --global --config=deno.json --allow-read --allow-write --allow-env --allow-run --allow-sys --force --name mm src/main.ts",
+    "compile": "deno compile --config=deno.json --allow-read --allow-write --allow-env --allow-run --allow-net --allow-sys --output=mm src/main.ts",
+    "install": "deno install --global --config=deno.json --allow-read --allow-write --allow-env --allow-run --allow-net --allow-sys --force --name mm src/main.ts",
     "check-docs": "./scripts/check-docs.sh",
     "dev": "deno task --cwd=fresh dev"
   },
