@@ -3,26 +3,24 @@ import { type CliDependencies, loadCliDependencies } from "../../dependencies.ts
 import { formatError } from "../../error_formatter.ts";
 import { isDebugMode } from "../../debug.ts";
 import {
-  readWorkspaceSchema,
-  writeWorkspaceSchema,
+  readMigrationVersion,
+  writeMigrationVersion,
 } from "../../../../infrastructure/fileSystem/workspace_schema_reader.ts";
 import {
+  ALL_MIGRATION_STEPS,
+  analyzeSteps,
+  applySteps,
+  collectAllExternalReferences,
+  findApplicableSteps,
   scanRawItems,
   writeRawItemFile,
-} from "../../../../infrastructure/fileSystem/migration_scanner.ts";
-import {
-  buildMigrationPlan,
-  buildScanResult,
-  migrateItemFrontmatter,
-} from "../../../../domain/workflows/migrate_schema.ts";
+} from "../../../../infrastructure/fileSystem/migration/mod.ts";
 import type {
   MigrationItemError,
-  MigrationPlan,
   MigrationScanError,
-  MigrationScanResult,
   RawItemFile,
-} from "../../../../domain/workflows/migrate_schema.ts";
-import { CURRENT_WORKSPACE_SCHEMA } from "../../../../domain/models/workspace_schema.ts";
+} from "../../../../infrastructure/fileSystem/migration/mod.ts";
+import type { StepAnalysis } from "../../../../infrastructure/fileSystem/migration/mod.ts";
 import {
   buildTopicItem,
   persistPreparedTopic,
@@ -48,10 +46,10 @@ function clearProgress(): void {
 
 // --- Scanning phase ---
 
-/**
- * Scan all items in the workspace and build a scan result.
- */
-async function scanItems(workspaceRoot: string): Promise<MigrationScanResult> {
+async function scanItems(workspaceRoot: string): Promise<{
+  items: RawItemFile[];
+  parseErrors: MigrationScanError[];
+}> {
   console.log("Scanning items...");
   const items: RawItemFile[] = [];
   const parseErrors: MigrationScanError[] = [];
@@ -64,24 +62,17 @@ async function scanItems(workspaceRoot: string): Promise<MigrationScanResult> {
     }
   }
 
-  const scanResult = buildScanResult(items, parseErrors);
-
-  console.log(
-    `Found ${scanResult.totalItems} items (${scanResult.itemsWithAliases} with alias strings requiring conversion)`,
-  );
+  console.log(`Found ${items.length} items`);
 
   if (parseErrors.length > 0) {
     console.log(`\nWarning: ${parseErrors.length} items could not be parsed`);
   }
 
-  return scanResult;
+  return { items, parseErrors };
 }
 
 // --- Alias resolution phase ---
 
-/**
- * Find which aliases already have permanent items in the workspace.
- */
 async function findExistingAliases(
   aliases: ReadonlyArray<string>,
   aliasRepository: AliasRepository,
@@ -99,9 +90,6 @@ async function findExistingAliases(
   return existingAliases;
 }
 
-/**
- * Build alias-to-UUID map from existing permanent items.
- */
 async function buildExistingAliasMap(
   existingAliases: ReadonlySet<string>,
   aliasRepository: AliasRepository,
@@ -121,27 +109,23 @@ async function buildExistingAliasMap(
 
 // --- Permanent item creation phase ---
 
-/**
- * Create permanent items for aliases that do not yet exist.
- * Returns the alias-to-UUID map (including both existing and newly created).
- */
 async function createPermanentItems(
-  plan: MigrationPlan,
+  aliasesToCreate: ReadonlyArray<string>,
   existingAliases: ReadonlySet<string>,
   deps: CliDependencies,
 ): Promise<Map<string, string>> {
   const aliasToUuid = await buildExistingAliasMap(existingAliases, deps.aliasRepository);
 
-  if (plan.permanentItemsToCreate.length === 0) {
+  if (aliasesToCreate.length === 0) {
     return aliasToUuid;
   }
 
   const nowResult = dateTimeFromDate(new Date());
   const now = Result.unwrap(nowResult);
   let created = 0;
-  const total = plan.permanentItemsToCreate.length;
+  const total = aliasesToCreate.length;
 
-  for (const alias of plan.permanentItemsToCreate) {
+  for (const alias of aliasesToCreate) {
     const slugResult = parseAliasSlug(alias);
     if (slugResult.type === "error") {
       console.error(`Error: Invalid alias '${alias}', skipping`);
@@ -184,20 +168,17 @@ async function createPermanentItems(
 
 // --- Frontmatter update phase ---
 
-/**
- * Update all item frontmatter with UUID references and schema bump.
- * Returns migration errors encountered during the process.
- */
 async function updateItemFrontmatter(
-  scanResult: MigrationScanResult,
-  aliasToUuid: ReadonlyMap<string, string>,
+  items: ReadonlyArray<RawItemFile>,
+  steps: ReturnType<typeof findApplicableSteps>,
+  resolutionMap: ReadonlyMap<string, string>,
 ): Promise<MigrationItemError[]> {
   const migrationErrors: MigrationItemError[] = [];
   let updated = 0;
-  const totalToUpdate = scanResult.allItems.length;
+  const total = items.length;
 
-  for (const item of scanResult.allItems) {
-    const migrateResult = migrateItemFrontmatter(item.frontmatter, aliasToUuid);
+  for (const item of items) {
+    const migrateResult = applySteps(item.frontmatter, steps, resolutionMap);
 
     if (migrateResult.type === "error") {
       for (const err of migrateResult.error) {
@@ -217,7 +198,7 @@ async function updateItemFrontmatter(
     }
 
     updated++;
-    writeProgress(`Updating item frontmatter... (${updated}/${totalToUpdate})`);
+    writeProgress(`Updating item frontmatter... (${updated}/${total})`);
   }
 
   clearProgress();
@@ -228,9 +209,6 @@ async function updateItemFrontmatter(
 
 // --- Error reporting ---
 
-/**
- * Report migration errors. Returns true if errors occurred (migration should abort).
- */
 function reportMigrationErrors(errors: ReadonlyArray<MigrationItemError>): boolean {
   if (errors.length === 0) {
     return false;
@@ -244,37 +222,44 @@ function reportMigrationErrors(errors: ReadonlyArray<MigrationItemError>): boole
   if (errors.length > 10) {
     console.log(`  ... and ${errors.length - 10} more errors`);
   }
-  console.log(`\nWorkspace schema NOT updated due to errors.`);
+  console.log(`\nMigration version NOT updated due to errors.`);
   return true;
 }
 
 // --- Display helpers ---
 
-function displayDryRunResults(plan: MigrationPlan, _scanResult: MigrationScanResult): void {
+function displayDryRunResults(
+  analyses: ReadonlyArray<StepAnalysis>,
+  allRefs: ReadonlyArray<string>,
+  currentMigration: number,
+): void {
   console.log(`\nAnalysis Results:`);
-  if (plan.permanentItemsToCreate.length > 0) {
+  console.log(`  Current migration version: ${currentMigration}`);
+
+  for (const analysis of analyses) {
     console.log(
-      `  - Will create ${plan.permanentItemsToCreate.length} permanent items for aliases:`,
+      `\n  Step ${analysis.step.fromMigration} \u2192 ${analysis.step.toMigration}: ${analysis.step.description}`,
     );
-    const toShow = plan.permanentItemsToCreate.slice(0, 3);
-    for (const alias of toShow) {
-      console.log(`    \u2022 ${alias}`);
+    console.log(`    - ${analysis.applicableItems} items total`);
+    if (analysis.itemsWithTransformation > 0) {
+      console.log(`    - ${analysis.itemsWithTransformation} items with real changes`);
     }
-    if (plan.permanentItemsToCreate.length > 3) {
-      console.log(`    ... (${plan.permanentItemsToCreate.length - 3} more)`);
+    if (analysis.itemsWithSchemaBumpOnly > 0) {
+      console.log(`    - ${analysis.itemsWithSchemaBumpOnly} items with schema bump only`);
     }
-  } else {
-    console.log(`  - No new permanent items needed`);
   }
 
-  console.log(
-    `\n  - Will update ${plan.itemsToUpdate} item frontmatter files (schema /3 \u2192 /4)`,
-  );
-  if (plan.itemsWithAliasConversion > 0) {
-    console.log(`    \u2022 ${plan.itemsWithAliasConversion} items with alias string conversion`);
-  }
-  if (plan.itemsWithSchemaBumpOnly > 0) {
-    console.log(`    \u2022 ${plan.itemsWithSchemaBumpOnly} items with schema bump only`);
+  if (allRefs.length > 0) {
+    console.log(`\n  Will create ${allRefs.length} permanent items for aliases:`);
+    const toShow = allRefs.slice(0, 3);
+    for (const ref of toShow) {
+      console.log(`    \u2022 ${ref}`);
+    }
+    if (allRefs.length > 3) {
+      console.log(`    ... (${allRefs.length - 3} more)`);
+    }
+  } else {
+    console.log(`\n  No new permanent items needed`);
   }
 
   console.log(`\nRun without --dry-run to apply the migration.`);
@@ -286,10 +271,8 @@ async function performGitChecks(
 ): Promise<boolean> {
   let ok = true;
 
-  // Check uncommitted changes
   const uncommittedResult = await vcs.hasUncommittedChanges(workspaceRoot);
   if (uncommittedResult.type === "error") {
-    // Git not available or not initialized -- skip git checks
     if (
       uncommittedResult.error.kind === "VersionControlNotAvailableError" ||
       uncommittedResult.error.kind === "VersionControlNotInitializedError"
@@ -309,10 +292,8 @@ async function performGitChecks(
     console.log(`\u2713 No uncommitted changes`);
   }
 
-  // Check unpushed commits
   const unpushedResult = await vcs.hasUnpushedCommits(workspaceRoot);
   if (unpushedResult.type === "error") {
-    // Non-fatal: can't determine, skip
     console.log(`\u2713 Could not check for unpushed commits (no remote tracking?)`);
   } else if (unpushedResult.value) {
     console.log(`\u2717 Unpushed commits detected`);
@@ -332,23 +313,26 @@ async function performGitChecks(
   return ok;
 }
 
-function displayMigrationSummary(plan: MigrationPlan): void {
+function displayMigrationSummary(
+  analyses: ReadonlyArray<StepAnalysis>,
+  allRefs: ReadonlyArray<string>,
+  currentMigration: number,
+  targetMigration: number,
+): void {
   console.log(`\nThis will:`);
-  if (plan.permanentItemsToCreate.length > 0) {
-    console.log(
-      `  1. Create ${plan.permanentItemsToCreate.length} permanent items for aliases`,
-    );
+  let stepNum = 1;
+  if (allRefs.length > 0) {
+    console.log(`  ${stepNum}. Create ${allRefs.length} permanent items for aliases`);
+    stepNum++;
   }
-  const stepOffset = plan.permanentItemsToCreate.length > 0 ? 1 : 0;
+  for (const analysis of analyses) {
+    console.log(
+      `  ${stepNum}. ${analysis.step.description} (${analysis.applicableItems} items)`,
+    );
+    stepNum++;
+  }
   console.log(
-    `  ${
-      1 + stepOffset
-    }. Update ${plan.itemsToUpdate} item frontmatter files (schema /3 \u2192 /4)`,
-  );
-  console.log(
-    `  ${2 + stepOffset}. Update workspace schema: ${
-      plan.currentWorkspaceSchema ?? "unknown"
-    } \u2192 ${CURRENT_WORKSPACE_SCHEMA}`,
+    `  ${stepNum}. Update migration version: ${currentMigration} \u2192 ${targetMigration}`,
   );
 
   console.log(`\n\u26a0\ufe0f  Before migrating:`);
@@ -376,7 +360,7 @@ async function promptConfirmation(): Promise<boolean> {
 
 export function createMigrateCommand() {
   return new Command()
-    .description("Migrate workspace to latest schema version")
+    .description("Migrate workspace to latest migration version")
     .option("-w, --workspace <workspace:string>", "Workspace to override")
     .option("--dry-run", "Preview changes without applying them")
     .action(async (options: Record<string, unknown>) => {
@@ -401,25 +385,36 @@ export function createMigrateCommand() {
         console.log("Running in dry-run mode (no changes will be made)\n");
       }
 
-      // Phase 1: Scan items
-      const scanResult = await scanItems(workspaceRoot);
-
-      // Read workspace schema
-      const schemaResult = await readWorkspaceSchema(workspaceRoot);
-      if (schemaResult.type === "error") {
-        console.error(`Error reading workspace schema: ${schemaResult.error.message}`);
+      // Read current migration version
+      const migrationResult = await readMigrationVersion(workspaceRoot);
+      if (migrationResult.type === "error") {
+        console.error(`Error reading migration version: ${migrationResult.error.message}`);
         Deno.exit(2);
       }
+      const currentMigration = migrationResult.value;
 
-      // Identify which aliases already exist as permanent items
-      const existingAliases = await findExistingAliases(
-        scanResult.uniqueAliases,
-        deps.aliasRepository,
-      );
-      const plan = buildMigrationPlan(scanResult, schemaResult.value, existingAliases);
+      // Find applicable steps
+      const steps = findApplicableSteps(currentMigration, ALL_MIGRATION_STEPS);
+      if (steps.length === 0) {
+        console.log(`Workspace is already at migration version ${currentMigration} (up to date).`);
+        Deno.exit(0);
+      }
+
+      const targetMigration = steps[steps.length - 1].toMigration;
+
+      // Phase 1: Scan items
+      const { items, parseErrors: _ } = await scanItems(workspaceRoot);
+
+      // Analyze steps
+      const analyses = analyzeSteps(items, steps);
+      const allRefs = collectAllExternalReferences(items, steps);
+
+      // Find which aliases already exist
+      const existingAliases = await findExistingAliases(allRefs, deps.aliasRepository);
+      const aliasesToCreate = allRefs.filter((a) => !existingAliases.has(a));
 
       if (dryRun) {
-        displayDryRunResults(plan, scanResult);
+        displayDryRunResults(analyses, allRefs, currentMigration);
         Deno.exit(0);
       }
 
@@ -432,7 +427,7 @@ export function createMigrateCommand() {
       }
 
       // Phase 3: Confirmation prompt
-      displayMigrationSummary(plan);
+      displayMigrationSummary(analyses, aliasesToCreate, currentMigration, targetMigration);
       const confirmed = await promptConfirmation();
       if (!confirmed) {
         console.log("Migration cancelled.");
@@ -440,28 +435,26 @@ export function createMigrateCommand() {
       }
 
       // Phase 4: Create permanent items
-      const aliasToUuid = await createPermanentItems(plan, existingAliases, deps);
+      const aliasToUuid = await createPermanentItems(aliasesToCreate, existingAliases, deps);
 
       // Phase 5: Update item frontmatter
-      const migrationErrors = await updateItemFrontmatter(scanResult, aliasToUuid);
+      const migrationErrors = await updateItemFrontmatter(items, steps, aliasToUuid);
 
       // Phase 6: Handle errors
       if (reportMigrationErrors(migrationErrors)) {
         Deno.exit(1);
       }
 
-      // Phase 7: Update workspace schema
+      // Phase 7: Update migration version
       console.log(
-        `\nUpdating workspace schema: ${
-          schemaResult.value ?? "unknown"
-        } \u2192 ${CURRENT_WORKSPACE_SCHEMA}`,
+        `\nUpdating migration version: ${currentMigration} \u2192 ${targetMigration}`,
       );
-      const updateResult = await writeWorkspaceSchema(workspaceRoot, CURRENT_WORKSPACE_SCHEMA);
+      const updateResult = await writeMigrationVersion(workspaceRoot, targetMigration);
       if (updateResult.type === "error") {
-        console.error(`Error updating workspace schema: ${updateResult.error.message}`);
+        console.error(`Error updating migration version: ${updateResult.error.message}`);
         Deno.exit(1);
       }
-      console.log(`\u2713 Updated workspace schema`);
+      console.log(`\u2713 Updated migration version`);
 
       console.log(`\n\u2713 Migration completed successfully`);
 
@@ -473,7 +466,7 @@ export function createMigrateCommand() {
           workspaceRepository: deps.workspaceRepository,
           stateRepository: deps.stateRepository,
         },
-        `migrate workspace schema to ${CURRENT_WORKSPACE_SCHEMA}`,
+        `migrate workspace to migration version ${targetMigration}`,
       );
 
       console.log(`\nNext steps:`);
@@ -481,7 +474,7 @@ export function createMigrateCommand() {
         `  - Verify changes: git status`,
       );
       console.log(
-        `  - If not auto-committed: git add -A && git commit -m "chore: migrate to schema v4"`,
+        `  - If not auto-committed: git add -A && git commit -m "chore: migrate to v${targetMigration}"`,
       );
       console.log(`  - If not auto-pushed: git push`);
     });

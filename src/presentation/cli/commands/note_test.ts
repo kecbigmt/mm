@@ -55,7 +55,7 @@ Deno.test({
     try {
       await Deno.writeTextFile(
         join(workspace, "workspace.json"),
-        JSON.stringify({ timezone: "Asia/Tokyo" }, null, 2),
+        JSON.stringify({ schema: "mm.workspace/1", migration: 2, timezone: "Asia/Tokyo" }, null, 2),
       );
 
       const noteConsole = captureConsole();
@@ -159,7 +159,7 @@ Deno.test({
     try {
       await Deno.writeTextFile(
         join(workspace, "workspace.json"),
-        JSON.stringify({ timezone: "Asia/Tokyo" }, null, 2),
+        JSON.stringify({ schema: "mm.workspace/1", migration: 2, timezone: "Asia/Tokyo" }, null, 2),
       );
 
       const noteConsole = captureConsole();
@@ -246,7 +246,7 @@ Deno.test({
     try {
       await Deno.writeTextFile(
         join(workspace, "workspace.json"),
-        JSON.stringify({ timezone: "Asia/Tokyo" }, null, 2),
+        JSON.stringify({ schema: "mm.workspace/1", migration: 2, timezone: "Asia/Tokyo" }, null, 2),
       );
 
       const noteConsole = captureConsole();

@@ -8,7 +8,10 @@ import {
   parseWorkspaceSettings,
   WorkspaceSettings,
 } from "../../domain/models/workspace.ts";
-import { CURRENT_WORKSPACE_SCHEMA } from "../../domain/models/workspace_schema.ts";
+import {
+  CURRENT_MIGRATION_VERSION,
+  WORKSPACE_SCHEMA,
+} from "../../domain/models/workspace_schema.ts";
 import { WorkspaceName, workspaceNameFromString } from "../../domain/primitives/workspace_name.ts";
 import { TimezoneIdentifier } from "../../domain/primitives/timezone_identifier.ts";
 import { profileAsync, profileSync } from "../../shared/profiler.ts";
@@ -72,7 +75,11 @@ const writeWorkspaceSnapshot = async (
   snapshot: WorkspaceSnapshot,
 ): Promise<Result<void, RepositoryError>> => {
   try {
-    const payload = JSON.stringify({ schema: CURRENT_WORKSPACE_SCHEMA, ...snapshot }, null, 2);
+    const payload = JSON.stringify(
+      { schema: WORKSPACE_SCHEMA, migration: CURRENT_MIGRATION_VERSION, ...snapshot },
+      null,
+      2,
+    );
     await Deno.writeTextFile(path, `${payload}\n`);
     return Result.ok(undefined);
   } catch (error) {

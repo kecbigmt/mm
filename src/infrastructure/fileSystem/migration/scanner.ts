@@ -1,15 +1,8 @@
 import { join } from "@std/path";
-import { Result } from "../../shared/result.ts";
-import { parseFrontmatter, serializeFrontmatter } from "./frontmatter.ts";
-import { walkFiles } from "./file_walker.ts";
-import type {
-  MigrationScanError,
-  RawItemFile,
-  RawItemFrontmatter,
-} from "../../domain/workflows/migrate_schema.ts";
-
-// Re-export domain types for backward compatibility with existing consumers
-export type { MigrationScanError, RawItemFile, RawItemFrontmatter };
+import { Result } from "../../../shared/result.ts";
+import { parseFrontmatter, serializeFrontmatter } from "../frontmatter.ts";
+import { walkFiles } from "../file_walker.ts";
+import type { MigrationScanError, RawItemFile, RawItemFrontmatter } from "./types.ts";
 
 /**
  * Scan all raw item files in a workspace without domain-level parsing.

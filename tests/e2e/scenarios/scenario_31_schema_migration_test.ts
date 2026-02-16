@@ -2,12 +2,11 @@
  * E2E Test: Schema Migration (mm doctor migrate)
  *
  * Tests the schema migration workflow:
- * - Workspace schema blocking (AC#2)
+ * - New workspace has migration: 2 (AC#1)
+ * - Commands blocked when migration version is outdated (AC#2)
  * - Migration dry-run mode (AC#8)
  * - Migration execution with permanent item creation (AC#6)
  * - Frontmatter update (AC#7)
- * - Workspace schema update (AC#1)
- * - New workspace creation with v2 schema (AC#1)
  */
 
 import { assert, assertEquals } from "@std/assert";
@@ -34,7 +33,7 @@ describe("Schema Migration", () => {
   });
 
   describe("AC#1: Workspace Schema Version Tracking", () => {
-    it("new workspace has mm.workspace/2 schema", async () => {
+    it("new workspace has mm.workspace/1 schema and migration 2", async () => {
       const initResult = await initWorkspace(ctx.testHome, "home");
       assertEquals(initResult.success, true, `Init failed: ${initResult.stderr}`);
 
@@ -42,43 +41,44 @@ describe("Schema Migration", () => {
       const workspaceJson = JSON.parse(
         await Deno.readTextFile(join(workspacePath, "workspace.json")),
       );
-      assertEquals(workspaceJson.schema, "mm.workspace/2");
+      assertEquals(workspaceJson.schema, "mm.workspace/1");
+      assertEquals(workspaceJson.migration, 2);
     });
   });
 
   describe("AC#2: Workspace-level Schema Detection", () => {
-    it("blocks commands when workspace schema is mm.workspace/1", async () => {
-      // Create workspace first (will have v2)
+    it("blocks commands when migration version is missing (defaults to 1)", async () => {
+      // Create workspace first (will have migration: 2)
       const initResult = await initWorkspace(ctx.testHome, "home");
       assertEquals(initResult.success, true, `Init failed: ${initResult.stderr}`);
 
-      // Downgrade to v1
+      // Remove migration field to simulate pre-migration workspace
       const workspacePath = getWorkspacePath(ctx.testHome, "home");
       const wsJsonPath = join(workspacePath, "workspace.json");
       const wsJson = JSON.parse(await Deno.readTextFile(wsJsonPath));
-      wsJson.schema = "mm.workspace/1";
+      delete wsJson.migration;
       await Deno.writeTextFile(wsJsonPath, JSON.stringify(wsJson, null, 2) + "\n");
 
       // Try to run mm ls - command should fail
       const lsResult = await runCommand(ctx.testHome, ["ls"]);
-      assertEquals(lsResult.success, false, "ls should fail with outdated schema");
+      assertEquals(lsResult.success, false, "ls should fail with outdated migration");
       assert(
-        lsResult.stderr.includes("Outdated workspace schema") ||
+        lsResult.stderr.includes("Outdated workspace") ||
           lsResult.stderr.includes("mm doctor migrate"),
-        `Expected outdated schema error, got: ${lsResult.stderr}`,
+        `Expected outdated migration error, got: ${lsResult.stderr}`,
       );
     });
 
-    it("allows mm doctor migrate when workspace schema is mm.workspace/1", async () => {
-      // Create workspace first (will have v2)
+    it("allows mm doctor migrate when migration version is outdated", async () => {
+      // Create workspace first (will have migration: 2)
       const initResult = await initWorkspace(ctx.testHome, "home");
       assertEquals(initResult.success, true, `Init failed: ${initResult.stderr}`);
 
-      // Downgrade to v1
+      // Remove migration field to simulate pre-migration workspace
       const workspacePath = getWorkspacePath(ctx.testHome, "home");
       const wsJsonPath = join(workspacePath, "workspace.json");
       const wsJson = JSON.parse(await Deno.readTextFile(wsJsonPath));
-      wsJson.schema = "mm.workspace/1";
+      delete wsJson.migration;
       await Deno.writeTextFile(wsJsonPath, JSON.stringify(wsJson, null, 2) + "\n");
 
       // mm doctor migrate --dry-run should work (not blocked)
@@ -98,13 +98,17 @@ describe("Schema Migration", () => {
       );
     });
 
-    it("allows commands when workspace schema is mm.workspace/2", async () => {
+    it("allows commands when migration version is current", async () => {
       const initResult = await initWorkspace(ctx.testHome, "home");
       assertEquals(initResult.success, true, `Init failed: ${initResult.stderr}`);
 
-      // mm ls should work with v2 workspace
+      // mm ls should work with current migration version
       const lsResult = await runCommand(ctx.testHome, ["ls"]);
-      assertEquals(lsResult.success, true, `ls should work with v2 schema: ${lsResult.stderr}`);
+      assertEquals(
+        lsResult.success,
+        true,
+        `ls should work with current migration: ${lsResult.stderr}`,
+      );
     });
   });
 
@@ -165,7 +169,7 @@ describe("Schema Migration", () => {
 
   describe("AC#8: Dry-run Mode", () => {
     it("shows analysis without making changes", async () => {
-      // Create workspace and downgrade to v1
+      // Create workspace
       const initResult = await initWorkspace(ctx.testHome, "home");
       assertEquals(initResult.success, true, `Init failed: ${initResult.stderr}`);
 
@@ -199,10 +203,10 @@ schema: "mm.item.frontmatter/3"
         JSON.stringify({ schema: "mm.edge/1", to: itemId, rank: "aaa" }, null, 2) + "\n",
       );
 
-      // Downgrade workspace to v1
+      // Remove migration field to simulate pre-migration workspace
       const wsJsonPath = join(workspacePath, "workspace.json");
       const wsJson = JSON.parse(await Deno.readTextFile(wsJsonPath));
-      wsJson.schema = "mm.workspace/1";
+      delete wsJson.migration;
       await Deno.writeTextFile(wsJsonPath, JSON.stringify(wsJson, null, 2) + "\n");
 
       // Run dry-run
@@ -221,7 +225,11 @@ schema: "mm.item.frontmatter/3"
 
       // Verify no changes were made
       const wsJsonAfter = JSON.parse(await Deno.readTextFile(wsJsonPath));
-      assertEquals(wsJsonAfter.schema, "mm.workspace/1", "Schema should not change in dry-run");
+      assertEquals(
+        wsJsonAfter.migration,
+        undefined,
+        "Migration version should not change in dry-run",
+      );
 
       const itemContentAfter = await Deno.readTextFile(join(itemDir, `${itemId}.md`));
       assert(
@@ -288,10 +296,10 @@ schema: "mm.item.frontmatter/3"
         JSON.stringify({ schema: "mm.edge/1", to: item2Id, rank: "bbb" }, null, 2) + "\n",
       );
 
-      // Downgrade workspace to v1
+      // Remove migration field to simulate pre-migration workspace
       const wsJsonPath = join(workspacePath, "workspace.json");
       const wsJson = JSON.parse(await Deno.readTextFile(wsJsonPath));
-      wsJson.schema = "mm.workspace/1";
+      delete wsJson.migration;
       await Deno.writeTextFile(wsJsonPath, JSON.stringify(wsJson, null, 2) + "\n");
 
       // Initialize git to avoid git check issues
@@ -360,9 +368,14 @@ schema: "mm.item.frontmatter/3"
         `Migration failed (exit ${output.code}):\nstdout: ${stdout}\nstderr: ${stderr}`,
       );
 
-      // Verify workspace schema updated to v2
+      // Verify workspace.json has migration: 2 and schema: mm.workspace/1
       const wsJsonAfter = JSON.parse(await Deno.readTextFile(wsJsonPath));
-      assertEquals(wsJsonAfter.schema, "mm.workspace/2", "Workspace schema should be v2");
+      assertEquals(
+        wsJsonAfter.schema,
+        "mm.workspace/1",
+        "Workspace schema should remain mm.workspace/1",
+      );
+      assertEquals(wsJsonAfter.migration, 2, "Migration version should be 2");
 
       // Verify item1 frontmatter updated
       const item1After = await Deno.readTextFile(join(itemDir, `${item1Id}.md`));
@@ -388,7 +401,6 @@ schema: "mm.item.frontmatter/3"
       );
 
       // Verify permanent items were created (check items directory for new files)
-      // Permanent items are stored under items/YYYY/MM/DD/ like regular items
       let permanentItemCount = 0;
       for await (const yearEntry of Deno.readDir(join(workspacePath, "items"))) {
         if (!yearEntry.isDirectory) continue;
