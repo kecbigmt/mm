@@ -120,7 +120,7 @@ _mm() {
             local cmd="$line[1]"
             case "$cmd" in
                 note|n|task|t|event|ev)
-                    _arguments $create_flags $common_flags
+                    _arguments -C $create_flags $common_flags
                     case "$state" in
                         project_aliases|context_aliases)
                             local -a aliases
@@ -130,7 +130,7 @@ _mm() {
                     esac
                     ;;
                 edit|e)
-                    _arguments \\
+                    _arguments -C \\
                         '1: :->item_id' \\
                         $edit_flags \\
                         $common_flags
@@ -143,7 +143,7 @@ _mm() {
                     esac
                     ;;
                 show|s)
-                    _arguments \\
+                    _arguments -C \\
                         '1: :->item_id' \\
                         '--print[Output directly without using pager]' \\
                         $common_flags
@@ -173,7 +173,7 @@ _mm() {
                         'next-month:Next month (1st-last)'
                         'last-month:Last month (1st-last)'
                     )
-                    _arguments \\
+                    _arguments -C \\
                         '1: :->path' \\
                         '--all[Show all items including closed]' \\
                         $common_flags
@@ -184,7 +184,7 @@ _mm() {
                     esac
                     ;;
                 move|mv)
-                    _arguments \\
+                    _arguments -C \\
                         '*: :->item_ids' \\
                         $common_flags
                     case "$state" in
@@ -221,7 +221,7 @@ _mm() {
                     esac
                     ;;
                 close|cl|reopen|op|remove|rm|snooze|sn)
-                    _arguments \\
+                    _arguments -C \\
                         '*: :->item_ids' \\
                         $common_flags
                     case "$state" in
@@ -233,7 +233,7 @@ _mm() {
                     esac
                     ;;
                 where)
-                    _arguments \\
+                    _arguments -C \\
                         '1: :->item_id' \\
                         $common_flags
                     case "$state" in

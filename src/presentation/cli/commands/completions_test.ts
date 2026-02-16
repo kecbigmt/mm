@@ -227,6 +227,24 @@ Deno.test({
 });
 
 Deno.test({
+  name: "zsh script uses -C flag on inner _arguments calls for state handling",
+  async fn() {
+    const { output } = await getCompletionOutput("zsh");
+    // Inner _arguments calls need -C so that ->state actions set $state
+    assertStringIncludes(
+      output,
+      "_arguments -C $create_flags",
+      "create command _arguments should use -C flag",
+    );
+    assertStringIncludes(
+      output,
+      "_arguments -C",
+      "inner _arguments calls should use -C flag",
+    );
+  },
+});
+
+Deno.test({
   name: "zsh script handles hyphen-containing aliases correctly",
   async fn() {
     const { output } = await getCompletionOutput("zsh");
