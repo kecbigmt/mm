@@ -1,6 +1,7 @@
 # mm CLI
 
-mmは、GTD・Bullet Journal・Zettelkastenといったタスク管理やナレッジ管理の手法を統合した、パーソナルナレッジ管理システムです。
+mmは、GTD・Bullet
+Journal・Zettelkastenといったタスク管理やナレッジ管理の手法を統合した、パーソナルナレッジ管理システムです。
 
 **主な特徴:**
 
@@ -9,6 +10,8 @@ mmは、GTD・Bullet Journal・Zettelkastenといったタスク管理やナレ�
 - Gitフレンドリーでユーザーが直接編集可能
 
 [English](README.md) | 日本語
+
+https://github.com/user-attachments/assets/38335df6-951c-4224-845e-61e96ddc007a
 
 ## 目次
 
@@ -71,7 +74,10 @@ mm list
 
 ### リリース
 
-**macOS Apple Silicon** 向けのビルド済みバイナリは [GitHub Releases](https://github.com/kecbigmt/mm/releases) で公開しています。必要なバージョンの `mm-<version>-darwin-arm64` をダウンロードしてください。`mm --version` で表示されるバージョンはリリースタグと一致します。
+**macOS Apple Silicon** 向けのビルド済みバイナリは
+[GitHub Releases](https://github.com/kecbigmt/mm/releases) で公開しています。必要なバージョンの
+`mm-<version>-darwin-arm64` をダウンロードしてください。`mm --version`
+で表示されるバージョンはリリースタグと一致します。
 
 **シェル補完（オプション）**: Zsh/Bash用のタブ補完を有効にするには、シェル設定に
 `source <(mm completions zsh)` または `source <(mm completions bash)` を追加します。詳細は
@@ -93,7 +99,7 @@ mm n --body "ノートの内容" "週次レビュー"
 オプション:
 
 - `-b, --body <body>` - 本文テキスト
-- `-p, --parent <path>` - 親コンテナ（デフォルト: today）
+- `-d, --dir <dir>` - ディレクトリロケータ（例: /2025-11-03, /alias, ./1, permanent）
 - `-c, --context <context>` - コンテキストタグ
 - `-a, --alias <slug>` - 人間が読めるエイリアス
 - `-e, --edit` - 作成後にエディタを開く
@@ -116,10 +122,10 @@ mm t "バグ修正" --due-at "17:00" --context work
 オプション:
 
 - `-b, --body <body>` - 本文テキスト
-- `-p, --parent <path>` - 親コンテナ（デフォルト: today）
+- `-d, --dir <dir>` - ディレクトリロケータ（例: /2025-11-03, /alias, ./1）
 - `-c, --context <context>` - コンテキストタグ
 - `-a, --alias <slug>` - 人間が読めるエイリアス
-- `-d, --due-at <datetime>` - 期限日時。以下のいずれかの形式:
+- `--due-at <datetime>` - 期限日時。以下のいずれかの形式:
   - タイムゾーン付きISO 8601: `2025-01-20T17:00:00Z` または `2025-01-20T17:00:00+09:00`
   - ローカル時刻ISO 8601: `2025-01-20T17:00`（ローカル時刻として解釈）
   - 時刻のみ: `17:00` または `17:00:00`（親の配置日付または今日を使用）
@@ -143,14 +149,14 @@ mm event "ランチ" --start-at "12:00" --duration 1h
 オプション:
 
 - `-b, --body <body>` - 本文テキスト
-- `-p, --parent <path>` - 親コンテナ（デフォルト: today）
+- `-d, --dir <dir>` - ディレクトリロケータ（例: /2025-11-03, /alias, ./1）
 - `-c, --context <context>` - コンテキストタグ
 - `-a, --alias <slug>` - 人間が読めるエイリアス
 - `-s, --start-at <datetime>` - 開始日時。以下のいずれかの形式:
   - タイムゾーン付きISO 8601: `2025-01-15T14:00:00Z` または `2025-01-15T14:00:00+09:00`
   - ローカル時刻ISO 8601: `2025-01-15T14:00`（ローカル時刻として解釈）
   - 時刻のみ: `14:00` または `14:00:00`（親の配置日付または今日を使用）
-- `-d, --duration <duration>` - 期間（例: 30m, 2h, 1h30m）
+- `--duration <duration>` - 期間（例: 30m, 2h, 1h30m）
 - `-e, --edit` - 作成後にエディタを開く
 
 **注意:** `--start-at` を指定したイベントの場合、カレンダーベースの配置（例:
@@ -202,9 +208,9 @@ mm reopen task-a
 mm reopen task-a task-b
 ```
 
-#### `move <ids...> <placement>`
+#### `move <ids...> <directory>`
 
-1つ以上のアイテムを新しい配置に移動します。アイテムは物理的な場所を維持し、論理的な配置のみが変更されます。エイリアス:
+1つ以上のアイテムを新しいディレクトリに移動します。アイテムは物理的な場所を維持し、論理的なディレクトリのみが変更されます。エイリアス:
 `mv`
 
 ```sh
@@ -231,7 +237,7 @@ mm mv task-a 2025-01-20
 mm mv task-a task-b task-c head:today
 ```
 
-配置形式:
+ディレクトリ形式:
 
 - `head:<path>` - ターゲットコンテナの先頭（最初の位置）に移動
 - `tail:<path>` - ターゲットコンテナの末尾（最後の位置）に移動
@@ -239,7 +245,7 @@ mm mv task-a task-b task-c head:today
 - `before:<item-id>` - 指定したアイテムの前に移動
 - `<path>` - ターゲットコンテナ（日付またはアイテムエイリアス）に移動
 
-複数のアイテムを移動する場合、指定した順序で配置されます。最初のアイテムがターゲット配置に移動し、以降のアイテムは前のアイテムの後に配置されます。
+複数のアイテムを移動する場合、指定した順序で配置されます。最初のアイテムがターゲットディレクトリに移動し、以降のアイテムは前のアイテムの後に配置されます。
 
 #### `snooze <ids...> [until]`
 
@@ -423,14 +429,15 @@ mm config get sync.mode                # 特定の値を取得
 mm config set sync.mode auto-sync      # 値を設定
 ```
 
-対応キー: `timezone`, `sync.enabled`, `sync.mode`, `sync.git.remote`, `sync.git.branch`
+対応キー: `timezone`, `sync.enabled`, `sync.mode`, `sync.git.remote`, `sync.git.branch`,
+`sync.git.noSign`, `sync.lazy.commits`, `sync.lazy.minutes`
 
 ### Git同期
 
 mmはGitベースの同期をサポートし、デバイス間でワークスペースをバックアップおよび同期できます。2つの同期モードがあります：
 
 - **auto-commit**: 各操作後に自動的に変更をコミット（手動プッシュが必要）
-- **auto-sync**: 各操作後に自動的に変更をコミットしてプッシュ
+- **auto-sync**: 自動的に変更をコミットしてプッシュ（バッチ同期の閾値を設定可能）
 
 #### `sync init <remote-url>`
 
@@ -493,8 +500,26 @@ auto-commitモードでは、変更はローカルにコミットされますが
 `mm sync push` または `mm sync`
 を使用してください。auto-syncモードでは、各操作後に変更が自動的にコミットされてプッシュされます。
 
-**同期モード設定**: 同期モードはデフォルトで `auto-commit` です。`auto-sync` に変更するには
-`mm config set sync.mode auto-sync` を使用してください。
+**同期モード設定**: 同期モードはデフォルトで `auto-commit` です。変更するには:
+
+```sh
+mm config set sync.mode auto-sync      # 各操作後に同期（デフォルト: 即時）
+```
+
+**auto-sync閾値設定**:
+デフォルトでは、auto-syncは各コミット後に即時プッシュします。バッチ同期の閾値を設定できます:
+
+```sh
+mm config set sync.lazy.commits 10     # 10コミット後に同期（デフォルト: 1）
+mm config set sync.lazy.minutes 10     # 10分後に同期（デフォルト: 0、無効）
+```
+
+**コミット署名**:
+デフォルトでは、mmはGitの署名設定に従います。mmの自動コミットでGPG/SSH署名をスキップするには（署名にパスフレーズの入力が必要な場合に便利）:
+
+```sh
+mm config set sync.git.noSign true
+```
 
 ### メンテナンス
 
@@ -504,6 +529,15 @@ auto-commitモードでは、変更はローカルにコミットされますが
 
 ```sh
 mm doctor check
+```
+
+#### `doctor migrate`
+
+ワークスペースのデータを最新のマイグレーションバージョンに移行します。ワークスペースが古い場合、コマンドはブロックされます。ドライラン、Gitプリチェック、対話的な確認をサポートします。
+
+```sh
+mm doctor migrate            # マイグレーションを実行
+mm doctor migrate --dry-run  # 変更なしでプレビュー
 ```
 
 #### `doctor rebuild-index`
@@ -553,7 +587,7 @@ source <(mm completions bash)
 ### 補完される内容
 
 - **コマンド**: すべてのmmコマンド（`note`, `task`, `edit`, `list`, `move`, `close` など）
-- **フラグ**: 各コマンドのコンテキスト対応フラグ補完（例: `--context`, `--parent`, `--alias`）
+- **フラグ**: 各コマンドのコンテキスト対応フラグ補完（例: `--context`, `--dir`, `--alias`）
 - **エイリアス**: アイテムの編集や移動時に最近使用したアイテムエイリアス（最近の操作からキャッシュ）
 - **コンテキストタグ**: `--context` 指定時に最近使用したタグ（最近の操作からキャッシュ）
 
