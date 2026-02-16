@@ -547,6 +547,49 @@ export const createGitVersionControlService = (): VersionControlService => {
     }
   };
 
+  const hasUnpushedCommits = async (
+    cwd: string,
+  ): Promise<Result<boolean, VersionControlError>> => {
+    try {
+      // Check if there's an upstream tracking branch
+      const trackingCmd = new Deno.Command("git", {
+        args: ["rev-parse", "--abbrev-ref", "@{upstream}"],
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const trackingOutput = await trackingCmd.output();
+      if (trackingOutput.code !== 0) {
+        // No upstream configured - no way to check for unpushed commits
+        return Result.ok(false);
+      }
+
+      // Compare local HEAD with upstream
+      const command = new Deno.Command("git", {
+        args: ["rev-list", "--count", "@{upstream}..HEAD"],
+        cwd,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const { code, stdout, stderr } = await command.output();
+      if (code !== 0) {
+        const errStr = new TextDecoder().decode(stderr);
+        return Result.error(
+          createVersionControlCommandFailedError(`git rev-list failed: ${errStr}`),
+        );
+      }
+      const count = parseInt(new TextDecoder().decode(stdout).trim(), 10);
+      return Result.ok(count > 0);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return Result.error(createVersionControlNotAvailableError());
+      }
+      return Result.error(
+        createVersionControlCommandFailedError(`git rev-list failed: ${error}`, { cause: error }),
+      );
+    }
+  };
+
   return {
     clone,
     init,
@@ -559,6 +602,7 @@ export const createGitVersionControlService = (): VersionControlService => {
     getCurrentBranch,
     checkoutBranch,
     hasUncommittedChanges,
+    hasUnpushedCommits,
     getRemoteDefaultBranch,
     hasChangesInPath,
   };

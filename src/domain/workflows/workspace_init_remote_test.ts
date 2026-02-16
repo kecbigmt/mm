@@ -22,6 +22,7 @@ const createMockGitService = (
   hasUncommittedChanges: () => Promise.resolve(Result.ok(false)),
   getRemoteDefaultBranch: () => Promise.resolve(Result.ok("main")),
   hasChangesInPath: () => Promise.resolve(Result.ok(false)),
+  hasUnpushedCommits: () => Promise.resolve(Result.ok(false)),
   ...overrides,
 });
 
