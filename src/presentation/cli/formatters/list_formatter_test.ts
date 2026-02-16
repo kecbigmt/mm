@@ -506,6 +506,50 @@ Deno.test("formatDateHeader - -8d shows ~8d label (beyond weekday range)", () =>
 });
 
 // =============================================================================
+// formatDateHeader - timezone-aware relative label tests
+// =============================================================================
+
+Deno.test("formatDateHeader - today label correct when UTC date differs from local date (JST midnight)", () => {
+  // 2025-02-11 00:09 JST = 2025-02-10 15:09 UTC
+  // UTC date is Feb 10, but JST date is Feb 11
+  const day = makeCalendarDay("2025-02-11");
+  const referenceDate = new Date("2025-02-10T15:09:00Z"); // Feb 11 00:09 JST
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(), // Asia/Tokyo
+    now: makeDateTime("2025-02-10T15:09:00Z"),
+  };
+  const result = formatDateHeader(day, referenceDate, options);
+  assertEquals(result, "[2025-02-11] today");
+});
+
+Deno.test("formatDateHeader - yesterday label correct when UTC date differs from local date (JST midnight)", () => {
+  // 2025-02-11 00:09 JST = 2025-02-10 15:09 UTC
+  const day = makeCalendarDay("2025-02-10");
+  const referenceDate = new Date("2025-02-10T15:09:00Z"); // Feb 11 00:09 JST
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(), // Asia/Tokyo
+    now: makeDateTime("2025-02-10T15:09:00Z"),
+  };
+  const result = formatDateHeader(day, referenceDate, options);
+  assertEquals(result, "[2025-02-10] yesterday");
+});
+
+Deno.test("formatDateHeader - tomorrow label correct when UTC date differs from local date (JST midnight)", () => {
+  // 2025-02-11 00:09 JST = 2025-02-10 15:09 UTC
+  const day = makeCalendarDay("2025-02-12");
+  const referenceDate = new Date("2025-02-10T15:09:00Z"); // Feb 11 00:09 JST
+  const options: ListFormatterOptions = {
+    printMode: true,
+    timezone: makeTimezone(), // Asia/Tokyo
+    now: makeDateTime("2025-02-10T15:09:00Z"),
+  };
+  const result = formatDateHeader(day, referenceDate, options);
+  assertEquals(result, "[2025-02-12] tomorrow");
+});
+
+// =============================================================================
 // formatSectionStub tests
 // =============================================================================
 

@@ -6,6 +6,7 @@ import { CalendarDay } from "../../../domain/primitives/calendar_day.ts";
 import { TimezoneIdentifier } from "../../../domain/primitives/timezone_identifier.ts";
 import type { DateTime } from "../../../domain/primitives/date_time.ts";
 import { SectionSummary } from "../../../domain/services/section_query_service.ts";
+import { formatSegmentsForTimezone } from "../../../shared/timezone_format.ts";
 
 /**
  * Options for list formatting.
@@ -319,16 +320,17 @@ const WEEKDAY_NAMES = [
  * - +Nd for dates beyond +7 days
  * - ~Nd for dates beyond -7 days
  */
-const computeRelativeLabel = (day: CalendarDay, referenceDate: Date): string => {
+const computeRelativeLabel = (
+  day: CalendarDay,
+  referenceDate: Date,
+  timezone: TimezoneIdentifier,
+): string => {
   const targetDate = day.toDate();
   const dayMs = targetDate.getTime();
 
-  // Normalize reference to start of day in UTC
-  const refDay = new Date(Date.UTC(
-    referenceDate.getUTCFullYear(),
-    referenceDate.getUTCMonth(),
-    referenceDate.getUTCDate(),
-  ));
+  // Normalize reference to start of day in workspace timezone
+  const [yearStr, monthStr, dayStr] = formatSegmentsForTimezone(referenceDate, timezone);
+  const refDay = new Date(Date.UTC(Number(yearStr), Number(monthStr) - 1, Number(dayStr)));
   const refDayMs = refDay.getTime();
 
   const diffDays = Math.round((dayMs - refDayMs) / ONE_DAY_MS);
@@ -375,7 +377,7 @@ export const formatDateHeader = (
 ): string => {
   const { printMode } = options;
   const dateStr = `[${day.toString()}]`;
-  const relative = computeRelativeLabel(day, referenceDate);
+  const relative = computeRelativeLabel(day, referenceDate, options.timezone);
 
   let header = relative ? `${dateStr} ${relative}` : dateStr;
 
