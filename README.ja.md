@@ -1,8 +1,7 @@
 # mm CLI
 
 mmは、GTD・Bullet
-Journal・Zettelkastenといったタスク管理やナレッジ管理の手法を統合した、PKOS（Personal Knowledge
-Operating System）です。
+Journal・Zettelkastenといったタスク管理やナレッジ管理の手法を統合した、パーソナルナレッジ管理システムです。
 
 **主な特徴:**
 
