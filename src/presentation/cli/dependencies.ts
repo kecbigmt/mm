@@ -37,6 +37,8 @@ import { createGitVersionControlService } from "../../infrastructure/git/git_cli
 import { CacheUpdateService } from "../../infrastructure/completion_cache/cache_update_service.ts";
 import { CacheManager } from "../../infrastructure/completion_cache/cache_manager.ts";
 import { profileAsync, profileSync } from "../../shared/profiler.ts";
+import { readMigrationVersion } from "../../infrastructure/fileSystem/workspace_schema_reader.ts";
+import { CURRENT_MIGRATION_VERSION } from "../../infrastructure/fileSystem/workspace_schema.ts";
 
 export type CliDependencies = Readonly<{
   readonly root: string;
@@ -198,8 +200,13 @@ const determineWorkspaceRoot = async (
   return await determineWorkspaceFromName(repository, parsedName.value);
 };
 
+export type LoadCliDependenciesOptions = Readonly<{
+  skipSchemaCheck?: boolean;
+}>;
+
 export const loadCliDependencies = async (
   workspacePath?: string,
+  options?: LoadCliDependenciesOptions,
 ): Promise<Result<CliDependencies, CliDependencyError>> => {
   const homeResult = profileSync("deps:resolveMmHome", () => resolveMmHome());
   if (homeResult.type === "error") {
@@ -224,6 +231,19 @@ export const loadCliDependencies = async (
   }
 
   const root = rootResult.value;
+
+  // Check migration version before loading full dependencies
+  if (!options?.skipSchemaCheck) {
+    const migrationResult = await readMigrationVersion(root);
+    if (migrationResult.type === "ok" && migrationResult.value < CURRENT_MIGRATION_VERSION) {
+      return Result.error({
+        type: "workspace",
+        message:
+          `Outdated workspace (migration ${migrationResult.value}, current ${CURRENT_MIGRATION_VERSION}). Run: mm doctor migrate`,
+      });
+    }
+  }
+
   const workspaceResult = await profileAsync(
     "deps:workspaceRepository.load",
     () => workspaceRepository.load(root),

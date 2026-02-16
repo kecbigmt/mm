@@ -81,4 +81,5 @@ export interface VersionControlService {
     toRef: string,
     path: string,
   ): Promise<Result<boolean, VersionControlError>>;
+  hasUnpushedCommits(cwd: string): Promise<Result<boolean, VersionControlError>>;
 }

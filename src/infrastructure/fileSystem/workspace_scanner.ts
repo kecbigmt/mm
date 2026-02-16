@@ -5,6 +5,7 @@ import { Alias, AliasSnapshot, parseAlias } from "../../domain/models/alias.ts";
 import { parseItemId } from "../../domain/primitives/item_id.ts";
 import { parseItemRank } from "../../domain/primitives/item_rank.ts";
 import { parseFrontmatter } from "./frontmatter.ts";
+import { walkFiles } from "./file_walker.ts";
 import { EdgeReference } from "./graph_index.ts";
 import { EdgeReferenceWithPath } from "./index_doctor.ts";
 
@@ -78,76 +79,13 @@ const extractTitleAndBody = (content: string): { title: string; body: string | u
 };
 
 /**
- * Recursively walk directories yielding markdown files
- */
-async function* walkMarkdownFiles(directory: string): AsyncIterableIterator<string> {
-  try {
-    for await (const entry of Deno.readDir(directory)) {
-      const entryPath = join(directory, entry.name);
-      if (entry.isDirectory) {
-        yield* walkMarkdownFiles(entryPath);
-      } else if (entry.isFile && entry.name.endsWith(".md")) {
-        yield entryPath;
-      }
-    }
-  } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) {
-      throw error;
-    }
-    // Directory doesn't exist, nothing to yield
-  }
-}
-
-/**
- * Recursively walk directories yielding edge files
- */
-async function* walkEdgeFiles(directory: string): AsyncIterableIterator<string> {
-  try {
-    for await (const entry of Deno.readDir(directory)) {
-      const entryPath = join(directory, entry.name);
-      if (entry.isDirectory) {
-        yield* walkEdgeFiles(entryPath);
-      } else if (entry.isFile && entry.name.endsWith(".edge.json")) {
-        yield entryPath;
-      }
-    }
-  } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) {
-      throw error;
-    }
-    // Directory doesn't exist, nothing to yield
-  }
-}
-
-/**
- * Recursively walk directories yielding alias files
- */
-async function* walkAliasFiles(directory: string): AsyncIterableIterator<string> {
-  try {
-    for await (const entry of Deno.readDir(directory)) {
-      const entryPath = join(directory, entry.name);
-      if (entry.isDirectory) {
-        yield* walkAliasFiles(entryPath);
-      } else if (entry.isFile && entry.name.endsWith(".alias.json")) {
-        yield entryPath;
-      }
-    }
-  } catch (error) {
-    if (!(error instanceof Deno.errors.NotFound)) {
-      throw error;
-    }
-    // Directory doesn't exist, nothing to yield
-  }
-}
-
-/**
  * Create a workspace scanner for the given workspace root
  */
 export const createWorkspaceScanner = (workspaceRoot: string): WorkspaceScanner => {
   const scanAllItems = async function* (): AsyncIterableIterator<Result<Item, ScanError>> {
     const itemsDir = join(workspaceRoot, "items");
 
-    for await (const filePath of walkMarkdownFiles(itemsDir)) {
+    for await (const filePath of walkFiles(itemsDir, ".md")) {
       // Read file content
       let content: string;
       try {
@@ -214,14 +152,14 @@ export const createWorkspaceScanner = (workspaceRoot: string): WorkspaceScanner 
   const scanAllEdges = async function* (): AsyncIterableIterator<Result<EdgeReference, ScanError>> {
     // Scan date edges
     const datesDir = join(workspaceRoot, ".index", "graph", "dates");
-    for await (const filePath of walkEdgeFiles(datesDir)) {
+    for await (const filePath of walkFiles(datesDir, ".edge.json")) {
       const result = await parseEdgeFile(filePath);
       yield result;
     }
 
     // Scan parent edges
     const parentsDir = join(workspaceRoot, ".index", "graph", "parents");
-    for await (const filePath of walkEdgeFiles(parentsDir)) {
+    for await (const filePath of walkFiles(parentsDir, ".edge.json")) {
       const result = await parseEdgeFile(filePath);
       yield result;
     }
@@ -232,14 +170,14 @@ export const createWorkspaceScanner = (workspaceRoot: string): WorkspaceScanner 
   > {
     // Scan date edges
     const datesDir = join(workspaceRoot, ".index", "graph", "dates");
-    for await (const filePath of walkEdgeFiles(datesDir)) {
+    for await (const filePath of walkFiles(datesDir, ".edge.json")) {
       const result = await parseEdgeFileWithPath(filePath);
       yield result;
     }
 
     // Scan parent edges
     const parentsDir = join(workspaceRoot, ".index", "graph", "parents");
-    for await (const filePath of walkEdgeFiles(parentsDir)) {
+    for await (const filePath of walkFiles(parentsDir, ".edge.json")) {
       const result = await parseEdgeFileWithPath(filePath);
       yield result;
     }
@@ -248,7 +186,7 @@ export const createWorkspaceScanner = (workspaceRoot: string): WorkspaceScanner 
   const scanAllAliases = async function* (): AsyncIterableIterator<Result<Alias, ScanError>> {
     const aliasesDir = join(workspaceRoot, ".index", "aliases");
 
-    for await (const filePath of walkAliasFiles(aliasesDir)) {
+    for await (const filePath of walkFiles(aliasesDir, ".alias.json")) {
       // Read file content
       let content: string;
       try {

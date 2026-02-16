@@ -93,6 +93,10 @@ const mockVersionControlService = () => {
       calls.push("hasChangesInPath");
       return Promise.resolve(Result.ok(false));
     },
+    hasUnpushedCommits: (_cwd: string): Promise<Result<boolean, VersionControlError>> => {
+      calls.push("hasUnpushedCommits");
+      return Promise.resolve(Result.ok(false));
+    },
     getCalls: () => calls,
   };
 };
