@@ -43,6 +43,12 @@ Domain and product design notes live in [docs/steering/design.md](docs/steering/
 brew install kecbigmt/tap/mm
 ```
 
+To update:
+
+```sh
+brew update && brew upgrade mm
+```
+
 The binary is ~86 MB because it embeds the Deno runtime.
 
 After installation:

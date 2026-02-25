@@ -42,6 +42,12 @@ https://github.com/user-attachments/assets/38335df6-951c-4224-845e-61e96ddc007a
 brew install kecbigmt/tap/mm
 ```
 
+アップデート：
+
+```sh
+brew update && brew upgrade mm
+```
+
 Denoランタイムを内蔵しているため、バイナリサイズは約86 MBになります。
 
 インストール後：
