@@ -33,9 +33,9 @@ jobs:
           - target: x86_64-apple-darwin
             suffix: darwin-x64
             ext: ""
-          # - target: x86_64-unknown-linux-gnu
-          #   suffix: linux-x64
-          #   ext: ""
+          - target: x86_64-unknown-linux-gnu
+            suffix: linux-x64
+            ext: ""
           # - target: aarch64-unknown-linux-gnu
           #   suffix: linux-arm64
           #   ext: ""
