@@ -26,7 +26,7 @@ export function compareVersions(a: string, b: string): number {
 
 function formatUpdateMessage(current: string, latest: string): string {
   const upgradeHint = Deno.build.os === "darwin"
-    ? "Run `brew upgrade mm` to update."
+    ? "Run `brew update && brew upgrade mm` to update."
     : `Visit ${RELEASES_PAGE_URL} to update.`;
   return `\nA new version of mm is available: v${latest} (current: v${current})\n${upgradeHint}`;
 }
