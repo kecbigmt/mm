@@ -276,6 +276,50 @@ Datetime formats:
 - ISO 8601 local time: `2025-01-20T17:00` (interpreted as local time)
 - Time only: `17:00` or `17:00:00` (uses parent directory date or today)
 
+#### `edit <id>`
+
+Edit an item's metadata or body. Alias: `e`
+
+```sh
+# Edit title, icon, body
+mm edit my-note --title "New title" --icon task --body "Full body text"
+
+# Append text to existing body
+mm edit my-note --append "Additional content"
+
+# Find and replace text in body
+mm edit my-note --find "old text" --replace "new text"
+
+# Replace all occurrences
+mm edit my-note --find "old" --replace "new" --replace-all
+
+# Delete matched text (replace with empty string)
+mm edit my-note --find "unwanted text" --replace=
+
+# Open in editor (no options)
+mm edit my-note
+```
+
+Options:
+
+- `--title <title>` - Update title
+- `--icon <icon>` - Update icon (note, task, event)
+- `--body <body>` - Replace entire body
+- `--append <text>` - Append text to existing body
+- `--find <text>` - Find text in body (used with --replace)
+- `--replace [text]` - Replace text found by --find (use `--replace=` for deletion)
+- `--replace-all` - Replace all occurrences (used with --find/--replace)
+- `--start-at <datetime>` - Update start time
+- `--duration <duration>` - Update duration
+- `--due-at <datetime>` - Update due date
+- `-a, --alias <slug>` - Update alias
+- `-p, --project <project>` - Update project reference
+- `-c, --context <context>` - Update context tags (repeatable)
+
+**Note:** `--body`, `--append`, and `--find`/`--replace` are mutually exclusive. `--find` requires
+`--replace`. Without `--replace-all`, the find text must match exactly once (ambiguous matches are
+rejected).
+
 #### `remove <ids...>`
 
 Permanently remove items from the workspace. Alias: `rm`
