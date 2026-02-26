@@ -321,6 +321,166 @@ describe("Scenario 19: Item edit", () => {
     );
   });
 
+  it("appends text to existing body", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+      "--body",
+      "Existing content",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--append",
+      "New content",
+    ]);
+    assertEquals(editResult.success, true, `edit failed: ${editResult.stderr}`);
+
+    // Verify body contains both existing and appended content
+    const itemFile = await findItemFileById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemFile, "Item file should exist");
+    const fileContent = await Deno.readTextFile(itemFile!);
+    const parseResult = parseFrontmatter(fileContent);
+    assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
+    if (parseResult.type === "error") throw new Error("Failed to parse frontmatter");
+
+    assertEquals(
+      parseResult.value.body.includes("Existing content"),
+      true,
+      "Original body content should be preserved",
+    );
+    assertEquals(
+      parseResult.value.body.includes("New content"),
+      true,
+      "Appended content should be present",
+    );
+    // Verify order: existing content comes before appended content
+    const body = parseResult.value.body;
+    const existingIdx = body.indexOf("Existing content");
+    const newIdx = body.indexOf("New content");
+    assertEquals(
+      existingIdx < newIdx,
+      true,
+      "Existing content should come before appended content",
+    );
+  });
+
+  it("appends text to item with empty body", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--append",
+      "First content",
+    ]);
+    assertEquals(editResult.success, true, `edit failed: ${editResult.stderr}`);
+
+    // Verify body contains the appended content
+    const itemFile = await findItemFileById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemFile, "Item file should exist");
+    const fileContent = await Deno.readTextFile(itemFile!);
+    const parseResult = parseFrontmatter(fileContent);
+    assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
+    if (parseResult.type === "error") throw new Error("Failed to parse frontmatter");
+
+    assertEquals(
+      parseResult.value.body.includes("First content"),
+      true,
+      "Appended content should be present in body",
+    );
+  });
+
+  it("appends text while also updating other metadata", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+      "--body",
+      "Original body",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--append",
+      "Extra info",
+      "--icon",
+      "task",
+    ]);
+    assertEquals(editResult.success, true, `edit failed: ${editResult.stderr}`);
+
+    // Verify both body append and icon update
+    const itemFile = await findItemFileById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemFile, "Item file should exist");
+    const fileContent = await Deno.readTextFile(itemFile!);
+    const parseResult = parseFrontmatter(fileContent);
+    assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
+    if (parseResult.type === "error") throw new Error("Failed to parse frontmatter");
+    const meta = parseResult.value.frontmatter as Record<string, unknown>;
+
+    assertEquals(meta.icon, "task", "Icon should be updated");
+    assertEquals(
+      parseResult.value.body.includes("Original body"),
+      true,
+      "Original body should be preserved",
+    );
+    assertEquals(
+      parseResult.value.body.includes("Extra info"),
+      true,
+      "Appended content should be present",
+    );
+  });
+
+  it("returns error when both --body and --append are specified", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--body",
+      "Full body",
+      "--append",
+      "Extra text",
+    ]);
+    assertEquals(editResult.success, false, "Should fail when both --body and --append are used");
+    assertEquals(
+      editResult.stderr.includes("--body") && editResult.stderr.includes("--append"),
+      true,
+      "Error message should mention both flags",
+    );
+  });
+
   it("uses alias 'e' for edit command", async () => {
     await runCommand(ctx.testHome, ["cd", "today"]);
 

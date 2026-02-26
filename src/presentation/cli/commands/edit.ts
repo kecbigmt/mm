@@ -4,14 +4,22 @@ import { EditItemWorkflow } from "../../../domain/workflows/edit_item.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/date_time.ts";
 import { deriveFilePathFromId } from "../../../infrastructure/fileSystem/item_repository.ts";
 import { formatError } from "../error_formatter.ts";
+import {
+  createItemLocatorService,
+  type ItemLocatorError,
+} from "../../../domain/services/item_locator_service.ts";
 import { isDebugMode } from "../debug.ts";
 import { executeAutoCommit } from "../auto_commit_helper.ts";
 import { executePrePull } from "../pre_pull_helper.ts";
 import { handlePostEditUpdates, launchEditor } from "../utils/edit_item_helper.ts";
+import type { ItemRepository } from "../../../domain/repositories/item_repository.ts";
+import type { AliasRepository } from "../../../domain/repositories/alias_repository.ts";
+import type { TimezoneIdentifier } from "../../../domain/primitives/mod.ts";
 
 const hasMetadataOptions = (options: Record<string, unknown>): boolean => {
   return (
     options.title !== undefined || options.icon !== undefined || options.body !== undefined ||
+    options.append !== undefined ||
     options.startAt !== undefined || options.duration !== undefined ||
     options.dueAt !== undefined ||
     options.alias !== undefined || options.project !== undefined || options.context !== undefined
@@ -31,6 +39,42 @@ const formatItem = (
   return `[${idLabel}] ${item.data.title.toString()}`;
 };
 
+/** Format an ItemLocatorError into a user-facing error message. */
+const formatLocatorError = (error: ItemLocatorError, debug: boolean): string => {
+  if (error.kind === "not_found") {
+    return `Item not found: ${error.locator}`;
+  }
+  if (error.kind === "ambiguous_prefix") {
+    return `Ambiguous prefix '${error.locator}': matches ${error.candidates.join(", ")}`;
+  }
+  return formatError(error.error, debug);
+};
+
+/**
+ * Resolve an item's existing body and concatenate the append text.
+ * Returns the merged body string, or exits with an error message on failure.
+ */
+const resolveBodyForAppend = async (
+  itemRef: string,
+  appendText: string,
+  deps: {
+    itemRepository: ItemRepository;
+    aliasRepository: AliasRepository;
+    timezone: TimezoneIdentifier;
+    prefixCandidates: () => Promise<readonly string[]>;
+  },
+  debug: boolean,
+): Promise<string> => {
+  const locatorService = createItemLocatorService(deps);
+  const resolveResult = await locatorService.resolve(itemRef);
+  if (resolveResult.type === "error") {
+    console.error(formatLocatorError(resolveResult.error, debug));
+    Deno.exit(1);
+  }
+  const existingBody = resolveResult.value.data.body ?? "";
+  return existingBody ? existingBody + "\n" + appendText : appendText;
+};
+
 export function createEditCommand() {
   return new Command()
     .description("Edit an item")
@@ -38,6 +82,7 @@ export function createEditCommand() {
     .option("--title <title:string>", "Update title")
     .option("--icon <icon:string>", "Update icon")
     .option("--body <body:string>", "Update body")
+    .option("--append <append:string>", "Append text to existing body")
     .option("--start-at <startAt:string>", "Update start time (ISO8601 format)")
     .option("--duration <duration:string>", "Update duration (e.g., 30m, 2h)")
     .option("--due-at <dueAt:string>", "Update due date (ISO8601 format)")
@@ -147,6 +192,12 @@ export function createEditCommand() {
         return;
       }
 
+      // Validate --body and --append mutual exclusivity
+      if (options.body !== undefined && options.append !== undefined) {
+        console.error("Cannot use --body and --append together. Use one or the other.");
+        Deno.exit(1);
+      }
+
       const updates: {
         title?: string;
         icon?: string;
@@ -158,6 +209,21 @@ export function createEditCommand() {
         project?: string;
         contexts?: readonly string[];
       } = {};
+
+      // Handle --append by resolving item and concatenating with existing body
+      if (typeof options.append === "string") {
+        updates.body = await resolveBodyForAppend(
+          itemRef,
+          options.append,
+          {
+            itemRepository: deps.itemRepository,
+            aliasRepository: deps.aliasRepository,
+            timezone: deps.timezone,
+            prefixCandidates: () => deps.cacheUpdateService.getAliases(),
+          },
+          debug,
+        );
+      }
 
       if (typeof options.title === "string") updates.title = options.title;
       if (typeof options.icon === "string") updates.icon = options.icon;
