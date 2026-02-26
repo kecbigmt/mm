@@ -169,7 +169,7 @@ export function createEditCommand() {
     .option("--body <body:string>", "Update body")
     .option("--append <append:string>", "Append text to existing body")
     .option("--find <find:string>", "Find text in body (used with --replace)")
-    .option("--replace [replace:string]", "Replace text found by --find")
+    .option("--replace [replace:string]", "Replace text found by --find (use --replace= to delete)")
     .option("--replace-all", "Replace all occurrences (used with --find/--replace)")
     .option("--start-at <startAt:string>", "Update start time (ISO8601 format)")
     .option("--duration <duration:string>", "Update duration (e.g., 30m, 2h)")
