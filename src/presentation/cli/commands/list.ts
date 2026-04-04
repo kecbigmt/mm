@@ -18,7 +18,7 @@ import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import type { RangeExpression } from "../../../domain/primitives/path_types.ts";
 import type { SectionSummary } from "../../../domain/services/section_query_service.ts";
 import { buildPartitions, formatWarning } from "../partitioning/build_partitions.ts";
-import { expandStubs } from "../partitioning/expand_stubs.ts";
+import { expandItemChildren, expandStubs } from "../partitioning/expand_stubs.ts";
 import {
   formatDateHeader,
   formatItemHeadHeader,
@@ -509,6 +509,20 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
 
       // Format items
       formatItems(partition.items, outputLines);
+
+      // Expand child items of each partition item
+      for (const item of partition.items) {
+        await expandItemChildren(
+          item.data.id,
+          effectiveDepth,
+          outputLines,
+          { itemRepository: deps.itemRepository, sectionQueryService: deps.sectionQueryService },
+          formatterOptions,
+          formatItems,
+          itemFilterFn,
+          1,
+        );
+      }
 
       // Format stubs (with optional depth expansion)
       await expandStubs(

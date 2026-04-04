@@ -1,10 +1,12 @@
 import { assertEquals } from "@std/assert";
 import {
+  expandItemChildren,
   expandStubs,
   type ExpandStubsDeps,
   type FormatItemsFn,
   type ItemFilterFn,
 } from "./expand_stubs.ts";
+import { parseItemId } from "../../../domain/primitives/item_id.ts";
 import type { SectionStub } from "./build_partitions.ts";
 import type { ListFormatterOptions } from "../formatters/list_formatter.ts";
 import type { Item } from "../../../domain/models/item.ts";
@@ -310,4 +312,178 @@ Deno.test("expandStubs: logs warning to stderr when item query fails", async () 
   } finally {
     console.error = originalError;
   }
+});
+
+// =============================================================================
+// expandItemChildren tests
+// =============================================================================
+
+const CHILD_A_ID = "019965a7-aaaa-740a-b8c1-1415904fd108";
+const CHILD_B_ID = "019965a7-bbbb-740a-b8c1-1415904fd108";
+const GRANDCHILD_ID = "019965a7-cccc-740a-b8c1-1415904fd108";
+
+const makeItemId = (id: string) => unwrap(parseItemId(id));
+
+Deno.test("expandItemChildren: depth 0 does nothing", async () => {
+  const child = makeItem(CHILD_A_ID, PARENT_ID, "Child A");
+  const itemsByDirectory = new Map([
+    [`${PARENT_ID}/`, [child]],
+  ]);
+  const deps = makeDeps(itemsByDirectory, new Map());
+  const lines: string[] = [];
+
+  await expandItemChildren(
+    makeItemId(PARENT_ID),
+    0,
+    lines,
+    deps,
+    makeOptions(),
+    collectTitles,
+    acceptAll,
+    1,
+  );
+
+  assertEquals(lines.length, 0);
+});
+
+Deno.test("expandItemChildren: depth 1 shows direct children", async () => {
+  const childA = makeItem(CHILD_A_ID, PARENT_ID, "Child A");
+  const childB = makeItem(CHILD_B_ID, PARENT_ID, "Child B");
+  const itemsByDirectory = new Map([
+    [`${PARENT_ID}/`, [childA, childB]],
+  ]);
+  const deps = makeDeps(itemsByDirectory, new Map());
+  const lines: string[] = [];
+
+  await expandItemChildren(
+    makeItemId(PARENT_ID),
+    1,
+    lines,
+    deps,
+    makeOptions(),
+    collectTitles,
+    acceptAll,
+    1,
+  );
+
+  assertEquals(lines.length, 2);
+  assertEquals(lines[0], "  item:Child A");
+  assertEquals(lines[1], "  item:Child B");
+});
+
+Deno.test("expandItemChildren: depth 2 shows grandchildren", async () => {
+  const childA = makeItem(CHILD_A_ID, PARENT_ID, "Child A");
+  const grandchild = makeItem(GRANDCHILD_ID, CHILD_A_ID, "Grandchild");
+  const itemsByDirectory = new Map([
+    [`${PARENT_ID}/`, [childA]],
+    [`${CHILD_A_ID}/`, [grandchild]],
+  ]);
+  const deps = makeDeps(itemsByDirectory, new Map());
+  const lines: string[] = [];
+
+  await expandItemChildren(
+    makeItemId(PARENT_ID),
+    2,
+    lines,
+    deps,
+    makeOptions(),
+    collectTitles,
+    acceptAll,
+    1,
+  );
+
+  assertEquals(lines.length, 2);
+  assertEquals(lines[0], "  item:Child A");
+  assertEquals(lines[1], "    item:Grandchild");
+});
+
+Deno.test("expandItemChildren: children + sections both rendered", async () => {
+  const childA = makeItem(CHILD_A_ID, PARENT_ID, "Child A");
+  const sectionItem = makeItem(
+    "019965a7-dddd-740a-b8c1-1415904fd108",
+    `${PARENT_ID}/1`,
+    "Section Item",
+  );
+  const section: SectionSummary = {
+    directory: makeDirectory(`${PARENT_ID}/1`),
+    itemCount: 1,
+    sectionCount: 0,
+  };
+  const itemsByDirectory = new Map<string, ReadonlyArray<Item>>([
+    [`${PARENT_ID}/`, [childA]],
+    [`${PARENT_ID}/1`, [sectionItem]],
+  ]);
+  const sectionsByDirectory = new Map([
+    [`${PARENT_ID}/`, [section]],
+  ]);
+  const deps = makeDeps(itemsByDirectory, sectionsByDirectory);
+  const lines: string[] = [];
+
+  await expandItemChildren(
+    makeItemId(PARENT_ID),
+    2,
+    lines,
+    deps,
+    makeOptions(),
+    collectTitles,
+    acceptAll,
+    1,
+  );
+
+  // Child items shown at indent 1, then section header at indent 1, section items at indent 2
+  assertEquals(lines[0], "  item:Child A");
+  // Section stub expanded at depth 1 (remainingDepth - 1 = 1)
+  assertEquals(lines[1], "  1/");
+  assertEquals(lines[2], "    item:Section Item");
+});
+
+Deno.test("expandItemChildren: respects item filter", async () => {
+  const openChild = makeItem(CHILD_A_ID, PARENT_ID, "Open Child");
+  const closedChild = makeItem(CHILD_B_ID, PARENT_ID, "Closed Child", "closed");
+  const itemsByDirectory = new Map([
+    [`${PARENT_ID}/`, [openChild, closedChild]],
+  ]);
+  const deps = makeDeps(itemsByDirectory, new Map());
+  const lines: string[] = [];
+
+  await expandItemChildren(
+    makeItemId(PARENT_ID),
+    1,
+    lines,
+    deps,
+    makeOptions(),
+    collectTitles,
+    openOnly,
+    1,
+  );
+
+  assertEquals(lines.length, 1);
+  assertEquals(lines[0], "  item:Open Child");
+});
+
+Deno.test("expandStubs: items inside sections have children expanded at depth 2", async () => {
+  // A section containing an item that itself has child items
+  const sectionItem = makeItem(CHILD_A_ID, `${PARENT_ID}/1`, "Section Item");
+  const childOfSectionItem = makeItem(GRANDCHILD_ID, CHILD_A_ID, "Child of Section Item");
+
+  const stubs: SectionStub[] = [{
+    directory: makeDirectory(`${PARENT_ID}/1`),
+    relativePath: "1/",
+    itemCount: 1,
+    sectionCount: 0,
+  }];
+
+  const itemsByDirectory = new Map<string, ReadonlyArray<Item>>([
+    [`${PARENT_ID}/1`, [sectionItem]],
+    [`${CHILD_A_ID}/`, [childOfSectionItem]],
+  ]);
+  const deps = makeDeps(itemsByDirectory, new Map());
+  const lines: string[] = [];
+
+  await expandStubs(stubs, 2, lines, deps, makeOptions(), collectTitles, acceptAll);
+
+  // 1/ header, section item indented once, child of section item indented twice
+  assertEquals(lines[0], "1/");
+  assertEquals(lines[1], "  item:Section Item");
+  assertEquals(lines[2], "    item:Child of Section Item");
 });
