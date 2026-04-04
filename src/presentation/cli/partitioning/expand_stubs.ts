@@ -5,6 +5,8 @@ import type {
   SectionSummary,
 } from "../../../domain/services/section_query_service.ts";
 import { createSingleRange } from "../../../domain/primitives/directory_range.ts";
+import { createDirectory } from "../../../domain/primitives/directory.ts";
+import type { ItemId } from "../../../domain/primitives/item_id.ts";
 import type { SectionStub } from "./build_partitions.ts";
 import {
   formatSectionHeader,
@@ -106,11 +108,28 @@ export const expandStubs = async (
     const sectionRange = createSingleRange(stub.directory);
     const sectionItemsResult = await deps.itemRepository.listByDirectory(sectionRange);
     if (sectionItemsResult.type === "ok") {
-      const sectionItems = sectionItemsResult.value.filter(itemFilter);
-      const itemLines: string[] = [];
-      formatItems(sectionItems, itemLines);
-      for (const line of itemLines) {
-        lines.push(childPrefix + line);
+      const sectionItems = sectionItemsResult.value
+        .filter(itemFilter)
+        .filter((item) =>
+          stub.directory.head.kind !== "item" || item.data.icon.toString() !== "event"
+        );
+      // Format each item and immediately expand its children
+      for (const item of sectionItems) {
+        const itemLines: string[] = [];
+        formatItems([item], itemLines);
+        for (const line of itemLines) {
+          lines.push(childPrefix + line);
+        }
+        await expandItemChildren(
+          item.data.id,
+          remainingDepth - 1,
+          lines,
+          deps,
+          formatterOptions,
+          formatItems,
+          itemFilter,
+          indentLevel + 2,
+        );
       }
     } else {
       console.error(
@@ -164,5 +183,83 @@ export const expandStubs = async (
         );
       }
     }
+  }
+};
+
+/**
+ * Expand child items of a given item recursively up to a given depth.
+ *
+ * Queries items whose directory head is the given item ID (item-to-item nesting),
+ * formats them, then recurses into each child. Also expands sections under
+ * the item-head directory.
+ *
+ * @param indentLevel - Current nesting level for indentation
+ */
+export const expandItemChildren = async (
+  itemId: ItemId,
+  remainingDepth: number,
+  lines: string[],
+  deps: ExpandStubsDeps,
+  formatterOptions: ListFormatterOptions,
+  formatItems: FormatItemsFn,
+  itemFilter: ItemFilterFn,
+  indentLevel: number,
+): Promise<void> => {
+  if (remainingDepth <= 0) return;
+
+  const prefix = indent(indentLevel);
+  const itemHeadDir = createDirectory({ kind: "item", id: itemId }, []);
+  const childRange = createSingleRange(itemHeadDir);
+
+  // Query child items under this item's directory
+  const childItemsResult = await deps.itemRepository.listByDirectory(childRange);
+  if (childItemsResult.type === "ok") {
+    const childItems = childItemsResult.value
+      .filter(itemFilter)
+      .filter((item) => item.data.icon.toString() !== "event");
+    // Format each child and immediately expand its descendants
+    for (const child of childItems) {
+      const itemLines: string[] = [];
+      formatItems([child], itemLines);
+      for (const line of itemLines) {
+        lines.push(prefix + line);
+      }
+      await expandItemChildren(
+        child.data.id,
+        remainingDepth - 1,
+        lines,
+        deps,
+        formatterOptions,
+        formatItems,
+        itemFilter,
+        indentLevel + 1,
+      );
+    }
+  } else {
+    console.error(
+      `Warning: failed to load child items for ${itemId.toString()}: ${childItemsResult.error.message}`,
+    );
+  }
+
+  // Query and expand sections under this item-head directory
+  const sectionsResult = await deps.sectionQueryService.listSections(itemHeadDir);
+  if (sectionsResult.type === "ok") {
+    const sectionStubs = sectionsResult.value
+      .filter(isNonEmpty)
+      .map((s) => toRelativeStub(s, 0));
+    await expandStubs(
+      sectionStubs,
+      remainingDepth - 1,
+      lines,
+      deps,
+      formatterOptions,
+      formatItems,
+      itemFilter,
+      indentLevel,
+    );
+  } else {
+    console.error(
+      `Warning: failed to query sections for ${itemId.toString()}: ${sectionsResult.error.message}`,
+    );
   }
 };
