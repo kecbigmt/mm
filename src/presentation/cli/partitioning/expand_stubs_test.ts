@@ -491,6 +491,43 @@ Deno.test("expandItemChildren: interleaves siblings with their descendants", asy
   assertEquals(lines[2], "  item:Child B");
 });
 
+Deno.test("expandItemChildren: does not filter item-head events (known scope exclusion)", async () => {
+  // buildPartitions filters out events under item-heads, but expandItemChildren
+  // intentionally does NOT replicate that policy. This test documents the
+  // deliberate inconsistency: events nested under item-heads are anomalous data,
+  // and filtering them during recursive expansion is out of scope.
+  const eventChild = unwrap(parseItem({
+    id: CHILD_A_ID,
+    title: "Meeting",
+    icon: "event",
+    status: "open",
+    directory: PARENT_ID,
+    rank: "a",
+    createdAt: "2025-02-10T12:00:00Z",
+    updatedAt: "2025-02-10T12:00:00Z",
+  }));
+  const itemsByDirectory = new Map<string, ReadonlyArray<Item>>([
+    [`${PARENT_ID}/`, [eventChild]],
+  ]);
+  const deps = makeDeps(itemsByDirectory, new Map());
+  const lines: string[] = [];
+
+  await expandItemChildren(
+    makeItemId(PARENT_ID),
+    1,
+    lines,
+    deps,
+    makeOptions(),
+    collectTitles,
+    acceptAll,
+    1,
+  );
+
+  // Event IS shown — this is the accepted inconsistency with buildPartitions
+  assertEquals(lines.length, 1);
+  assertEquals(lines[0], "  item:Meeting");
+});
+
 Deno.test("expandStubs: items inside sections have children expanded at depth 2", async () => {
   // A section containing an item that itself has child items
   const sectionItem = makeItem(CHILD_A_ID, `${PARENT_ID}/1`, "Section Item");
