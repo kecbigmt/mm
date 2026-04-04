@@ -58,17 +58,25 @@ I can build the SwiftUI-side client against a stable structured contract.**
 
 ### Completed Work Summary
 
-Not yet started.
+### Refactoring
+**Status: Complete - Ready for Verify**
+**Applied:** Extract isValidationError and isRepositoryError type guards from error_mapper.ts to
+their source modules (shared/errors.ts and repository_error.ts): high cohesion, single
+responsibility. Guards belong with the discriminants they check.
+**Design:** error_mapper.ts now imports reusable guards instead of inlining duck-typing logic.
+**Quality:** Tests passing (703), Linting clean
+**Next:** Verify
 
-### Acceptance Checks
+### Verification
+**Status: Verified - Ready for Code Review**
+**Acceptance:** 2026-04-04
+- Criterion 1 (Message Shape): PASS - `src/presentation/jsonrpc/envelope.ts` defines `JsonRpcRequest`, `JsonRpcSuccessResponse<T>`, `JsonRpcErrorResponse`, and `JsonRpcResponse<T>` with consistent `"2.0"` field; `JsonRpcId = string | number` handles request ID correlation
+- Criterion 2 (Error Mapping): PASS - `src/presentation/jsonrpc/error_mapper.ts` maps `ValidationError` to `-32001` and `RepositoryError` to `-32002` using `isValidationError`/`isRepositoryError` guards from source modules; no CLI behavior embedded
+- Criterion 3 (Boundary Clarity): PASS - envelope and error_mapper live in `presentation/jsonrpc`; domain and application layers have zero imports from this module (confirmed by grep)
 
-**Status: Pending Product Owner Review**
-
-Developer verification completed:
-
-- not yet started
-
-**Awaiting product owner acceptance testing before marking this user story as complete.**
+**Tests:** All passing (703) - includes `envelope_test.ts` and `error_mapper_test.ts`
+**Quality:** Linting clean, no debug output, no bare TODOs
+**Next:** Code Review
 
 ### Follow-ups / Open Risks
 

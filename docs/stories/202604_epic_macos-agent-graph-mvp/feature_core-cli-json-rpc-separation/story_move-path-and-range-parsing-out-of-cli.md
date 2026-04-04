@@ -59,17 +59,26 @@ use cases can be reused without importing `presentation/cli`.**
 
 ### Completed Work Summary
 
-Not yet started.
+### Refactoring
+**Status: Complete - Ready for Verify**
+**Applied:** Remove backward-compatibility re-export shim (path_parser.ts) and duplicated test file
+(path_parser_test.ts): no duplication, loose coupling. Update 7 CLI commands to import parsers
+directly from domain/primitives/path_expression_parser.ts.
+**Design:** CLI commands now depend on domain primitives directly, eliminating the unnecessary
+indirection layer. Tests live only in domain where the implementation lives.
+**Quality:** Tests passing (703), Linting clean
+**Next:** Verify
 
-### Acceptance Checks
+### Verification
+**Status: Verified - Ready for Code Review**
+**Acceptance:** 2026-04-04
+- Criterion 1 (Parser Relocation): PASS - `parsePathExpression` and `parseRangeExpression` live in `src/domain/primitives/path_expression_parser.ts`; importable without any `presentation/cli` dependency
+- Criterion 2 (Workflow Decoupling): PASS - `src/domain/workflows/list_items.ts` and `src/domain/workflows/move_item.ts` contain zero imports from `presentation/cli` (confirmed by grep); typed validation errors returned on parse failure
+- Criterion 3 (Safety): PASS - test coverage for path and range parsing lives alongside the implementation in `src/domain/primitives/`; all 703 tests pass
 
-**Status: Pending Product Owner Review**
-
-Developer verification completed:
-
-- not yet started
-
-**Awaiting product owner acceptance testing before marking this user story as complete.**
+**Tests:** All passing (703)
+**Quality:** Linting clean, no debug output, no bare TODOs
+**Next:** Code Review
 
 ### Follow-ups / Open Risks
 

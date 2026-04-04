@@ -60,17 +60,23 @@ JSON-RPC can retrieve the same results through a structured core interface.**
 
 ### Completed Work Summary
 
-Not yet started.
+### Refactoring
+**Status: Complete - Ready for Verify**
+**Applied:** Reviewed list_items.ts use case. No changes needed -- explicit field mapping between
+request DTO and workflow input is the correct pattern for an application boundary layer.
+**Quality:** Tests passing (703), Linting clean
+**Next:** Verify
 
-### Acceptance Checks
+### Verification
+**Status: Verified - Ready for Code Review**
+**Acceptance:** 2026-04-04
+- Criterion 1 (Shared Use Case): PASS - `src/application/use_cases/list_items.ts` exposes `listItems(request, deps)` returning the same logical results as the CLI list flow via `ListItemsWorkflow.execute`; adapters receive `ListItemsResponse` with structured `ListItemDto` array, not formatted strings
+- Criterion 2 (Structured Errors): PASS - `ListItemsApplicationError = ValidationError<"ListItems"> | RepositoryError`; parse and repository failures propagate as typed errors without CLI-specific messaging
+- Criterion 3 (Compatibility): PASS - `ListItemsRequest` includes `status` (maps to `ListItemsStatusFilter`), `icon` (maps to `ItemIconValue`), `expression` (path/range expression), and `timezone`/`today` for snooze/ordering; all filtering semantics pass through unchanged to `ListItemsWorkflow`
 
-**Status: Pending Product Owner Review**
-
-Developer verification completed:
-
-- not yet started
-
-**Awaiting product owner acceptance testing before marking this user story as complete.**
+**Tests:** All passing (703)
+**Quality:** Linting clean, no debug output, no bare TODOs
+**Next:** Code Review
 
 ### Follow-ups / Open Risks
 
