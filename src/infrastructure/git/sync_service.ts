@@ -146,8 +146,8 @@ export type SyncServiceDeps = {
  * const pullResult = await syncService.pull(input);
  * if (pullResult.warning) showWarning(pullResult.warning);
  *
- * // Domain workflow (pure)
- * const result = await EditItemWorkflow.execute(...);
+ * // Shared application use case
+ * const result = await editItem(...);
  *
  * // After file operation
  * const commitResult = await syncService.commit({ workspaceRoot, summary });
