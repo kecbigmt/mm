@@ -8,6 +8,12 @@ export type {
 export { loadCoreDependencies, resolveMmHome, resolveWorkspaceRootFromSources } from "./runtime.ts";
 
 export {
+  type CreatedItemDto,
+  createItem,
+  type CreateItemApplicationError,
+  type CreateItemDeps,
+  type CreateItemRequest,
+  type CreateItemResponse,
   type ListItemDto,
   listItems,
   type ListItemsApplicationError,
