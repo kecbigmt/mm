@@ -8,7 +8,7 @@ import { assertEquals } from "@std/assert";
 import { createPathResolver } from "./path_resolver.ts";
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
 import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.ts";
-import { parsePathExpression } from "../../presentation/cli/path_parser.ts";
+import { parsePathExpression } from "../primitives/path_expression_parser.ts";
 import { createAlias } from "../models/alias.ts";
 import { createItem } from "../models/item.ts";
 import {

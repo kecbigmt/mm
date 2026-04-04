@@ -7,7 +7,7 @@ import {
 } from "../../../domain/primitives/mod.ts";
 import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
-import { parsePathExpression } from "../path_parser.ts";
+import { parsePathExpression } from "../../../domain/primitives/path_expression_parser.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";

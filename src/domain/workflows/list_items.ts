@@ -4,7 +4,7 @@ import { Item } from "../models/item.ts";
 import { Directory } from "../primitives/directory.ts";
 import { parseTimezoneIdentifier, TimezoneIdentifier } from "../primitives/timezone_identifier.ts";
 import { createSingleRange } from "../primitives/directory_range.ts";
-import { parseRangeExpression } from "../../presentation/cli/path_parser.ts";
+import { parseRangeExpression } from "../primitives/path_expression_parser.ts";
 import { createPathResolver } from "../services/path_resolver.ts";
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";

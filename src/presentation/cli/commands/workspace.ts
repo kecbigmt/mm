@@ -1,7 +1,7 @@
 import { Command } from "@cliffy/command";
 import { bold } from "@std/fmt/colors";
 import { Result } from "../../../shared/result.ts";
-import { resolveMmHome } from "../dependencies.ts";
+import { resolveMmHome } from "../../../application/runtime.ts";
 import { workspaceNameFromString } from "../../../domain/primitives/workspace_name.ts";
 import { createFileSystemConfigRepository } from "../../../infrastructure/fileSystem/config_repository.ts";
 import { createFileSystemWorkspaceRepository } from "../../../infrastructure/fileSystem/workspace_repository.ts";

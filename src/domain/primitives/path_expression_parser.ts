@@ -8,8 +8,8 @@ import {
   RANGE_EXPRESSION_KIND_VALUE,
   RangeExpression,
   RangeExpressionValidationError,
-} from "../../domain/primitives/path_types.ts";
-import { isDateExpression } from "../../domain/services/date_resolver.ts";
+} from "./path_types.ts";
+import { isDateExpression } from "../services/date_resolver.ts";
 
 const NUMERIC_REGEX = /^[1-9]\d*$/u;
 

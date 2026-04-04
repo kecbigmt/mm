@@ -6,7 +6,7 @@ import { assertEquals } from "@std/assert";
 import { createPathResolver } from "./path_resolver.ts";
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
 import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.ts";
-import { parsePathExpression } from "../../presentation/cli/path_parser.ts";
+import { parsePathExpression } from "../primitives/path_expression_parser.ts";
 import { createItem } from "../models/item.ts";
 import {
   createDateDirectory,
@@ -239,7 +239,7 @@ Deno.test("PathResolver - returns error for reversed numeric range (5..3)", asyn
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
 
   // Try to resolve range using absolute path 2025-11-16/5..3 (reversed)
-  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const { parseRangeExpression } = await import("../primitives/path_expression_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-16/5..3"));
   const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
@@ -263,7 +263,7 @@ Deno.test("PathResolver - returns error for large reversed numeric range (10..1)
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
 
   // Try to resolve range 2025-11-16/10..1 (large reversed range)
-  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const { parseRangeExpression } = await import("../primitives/path_expression_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-16/10..1"));
   const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
@@ -287,7 +287,7 @@ Deno.test("PathResolver - returns error for adjacent reversed numeric range (2..
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
 
   // Try to resolve range 2025-11-16/2..1 (adjacent reversed)
-  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const { parseRangeExpression } = await import("../primitives/path_expression_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-16/2..1"));
   const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
@@ -403,7 +403,7 @@ Deno.test("PathResolver - returns error for different date parents", async () =>
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
 
   // Try to resolve range with different date parents (2025-11-15/1..2025-11-16/3)
-  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const { parseRangeExpression } = await import("../primitives/path_expression_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("2025-11-15/1..2025-11-16/3"));
   const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
@@ -455,7 +455,7 @@ Deno.test("PathResolver - returns error for different item parents", async () =>
   }));
 
   // Try to resolve range with different item parents (itemA/1..itemB/3)
-  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const { parseRangeExpression } = await import("../primitives/path_expression_parser.ts");
   const rangeExpr = Result.unwrap(
     parseRangeExpression(`${itemA.toString()}/1..${itemB.toString()}/3`),
   );
@@ -482,7 +482,7 @@ Deno.test("PathResolver - resolveRange expands this-week to Mon-Sun date range",
 
   const today = Result.unwrap(parseCalendarDay("2025-12-06"));
 
-  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const { parseRangeExpression } = await import("../primitives/path_expression_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("this-week"));
   const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
@@ -510,7 +510,7 @@ Deno.test("PathResolver - resolveRange expands tw alias to Mon-Sun date range", 
 
   const today = Result.unwrap(parseCalendarDay("2025-12-06"));
 
-  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const { parseRangeExpression } = await import("../primitives/path_expression_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("tw"));
   const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
@@ -537,7 +537,7 @@ Deno.test("PathResolver - resolveRange expands next-week to Mon-Sun of next week
 
   const today = Result.unwrap(parseCalendarDay("2025-12-06"));
 
-  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const { parseRangeExpression } = await import("../primitives/path_expression_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("next-week"));
   const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
@@ -565,7 +565,7 @@ Deno.test("PathResolver - resolveRange expands this-month to 1st to last day", a
 
   const today = Result.unwrap(parseCalendarDay("2025-12-06"));
 
-  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const { parseRangeExpression } = await import("../primitives/path_expression_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("this-month"));
   const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
@@ -593,7 +593,7 @@ Deno.test("PathResolver - resolveRange expands next-month crossing year boundary
 
   const today = Result.unwrap(parseCalendarDay("2025-12-06"));
 
-  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const { parseRangeExpression } = await import("../primitives/path_expression_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("next-month"));
   const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
@@ -621,7 +621,7 @@ Deno.test("PathResolver - resolveRange keeps today as single date (not period ke
 
   const today = Result.unwrap(parseCalendarDay("2025-12-06"));
 
-  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const { parseRangeExpression } = await import("../primitives/path_expression_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("today"));
   const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 
@@ -923,7 +923,7 @@ Deno.test("PathResolver - resolveRange resolves 'permanent' to single permanent 
 
   const today = Result.unwrap(parseCalendarDay("2025-11-16"));
 
-  const { parseRangeExpression } = await import("../../presentation/cli/path_parser.ts");
+  const { parseRangeExpression } = await import("../primitives/path_expression_parser.ts");
   const rangeExpr = Result.unwrap(parseRangeExpression("permanent"));
   const result = await pathResolver.resolveRange(createDateDirectory(today, []), rangeExpr);
 

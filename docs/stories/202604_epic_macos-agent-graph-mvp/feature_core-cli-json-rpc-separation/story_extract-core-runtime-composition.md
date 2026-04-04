@@ -59,17 +59,26 @@ that CLI and JSON-RPC can reuse the same repositories and services without dupli
 
 ### Completed Work Summary
 
-Not yet started.
+### Refactoring
+**Status: Complete - Ready for Verify**
+**Applied:** Remove duplicated test helpers and resolveWorkspaceRootFromSources tests from
+dependencies_test.ts: loose coupling, no duplication. Remove resolveWorkspaceRootFromSources
+re-export from CLI dependencies.ts: single responsibility, CLI wrapper only wraps.
+**Design:** CLI dependencies.ts is now a pure thin wrapper with no re-exports of application-layer
+utilities. workspace.ts imports resolveMmHome from application layer directly.
+**Quality:** Tests passing (703), Linting clean
+**Next:** Verify
 
-### Acceptance Checks
+### Verification
+**Status: Verified - Ready for Code Review**
+**Acceptance:** 2026-04-04
+- Criterion 1 (Shared Runtime Boundary): PASS - `src/application/runtime.ts` exports `CoreDependencies` (UI-agnostic repos/services); `src/presentation/cli/dependencies.ts` is a thin wrapper that re-exports `loadCoreDependencies` and type-aliases `CoreDependencies` as `CliDependencies`, keeping command definitions, console output, and exit handling in CLI layer
+- Criterion 2 (Workspace Resolution): PASS - `loadCoreDependencies` preserves current workspace resolution logic (explicit path, MM_HOME, HOME, config file); returns structured `CoreDependencyError` with `type: "workspace"` or `type: "repository"` on failure
+- Criterion 3 (Sync Compatibility): PASS - `versionControlService`, `sessionRepository`, and `stateRepository` remain in `CoreDependencies`; no sync-related infrastructure was altered
 
-**Status: Pending Product Owner Review**
-
-Developer verification completed:
-
-- not yet started
-
-**Awaiting product owner acceptance testing before marking this user story as complete.**
+**Tests:** All passing (703)
+**Quality:** Linting clean (`deno lint src/` 0 errors), no debug output in application/domain layers, no bare TODOs
+**Next:** Code Review
 
 ### Follow-ups / Open Risks
 
