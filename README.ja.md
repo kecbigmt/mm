@@ -275,6 +275,50 @@ mm sn task-b -c
 - ローカル時刻ISO 8601: `2025-01-20T17:00`（ローカル時刻として解釈）
 - 時刻のみ: `17:00` または `17:00:00`（親の配置日付または今日を使用）
 
+#### `edit <id>`
+
+アイテムのメタデータや本文を編集します。エイリアス: `e`
+
+```sh
+# タイトル、アイコン、本文を編集
+mm edit my-note --title "新しいタイトル" --icon task --body "本文テキスト全体"
+
+# 既存の本文にテキストを追記
+mm edit my-note --append "追加テキスト"
+
+# 本文内のテキストを検索して置換
+mm edit my-note --find "旧テキスト" --replace "新テキスト"
+
+# すべての出現箇所を置換
+mm edit my-note --find "旧" --replace "新" --replace-all
+
+# マッチしたテキストを削除（空文字に置換）
+mm edit my-note --find "削除したいテキスト" --replace=
+
+# エディタで開く（オプションなし）
+mm edit my-note
+```
+
+オプション:
+
+- `--title <title>` - タイトルを更新
+- `--icon <icon>` - アイコンを更新（note, task, event）
+- `--body <body>` - 本文を全体置換
+- `--append <text>` - 既存の本文にテキストを追記
+- `--find <text>` - 本文内のテキストを検索（--replaceと併用）
+- `--replace [text]` - --findで見つけたテキストを置換（削除する場合は`--replace=`を使用）
+- `--replace-all` - すべての出現箇所を置換（--find/--replaceと併用）
+- `--start-at <datetime>` - 開始時刻を更新
+- `--duration <duration>` - 期間を更新
+- `--due-at <datetime>` - 期限を更新
+- `-a, --alias <slug>` - エイリアスを更新
+- `-p, --project <project>` - プロジェクト参照を更新
+- `-c, --context <context>` - コンテキストタグを更新（複数指定可能）
+
+**注意:** `--body`、`--append`、`--find`/`--replace`
+は排他的です（同時指定不可）。`--find`には`--replace`が必須です。`--replace-all`
+なしの場合、検索テキストは1箇所だけにマッチする必要があります（複数マッチはエラー）。
+
 #### `remove <ids...>`
 
 ワークスペースからアイテムを完全に削除します。エイリアス: `rm`

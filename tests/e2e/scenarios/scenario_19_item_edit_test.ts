@@ -481,6 +481,396 @@ describe("Scenario 19: Item edit", () => {
     );
   });
 
+  // --find/--replace: validation error cases
+
+  it("returns error when --find is used with --body", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+      "--body",
+      "some body",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--find",
+      "some",
+      "--replace",
+      "other",
+      "--body",
+      "full body",
+    ]);
+    assertEquals(editResult.success, false, "Should fail when --find is used with --body");
+    assertEquals(
+      editResult.stderr.includes("--find") && editResult.stderr.includes("--body"),
+      true,
+      "Error message should mention both --find and --body",
+    );
+  });
+
+  it("returns error when --find is used with --append", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+      "--body",
+      "some body",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--find",
+      "some",
+      "--replace",
+      "other",
+      "--append",
+      "extra text",
+    ]);
+    assertEquals(editResult.success, false, "Should fail when --find is used with --append");
+    assertEquals(
+      editResult.stderr.includes("--find") && editResult.stderr.includes("--append"),
+      true,
+      "Error message should mention both --find and --append",
+    );
+  });
+
+  it("returns error when --find is specified without --replace", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+      "--body",
+      "some body",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--find",
+      "some",
+    ]);
+    assertEquals(editResult.success, false, "Should fail when --find is used without --replace");
+    assertEquals(
+      editResult.stderr.includes("--find") && editResult.stderr.includes("--replace"),
+      true,
+      "Error message should mention --find and --replace",
+    );
+  });
+
+  it("returns error when --replace is specified without --find", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+      "--body",
+      "some body",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--replace",
+      "other",
+    ]);
+    assertEquals(editResult.success, false, "Should fail when --replace is used without --find");
+    assertEquals(
+      editResult.stderr.includes("--replace") && editResult.stderr.includes("--find"),
+      true,
+      "Error message should mention --replace and --find",
+    );
+  });
+
+  it("returns error when --replace-all is specified without --find", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+      "--body",
+      "some body",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--replace-all",
+    ]);
+    assertEquals(
+      editResult.success,
+      false,
+      "Should fail when --replace-all is used without --find",
+    );
+    assertEquals(
+      editResult.stderr.includes("--replace-all") && editResult.stderr.includes("--find"),
+      true,
+      "Error message should mention --replace-all and --find",
+    );
+  });
+
+  // --find/--replace: happy path and runtime error cases
+
+  it("replaces first occurrence of find text in body", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+      "--body",
+      "foo bar baz",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--find",
+      "bar",
+      "--replace",
+      "qux",
+    ]);
+    assertEquals(editResult.success, true, `edit failed: ${editResult.stderr}`);
+
+    const itemFile = await findItemFileById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemFile, "Item file should exist");
+    const fileContent = await Deno.readTextFile(itemFile!);
+    const parseResult = parseFrontmatter(fileContent);
+    assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
+    if (parseResult.type === "error") throw new Error("Failed to parse frontmatter");
+
+    assertEquals(
+      parseResult.value.body.includes("foo qux baz"),
+      true,
+      "Body should have 'bar' replaced with 'qux'",
+    );
+    assertEquals(
+      parseResult.value.body.includes("foo bar baz"),
+      false,
+      "Original text should no longer be present",
+    );
+  });
+
+  it("replaces all occurrences when --replace-all is specified", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+      "--body",
+      "aaa bbb aaa",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--find",
+      "aaa",
+      "--replace",
+      "ccc",
+      "--replace-all",
+    ]);
+    assertEquals(editResult.success, true, `edit failed: ${editResult.stderr}`);
+
+    const itemFile = await findItemFileById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemFile, "Item file should exist");
+    const fileContent = await Deno.readTextFile(itemFile!);
+    const parseResult = parseFrontmatter(fileContent);
+    assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
+    if (parseResult.type === "error") throw new Error("Failed to parse frontmatter");
+
+    assertEquals(
+      parseResult.value.body.includes("ccc bbb ccc"),
+      true,
+      "All occurrences of 'aaa' should be replaced with 'ccc'",
+    );
+    assertEquals(
+      parseResult.value.body.includes("aaa"),
+      false,
+      "No 'aaa' should remain",
+    );
+  });
+
+  it("deletes matched text when --replace is empty string", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+      "--body",
+      "hello world",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--find",
+      "world",
+      "--replace=",
+    ]);
+    assertEquals(editResult.success, true, `edit failed: ${editResult.stderr}`);
+
+    const itemFile = await findItemFileById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemFile, "Item file should exist");
+    const fileContent = await Deno.readTextFile(itemFile!);
+    const parseResult = parseFrontmatter(fileContent);
+    assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
+    if (parseResult.type === "error") throw new Error("Failed to parse frontmatter");
+
+    assertEquals(
+      parseResult.value.body.includes("world"),
+      false,
+      "'world' should be removed from body",
+    );
+    assertEquals(
+      parseResult.value.body.includes("hello"),
+      true,
+      "'hello' should remain",
+    );
+  });
+
+  it("applies find/replace together with other metadata flags", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+      "--body",
+      "old content here",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--find",
+      "old",
+      "--replace",
+      "new",
+      "--icon",
+      "task",
+    ]);
+    assertEquals(editResult.success, true, `edit failed: ${editResult.stderr}`);
+
+    const itemFile = await findItemFileById(ctx.testHome, "test-workspace", itemId);
+    assertExists(itemFile, "Item file should exist");
+    const fileContent = await Deno.readTextFile(itemFile!);
+    const parseResult = parseFrontmatter(fileContent);
+    assertEquals(parseResult.type, "ok", "Should parse frontmatter successfully");
+    if (parseResult.type === "error") throw new Error("Failed to parse frontmatter");
+    const meta = parseResult.value.frontmatter as Record<string, unknown>;
+
+    assertEquals(meta.icon, "task", "Icon should be updated");
+    assertEquals(
+      parseResult.value.body.includes("new content here"),
+      true,
+      "Body should have 'old' replaced with 'new'",
+    );
+  });
+
+  it("returns error when find text is not found in body", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+      "--body",
+      "some body text",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--find",
+      "nonexistent text",
+      "--replace",
+      "replacement",
+    ]);
+    assertEquals(editResult.success, false, "Should fail when find text is not in body");
+    assertEquals(
+      editResult.stderr.length > 0,
+      true,
+      "Should print an error message",
+    );
+  });
+
+  it("returns error when find text has multiple matches without --replace-all", async () => {
+    await runCommand(ctx.testHome, ["cd", "today"]);
+
+    const createResult = await runCommand(ctx.testHome, [
+      "note",
+      "Test note",
+      "--body",
+      "aaa bbb aaa",
+    ]);
+    assertEquals(createResult.success, true, `Failed to create note: ${createResult.stderr}`);
+
+    const today = await getCurrentDateFromCli(ctx.testHome);
+    const itemId = await getLatestItemId(ctx.testHome, "test-workspace", today);
+
+    const editResult = await runCommand(ctx.testHome, [
+      "edit",
+      itemId,
+      "--find",
+      "aaa",
+      "--replace",
+      "ccc",
+    ]);
+    assertEquals(
+      editResult.success,
+      false,
+      "Should fail when multiple matches without --replace-all",
+    );
+    assertEquals(
+      editResult.stderr.length > 0,
+      true,
+      "Should print an error message about multiple matches",
+    );
+  });
+
   it("uses alias 'e' for edit command", async () => {
     await runCommand(ctx.testHome, ["cd", "today"]);
 

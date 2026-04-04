@@ -20,6 +20,7 @@ const hasMetadataOptions = (options: Record<string, unknown>): boolean => {
   return (
     options.title !== undefined || options.icon !== undefined || options.body !== undefined ||
     options.append !== undefined ||
+    options.find !== undefined || options.replace !== undefined || options.replaceAll === true ||
     options.startAt !== undefined || options.duration !== undefined ||
     options.dueAt !== undefined ||
     options.alias !== undefined || options.project !== undefined || options.context !== undefined
@@ -51,18 +52,52 @@ const formatLocatorError = (error: ItemLocatorError, debug: boolean): string => 
 };
 
 /**
- * Resolve an item's existing body and concatenate the append text.
- * Returns the merged body string, or exits with an error message on failure.
+ * Validate mutual exclusivity and pairing rules for body-editing flags.
+ * Returns an error message string if validation fails, or null if valid.
  */
-const resolveBodyForAppend = async (
+const validateBodyFlags = (options: Record<string, unknown>): string | null => {
+  // Mutual exclusivity: --body, --append, and --find are exclusive body modes
+  if (options.body !== undefined && options.append !== undefined) {
+    return "Cannot use --body and --append together. Use one or the other.";
+  }
+  if (options.find !== undefined && options.body !== undefined) {
+    return "Cannot use --find and --body together. Use one or the other.";
+  }
+  if (options.find !== undefined && options.append !== undefined) {
+    return "Cannot use --find and --append together. Use one or the other.";
+  }
+  // --find must be non-empty
+  if (typeof options.find === "string" && options.find.length === 0) {
+    return "--find text must not be empty.";
+  }
+  // --find/--replace pairing
+  if (options.find !== undefined && options.replace === undefined) {
+    return "--find requires --replace. Use --find and --replace together.";
+  }
+  if (options.replace !== undefined && options.find === undefined) {
+    return "--replace requires --find. Use --find and --replace together.";
+  }
+  if (options.replaceAll === true && options.find === undefined) {
+    return "--replace-all requires --find. Use --find, --replace, and --replace-all together.";
+  }
+  return null;
+};
+
+/** Shared dependencies for resolving an item's body before transformation. */
+type BodyResolutionDeps = Readonly<{
+  itemRepository: ItemRepository;
+  aliasRepository: AliasRepository;
+  timezone: TimezoneIdentifier;
+  prefixCandidates: () => Promise<readonly string[]>;
+}>;
+
+/**
+ * Resolve an item and return its existing body text.
+ * Exits with an error message on resolution failure.
+ */
+const resolveExistingBody = async (
   itemRef: string,
-  appendText: string,
-  deps: {
-    itemRepository: ItemRepository;
-    aliasRepository: AliasRepository;
-    timezone: TimezoneIdentifier;
-    prefixCandidates: () => Promise<readonly string[]>;
-  },
+  deps: BodyResolutionDeps,
   debug: boolean,
 ): Promise<string> => {
   const locatorService = createItemLocatorService(deps);
@@ -71,7 +106,61 @@ const resolveBodyForAppend = async (
     console.error(formatLocatorError(resolveResult.error, debug));
     Deno.exit(1);
   }
-  const existingBody = resolveResult.value.data.body ?? "";
+  return resolveResult.value.data.body ?? "";
+};
+
+/** Count non-overlapping occurrences of a literal substring. */
+const countOccurrences = (haystack: string, needle: string): number => {
+  let count = 0;
+  let pos = 0;
+  while ((pos = haystack.indexOf(needle, pos)) !== -1) {
+    count++;
+    pos += needle.length;
+  }
+  return count;
+};
+
+/**
+ * Resolve an item's existing body and apply find/replace.
+ * Returns the replaced body string, or exits with an error message on failure.
+ */
+const resolveBodyForFindReplace = async (
+  itemRef: string,
+  findText: string,
+  replaceText: string,
+  replaceAll: boolean,
+  deps: BodyResolutionDeps,
+  debug: boolean,
+): Promise<string> => {
+  const existingBody = await resolveExistingBody(itemRef, deps, debug);
+  const occurrences = countOccurrences(existingBody, findText);
+  if (occurrences === 0) {
+    console.error(`Find text not found in body: "${findText}"`);
+    Deno.exit(1);
+  }
+  if (!replaceAll && occurrences > 1) {
+    console.error(
+      `Find text "${findText}" matches ${occurrences} times. Use --replace-all to replace all, or provide a more specific --find text.`,
+    );
+    Deno.exit(1);
+  }
+  if (replaceAll) {
+    return existingBody.replaceAll(findText, replaceText);
+  }
+  return existingBody.replace(findText, replaceText);
+};
+
+/**
+ * Resolve an item's existing body and concatenate the append text.
+ * Returns the merged body string, or exits with an error message on failure.
+ */
+const resolveBodyForAppend = async (
+  itemRef: string,
+  appendText: string,
+  deps: BodyResolutionDeps,
+  debug: boolean,
+): Promise<string> => {
+  const existingBody = await resolveExistingBody(itemRef, deps, debug);
   return existingBody ? existingBody + "\n" + appendText : appendText;
 };
 
@@ -83,6 +172,9 @@ export function createEditCommand() {
     .option("--icon <icon:string>", "Update icon")
     .option("--body <body:string>", "Update body")
     .option("--append <append:string>", "Append text to existing body")
+    .option("--find <find:string>", "Find text in body (used with --replace)")
+    .option("--replace [replace:string]", "Replace text found by --find (use --replace= to delete)")
+    .option("--replace-all", "Replace all occurrences (used with --find/--replace)")
     .option("--start-at <startAt:string>", "Update start time (ISO8601 format)")
     .option("--duration <duration:string>", "Update duration (e.g., 30m, 2h)")
     .option("--due-at <dueAt:string>", "Update due date (ISO8601 format)")
@@ -192,9 +284,9 @@ export function createEditCommand() {
         return;
       }
 
-      // Validate --body and --append mutual exclusivity
-      if (options.body !== undefined && options.append !== undefined) {
-        console.error("Cannot use --body and --append together. Use one or the other.");
+      const bodyFlagError = validateBodyFlags(options);
+      if (bodyFlagError) {
+        console.error(bodyFlagError);
         Deno.exit(1);
       }
 
@@ -210,17 +302,32 @@ export function createEditCommand() {
         contexts?: readonly string[];
       } = {};
 
+      const bodyResolutionDeps: BodyResolutionDeps = {
+        itemRepository: deps.itemRepository,
+        aliasRepository: deps.aliasRepository,
+        timezone: deps.timezone,
+        prefixCandidates: () => deps.cacheUpdateService.getAliases(),
+      };
+
       // Handle --append by resolving item and concatenating with existing body
       if (typeof options.append === "string") {
         updates.body = await resolveBodyForAppend(
           itemRef,
           options.append,
-          {
-            itemRepository: deps.itemRepository,
-            aliasRepository: deps.aliasRepository,
-            timezone: deps.timezone,
-            prefixCandidates: () => deps.cacheUpdateService.getAliases(),
-          },
+          bodyResolutionDeps,
+          debug,
+        );
+      }
+
+      // Handle --find/--replace by resolving item and applying replacement
+      if (typeof options.find === "string") {
+        const replaceText = typeof options.replace === "string" ? options.replace : "";
+        updates.body = await resolveBodyForFindReplace(
+          itemRef,
+          options.find,
+          replaceText,
+          options.replaceAll === true,
+          bodyResolutionDeps,
           debug,
         );
       }
