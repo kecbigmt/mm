@@ -461,6 +461,36 @@ Deno.test("expandItemChildren: respects item filter", async () => {
   assertEquals(lines[0], "  item:Open Child");
 });
 
+Deno.test("expandItemChildren: interleaves siblings with their descendants", async () => {
+  // Child A has a grandchild, Child B does not.
+  // Expected order: Child A, Grandchild, Child B (not Child A, Child B, Grandchild)
+  const childA = makeItem(CHILD_A_ID, PARENT_ID, "Child A");
+  const childB = makeItem(CHILD_B_ID, PARENT_ID, "Child B");
+  const grandchild = makeItem(GRANDCHILD_ID, CHILD_A_ID, "Grandchild of A");
+  const itemsByDirectory = new Map<string, ReadonlyArray<Item>>([
+    [`${PARENT_ID}/`, [childA, childB]],
+    [`${CHILD_A_ID}/`, [grandchild]],
+  ]);
+  const deps = makeDeps(itemsByDirectory, new Map());
+  const lines: string[] = [];
+
+  await expandItemChildren(
+    makeItemId(PARENT_ID),
+    2,
+    lines,
+    deps,
+    makeOptions(),
+    collectTitles,
+    acceptAll,
+    1,
+  );
+
+  assertEquals(lines.length, 3);
+  assertEquals(lines[0], "  item:Child A");
+  assertEquals(lines[1], "    item:Grandchild of A");
+  assertEquals(lines[2], "  item:Child B");
+});
+
 Deno.test("expandStubs: items inside sections have children expanded at depth 2", async () => {
   // A section containing an item that itself has child items
   const sectionItem = makeItem(CHILD_A_ID, `${PARENT_ID}/1`, "Section Item");

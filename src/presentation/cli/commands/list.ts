@@ -507,11 +507,9 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
         );
       }
 
-      // Format items
-      formatItems(partition.items, outputLines);
-
-      // Expand child items of each partition item
+      // Format items, interleaving each item with its child expansion
       for (const item of partition.items) {
+        formatItems([item], outputLines);
         await expandItemChildren(
           item.data.id,
           effectiveDepth,

@@ -109,13 +109,13 @@ export const expandStubs = async (
     const sectionItemsResult = await deps.itemRepository.listByDirectory(sectionRange);
     if (sectionItemsResult.type === "ok") {
       const sectionItems = sectionItemsResult.value.filter(itemFilter);
-      const itemLines: string[] = [];
-      formatItems(sectionItems, itemLines);
-      for (const line of itemLines) {
-        lines.push(childPrefix + line);
-      }
-      // Expand child items of each item in this section
+      // Format each item and immediately expand its children
       for (const item of sectionItems) {
+        const itemLines: string[] = [];
+        formatItems([item], itemLines);
+        for (const line of itemLines) {
+          lines.push(childPrefix + line);
+        }
         await expandItemChildren(
           item.data.id,
           remainingDepth - 1,
@@ -211,13 +211,13 @@ export const expandItemChildren = async (
   const childItemsResult = await deps.itemRepository.listByDirectory(childRange);
   if (childItemsResult.type === "ok") {
     const childItems = childItemsResult.value.filter(itemFilter);
-    const itemLines: string[] = [];
-    formatItems(childItems, itemLines);
-    for (const line of itemLines) {
-      lines.push(prefix + line);
-    }
-    // Recurse into each child
+    // Format each child and immediately expand its descendants
     for (const child of childItems) {
+      const itemLines: string[] = [];
+      formatItems([child], itemLines);
+      for (const line of itemLines) {
+        lines.push(prefix + line);
+      }
       await expandItemChildren(
         child.data.id,
         remainingDepth - 1,
