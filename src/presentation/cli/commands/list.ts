@@ -1,6 +1,9 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { ListItemsStatusFilter, ListItemsWorkflow } from "../../../domain/workflows/list_items.ts";
+import {
+  listItemsForDomain,
+  type ListItemsStatusFilter,
+} from "../../../application/use_cases/list_items.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import type { ItemIconValue } from "../../../domain/primitives/item_icon.ts";
 import { parseRangeExpression } from "../../../domain/primitives/path_expression_parser.ts";
@@ -244,9 +247,9 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
 
   // Execute workflow to get items
   const workflowResult = await profileAsync(
-    "ListItemsWorkflow.execute",
+    "listItemsForDomain",
     () =>
-      ListItemsWorkflow.execute(
+      listItemsForDomain(
         {
           expression: effectiveExpression,
           cwd,

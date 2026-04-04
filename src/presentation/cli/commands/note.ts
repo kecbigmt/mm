@@ -1,7 +1,11 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { createPermanentDirectory, dateTimeFromDate } from "../../../domain/primitives/mod.ts";
-import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
+import { createItem } from "../../../application/use_cases/create_item.ts";
+import {
+  createPermanentDirectory,
+  dateTimeFromDate,
+  itemIdFromString,
+} from "../../../domain/primitives/mod.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { parsePathExpression } from "../../../domain/primitives/path_expression_parser.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
@@ -135,7 +139,7 @@ export function createNoteCommand() {
         : undefined;
       const aliasOption = typeof options.alias === "string" ? options.alias : undefined;
 
-      const workflowResult = await CreateItemWorkflow.execute({
+      const createItemResult = await createItem({
         title: resolvedTitle,
         itemType: "note",
         body: bodyOption,
@@ -153,29 +157,43 @@ export function createNoteCommand() {
         idGenerationService: deps.idGenerationService,
       });
 
-      if (workflowResult.type === "error") {
-        if (workflowResult.error.kind === "validation") {
-          console.error(formatError(workflowResult.error, debug));
-          reportValidationIssues(workflowResult.error.issues);
-        } else {
-          console.error(formatError(workflowResult.error.error, debug));
+      if (createItemResult.type === "error") {
+        console.error(formatError(createItemResult.error, debug));
+        if (createItemResult.error.kind === "ValidationError") {
+          reportValidationIssues(createItemResult.error.issues);
         }
         return;
       }
 
-      const { item, createdTopics } = workflowResult.value;
+      const { item, createdTopics } = createItemResult.value;
 
       // Display notifications for auto-created topics
       for (const topicAlias of createdTopics) {
-        console.log(`Created topic: ${topicAlias.toString()}`);
+        console.log(`Created topic: ${topicAlias}`);
+      }
+
+      const itemIdResult = itemIdFromString(item.id);
+      if (itemIdResult.type === "error") {
+        console.error(formatError(itemIdResult.error, debug));
+        return;
+      }
+
+      const savedItemResult = await deps.itemRepository.load(itemIdResult.value);
+      if (savedItemResult.type === "error") {
+        console.error(formatError(savedItemResult.error, debug));
+        return;
+      }
+      if (!savedItemResult.value) {
+        console.error(`Could not reload created item: ${item.id}`);
+        return;
       }
 
       // Update cache with created item
-      await deps.cacheUpdateService.updateFromItem(item);
+      await deps.cacheUpdateService.updateFromItem(savedItemResult.value);
 
-      const label = formatItemLabel(item);
+      const label = item.alias ?? item.id;
       console.log(
-        `✅ Created note [${label}] ${item.data.title.toString()} at ${parentDirectory.toString()}`,
+        `✅ Created note [${label}] ${item.title} at ${parentDirectory.toString()}`,
       );
 
       // Auto-commit if enabled
@@ -190,7 +208,7 @@ export function createNoteCommand() {
       if (options.edit === true) {
         const filePath = deriveFilePathFromId(
           { root: deps.root, timezone: deps.timezone },
-          item.data.id.toString(),
+          item.id,
         );
 
         if (!filePath) {
@@ -207,8 +225,8 @@ export function createNoteCommand() {
               cacheUpdateService: deps.cacheUpdateService,
             },
             {
-              itemId: item.data.id,
-              oldAlias: item.data.alias,
+              itemId: savedItemResult.value.data.id,
+              oldAlias: savedItemResult.value.data.alias,
               occurredAt: createdAtResult.value,
             },
           );

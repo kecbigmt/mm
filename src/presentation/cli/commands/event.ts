@@ -1,7 +1,12 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { dateTimeFromDate, parseDateTime, parseDuration } from "../../../domain/primitives/mod.ts";
-import { CreateItemWorkflow } from "../../../domain/workflows/create_item.ts";
+import { createItem } from "../../../application/use_cases/create_item.ts";
+import {
+  dateTimeFromDate,
+  itemIdFromString,
+  parseDateTime,
+  parseDuration,
+} from "../../../domain/primitives/mod.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { parsePathExpression } from "../../../domain/primitives/path_expression_parser.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
@@ -168,7 +173,7 @@ export function createEventCommand() {
         duration = durationResult.value;
       }
 
-      const workflowResult = await CreateItemWorkflow.execute({
+      const createItemResult = await createItem({
         title: resolvedTitle,
         itemType: "event",
         body: bodyOption,
@@ -188,10 +193,10 @@ export function createEventCommand() {
         idGenerationService: deps.idGenerationService,
       });
 
-      if (workflowResult.type === "error") {
-        if (workflowResult.error.kind === "validation") {
+      if (createItemResult.type === "error") {
+        if (createItemResult.error.kind === "ValidationError") {
           // Check for date consistency errors and provide user-friendly message
-          const hasDateConsistency = workflowResult.error.issues.some(
+          const hasDateConsistency = createItemResult.error.issues.some(
             (i) => i.code === "date_time_inconsistency",
           );
           if (hasDateConsistency) {
@@ -200,27 +205,43 @@ export function createEventCommand() {
               "The start time's date must match the parent directory date.",
             );
           }
-          console.error(formatError(workflowResult.error, debug));
-          reportValidationIssues(workflowResult.error.issues);
+          console.error(formatError(createItemResult.error, debug));
+          reportValidationIssues(createItemResult.error.issues);
         } else {
-          console.error(formatError(workflowResult.error.error, debug));
+          console.error(formatError(createItemResult.error, debug));
         }
         return;
       }
 
-      const { item, createdTopics } = workflowResult.value;
+      const { item, createdTopics } = createItemResult.value;
 
       // Display notifications for auto-created topics
       for (const topicAlias of createdTopics) {
-        console.log(`Created topic: ${topicAlias.toString()}`);
+        console.log(`Created topic: ${topicAlias}`);
+      }
+
+      const itemIdResult = itemIdFromString(item.id);
+      if (itemIdResult.type === "error") {
+        console.error(formatError(itemIdResult.error, debug));
+        return;
+      }
+
+      const savedItemResult = await deps.itemRepository.load(itemIdResult.value);
+      if (savedItemResult.type === "error") {
+        console.error(formatError(savedItemResult.error, debug));
+        return;
+      }
+      if (!savedItemResult.value) {
+        console.error(`Could not reload created item: ${item.id}`);
+        return;
       }
 
       // Update cache with created item
-      await deps.cacheUpdateService.updateFromItem(item);
+      await deps.cacheUpdateService.updateFromItem(savedItemResult.value);
 
-      const label = formatItemLabel(item);
+      const label = item.alias ?? item.id;
       console.log(
-        `✅ Created event [${label}] ${item.data.title.toString()} at ${parentDirectory.toString()}`,
+        `✅ Created event [${label}] ${item.title} at ${parentDirectory.toString()}`,
       );
 
       // Auto-commit if enabled
@@ -235,7 +256,7 @@ export function createEventCommand() {
       if (options.edit === true) {
         const filePath = deriveFilePathFromId(
           { root: deps.root, timezone: deps.timezone },
-          item.data.id.toString(),
+          item.id,
         );
 
         if (!filePath) {
@@ -252,8 +273,8 @@ export function createEventCommand() {
               cacheUpdateService: deps.cacheUpdateService,
             },
             {
-              itemId: item.data.id,
-              oldAlias: item.data.alias,
+              itemId: savedItemResult.value.data.id,
+              oldAlias: savedItemResult.value.data.alias,
               occurredAt: createdAtResult.value,
             },
           );
