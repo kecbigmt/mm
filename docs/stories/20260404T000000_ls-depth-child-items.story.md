@@ -37,7 +37,6 @@ Currently `--depth` only expands numbered sections (sub-directories like `1/`, `
 - Manual: create a 3-level hierarchy, run `mm ls -d 0`, `mm ls -d 1`, `mm ls -d 2`, `mm ls -d 10`
 
 ### Out of Scope
-- Filtering item-head events in recursive expansion: `buildPartitions` filters out events under item-heads, but `expandItemChildren` intentionally does not replicate that policy. This is a known consistency gap accepted because events under item-heads are anomalous data that normal workflows do not produce. Documented by test `expandItemChildren: does not filter item-head events (known scope exclusion)`
 - Depth expansion for date range or numeric range listings
 - Parallel queries for child items (sequential is acceptable for typical nesting depth)
 - Visual tree connectors (e.g. `├──`, `└──`); indentation only
@@ -64,8 +63,8 @@ Developer verification completed:
 #### Addressed
 - Tree ordering: Fixed interleaving so each item's descendants appear immediately after it
 - Depth counter shared between child-item and section expansion
+- Item-head event filtering: `expandItemChildren` and `expandStubs` now filter out events under item-heads, consistent with `buildPartitions`
 
 #### Remaining
-- Item-head events are not filtered during recursive expansion (deliberate: edge case where data is anomalous)
 - Deep nesting (depth > 3) not tested in E2E (unit test coverage only)
 - Consider adding visual tree connectors in a future story

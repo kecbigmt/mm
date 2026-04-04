@@ -108,7 +108,11 @@ export const expandStubs = async (
     const sectionRange = createSingleRange(stub.directory);
     const sectionItemsResult = await deps.itemRepository.listByDirectory(sectionRange);
     if (sectionItemsResult.type === "ok") {
-      const sectionItems = sectionItemsResult.value.filter(itemFilter);
+      const sectionItems = sectionItemsResult.value
+        .filter(itemFilter)
+        .filter((item) =>
+          stub.directory.head.kind !== "item" || item.data.icon.toString() !== "event"
+        );
       // Format each item and immediately expand its children
       for (const item of sectionItems) {
         const itemLines: string[] = [];
@@ -210,7 +214,9 @@ export const expandItemChildren = async (
   // Query child items under this item's directory
   const childItemsResult = await deps.itemRepository.listByDirectory(childRange);
   if (childItemsResult.type === "ok") {
-    const childItems = childItemsResult.value.filter(itemFilter);
+    const childItems = childItemsResult.value
+      .filter(itemFilter)
+      .filter((item) => item.data.icon.toString() !== "event");
     // Format each child and immediately expand its descendants
     for (const child of childItems) {
       const itemLines: string[] = [];
