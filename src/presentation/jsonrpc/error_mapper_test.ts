@@ -5,6 +5,7 @@ import {
   JSON_RPC_INTERNAL_ERROR,
   JSON_RPC_REPOSITORY_ERROR,
   JSON_RPC_VALIDATION_ERROR,
+  JSON_RPC_WORKSPACE_ERROR,
 } from "./envelope.ts";
 import { mapErrorToJsonRpc } from "./error_mapper.ts";
 
@@ -39,6 +40,30 @@ Deno.test("mapErrorToJsonRpc", async (t) => {
     assertEquals(data.scope, "item");
     assertEquals(data.operation, "load");
     assertEquals(data.identifier, "item-123");
+  });
+
+  await t.step("maps CoreDependencyError workspace to JSON_RPC_WORKSPACE_ERROR", () => {
+    const workspaceErr = {
+      type: "workspace" as const,
+      message: "workspace timezone is not configured",
+    };
+
+    const res = mapErrorToJsonRpc(4, workspaceErr);
+
+    assertEquals(res.error.code, JSON_RPC_WORKSPACE_ERROR);
+    assertEquals(res.error.message, "workspace timezone is not configured");
+  });
+
+  await t.step("maps CoreDependencyError repository to JSON_RPC_REPOSITORY_ERROR", () => {
+    const repoErr = createRepositoryError("workspace", "load", "not found", {
+      identifier: "home",
+    });
+    const depErr = { type: "repository" as const, error: repoErr };
+
+    const res = mapErrorToJsonRpc(5, depErr);
+
+    assertEquals(res.error.code, JSON_RPC_REPOSITORY_ERROR);
+    assertEquals(res.error.message, "not found");
   });
 
   await t.step("maps unknown errors to JSON_RPC_INTERNAL_ERROR", () => {
