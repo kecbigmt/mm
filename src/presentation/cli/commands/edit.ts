@@ -1,7 +1,10 @@
 import { Command } from "@cliffy/command";
+import { editItem, ItemDto } from "../../../application/mod.ts";
 import { loadCliDependencies } from "../dependencies.ts";
-import { EditItemWorkflow } from "../../../domain/workflows/edit_item.ts";
+import type { Item } from "../../../domain/models/item.ts";
+import { parseAliasSlug } from "../../../domain/primitives/alias_slug.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/date_time.ts";
+import { itemIdFromString } from "../../../domain/primitives/item_id.ts";
 import { deriveFilePathFromId } from "../../../infrastructure/fileSystem/item_repository.ts";
 import { formatError } from "../error_formatter.ts";
 import {
@@ -15,6 +18,7 @@ import { handlePostEditUpdates, launchEditor } from "../utils/edit_item_helper.t
 import type { ItemRepository } from "../../../domain/repositories/item_repository.ts";
 import type { AliasRepository } from "../../../domain/repositories/alias_repository.ts";
 import type { TimezoneIdentifier } from "../../../domain/primitives/mod.ts";
+import { Result } from "../../../shared/result.ts";
 
 const hasMetadataOptions = (options: Record<string, unknown>): boolean => {
   return (
@@ -27,17 +31,16 @@ const hasMetadataOptions = (options: Record<string, unknown>): boolean => {
   );
 };
 
-const formatItem = (
-  item: {
-    data: {
-      id: { toString(): string };
-      title: { toString(): string };
-      alias?: { toString(): string };
-    };
-  },
-): string => {
-  const idLabel = item.data.alias ? item.data.alias.toString() : item.data.id.toString().slice(-7);
-  return `[${idLabel}] ${item.data.title.toString()}`;
+const formatItem = (item: Pick<ItemDto, "id" | "title" | "alias"> | Item): string => {
+  if ("data" in item) {
+    const idLabel = item.data.alias
+      ? item.data.alias.toString()
+      : item.data.id.toString().slice(-7);
+    return `[${idLabel}] ${item.data.title.toString()}`;
+  }
+
+  const idLabel = item.alias ?? item.id.slice(-7);
+  return `[${idLabel}] ${item.title}`;
 };
 
 /** Format an ItemLocatorError into a user-facing error message. */
@@ -212,7 +215,7 @@ export function createEditCommand() {
       }
 
       if (!hasMetadataOptions(options)) {
-        const loadResult = await EditItemWorkflow.execute(
+        const loadResult = await editItem(
           {
             itemLocator: itemRef,
             updates: {},
@@ -239,10 +242,15 @@ export function createEditCommand() {
         }
 
         const { item } = loadResult.value;
-        const oldAlias = item.data.alias;
+        const itemIdResult = itemIdFromString(item.id);
+        if (itemIdResult.type === "error") {
+          console.error(itemIdResult.error.issues[0]?.message ?? "Invalid item ID");
+          Deno.exit(1);
+        }
+        const oldAlias = item.alias ? Result.unwrap(parseAliasSlug(item.alias)) : undefined;
         const filePath = deriveFilePathFromId(
           { root: deps.root, timezone: deps.timezone },
-          item.data.id.toString(),
+          item.id,
         );
 
         if (!filePath) {
@@ -259,8 +267,8 @@ export function createEditCommand() {
               cacheUpdateService: deps.cacheUpdateService,
             },
             {
-              itemId: item.data.id,
-              oldAlias: oldAlias,
+              itemId: itemIdResult.value,
+              oldAlias,
               occurredAt: occurredAtResult.value,
             },
           );
@@ -342,7 +350,7 @@ export function createEditCommand() {
       if (typeof options.project === "string") updates.project = options.project;
       if (Array.isArray(options.context)) updates.contexts = options.context as string[];
 
-      const result = await EditItemWorkflow.execute(
+      const result = await editItem(
         {
           itemLocator: itemRef,
           updates,
@@ -375,10 +383,9 @@ export function createEditCommand() {
 
       // Display notifications for auto-created topics
       for (const topicAlias of createdTopics) {
-        console.log(`Created topic: ${topicAlias.toString()}`);
+        console.log(`Created topic: ${topicAlias}`);
       }
 
-      // Update cache with edited item
       await deps.cacheUpdateService.updateFromItem(item);
 
       console.log(`✅ Updated ${formatItem(item)}`);

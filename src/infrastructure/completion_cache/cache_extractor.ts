@@ -1,13 +1,20 @@
-/**
- * Item representation for cache extraction
- * Matches the structure of domain Item
- */
-export interface ExtractableItem {
-  readonly data: {
-    readonly alias?: { toString(): string };
-    readonly contexts?: ReadonlyArray<{ toString(): string }>;
+type DomainExtractableItem = Readonly<{
+  data: {
+    alias?: { toString(): string };
+    contexts?: ReadonlyArray<{ toString(): string }>;
   };
-}
+}>;
+
+type FlatExtractableItem = Readonly<{
+  alias?: string;
+  contexts?: ReadonlyArray<string>;
+}>;
+
+/**
+ * Item representation for cache extraction.
+ * Supports both domain Item-like objects and application DTOs.
+ */
+export type ExtractableItem = DomainExtractableItem | FlatExtractableItem;
 
 /**
  * Extraction result containing aliases and context tags
@@ -25,13 +32,26 @@ export function extractFromItem(item: ExtractableItem): ExtractedEntries {
   const aliases: string[] = [];
   const contextTags: string[] = [];
 
-  if (item.data.alias) {
-    aliases.push(item.data.alias.toString());
+  if ("data" in item) {
+    if (item.data.alias) {
+      aliases.push(item.data.alias.toString());
+    }
+
+    if (item.data.contexts) {
+      for (const context of item.data.contexts) {
+        contextTags.push(context.toString());
+      }
+    }
+    return { aliases, contextTags };
   }
 
-  if (item.data.contexts) {
-    for (const context of item.data.contexts) {
-      contextTags.push(context.toString());
+  if (item.alias) {
+    aliases.push(item.alias);
+  }
+
+  if (item.contexts) {
+    for (const context of item.contexts) {
+      contextTags.push(context);
     }
   }
 

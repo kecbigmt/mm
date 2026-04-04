@@ -1,15 +1,13 @@
 import { Command } from "@cliffy/command";
+import { changeItemStatus, ItemDto } from "../../../application/mod.ts";
 import { loadCliDependencies } from "../dependencies.ts";
-import { ChangeItemStatusWorkflow } from "../../../domain/workflows/change_item_status.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/date_time.ts";
-import { Item } from "../../../domain/models/item.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import { executeAutoCommit } from "../auto_commit_helper.ts";
 import { executePrePull } from "../pre_pull_helper.ts";
 
-const formatItemLabel = (item: Item): string =>
-  item.data.alias ? item.data.alias.toString() : item.data.id.toString();
+const formatItemLabel = (item: ItemDto): string => item.alias ?? item.id;
 
 export function createCloseCommand() {
   return new Command()
@@ -50,7 +48,7 @@ export function createCloseCommand() {
         return;
       }
 
-      const workflowResult = await ChangeItemStatusWorkflow.execute({
+      const workflowResult = await changeItemStatus({
         itemIds: ids,
         action: "close",
         occurredAt: occurredAtResult.value,
@@ -78,12 +76,12 @@ export function createCloseCommand() {
         if (succeeded.length === 1) {
           const item = succeeded[0];
           const label = formatItemLabel(item);
-          console.log(`✅ Closed [${label}] ${item.data.title.toString()}`);
+          console.log(`✅ Closed [${label}] ${item.title}`);
         } else {
           console.log(`✅ Closed ${succeeded.length} item(s):`);
           for (const item of succeeded) {
             const label = formatItemLabel(item);
-            console.log(`  [${label}] ${item.data.title.toString()}`);
+            console.log(`  [${label}] ${item.title}`);
           }
         }
 
