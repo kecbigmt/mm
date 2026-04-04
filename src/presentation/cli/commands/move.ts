@@ -1,6 +1,6 @@
 import { Command } from "@cliffy/command";
+import { moveItem } from "../../../application/mod.ts";
 import { loadCliDependencies } from "../dependencies.ts";
-import { MoveItemWorkflow } from "../../../domain/workflows/move_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
 import { formatError } from "../error_formatter.ts";
@@ -9,8 +9,8 @@ import { executeAutoCommit } from "../auto_commit_helper.ts";
 import { executePrePull } from "../pre_pull_helper.ts";
 
 const formatItemLabel = (
-  item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
-): string => item.data.alias ? item.data.alias.toString() : item.data.id.toString().slice(-7);
+  item: { id: string; alias?: string },
+): string => item.alias ?? item.id.slice(-7);
 
 export function createMoveCommand() {
   return new Command()
@@ -79,10 +79,10 @@ export function createMoveCommand() {
       for (const itemRef of itemRefs) {
         const targetExpression = previousItemId ? `after:${previousItemId}` : destination;
 
-        const workflowResult = await MoveItemWorkflow.execute(
+        const moveResult = await moveItem(
           {
-            itemExpression: itemRef,
-            targetExpression,
+            itemLocator: itemRef,
+            destination: targetExpression,
             cwd: cwdResult.value.directory,
             today: now,
             occurredAt: occurredAtResult.value,
@@ -96,17 +96,17 @@ export function createMoveCommand() {
           },
         );
 
-        if (workflowResult.type === "error") {
-          console.error(formatError(workflowResult.error, debug));
+        if (moveResult.type === "error") {
+          console.error(formatError(moveResult.error, debug));
           return;
         }
 
-        const { item } = workflowResult.value;
-        previousItemId = item.data.id.toString();
+        const { item } = moveResult.value;
+        previousItemId = item.id;
 
         const label = formatItemLabel(item);
         console.log(
-          `✅ Moved [${label}] ${item.data.title.toString()} to ${item.data.directory.toString()}`,
+          `✅ Moved [${label}] ${item.title} to ${item.directory}`,
         );
       }
 

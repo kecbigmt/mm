@@ -26,6 +26,15 @@ import {
   type TestContext,
 } from "../helpers.ts";
 
+const commandExists = async (command: string): Promise<boolean> => {
+  const result = await new Deno.Command("bash", {
+    args: ["-lc", `command -v ${command}`],
+    stdout: "null",
+    stderr: "null",
+  }).output();
+  return result.success;
+};
+
 describe("Shell Completion Script Registration", () => {
   let ctx: TestContext;
 
@@ -38,6 +47,10 @@ describe("Shell Completion Script Registration", () => {
   });
 
   it("zsh completion is registered after sourcing script", async () => {
+    if (!await commandExists("zsh")) {
+      return;
+    }
+
     const result = await runCommand(ctx.testHome, ["completions", "zsh"]);
     assertEquals(result.success, true, `Command failed: ${result.stderr}`);
 

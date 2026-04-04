@@ -46,3 +46,11 @@ export {
   type RemoveItemRequest,
   type RemoveItemResponse,
 } from "./remove_item.ts";
+
+export {
+  moveItem,
+  type MoveItemApplicationError,
+  type MoveItemDeps,
+  type MoveItemRequest,
+  type MoveItemResponse,
+} from "./move_item.ts";
