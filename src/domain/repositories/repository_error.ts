@@ -32,6 +32,10 @@ const repositoryErrorToString = function (this: RepositoryError): string {
   return `${this.kind}(${this.operation}:${target}): ${this.message}`;
 };
 
+export const isRepositoryError = (e: unknown): e is RepositoryError =>
+  typeof e === "object" && e !== null && "kind" in e &&
+  (e as { kind: string }).kind === "RepositoryError";
+
 export const createRepositoryError = (
   scope: RepositoryScope,
   operation: RepositoryOperation,

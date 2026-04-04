@@ -39,6 +39,10 @@ export const createValidationIssue = (
   code: options?.code,
 });
 
+export const isValidationError = (e: unknown): e is ValidationError<string> =>
+  typeof e === "object" && e !== null && "kind" in e &&
+  (e as { kind: string }).kind === "ValidationError";
+
 export const createValidationError = <K extends string>(
   objectKind: K,
   issues: ReadonlyArray<ValidationIssue>,
