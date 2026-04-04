@@ -4,7 +4,7 @@ import {
   CwdResolutionService,
   CwdSaveDependencies,
 } from "../../../domain/services/cwd_resolution_service.ts";
-import { parsePathExpression } from "../path_parser.ts";
+import { parsePathExpression } from "../../../domain/primitives/path_expression_parser.ts";
 import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import {
   DirectoryDisplayDependencies,
