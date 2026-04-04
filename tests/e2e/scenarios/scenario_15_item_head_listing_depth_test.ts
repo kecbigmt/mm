@@ -188,6 +188,34 @@ describe("Scenario 15: Item-head listing with depth expansion", () => {
     );
   });
 
+  it("depth 1 does not show grandchild items of already-listed children", async () => {
+    const opts = { sessionDir: ctx.sessionDir };
+
+    await runCd(ctx.testHome, "today", opts);
+
+    // Create parent -> child -> grandchild hierarchy
+    await runCommand(ctx.testHome, ["note", "Parent", "--alias", "parent"], opts);
+    await runCommand(ctx.testHome, ["note", "Child", "--alias", "child", "--dir", "parent"], opts);
+    await runCommand(ctx.testHome, ["note", "Grandchild", "--dir", "child"], opts);
+
+    // Navigate to parent and list with depth 1
+    await runCd(ctx.testHome, "parent", opts);
+    const lsResult = await runCommand(ctx.testHome, ["ls", "-p", "-d", "1"], opts);
+    assertEquals(lsResult.success, true, `ls failed: ${lsResult.stderr}`);
+
+    const lines = lsResult.stdout.split("\n").filter((line) => line.trim() !== "");
+    assertEquals(
+      lines.some((line) => line.includes("Child")),
+      true,
+      `Should show Child at depth 1, got: ${lsResult.stdout}`,
+    );
+    assertEquals(
+      lines.some((line) => line.includes("Grandchild")),
+      false,
+      `Should NOT show Grandchild at depth 1, got: ${lsResult.stdout}`,
+    );
+  });
+
   it("depth 0 does not show grandchild items", async () => {
     const opts = { sessionDir: ctx.sessionDir };
 

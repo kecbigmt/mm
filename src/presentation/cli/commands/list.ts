@@ -515,7 +515,7 @@ export async function listAction(options: ListOptions, locatorArg?: string) {
         formatItems([item], outputLines);
         await expandItemChildren(
           item.data.id,
-          effectiveDepth,
+          effectiveDepth - 1,
           outputLines,
           { itemRepository: deps.itemRepository, sectionQueryService: deps.sectionQueryService },
           formatterOptions,

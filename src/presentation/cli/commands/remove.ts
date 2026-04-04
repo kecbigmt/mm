@@ -1,14 +1,12 @@
 import { Command } from "@cliffy/command";
+import { ItemDto, removeItem } from "../../../application/mod.ts";
 import { loadCliDependencies } from "../dependencies.ts";
-import { RemoveItemWorkflow } from "../../../domain/workflows/remove_item.ts";
-import { Item } from "../../../domain/models/item.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import { executeAutoCommit } from "../auto_commit_helper.ts";
 import { executePrePull } from "../pre_pull_helper.ts";
 
-const formatItemLabel = (item: Item): string =>
-  item.data.alias ? item.data.alias.toString() : item.data.id.toString();
+const formatItemLabel = (item: ItemDto): string => item.alias ?? item.id;
 
 export function createRemoveCommand() {
   return new Command()
@@ -37,7 +35,7 @@ export function createRemoveCommand() {
         workspaceRepository: deps.workspaceRepository,
       });
 
-      const workflowResult = await RemoveItemWorkflow.execute({
+      const workflowResult = await removeItem({
         itemIds: ids,
         timezone: deps.timezone,
       }, {
@@ -58,12 +56,12 @@ export function createRemoveCommand() {
         if (succeeded.length === 1) {
           const item = succeeded[0];
           const label = formatItemLabel(item);
-          console.log(`✅ Removed [${label}] ${item.data.title.toString()}`);
+          console.log(`✅ Removed [${label}] ${item.title}`);
         } else {
           console.log(`✅ Removed ${succeeded.length} item(s):`);
           for (const item of succeeded) {
             const label = formatItemLabel(item);
-            console.log(`  [${label}] ${item.data.title.toString()}`);
+            console.log(`  [${label}] ${item.title}`);
           }
         }
 

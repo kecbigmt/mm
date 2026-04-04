@@ -15,6 +15,7 @@ import { AliasRepository } from "../../domain/repositories/alias_repository.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
 import { dateTimeFromDate } from "../../domain/primitives/date_time.ts";
 import { profileAsync, profileSync } from "../../shared/profiler.ts";
+import { ItemDto, toItemDto } from "./item_dto.ts";
 
 export type ListItemsStatusFilter = "open" | "closed" | "all";
 
@@ -36,25 +37,7 @@ export type ListItemsDeps = Readonly<{
 }>;
 
 /** Presentation-free item DTO for structured responses */
-export type ListItemDto = Readonly<{
-  id: string;
-  icon: string;
-  title: string;
-  status: string;
-  rank: string;
-  directory: string;
-  createdAt: string;
-  updatedAt: string;
-  closedAt?: string;
-  startAt?: string;
-  duration?: string;
-  dueAt?: string;
-  snoozeUntil?: string;
-  alias?: string;
-  project?: string;
-  contexts?: readonly string[];
-  body?: string;
-}>;
+export type ListItemDto = ItemDto;
 
 /** Application-level result DTO */
 export type ListItemsResponse = Readonly<{
@@ -69,32 +52,6 @@ type ListItemsDomainResponse = Readonly<{
 export type ListItemsApplicationError =
   | ValidationError<"ListItems">
   | RepositoryError;
-
-/** Map a domain Item to a presentation-free DTO */
-const toDto = (item: Item): ListItemDto => {
-  const d = item.data;
-  return Object.freeze({
-    id: d.id.toString(),
-    icon: d.icon.toString(),
-    title: d.title.toString(),
-    status: d.status.isOpen() ? "open" : "closed",
-    rank: d.rank.toString(),
-    directory: d.directory.toString(),
-    createdAt: d.createdAt.toString(),
-    updatedAt: d.updatedAt.toString(),
-    ...(d.closedAt ? { closedAt: d.closedAt.toString() } : {}),
-    ...(d.startAt ? { startAt: d.startAt.toString() } : {}),
-    ...(d.duration ? { duration: d.duration.toString() } : {}),
-    ...(d.dueAt ? { dueAt: d.dueAt.toString() } : {}),
-    ...(d.snoozeUntil ? { snoozeUntil: d.snoozeUntil.toString() } : {}),
-    ...(d.alias ? { alias: d.alias.toString() } : {}),
-    ...(d.project ? { project: d.project.toString() } : {}),
-    ...(d.contexts && d.contexts.length > 0
-      ? { contexts: d.contexts.map((c) => c.toString()) }
-      : {}),
-    ...(d.body ? { body: d.body } : {}),
-  });
-};
 
 /** Execute the list-items use case, returning presentation-free DTOs */
 export const listItemsForDomain = async (
@@ -205,6 +162,6 @@ export const listItems = async (
   }
 
   return Result.ok(
-    Object.freeze({ items: Object.freeze(result.value.items.map(toDto)) }),
+    Object.freeze({ items: Object.freeze(result.value.items.map(toItemDto)) }),
   );
 };
