@@ -66,6 +66,10 @@ const validateBodyFlags = (options: Record<string, unknown>): string | null => {
   if (options.find !== undefined && options.append !== undefined) {
     return "Cannot use --find and --append together. Use one or the other.";
   }
+  // --find must be non-empty
+  if (typeof options.find === "string" && options.find.length === 0) {
+    return "--find text must not be empty.";
+  }
   // --find/--replace pairing
   if (options.find !== undefined && options.replace === undefined) {
     return "--find requires --replace. Use --find and --replace together.";
