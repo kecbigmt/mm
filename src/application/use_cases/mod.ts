@@ -12,6 +12,8 @@ export {
   listItems,
   type ListItemsApplicationError,
   type ListItemsDeps,
+  listItemsForDomain,
   type ListItemsRequest,
   type ListItemsResponse,
+  type ListItemsStatusFilter,
 } from "./list_items.ts";

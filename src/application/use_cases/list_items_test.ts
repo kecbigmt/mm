@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { ListItemDto, listItems } from "./list_items.ts";
+import { parseItem } from "../../domain/models/item.ts";
 import { InMemoryItemRepository } from "../../domain/repositories/item_repository_fake.ts";
 import { InMemoryAliasRepository } from "../../domain/repositories/alias_repository_fake.ts";
 import { createItem, Item } from "../../domain/models/item.ts";
@@ -14,6 +15,7 @@ import {
   itemStatusOpen,
   itemTitleFromString,
   parseCalendarDay,
+  parseDirectory,
   parseTimezoneIdentifier,
 } from "../../domain/primitives/mod.ts";
 
@@ -196,4 +198,135 @@ Deno.test("listItems - DTO fields are frozen", async () => {
   assertEquals(result.type, "ok");
   if (result.type !== "ok") return;
   assertEquals(Object.isFrozen(result.value.items[0]), true);
+});
+
+Deno.test("listItems - hides snoozed items by default", async () => {
+  const snoozed = Result.unwrap(parseItem({
+    id: "01936d9a-0000-7000-8000-000000000001",
+    title: "Snoozed Item",
+    icon: "note",
+    status: "open",
+    directory: "2025-12-02",
+    rank: "a",
+    createdAt: "2025-12-02T09:00:00Z",
+    updatedAt: "2025-12-02T09:00:00Z",
+    snoozeUntil: "2025-12-02T20:00:00Z",
+  }));
+  const normal = Result.unwrap(parseItem({
+    id: "01936d9a-0000-7000-8000-000000000002",
+    title: "Normal Item",
+    icon: "note",
+    status: "open",
+    directory: "2025-12-02",
+    rank: "b",
+    createdAt: "2025-12-02T09:00:00Z",
+    updatedAt: "2025-12-02T09:00:00Z",
+  }));
+  const deps = makeDeps([snoozed, normal]);
+  const cwd = Result.unwrap(parseDirectory("2025-12-02"));
+
+  const result = await listItems({
+    cwd,
+    timezone: TZ,
+    today: new Date("2025-12-02T10:00:00Z"),
+    status: "open",
+  }, deps);
+
+  assertEquals(result.type, "ok");
+  if (result.type !== "ok") return;
+  assertEquals(result.value.items.length, 1);
+  assertEquals(result.value.items[0].title, "Normal Item");
+});
+
+Deno.test("listItems - shows snoozed items with status=all", async () => {
+  const snoozed = Result.unwrap(parseItem({
+    id: "01936d9a-0000-7000-8000-000000000003",
+    title: "Snoozed Item",
+    icon: "note",
+    status: "open",
+    directory: "2025-12-02",
+    rank: "a",
+    createdAt: "2025-12-02T09:00:00Z",
+    updatedAt: "2025-12-02T09:00:00Z",
+    snoozeUntil: "2025-12-02T20:00:00Z",
+  }));
+  const normal = Result.unwrap(parseItem({
+    id: "01936d9a-0000-7000-8000-000000000004",
+    title: "Normal Item",
+    icon: "note",
+    status: "open",
+    directory: "2025-12-02",
+    rank: "b",
+    createdAt: "2025-12-02T09:00:00Z",
+    updatedAt: "2025-12-02T09:00:00Z",
+  }));
+  const deps = makeDeps([snoozed, normal]);
+  const cwd = Result.unwrap(parseDirectory("2025-12-02"));
+
+  const result = await listItems({
+    cwd,
+    timezone: TZ,
+    today: new Date("2025-12-02T10:00:00Z"),
+    status: "all",
+  }, deps);
+
+  assertEquals(result.type, "ok");
+  if (result.type !== "ok") return;
+  assertEquals(result.value.items.length, 2);
+});
+
+Deno.test("listItems - shows items with past snoozeUntil", async () => {
+  const item = Result.unwrap(parseItem({
+    id: "01936d9a-0000-7000-8000-000000000005",
+    title: "Past Snooze Item",
+    icon: "note",
+    status: "open",
+    directory: "2025-12-02",
+    rank: "a",
+    createdAt: "2025-12-02T09:00:00Z",
+    updatedAt: "2025-12-02T09:00:00Z",
+    snoozeUntil: "2025-12-02T08:00:00Z",
+  }));
+  const deps = makeDeps([item]);
+  const cwd = Result.unwrap(parseDirectory("2025-12-02"));
+
+  const result = await listItems({
+    cwd,
+    timezone: TZ,
+    today: new Date("2025-12-02T10:00:00Z"),
+    status: "open",
+  }, deps);
+
+  assertEquals(result.type, "ok");
+  if (result.type !== "ok") return;
+  assertEquals(result.value.items.length, 1);
+  assertEquals(result.value.items[0].title, "Past Snooze Item");
+});
+
+Deno.test("listItems - shows items with snoozeUntil equal to current time", async () => {
+  const item = Result.unwrap(parseItem({
+    id: "01936d9a-0000-7000-8000-000000000006",
+    title: "Snooze Ending Item",
+    icon: "note",
+    status: "open",
+    directory: "2025-12-02",
+    rank: "a",
+    createdAt: "2025-12-02T09:00:00Z",
+    updatedAt: "2025-12-02T09:00:00Z",
+    snoozeUntil: "2025-12-02T10:00:00Z",
+  }));
+  const deps = makeDeps([item]);
+  const cwd = Result.unwrap(parseDirectory("2025-12-02"));
+
+  const result = await listItems({
+    cwd,
+    timezone: TZ,
+    today: new Date("2025-12-02T10:00:00Z"),
+    status: "open",
+  }, deps);
+
+  assertEquals(result.type, "ok");
+  if (result.type !== "ok") return;
+  assertEquals(result.value.items.length, 1);
+  assertEquals(result.value.items[0].title, "Snooze Ending Item");
 });

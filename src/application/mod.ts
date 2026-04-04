@@ -18,6 +18,8 @@ export {
   listItems,
   type ListItemsApplicationError,
   type ListItemsDeps,
+  listItemsForDomain,
   type ListItemsRequest,
   type ListItemsResponse,
+  type ListItemsStatusFilter,
 } from "./use_cases/mod.ts";
