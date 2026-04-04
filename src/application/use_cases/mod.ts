@@ -23,7 +23,6 @@ export {
   type ChangeItemStatusApplicationError,
   type ChangeItemStatusDeps,
   type ChangeItemStatusFailure,
-  changeItemStatusForDomain,
   type ChangeItemStatusRequest,
   type ChangeItemStatusResponse,
   type StatusAction,
@@ -33,7 +32,6 @@ export {
   editItem,
   type EditItemApplicationError,
   type EditItemDeps,
-  editItemForDomain,
   type EditItemRequest,
   type EditItemResponse,
 } from "./edit_item.ts";
@@ -45,7 +43,6 @@ export {
   type RemoveItemApplicationError,
   type RemoveItemDeps,
   type RemoveItemFailure,
-  removeItemForDomain,
   type RemoveItemRequest,
   type RemoveItemResponse,
 } from "./remove_item.ts";

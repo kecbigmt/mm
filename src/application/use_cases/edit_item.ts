@@ -78,7 +78,7 @@ const topicBuildErrorToEditItemError = (
   return error.error;
 };
 
-export const editItemForDomain = async (
+const executeEditItem = async (
   input: EditItemRequest,
   deps: EditItemDeps,
 ): Promise<Result<EditItemDomainResponse, EditItemApplicationError>> => {
@@ -421,7 +421,7 @@ export const editItem = async (
   input: EditItemRequest,
   deps: EditItemDeps,
 ): Promise<Result<EditItemResponse, EditItemApplicationError>> => {
-  const result = await editItemForDomain(input, deps);
+  const result = await executeEditItem(input, deps);
   if (result.type === "error") {
     return result;
   }

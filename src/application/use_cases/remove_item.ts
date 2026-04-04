@@ -4,7 +4,6 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
-import { Item } from "../../domain/models/item.ts";
 import { TimezoneIdentifier } from "../../domain/primitives/mod.ts";
 import { AliasRepository } from "../../domain/repositories/alias_repository.ts";
 import { ItemRepository } from "../../domain/repositories/item_repository.ts";
@@ -35,15 +34,10 @@ export type RemoveItemResponse = Readonly<{
   failed: ReadonlyArray<RemoveItemFailure>;
 }>;
 
-type RemoveItemDomainResponse = Readonly<{
-  succeeded: ReadonlyArray<Item>;
-  failed: ReadonlyArray<RemoveItemFailure>;
-}>;
-
-export const removeItemForDomain = async (
+export const removeItem = async (
   input: RemoveItemRequest,
   deps: RemoveItemDeps,
-): Promise<Result<RemoveItemDomainResponse, RemoveItemApplicationError>> => {
+): Promise<Result<RemoveItemResponse, RemoveItemApplicationError>> => {
   if (input.itemIds.length === 0) {
     return Result.error(
       createValidationError("RemoveItem", [
@@ -62,7 +56,7 @@ export const removeItemForDomain = async (
     prefixCandidates: deps.prefixCandidates,
   });
 
-  const succeeded: Item[] = [];
+  const succeeded = [];
   const failed: RemoveItemFailure[] = [];
 
   for (const itemId of input.itemIds) {
@@ -107,25 +101,10 @@ export const removeItemForDomain = async (
     succeeded.push(item);
   }
 
-  return Result.ok({
-    succeeded: Object.freeze(succeeded),
-    failed: Object.freeze(failed),
-  });
-};
-
-export const removeItem = async (
-  input: RemoveItemRequest,
-  deps: RemoveItemDeps,
-): Promise<Result<RemoveItemResponse, RemoveItemApplicationError>> => {
-  const result = await removeItemForDomain(input, deps);
-  if (result.type === "error") {
-    return result;
-  }
-
   return Result.ok(
     Object.freeze({
-      succeeded: Object.freeze(result.value.succeeded.map(toItemDto)),
-      failed: result.value.failed,
+      succeeded: Object.freeze(succeeded.map(toItemDto)),
+      failed: Object.freeze(failed),
     }),
   );
 };

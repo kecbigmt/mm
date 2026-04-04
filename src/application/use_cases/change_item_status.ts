@@ -4,7 +4,6 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
-import { Item } from "../../domain/models/item.ts";
 import { DateTime, TimezoneIdentifier } from "../../domain/primitives/mod.ts";
 import { AliasRepository } from "../../domain/repositories/alias_repository.ts";
 import { ItemRepository } from "../../domain/repositories/item_repository.ts";
@@ -41,15 +40,10 @@ export type ChangeItemStatusResponse = Readonly<{
   failed: ReadonlyArray<ChangeItemStatusFailure>;
 }>;
 
-type ChangeItemStatusDomainResponse = Readonly<{
-  succeeded: ReadonlyArray<Item>;
-  failed: ReadonlyArray<ChangeItemStatusFailure>;
-}>;
-
-export const changeItemStatusForDomain = async (
+export const changeItemStatus = async (
   input: ChangeItemStatusRequest,
   deps: ChangeItemStatusDeps,
-): Promise<Result<ChangeItemStatusDomainResponse, ChangeItemStatusApplicationError>> => {
+): Promise<Result<ChangeItemStatusResponse, ChangeItemStatusApplicationError>> => {
   if (input.itemIds.length === 0) {
     return Result.error(
       createValidationError("ChangeItemStatus", [
@@ -68,7 +62,7 @@ export const changeItemStatusForDomain = async (
     prefixCandidates: deps.prefixCandidates,
   });
 
-  const succeeded: Item[] = [];
+  const succeeded = [];
   const failed: ChangeItemStatusFailure[] = [];
 
   for (const itemId of input.itemIds) {
@@ -104,7 +98,7 @@ export const changeItemStatusForDomain = async (
     }
 
     const item = resolveResult.value;
-    let updatedItem: Item;
+    let updatedItem;
     if (input.action === "close") {
       if (item.data.status.isClosed()) {
         succeeded.push(item);
@@ -128,25 +122,10 @@ export const changeItemStatusForDomain = async (
     succeeded.push(updatedItem);
   }
 
-  return Result.ok({
-    succeeded: Object.freeze(succeeded),
-    failed: Object.freeze(failed),
-  });
-};
-
-export const changeItemStatus = async (
-  input: ChangeItemStatusRequest,
-  deps: ChangeItemStatusDeps,
-): Promise<Result<ChangeItemStatusResponse, ChangeItemStatusApplicationError>> => {
-  const result = await changeItemStatusForDomain(input, deps);
-  if (result.type === "error") {
-    return result;
-  }
-
   return Result.ok(
     Object.freeze({
-      succeeded: Object.freeze(result.value.succeeded.map(toItemDto)),
-      failed: result.value.failed,
+      succeeded: Object.freeze(succeeded.map(toItemDto)),
+      failed: Object.freeze(failed),
     }),
   );
 };
