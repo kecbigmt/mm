@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertExists } from "@std/assert";
-import { CreateItemWorkflow } from "./create_item.ts";
+import { CreateItemService } from "./create_item.ts";
 import { Result } from "../../shared/result.ts";
 import { createItem, Item } from "../models/item.ts";
 import {
@@ -66,7 +66,7 @@ const createExistingItem = (id: string, rank: string, section: string): Item => 
   });
 };
 
-Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async () => {
+Deno.test("CreateItemService assigns middle rank when section is empty", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -76,7 +76,7 @@ Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async 
   const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
-  const result = await CreateItemWorkflow.execute({
+  const result = await CreateItemService.execute({
     title: "New note",
     itemType: "note",
     parentDirectory,
@@ -106,7 +106,7 @@ Deno.test("CreateItemWorkflow assigns middle rank when section is empty", async 
   assertEquals(listResult.value.length, 1);
 });
 
-Deno.test("CreateItemWorkflow appends rank after existing siblings", async () => {
+Deno.test("CreateItemService appends rank after existing siblings", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -123,7 +123,7 @@ Deno.test("CreateItemWorkflow appends rank after existing siblings", async () =>
   const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T13:00:00Z")));
 
-  const result = await CreateItemWorkflow.execute({
+  const result = await CreateItemService.execute({
     title: "Follow-up",
     itemType: "note",
     parentDirectory,
@@ -164,7 +164,7 @@ Deno.test("CreateItemWorkflow appends rank after existing siblings", async () =>
   assertEquals(orderComparison < 0, true);
 });
 
-Deno.test("CreateItemWorkflow saves alias when provided", async () => {
+Deno.test("CreateItemService saves alias when provided", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -174,7 +174,7 @@ Deno.test("CreateItemWorkflow saves alias when provided", async () => {
   const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
-  const result = await CreateItemWorkflow.execute({
+  const result = await CreateItemService.execute({
     title: "Chapter 1",
     itemType: "note",
     alias: "chapter1",
@@ -205,7 +205,7 @@ Deno.test("CreateItemWorkflow saves alias when provided", async () => {
   assertEquals(aliasResult.value.data.itemId.toString(), "019965a7-2789-740a-b8c1-1415904fd120");
 });
 
-Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
+Deno.test("CreateItemService rejects duplicate alias", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -217,7 +217,7 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
   // Create first item with alias
-  const firstResult = await CreateItemWorkflow.execute({
+  const firstResult = await CreateItemService.execute({
     title: "First",
     itemType: "note",
     alias: "chapter1",
@@ -237,7 +237,7 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
   }
 
   // Try to create second item with same alias
-  const secondResult = await CreateItemWorkflow.execute({
+  const secondResult = await CreateItemService.execute({
     title: "Second",
     itemType: "note",
     alias: "chapter1",
@@ -265,7 +265,7 @@ Deno.test("CreateItemWorkflow rejects duplicate alias", async () => {
   }
 });
 
-Deno.test("CreateItemWorkflow rejects alias with same canonical key (uppercase)", async () => {
+Deno.test("CreateItemService rejects alias with same canonical key (uppercase)", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -277,7 +277,7 @@ Deno.test("CreateItemWorkflow rejects alias with same canonical key (uppercase)"
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
   // Create first item with lowercase alias
-  const firstResult = await CreateItemWorkflow.execute({
+  const firstResult = await CreateItemService.execute({
     title: "First",
     itemType: "note",
     alias: "test-item",
@@ -297,7 +297,7 @@ Deno.test("CreateItemWorkflow rejects alias with same canonical key (uppercase)"
   }
 
   // Try to create second item with uppercase alias (same canonical key)
-  const secondResult = await CreateItemWorkflow.execute({
+  const secondResult = await CreateItemService.execute({
     title: "Second",
     itemType: "note",
     alias: "TEST-ITEM",
@@ -325,7 +325,7 @@ Deno.test("CreateItemWorkflow rejects alias with same canonical key (uppercase)"
   }
 });
 
-Deno.test("CreateItemWorkflow rejects alias with same canonical key (diacritics)", async () => {
+Deno.test("CreateItemService rejects alias with same canonical key (diacritics)", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -337,7 +337,7 @@ Deno.test("CreateItemWorkflow rejects alias with same canonical key (diacritics)
   const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
   // Create first item with ASCII alias
-  const firstResult = await CreateItemWorkflow.execute({
+  const firstResult = await CreateItemService.execute({
     title: "First",
     itemType: "note",
     alias: "test-item",
@@ -357,7 +357,7 @@ Deno.test("CreateItemWorkflow rejects alias with same canonical key (diacritics)
   }
 
   // Try to create second item with diacritic alias (same canonical key)
-  const secondResult = await CreateItemWorkflow.execute({
+  const secondResult = await CreateItemService.execute({
     title: "Second",
     itemType: "note",
     alias: "tëst-item",
@@ -385,8 +385,8 @@ Deno.test("CreateItemWorkflow rejects alias with same canonical key (diacritics)
   }
 });
 
-// CreateItemWorkflow with scheduling fields
-Deno.test("CreateItemWorkflow - creates task with dueAt", async () => {
+// CreateItemService with scheduling fields
+Deno.test("CreateItemService - creates task with dueAt", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -397,7 +397,7 @@ Deno.test("CreateItemWorkflow - creates task with dueAt", async () => {
   const createdAt = Result.unwrap(parseDateTime("2025-01-15T10:00:00Z"));
   const dueAt = Result.unwrap(parseDateTime("2025-01-20T23:59:59Z"));
 
-  const result = await CreateItemWorkflow.execute({
+  const result = await CreateItemService.execute({
     title: "Review PR",
     itemType: "task",
     dueAt,
@@ -419,7 +419,7 @@ Deno.test("CreateItemWorkflow - creates task with dueAt", async () => {
   assertEquals(result.value.item.data.dueAt, dueAt);
 });
 
-Deno.test("CreateItemWorkflow - creates event with startAt and duration", async () => {
+Deno.test("CreateItemService - creates event with startAt and duration", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -431,7 +431,7 @@ Deno.test("CreateItemWorkflow - creates event with startAt and duration", async 
   const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z"));
   const duration = Result.unwrap(parseDuration("2h"));
 
-  const result = await CreateItemWorkflow.execute({
+  const result = await CreateItemService.execute({
     title: "Team meeting",
     itemType: "event",
     startAt,
@@ -455,7 +455,7 @@ Deno.test("CreateItemWorkflow - creates event with startAt and duration", async 
   assertEquals(result.value.item.data.duration, duration);
 });
 
-Deno.test("CreateItemWorkflow - rejects event with mismatched startAt date", async () => {
+Deno.test("CreateItemService - rejects event with mismatched startAt date", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -466,7 +466,7 @@ Deno.test("CreateItemWorkflow - rejects event with mismatched startAt date", asy
   const createdAt = Result.unwrap(parseDateTime("2025-01-16T10:00:00Z"));
   const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z")); // Wrong date
 
-  const result = await CreateItemWorkflow.execute({
+  const result = await CreateItemService.execute({
     title: "Team meeting",
     itemType: "event",
     startAt,
@@ -490,7 +490,7 @@ Deno.test("CreateItemWorkflow - rejects event with mismatched startAt date", asy
   }
 });
 
-Deno.test("CreateItemWorkflow - accepts event when startAt crosses UTC day boundary", async () => {
+Deno.test("CreateItemService - accepts event when startAt crosses UTC day boundary", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -506,7 +506,7 @@ Deno.test("CreateItemWorkflow - accepts event when startAt crosses UTC day bound
   // But in workspace timezone (PST), it's still 2025-01-15, so validation should pass
   const startAt = Result.unwrap(parseDateTime("2025-01-15T20:00:00-08:00"));
 
-  const result = await CreateItemWorkflow.execute({
+  const result = await CreateItemService.execute({
     title: "Evening event",
     itemType: "event",
     startAt,
@@ -532,7 +532,7 @@ Deno.test("CreateItemWorkflow - accepts event when startAt crosses UTC day bound
   }
 });
 
-Deno.test("CreateItemWorkflow - allows event with different date for item directory", async () => {
+Deno.test("CreateItemService - allows event with different date for item directory", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -541,7 +541,7 @@ Deno.test("CreateItemWorkflow - allows event with different date for item direct
   const idService2 = createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120");
 
   // Create a parent item under a date
-  const parentItemResult = await CreateItemWorkflow.execute({
+  const parentItemResult = await CreateItemService.execute({
     title: "Project",
     itemType: "note",
     parentDirectory: Result.unwrap(parseDirectory("2025-01-10")),
@@ -564,7 +564,7 @@ Deno.test("CreateItemWorkflow - allows event with different date for item direct
   const startAt = Result.unwrap(parseDateTime("2025-01-15T14:00:00Z")); // Different date - OK for item directory
 
   // Create event under item directory with different date
-  const result = await CreateItemWorkflow.execute({
+  const result = await CreateItemService.execute({
     title: "Team meeting",
     itemType: "event",
     startAt,
@@ -586,7 +586,7 @@ Deno.test("CreateItemWorkflow - allows event with different date for item direct
   }
 });
 
-Deno.test("CreateItemWorkflow - creates task with CalendarDay dueAt (converts to end of day)", async () => {
+Deno.test("CreateItemService - creates task with CalendarDay dueAt (converts to end of day)", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -597,7 +597,7 @@ Deno.test("CreateItemWorkflow - creates task with CalendarDay dueAt (converts to
   const createdAt = Result.unwrap(parseDateTime("2025-01-15T10:00:00Z"));
   const dueAtDay = Result.unwrap(parseCalendarDay("2025-01-20"));
 
-  const result = await CreateItemWorkflow.execute({
+  const result = await CreateItemService.execute({
     title: "Review PR",
     itemType: "task",
     dueAt: dueAtDay,
@@ -622,7 +622,7 @@ Deno.test("CreateItemWorkflow - creates task with CalendarDay dueAt (converts to
   assertEquals(dueAt.data.iso, "2025-01-20T23:59:59.000Z");
 });
 
-Deno.test("CreateItemWorkflow - creates task with CalendarDay dueAt in JST timezone", async () => {
+Deno.test("CreateItemService - creates task with CalendarDay dueAt in JST timezone", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -634,7 +634,7 @@ Deno.test("CreateItemWorkflow - creates task with CalendarDay dueAt in JST timez
   const createdAt = Result.unwrap(parseDateTime("2025-01-20T10:00:00+09:00"));
   const dueAtDay = Result.unwrap(parseCalendarDay("2025-01-20"));
 
-  const result = await CreateItemWorkflow.execute({
+  const result = await CreateItemService.execute({
     title: "Review PR",
     itemType: "task",
     dueAt: dueAtDay,
@@ -660,7 +660,7 @@ Deno.test("CreateItemWorkflow - creates task with CalendarDay dueAt in JST timez
 });
 
 // Test for deferred topic persistence - no orphan topics on validation failure
-Deno.test("CreateItemWorkflow - does not create orphan topics when validation fails", async () => {
+Deno.test("CreateItemService - does not create orphan topics when validation fails", async () => {
   const repository = new InMemoryItemRepository();
   const aliasRepository = new InMemoryAliasRepository();
   const aliasAutoGenerator = createTestAliasAutoGenerator();
@@ -675,7 +675,7 @@ Deno.test("CreateItemWorkflow - does not create orphan topics when validation fa
   // - An invalid own alias (will fail validation due to conflict after creating first item)
 
   // First, create an item with alias "taken-alias"
-  const firstResult = await CreateItemWorkflow.execute({
+  const firstResult = await CreateItemService.execute({
     title: "First item",
     itemType: "note",
     alias: "taken-alias",
@@ -709,7 +709,7 @@ Deno.test("CreateItemWorkflow - does not create orphan topics when validation fa
   // Now try to create an item that will fail validation
   // - References non-existent project "new-project" (would trigger auto-creation)
   // - Uses already-taken alias "taken-alias" (will fail validation)
-  const failingResult = await CreateItemWorkflow.execute({
+  const failingResult = await CreateItemService.execute({
     title: "Second item",
     itemType: "note",
     project: "new-project",

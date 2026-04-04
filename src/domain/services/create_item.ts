@@ -20,16 +20,16 @@ import {
 import { ItemRepository } from "../repositories/item_repository.ts";
 import { AliasRepository } from "../repositories/alias_repository.ts";
 import { RepositoryError } from "../repositories/repository_error.ts";
-import { RankService } from "../services/rank_service.ts";
-import { IdGenerationService } from "../services/id_generation_service.ts";
-import { AliasAutoGenerator } from "../services/alias_auto_generator.ts";
+import { RankService } from "./rank_service.ts";
+import { IdGenerationService } from "./id_generation_service.ts";
+import { AliasAutoGenerator } from "./alias_auto_generator.ts";
 import { createAlias } from "../models/alias.ts";
 import {
   buildTopicItem,
   persistPreparedTopic,
   PreparedTopic,
   TopicBuildError,
-} from "../services/topic_auto_creation_service.ts";
+} from "./topic_auto_creation_service.ts";
 
 export type CreateItemInput = Readonly<{
   title: string;
@@ -189,7 +189,7 @@ const calendarDayToEndOfDay = (
   return Result.ok(result.value);
 };
 
-export const CreateItemWorkflow = {
+export const CreateItemService = {
   execute: async (
     input: CreateItemInput,
     deps: CreateItemDependencies,

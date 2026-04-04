@@ -1,7 +1,7 @@
 import { assertEquals, assertExists } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 import { MoveItemWorkflow } from "./move_item.ts";
-import { CreateItemWorkflow } from "./create_item.ts";
+import { CreateItemService } from "../services/create_item.ts";
 import { Result } from "../../shared/result.ts";
 import {
   dateTimeFromDate,
@@ -42,7 +42,7 @@ describe("MoveItemWorkflow", () => {
     const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
     // Create items A, B, C, D
-    const itemAResult = await CreateItemWorkflow.execute({
+    const itemAResult = await CreateItemService.execute({
       title: "Item A",
       itemType: "note",
       parentDirectory,
@@ -59,7 +59,7 @@ describe("MoveItemWorkflow", () => {
     const itemA = itemAResult.type === "ok" ? itemAResult.value.item : undefined;
     assertExists(itemA);
 
-    const itemBResult = await CreateItemWorkflow.execute({
+    const itemBResult = await CreateItemService.execute({
       title: "Item B",
       itemType: "note",
       parentDirectory,
@@ -76,7 +76,7 @@ describe("MoveItemWorkflow", () => {
     const itemB = itemBResult.type === "ok" ? itemBResult.value.item : undefined;
     assertExists(itemB);
 
-    const itemCResult = await CreateItemWorkflow.execute({
+    const itemCResult = await CreateItemService.execute({
       title: "Item C",
       itemType: "note",
       parentDirectory,
@@ -93,7 +93,7 @@ describe("MoveItemWorkflow", () => {
     const itemC = itemCResult.type === "ok" ? itemCResult.value.item : undefined;
     assertExists(itemC);
 
-    const itemDResult = await CreateItemWorkflow.execute({
+    const itemDResult = await CreateItemService.execute({
       title: "Item D",
       itemType: "note",
       parentDirectory,
@@ -184,7 +184,7 @@ describe("MoveItemWorkflow", () => {
     const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
     // Create items A, B, C, D
-    const itemAResult = await CreateItemWorkflow.execute({
+    const itemAResult = await CreateItemService.execute({
       title: "Item A",
       itemType: "note",
       parentDirectory,
@@ -201,7 +201,7 @@ describe("MoveItemWorkflow", () => {
     const itemA = itemAResult.type === "ok" ? itemAResult.value.item : undefined;
     assertExists(itemA);
 
-    const itemBResult = await CreateItemWorkflow.execute({
+    const itemBResult = await CreateItemService.execute({
       title: "Item B",
       itemType: "note",
       parentDirectory,
@@ -218,7 +218,7 @@ describe("MoveItemWorkflow", () => {
     const itemB = itemBResult.type === "ok" ? itemBResult.value.item : undefined;
     assertExists(itemB);
 
-    const itemCResult = await CreateItemWorkflow.execute({
+    const itemCResult = await CreateItemService.execute({
       title: "Item C",
       itemType: "note",
       parentDirectory,
@@ -235,7 +235,7 @@ describe("MoveItemWorkflow", () => {
     const itemC = itemCResult.type === "ok" ? itemCResult.value.item : undefined;
     assertExists(itemC);
 
-    const itemDResult = await CreateItemWorkflow.execute({
+    const itemDResult = await CreateItemService.execute({
       title: "Item D",
       itemType: "note",
       parentDirectory,

@@ -14,7 +14,7 @@ import { ItemRepository } from "../../domain/repositories/item_repository.ts";
 import { AliasAutoGenerator } from "../../domain/services/alias_auto_generator.ts";
 import { IdGenerationService } from "../../domain/services/id_generation_service.ts";
 import { RankService } from "../../domain/services/rank_service.ts";
-import { CreateItemError, CreateItemWorkflow } from "../../domain/workflows/create_item.ts";
+import { CreateItemError, CreateItemService } from "../../domain/services/create_item.ts";
 
 export type CreateItemRequest = Readonly<{
   title: string;
@@ -110,7 +110,7 @@ export const createItem = async (
   request: CreateItemRequest,
   deps: CreateItemDeps,
 ): Promise<Result<CreateItemResponse, CreateItemApplicationError>> => {
-  const result = await CreateItemWorkflow.execute(request, deps);
+  const result = await CreateItemService.execute(request, deps);
 
   if (result.type === "error") {
     return Result.error(mapWorkflowError(result.error));
