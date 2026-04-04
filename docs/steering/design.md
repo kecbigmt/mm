@@ -1,7 +1,8 @@
 # Project Design
 
-**Role**: This document defines the **domain model and architecture** of mm. For the current MVP
-product boundary and release scope, see `product-scope.md`.
+**Role**: This document defines the **domain model and architecture** of mm. For the current
+development-time MVP scope and sequencing, see
+`docs/stories/202604_epic_macos-agent-graph-mvp/README.md`.
 
 ---
 
