@@ -1,4 +1,7 @@
-// JSON-RPC 2.0 envelope types
+// JSON-RPC 2.0 request/response subset
+//
+// Covers the request–response pattern only. Notifications (requests without id)
+// are intentionally out of scope until a concrete use case requires them.
 
 export type JsonRpcId = string | number;
 

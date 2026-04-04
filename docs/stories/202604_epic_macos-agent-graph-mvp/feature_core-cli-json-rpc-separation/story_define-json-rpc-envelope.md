@@ -53,6 +53,7 @@ I can build the SwiftUI-side client against a stable structured contract.**
 - Implementing the JSON-RPC server
 - Implementing the SwiftUI client
 - Exposing every core method immediately
+- JSON-RPC notifications (requests without id) — add when a concrete use case requires them
 
 ---
 
