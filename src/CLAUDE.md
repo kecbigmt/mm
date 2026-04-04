@@ -8,8 +8,8 @@ see root `AGENTS.md`.
 
 Use `src/application/use_cases/` as the public entry layer for shared client operations.
 
-- Put use-case orchestration that coordinates repositories, ID generation, ranking, parsing of
-  typed request fields, and persistence in `application/use_cases`
+- Put use-case orchestration that coordinates repositories, ID generation, ranking, parsing of typed
+  request fields, and persistence in `application/use_cases`
 - Keep `src/presentation/` thin: CLI and JSON-RPC adapt input/output, invoke application use cases,
   and own UI-specific side effects
 - Do not let adapters import `src/domain/workflows`
