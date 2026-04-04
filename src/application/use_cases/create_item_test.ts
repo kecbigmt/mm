@@ -2,9 +2,15 @@ import { assertEquals, assertExists } from "@std/assert";
 import { createItem } from "./create_item.ts";
 import { InMemoryItemRepository } from "../../domain/repositories/item_repository_fake.ts";
 import { InMemoryAliasRepository } from "../../domain/repositories/alias_repository_fake.ts";
+import { createItem as createDomainItem, Item } from "../../domain/models/item.ts";
 import {
   aliasSlugFromString,
+  createItemIcon,
   dateTimeFromDate,
+  itemIdFromString,
+  itemRankFromString,
+  itemStatusOpen,
+  itemTitleFromString,
   parseCalendarDay,
   parseDirectory,
   parseDuration,
@@ -40,6 +46,93 @@ const createDeps = () => ({
   aliasAutoGenerator: createTestAliasAutoGenerator(),
   rankService: createLexoRankService(),
   idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd120"),
+});
+
+const createExistingItem = (id: string, rank: string, section: string): Item => {
+  const itemId = Result.unwrap(itemIdFromString(id));
+  const title = Result.unwrap(itemTitleFromString("Existing"));
+  const icon = createItemIcon("note");
+  const status = itemStatusOpen();
+  const directory = Result.unwrap(parseDirectory(section));
+  const itemRank = Result.unwrap(itemRankFromString(rank));
+  const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
+
+  return createDomainItem({
+    id: itemId,
+    title,
+    icon,
+    status,
+    directory,
+    rank: itemRank,
+    createdAt,
+    updatedAt: createdAt,
+  });
+};
+
+Deno.test("createItem assigns middle rank when section is empty", async () => {
+  const deps = createDeps();
+  const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
+  const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
+
+  const result = await createItem({
+    title: "New note",
+    itemType: "note",
+    parentDirectory,
+    createdAt,
+    timezone: TEST_TIMEZONE,
+  }, deps);
+
+  assertEquals(result.type, "ok");
+  if (result.type !== "ok") return;
+
+  assertExists(result.value.item.rank);
+
+  const listResult = await deps.itemRepository.listByDirectory(
+    { kind: "single", at: parentDirectory },
+  );
+  assertEquals(listResult.type, "ok");
+  if (listResult.type !== "ok") return;
+  assertEquals(listResult.value.length, 1);
+});
+
+Deno.test("createItem appends rank after existing siblings", async () => {
+  const deps = createDeps();
+  const existing = createExistingItem(
+    "019965a7-2789-740a-b8c1-1415904fd110",
+    "0|100000:",
+    "2024-09-20",
+  );
+  Result.unwrap(await deps.itemRepository.save(existing));
+
+  const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
+  const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T13:00:00Z")));
+
+  const result = await createItem({
+    title: "Follow-up",
+    itemType: "note",
+    parentDirectory,
+    createdAt,
+    timezone: TEST_TIMEZONE,
+  }, {
+    ...deps,
+    idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd121"),
+  });
+
+  assertEquals(result.type, "ok");
+  if (result.type !== "ok") return;
+
+  const listResult = await deps.itemRepository.listByDirectory(
+    { kind: "single", at: parentDirectory },
+  );
+  assertEquals(listResult.type, "ok");
+  if (listResult.type !== "ok") return;
+  assertEquals(listResult.value.length, 2);
+
+  const orderComparison = deps.rankService.compareRanks(
+    listResult.value[0].data.rank,
+    listResult.value[1].data.rank,
+  );
+  assertEquals(orderComparison < 0, true);
 });
 
 Deno.test("createItem returns a presentation-free DTO for created task", async () => {
@@ -173,4 +266,73 @@ Deno.test("createItem persists manual alias", async () => {
   assertEquals(aliasResult.type, "ok");
   if (aliasResult.type !== "ok") return;
   assertExists(aliasResult.value);
+});
+
+Deno.test("createItem rejects duplicate alias", async () => {
+  const deps = createDeps();
+  const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
+  const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
+
+  const firstResult = await createItem({
+    title: "First",
+    itemType: "note",
+    alias: "chapter1",
+    parentDirectory,
+    createdAt,
+    timezone: TEST_TIMEZONE,
+  }, deps);
+  assertEquals(firstResult.type, "ok");
+
+  const secondResult = await createItem({
+    title: "Second",
+    itemType: "note",
+    alias: "chapter1",
+    parentDirectory,
+    createdAt,
+    timezone: TEST_TIMEZONE,
+  }, {
+    ...deps,
+    idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd121"),
+  });
+
+  assertEquals(secondResult.type, "error");
+  if (secondResult.type !== "error") return;
+  assertEquals(secondResult.error.kind, "ValidationError");
+});
+
+Deno.test("createItem accepts event when startAt crosses UTC day boundary", async () => {
+  const deps = createDeps();
+  const jst = Result.unwrap(parseTimezoneIdentifier("Asia/Tokyo"));
+  const parentDirectory = Result.unwrap(parseDirectory("2024-09-21"));
+  const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-21T00:00:00+09:00")));
+
+  const result = await createItem({
+    title: "Morning Event",
+    itemType: "event",
+    parentDirectory,
+    createdAt,
+    timezone: jst,
+    startAt: Result.unwrap(dateTimeFromDate(new Date("2024-09-20T15:30:00Z"))),
+    duration: Result.unwrap(parseDuration("1h")),
+  }, deps);
+
+  assertEquals(result.type, "ok");
+});
+
+Deno.test("createItem allows event with different date for item directory", async () => {
+  const deps = createDeps();
+  const parentDirectory = Result.unwrap(parseDirectory("permanent"));
+  const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
+
+  const result = await createItem({
+    title: "Sub Event",
+    itemType: "event",
+    parentDirectory,
+    createdAt,
+    timezone: TEST_TIMEZONE,
+    startAt: Result.unwrap(dateTimeFromDate(new Date("2024-09-25T10:00:00Z"))),
+    duration: Result.unwrap(parseDuration("1h")),
+  }, deps);
+
+  assertEquals(result.type, "ok");
 });

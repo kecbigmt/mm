@@ -1,114 +1,82 @@
-import { assertEquals, assertExists } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 import { MoveItemWorkflow } from "./move_item.ts";
-import { CreateItemService } from "../services/create_item.ts";
 import { Result } from "../../shared/result.ts";
+import { createItem as createDomainItem, Item } from "../models/item.ts";
 import {
+  createItemIcon,
   dateTimeFromDate,
+  itemIdFromString,
+  itemRankFromString,
+  itemStatusOpen,
+  itemTitleFromString,
   parseDirectory,
-  timezoneIdentifierFromString,
 } from "../primitives/mod.ts";
-import { createIdGenerationService } from "../services/id_generation_service.ts";
 import { InMemoryItemRepository } from "../repositories/item_repository_fake.ts";
 import { InMemoryAliasRepository } from "../repositories/alias_repository_fake.ts";
-import { createAliasAutoGenerator, type RandomSource } from "../services/alias_auto_generator.ts";
 import { createLexoRankService } from "../../infrastructure/lexorank/rank_service.ts";
-
-const TEST_TIMEZONE = Result.unwrap(timezoneIdentifierFromString("UTC"));
 
 const createTestRankService = () => {
   return createLexoRankService();
 };
 
-const createFixedIdService = (id: string) =>
-  createIdGenerationService({
-    generate: () => id,
-  });
+const createExistingItem = (id: string, title: string, rank: string, section: string): Item => {
+  const itemId = Result.unwrap(itemIdFromString(id));
+  const parsedTitle = Result.unwrap(itemTitleFromString(title));
+  const icon = createItemIcon("note");
+  const status = itemStatusOpen();
+  const directory = Result.unwrap(parseDirectory(section));
+  const itemRank = Result.unwrap(itemRankFromString(rank));
+  const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
-const createTestAliasAutoGenerator = () => {
-  const random: RandomSource = {
-    nextInt: (max) => Math.floor(Math.random() * max),
-  };
-  return createAliasAutoGenerator(random);
+  return createDomainItem({
+    id: itemId,
+    title: parsedTitle,
+    icon,
+    status,
+    directory,
+    rank: itemRank,
+    createdAt,
+    updatedAt: createdAt,
+  });
 };
 
 describe("MoveItemWorkflow", () => {
   it("moves item after another item with correct rank (A > B > C > D, move D after:A -> A > D > B > C)", async () => {
     const itemRepository = new InMemoryItemRepository();
     const aliasRepository = new InMemoryAliasRepository();
-    const aliasAutoGenerator = createTestAliasAutoGenerator();
     const rankService = createTestRankService();
     const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
     const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
-    // Create items A, B, C, D
-    const itemAResult = await CreateItemService.execute({
-      title: "Item A",
-      itemType: "note",
-      parentDirectory,
-      createdAt,
-      timezone: TEST_TIMEZONE,
-    }, {
-      itemRepository,
-      aliasRepository,
-      aliasAutoGenerator,
-      rankService,
-      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd001"),
-    });
-    assertEquals(itemAResult.type, "ok");
-    const itemA = itemAResult.type === "ok" ? itemAResult.value.item : undefined;
-    assertExists(itemA);
-
-    const itemBResult = await CreateItemService.execute({
-      title: "Item B",
-      itemType: "note",
-      parentDirectory,
-      createdAt,
-      timezone: TEST_TIMEZONE,
-    }, {
-      itemRepository,
-      aliasRepository,
-      aliasAutoGenerator,
-      rankService,
-      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd002"),
-    });
-    assertEquals(itemBResult.type, "ok");
-    const itemB = itemBResult.type === "ok" ? itemBResult.value.item : undefined;
-    assertExists(itemB);
-
-    const itemCResult = await CreateItemService.execute({
-      title: "Item C",
-      itemType: "note",
-      parentDirectory,
-      createdAt,
-      timezone: TEST_TIMEZONE,
-    }, {
-      itemRepository,
-      aliasRepository,
-      aliasAutoGenerator,
-      rankService,
-      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd003"),
-    });
-    assertEquals(itemCResult.type, "ok");
-    const itemC = itemCResult.type === "ok" ? itemCResult.value.item : undefined;
-    assertExists(itemC);
-
-    const itemDResult = await CreateItemService.execute({
-      title: "Item D",
-      itemType: "note",
-      parentDirectory,
-      createdAt,
-      timezone: TEST_TIMEZONE,
-    }, {
-      itemRepository,
-      aliasRepository,
-      aliasAutoGenerator,
-      rankService,
-      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd004"),
-    });
-    assertEquals(itemDResult.type, "ok");
-    const itemD = itemDResult.type === "ok" ? itemDResult.value.item : undefined;
-    assertExists(itemD);
+    const itemA = createExistingItem(
+      "019965a7-2789-740a-b8c1-1415904fd001",
+      "Item A",
+      "0|100000:",
+      "2024-09-20",
+    );
+    const itemB = createExistingItem(
+      "019965a7-2789-740a-b8c1-1415904fd002",
+      "Item B",
+      "0|200000:",
+      "2024-09-20",
+    );
+    const itemC = createExistingItem(
+      "019965a7-2789-740a-b8c1-1415904fd003",
+      "Item C",
+      "0|300000:",
+      "2024-09-20",
+    );
+    const itemD = createExistingItem(
+      "019965a7-2789-740a-b8c1-1415904fd004",
+      "Item D",
+      "0|400000:",
+      "2024-09-20",
+    );
+    Result.unwrap(await itemRepository.save(itemA));
+    Result.unwrap(await itemRepository.save(itemB));
+    Result.unwrap(await itemRepository.save(itemC));
+    Result.unwrap(await itemRepository.save(itemD));
 
     // Verify initial order: A, B, C, D
     const initialListResult = await itemRepository.listByDirectory({
@@ -178,79 +146,38 @@ describe("MoveItemWorkflow", () => {
   it("moves item before another item with correct rank (A > B > C > D, move A before:D -> B > C > A > D)", async () => {
     const itemRepository = new InMemoryItemRepository();
     const aliasRepository = new InMemoryAliasRepository();
-    const aliasAutoGenerator = createTestAliasAutoGenerator();
     const rankService = createTestRankService();
     const parentDirectory = Result.unwrap(parseDirectory("2024-09-20"));
     const createdAt = Result.unwrap(dateTimeFromDate(new Date("2024-09-20T12:00:00Z")));
 
-    // Create items A, B, C, D
-    const itemAResult = await CreateItemService.execute({
-      title: "Item A",
-      itemType: "note",
-      parentDirectory,
-      createdAt,
-      timezone: TEST_TIMEZONE,
-    }, {
-      itemRepository,
-      aliasRepository,
-      aliasAutoGenerator,
-      rankService,
-      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd005"),
-    });
-    assertEquals(itemAResult.type, "ok");
-    const itemA = itemAResult.type === "ok" ? itemAResult.value.item : undefined;
-    assertExists(itemA);
-
-    const itemBResult = await CreateItemService.execute({
-      title: "Item B",
-      itemType: "note",
-      parentDirectory,
-      createdAt,
-      timezone: TEST_TIMEZONE,
-    }, {
-      itemRepository,
-      aliasRepository,
-      aliasAutoGenerator,
-      rankService,
-      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd006"),
-    });
-    assertEquals(itemBResult.type, "ok");
-    const itemB = itemBResult.type === "ok" ? itemBResult.value.item : undefined;
-    assertExists(itemB);
-
-    const itemCResult = await CreateItemService.execute({
-      title: "Item C",
-      itemType: "note",
-      parentDirectory,
-      createdAt,
-      timezone: TEST_TIMEZONE,
-    }, {
-      itemRepository,
-      aliasRepository,
-      aliasAutoGenerator,
-      rankService,
-      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd007"),
-    });
-    assertEquals(itemCResult.type, "ok");
-    const itemC = itemCResult.type === "ok" ? itemCResult.value.item : undefined;
-    assertExists(itemC);
-
-    const itemDResult = await CreateItemService.execute({
-      title: "Item D",
-      itemType: "note",
-      parentDirectory,
-      createdAt,
-      timezone: TEST_TIMEZONE,
-    }, {
-      itemRepository,
-      aliasRepository,
-      aliasAutoGenerator,
-      rankService,
-      idGenerationService: createFixedIdService("019965a7-2789-740a-b8c1-1415904fd008"),
-    });
-    assertEquals(itemDResult.type, "ok");
-    const itemD = itemDResult.type === "ok" ? itemDResult.value.item : undefined;
-    assertExists(itemD);
+    const itemA = createExistingItem(
+      "019965a7-2789-740a-b8c1-1415904fd005",
+      "Item A",
+      "0|100000:",
+      "2024-09-20",
+    );
+    const itemB = createExistingItem(
+      "019965a7-2789-740a-b8c1-1415904fd006",
+      "Item B",
+      "0|200000:",
+      "2024-09-20",
+    );
+    const itemC = createExistingItem(
+      "019965a7-2789-740a-b8c1-1415904fd007",
+      "Item C",
+      "0|300000:",
+      "2024-09-20",
+    );
+    const itemD = createExistingItem(
+      "019965a7-2789-740a-b8c1-1415904fd008",
+      "Item D",
+      "0|400000:",
+      "2024-09-20",
+    );
+    Result.unwrap(await itemRepository.save(itemA));
+    Result.unwrap(await itemRepository.save(itemB));
+    Result.unwrap(await itemRepository.save(itemC));
+    Result.unwrap(await itemRepository.save(itemD));
 
     // Move A before D
     const moveResult = await MoveItemWorkflow.execute({

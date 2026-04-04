@@ -122,7 +122,7 @@ Typical commands:
 
 ```bash
 # Run a specific test file
-deno task test:file src/domain/services/create_item_test.ts
+deno task test:file src/application/use_cases/create_item_test.ts
 
 # Run all tests matching a pattern
 deno task test:file tests/e2e/scenarios/*sync*test.ts
