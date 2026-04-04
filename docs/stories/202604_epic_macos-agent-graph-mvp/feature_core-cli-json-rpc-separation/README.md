@@ -22,6 +22,7 @@ through JSON-RPC, without copying workflows or binding domain logic to CLI-only 
 - introduce a structured local API surface for macOS integration
 - keep CLI as a thin presentation adapter over shared core use cases
 - define DTOs and error mapping suitable for JSON-RPC responses
+- preserve compatibility with the existing GitHub sync and multi-client file workflow
 
 ## Out of Scope
 
@@ -43,6 +44,9 @@ through JSON-RPC, without copying workflows or binding domain logic to CLI-only 
 4. **Clear composition root** Runtime wiring for repositories and services should move out of
    CLI-only dependency loading.
 
+5. **Sync compatibility is mandatory** Core and presentation separation must not break the existing
+   GitHub-based multi-client workflow.
+
 ## Expected Deliverables
 
 - `application` or equivalent core-facing module structure
@@ -50,6 +54,7 @@ through JSON-RPC, without copying workflows or binding domain logic to CLI-only 
 - thin CLI adapter updates for migrated flows
 - JSON-RPC presentation skeleton and initial method set
 - migration plan for remaining commands still coupled to CLI behavior
+- explicit notes on preserving sync-related behaviors during the split
 
 ## Candidate First Use Cases
 

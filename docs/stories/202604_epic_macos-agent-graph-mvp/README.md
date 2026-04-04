@@ -37,7 +37,8 @@ The main differentiator is that knowledge, action, and events live in the same g
 - local-first workspace with user-owned files as source of truth
 - note/task/event graph browsing and editing
 - agent-assisted workflows such as summarize, suggest links, suggest tasks, and periodic summaries
-- sync-ready foundations such as stable IDs, revisions, and conflict-aware save behavior
+- preserve compatibility with the existing GitHub-based multi-client sync workflow
+- keep stable IDs, revisions, and conflict-aware save behavior aligned with file-based sync
 - core APIs reusable from multiple presentation layers
 
 ## Out of Scope
@@ -46,17 +47,18 @@ The main differentiator is that knowledge, action, and events live in the same g
 - new top-level item domains such as `source`, `article`, or `concept`
 - cloud sync backend, team collaboration, or cloud runner
 - heavy ingest pipelines, generic RAG platform features, or autonomous research orchestration
+- realtime sync, CRDT-grade merge, or fully automatic conflict resolution
 - plugin ecosystem
 
 ## Sync Posture
 
-The MVP should be sync-ready, not sync-complete.
+The MVP must preserve the existing GitHub-based multi-client sync workflow.
 
-- Include stable workspace and item identity
-- Include revision-oriented persistence metadata
-- Detect local and external changes
-- Keep conflict handling explicit rather than hidden last-writer-wins
-- Avoid committing to a heavy distributed coordination model in the first release
+- Keep Markdown/frontmatter files as the canonical state exchanged through Git
+- Preserve compatibility with pull/rebase/push-based multi-client operation
+- Keep stable workspace and item identity and revision-oriented persistence metadata
+- Detect local and external changes without hiding conflicts behind implicit last-writer-wins
+- Avoid introducing a new cloud-first or distributed sync architecture in the first release
 
 ## Success Criteria
 
@@ -64,6 +66,7 @@ The MVP should be sync-ready, not sync-complete.
 - The same core can serve both CLI and structured local APIs without duplicating domain logic.
 - Agent results can be previewed and applied as persistent graph changes.
 - The MVP scope remains centered on local knowledge work over `task` / `note` / `event`.
+- macOS/core changes do not regress the existing GitHub-based multi-client sync workflow.
 
 ## Planned Features
 
@@ -86,3 +89,4 @@ The MVP should be sync-ready, not sync-complete.
   agreed.
 - This epic should prefer additive seams and removal of architectural coupling over broad feature
   work in the first pass.
+- Existing sync behavior is a compatibility constraint, not a future aspiration.
