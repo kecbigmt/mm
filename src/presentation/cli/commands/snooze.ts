@@ -4,6 +4,8 @@ import { snoozeItem } from "../../../application/use_cases/snooze_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
 import { parseFutureDateTime } from "../utils/future_date_time.ts";
+import { formatError } from "../error_formatter.ts";
+import { isDebugMode } from "../debug.ts";
 import { executeAutoCommit } from "../auto_commit_helper.ts";
 import { executePrePull } from "../pre_pull_helper.ts";
 
@@ -36,6 +38,7 @@ export function createSnoozeCommand() {
         until = args[args.length - 1];
       }
 
+      const debug = isDebugMode();
       const workspaceOption = typeof options.workspace === "string" ? options.workspace : undefined;
       const depsResult = await loadCliDependencies(workspaceOption);
       if (depsResult.type === "error") {
@@ -115,7 +118,7 @@ export function createSnoozeCommand() {
         });
 
         if (result.type === "error") {
-          console.error(`Error processing ${itemRef}: ${result.error.message}`);
+          console.error(formatError(result.error, debug));
           continue;
         }
 
