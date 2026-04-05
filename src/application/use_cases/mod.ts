@@ -54,3 +54,12 @@ export {
   type MoveItemRequest,
   type MoveItemResponse,
 } from "./move_item.ts";
+
+export {
+  initRemoteWorkspace,
+  type InitRemoteWorkspaceDeps,
+  type InitRemoteWorkspaceError,
+  type InitRemoteWorkspaceRequest,
+  type InitRemoteWorkspaceResponse,
+  type WorkspaceAlreadyExistsError,
+} from "./init_remote_workspace.ts";
