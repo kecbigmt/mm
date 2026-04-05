@@ -10,7 +10,7 @@ import { CliDependencyError } from "../dependencies.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import { createGitVersionControlService } from "../../../infrastructure/git/git_client.ts";
-import { WorkspaceInitRemoteWorkflow } from "../../../domain/workflows/workspace_init_remote.ts";
+import { initRemoteWorkspace } from "../../../application/use_cases/init_remote_workspace.ts";
 import { createWorkspaceScanner } from "../../../infrastructure/fileSystem/workspace_scanner.ts";
 import { rebuildFromItems } from "../../../infrastructure/fileSystem/index_rebuilder.ts";
 import {
@@ -172,7 +172,7 @@ const initAction = async (
   if (remoteUrl) {
     const gitService = createGitVersionControlService();
 
-    const result = await WorkspaceInitRemoteWorkflow.execute(
+    const result = await initRemoteWorkspace(
       {
         workspaceName: parsedName.value,
         remoteUrl,

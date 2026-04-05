@@ -1,9 +1,15 @@
 import { Command } from "@cliffy/command";
 import { join } from "@std/path";
 import { loadCliDependencies } from "../dependencies.ts";
-import { SyncInitWorkflow } from "../../../domain/workflows/sync_init.ts";
-import { SyncPushValidationError, SyncPushWorkflow } from "../../../domain/workflows/sync_push.ts";
-import { SyncPullValidationError, SyncPullWorkflow } from "../../../domain/workflows/sync_pull.ts";
+import {
+  isSyncPullValidationError,
+  isSyncPushValidationError,
+  syncInit,
+  syncPull,
+  type SyncPullValidationError,
+  syncPush,
+  type SyncPushValidationError,
+} from "../../../application/use_cases/mod.ts";
 import { formatError } from "../error_formatter.ts";
 import { isDebugMode } from "../debug.ts";
 import { VersionControlService } from "../../../domain/services/version_control_service.ts";
@@ -161,27 +167,6 @@ function formatSyncPullError(error: SyncPullValidationError): string {
   }
 }
 
-function isSyncPushValidationError(error: unknown): error is SyncPushValidationError {
-  return (
-    typeof error === "object" && error !== null &&
-    "type" in error &&
-    (error.type === "git_not_enabled" ||
-      error.type === "no_remote_configured" ||
-      error.type === "branch_mismatch")
-  );
-}
-
-function isSyncPullValidationError(error: unknown): error is SyncPullValidationError {
-  return (
-    typeof error === "object" && error !== null &&
-    "type" in error &&
-    (error.type === "git_not_enabled" ||
-      error.type === "no_remote_configured" ||
-      error.type === "uncommitted_changes" ||
-      error.type === "branch_mismatch")
-  );
-}
-
 export const createSyncCommand = () => {
   const initCommand = new Command()
     .description("Initialize git sync with remote")
@@ -200,7 +185,7 @@ export const createSyncCommand = () => {
       }
       const deps = depsResult.value;
 
-      const result = await SyncInitWorkflow.execute(
+      const result = await syncInit(
         {
           workspaceRoot: deps.root,
           remoteUrl,
@@ -248,7 +233,7 @@ export const createSyncCommand = () => {
       const deps = depsResult.value;
 
       const result = await withLoadingIndicator("Pushing...", () =>
-        SyncPushWorkflow.execute(
+        syncPush(
           {
             workspaceRoot: deps.root,
             force,
@@ -274,7 +259,7 @@ export const createSyncCommand = () => {
       await resetSyncState(deps.stateRepository);
 
       // Silent on success
-      const output = result.value.trim();
+      const output = result.value.output.trim();
       if (output && !output.toLowerCase().includes("everything up-to-date")) {
         console.log(output);
       }
@@ -293,7 +278,7 @@ export const createSyncCommand = () => {
       const deps = depsResult.value;
 
       const result = await withLoadingIndicator("Pulling...", () =>
-        SyncPullWorkflow.execute(
+        syncPull(
           {
             workspaceRoot: deps.root,
           },
@@ -324,7 +309,7 @@ export const createSyncCommand = () => {
       }
 
       // Silent on success
-      const output = result.value.trim();
+      const output = result.value.output.trim();
       if (output && !output.toLowerCase().includes("already up to date")) {
         console.log(output);
       }
@@ -368,7 +353,7 @@ export const createSyncCommand = () => {
 
       // Pull with loading indicator
       const pullResult = await withLoadingIndicator("Pulling...", () =>
-        SyncPullWorkflow.execute(
+        syncPull(
           { workspaceRoot: deps.root },
           {
             gitService: deps.versionControlService,
@@ -412,7 +397,7 @@ export const createSyncCommand = () => {
 
       // Push with loading indicator
       const pushResult = await withLoadingIndicator("Pushing...", () =>
-        SyncPushWorkflow.execute(
+        syncPush(
           { workspaceRoot: deps.root, force: false },
           {
             gitService: deps.versionControlService,
