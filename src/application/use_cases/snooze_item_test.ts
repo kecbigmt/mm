@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 import { snoozeItem } from "./snooze_item.ts";
 import { createItem } from "../../domain/models/item.ts";
 import { InMemoryAliasRepository } from "../../domain/repositories/alias_repository_fake.ts";
@@ -132,4 +132,44 @@ Deno.test("snoozeItem returns validation error for unknown item", async () => {
   if (result.error.kind !== "ValidationError") return;
   assertEquals(result.error.objectKind, "SnoozeItem");
   assertEquals(result.error.issues[0]?.path, ["itemLocator"]);
+});
+
+Deno.test("snoozeItem preserves actionable message when locator resolves to a date", async () => {
+  const deps = createDeps();
+  const occurredAt = Result.unwrap(dateTimeFromDate(new Date("2025-12-02T10:00:00Z")));
+
+  const result = await snoozeItem({
+    itemLocator: "2025-12-02",
+    cwd: TEST_CWD,
+    timezone: TEST_TIMEZONE,
+    occurredAt,
+  }, deps);
+
+  assertEquals(result.type, "error");
+  if (result.type !== "error") return;
+  assertEquals(result.error.kind, "ValidationError");
+  if (result.error.kind !== "ValidationError") return;
+  assertStringIncludes(
+    result.error.issues[0]?.message,
+    "expression must resolve to an item, not a date",
+  );
+});
+
+Deno.test("snoozeItem preserves actionable message when path resolution fails", async () => {
+  const deps = createDeps();
+  const occurredAt = Result.unwrap(dateTimeFromDate(new Date("2025-12-02T10:00:00Z")));
+
+  // Use an alias-like locator that doesn't exist in the repository
+  const result = await snoozeItem({
+    itemLocator: "nonexistent-alias",
+    cwd: TEST_CWD,
+    timezone: TEST_TIMEZONE,
+    occurredAt,
+  }, deps);
+
+  assertEquals(result.type, "error");
+  if (result.type !== "error") return;
+  assertEquals(result.error.kind, "ValidationError");
+  if (result.error.kind !== "ValidationError") return;
+  assertStringIncludes(result.error.issues[0]?.message, "failed to resolve item");
 });
