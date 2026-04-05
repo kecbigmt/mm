@@ -63,3 +63,11 @@ export {
   type InitRemoteWorkspaceResponse,
   type WorkspaceAlreadyExistsError,
 } from "./init_remote_workspace.ts";
+
+export {
+  snoozeItem,
+  type SnoozeItemApplicationError,
+  type SnoozeItemDeps,
+  type SnoozeItemRequest,
+  type SnoozeItemResponse,
+} from "./snooze_item.ts";
