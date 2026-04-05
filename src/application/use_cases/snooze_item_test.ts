@@ -6,6 +6,7 @@ import { InMemoryItemRepository } from "../../domain/repositories/item_repositor
 import {
   createItemIcon,
   dateTimeFromDate,
+  Directory,
   itemIdFromString,
   itemRankFromString,
   itemStatusOpen,
@@ -18,6 +19,7 @@ import { Result } from "../../shared/result.ts";
 import { createLexoRankService } from "../../infrastructure/lexorank/rank_service.ts";
 
 const TEST_TIMEZONE = Result.unwrap(parseTimezoneIdentifier("UTC"));
+const TEST_CWD: Directory = Result.unwrap(parseDirectory("2025-12-02"));
 
 const createDeps = () => ({
   itemRepository: new InMemoryItemRepository(),
@@ -55,6 +57,7 @@ Deno.test("snoozeItem snoozes with default duration (8h) and returns DTO", async
 
   const result = await snoozeItem({
     itemLocator: item.data.id.toString(),
+    cwd: TEST_CWD,
     timezone: TEST_TIMEZONE,
     occurredAt,
   }, deps);
@@ -78,6 +81,7 @@ Deno.test("snoozeItem relocates to future date directory when snoozeUntil exceed
 
   const result = await snoozeItem({
     itemLocator: item.data.id.toString(),
+    cwd: TEST_CWD,
     snoozeUntil,
     timezone: TEST_TIMEZONE,
     occurredAt,
@@ -99,6 +103,7 @@ Deno.test("snoozeItem clears snooze when clear flag is true", async () => {
 
   const result = await snoozeItem({
     itemLocator: item.data.id.toString(),
+    cwd: TEST_CWD,
     clear: true,
     timezone: TEST_TIMEZONE,
     occurredAt,
@@ -116,6 +121,7 @@ Deno.test("snoozeItem returns validation error for unknown item", async () => {
 
   const result = await snoozeItem({
     itemLocator: "01936d9a-9999-7000-8000-000000000000",
+    cwd: TEST_CWD,
     timezone: TEST_TIMEZONE,
     occurredAt,
   }, deps);

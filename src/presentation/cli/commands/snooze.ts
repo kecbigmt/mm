@@ -1,6 +1,7 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
 import { snoozeItem } from "../../../application/use_cases/snooze_item.ts";
+import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
 import { parseFutureDateTime } from "../utils/future_date_time.ts";
 import { executeAutoCommit } from "../auto_commit_helper.ts";
@@ -57,6 +58,22 @@ export function createSnoozeCommand() {
 
       const now = new Date();
 
+      const cwdResult = await CwdResolutionService.getCwd({
+        sessionRepository: deps.sessionRepository,
+        workspacePath: deps.root,
+        itemRepository: deps.itemRepository,
+        timezone: deps.timezone,
+      });
+
+      if (cwdResult.type === "error") {
+        console.error(cwdResult.error.message);
+        return;
+      }
+
+      if (cwdResult.value.warning) {
+        console.error(`Warning: ${cwdResult.value.warning}`);
+      }
+
       const occurredAtResult = dateTimeFromDate(now);
       if (occurredAtResult.type === "error") {
         console.error(occurredAtResult.error.message);
@@ -84,9 +101,11 @@ export function createSnoozeCommand() {
       for (const itemRef of itemRefs) {
         const result = await snoozeItem({
           itemLocator: itemRef,
+          cwd: cwdResult.value.directory,
           snoozeUntil,
           clear: clearFlag,
           timezone: deps.timezone,
+          today: now,
           occurredAt: occurredAtResult.value,
         }, {
           itemRepository: deps.itemRepository,

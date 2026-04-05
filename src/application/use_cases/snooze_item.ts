@@ -4,22 +4,30 @@ import {
   createValidationIssue,
   ValidationError,
 } from "../../shared/errors.ts";
-import { DateTime, TimezoneIdentifier } from "../../domain/primitives/mod.ts";
+import {
+  DateTime,
+  Directory,
+  parseTimezoneIdentifier,
+  TimezoneIdentifier,
+} from "../../domain/primitives/mod.ts";
 import { createDurationFromHours } from "../../domain/primitives/duration.ts";
 import { parseDirectory } from "../../domain/primitives/directory.ts";
 import { createSingleRange } from "../../domain/primitives/directory_range.ts";
+import { parsePathExpression } from "../../domain/primitives/path_expression_parser.ts";
 import { AliasRepository } from "../../domain/repositories/alias_repository.ts";
 import { ItemRepository } from "../../domain/repositories/item_repository.ts";
 import { RepositoryError } from "../../domain/repositories/repository_error.ts";
-import { createItemLocatorService } from "../../domain/services/item_locator_service.ts";
+import { createPathResolver } from "../../domain/services/path_resolver.ts";
 import { RankService } from "../../domain/services/rank_service.ts";
 import { ItemDto, toItemDto } from "./item_dto.ts";
 
 export type SnoozeItemRequest = Readonly<{
   itemLocator: string;
+  cwd: Directory;
   snoozeUntil?: DateTime;
   clear?: boolean;
-  timezone: TimezoneIdentifier;
+  timezone?: TimezoneIdentifier;
+  today?: Date;
   occurredAt: DateTime;
 }>;
 
@@ -42,30 +50,65 @@ export const snoozeItem = async (
   input: SnoozeItemRequest,
   deps: SnoozeItemDeps,
 ): Promise<Result<SnoozeItemResponse, SnoozeItemApplicationError>> => {
-  const locatorService = createItemLocatorService({
-    itemRepository: deps.itemRepository,
+  const today = input.today ?? new Date();
+  const timezoneResult = input.timezone
+    ? Result.ok(input.timezone)
+    : parseTimezoneIdentifier("UTC");
+  if (timezoneResult.type === "error") {
+    return Result.error(createValidationError("SnoozeItem", timezoneResult.error.issues));
+  }
+  const timezone = timezoneResult.value;
+
+  const pathResolver = createPathResolver({
     aliasRepository: deps.aliasRepository,
-    timezone: input.timezone,
+    itemRepository: deps.itemRepository,
+    timezone,
+    today,
     prefixCandidates: deps.prefixCandidates,
   });
 
-  // Resolve item locator to a loaded Item
-  const resolveResult = await locatorService.resolve(input.itemLocator);
-  if (resolveResult.type === "error") {
-    const err = resolveResult.error;
-    if (err.kind === "repository_error") {
-      return Result.error(err.error);
-    }
-    if (err.kind === "ambiguous_prefix") {
-      return Result.error(
-        createValidationError("SnoozeItem", [
-          createValidationIssue(
-            `Ambiguous prefix '${err.locator}': matches ${err.candidates.join(", ")}`,
-            { code: "ambiguous_prefix", path: ["itemLocator"] },
-          ),
-        ]),
-      );
-    }
+  // Resolve item locator via path expression (supports CWD-relative refs like 1, ./1, today/2)
+  const exprResult = parsePathExpression(input.itemLocator);
+  if (exprResult.type === "error") {
+    return Result.error(
+      createValidationError("SnoozeItem", [
+        createValidationIssue(
+          `invalid item expression: ${exprResult.error.issues.map((i) => i.message).join(", ")}`,
+          { code: "invalid_item_expression", path: ["itemLocator"] },
+        ),
+      ]),
+    );
+  }
+
+  const pathResult = await pathResolver.resolvePath(input.cwd, exprResult.value);
+  if (pathResult.type === "error") {
+    return Result.error(
+      createValidationError("SnoozeItem", [
+        createValidationIssue(
+          `failed to resolve item: ${pathResult.error.issues.map((i) => i.message).join(", ")}`,
+          { code: "item_resolution_failed", path: ["itemLocator"] },
+        ),
+      ]),
+    );
+  }
+
+  if (pathResult.value.head.kind !== "item") {
+    return Result.error(
+      createValidationError("SnoozeItem", [
+        createValidationIssue("expression must resolve to an item, not a date", {
+          code: "not_an_item",
+          path: ["itemLocator"],
+        }),
+      ]),
+    );
+  }
+
+  const itemId = pathResult.value.head.id;
+  const loadResult = await deps.itemRepository.load(itemId);
+  if (loadResult.type === "error") {
+    return Result.error(loadResult.error);
+  }
+  if (!loadResult.value) {
     return Result.error(
       createValidationError("SnoozeItem", [
         createValidationIssue(`Item not found: ${input.itemLocator}`, {
@@ -76,7 +119,7 @@ export const snoozeItem = async (
     );
   }
 
-  const item = resolveResult.value;
+  const item = loadResult.value;
 
   // Handle unsnooze case (--clear flag)
   if (input.clear === true) {
@@ -108,7 +151,7 @@ export const snoozeItem = async (
   // Check if we need to relocate to a new date directory
   const snoozeUntilDate = finalSnoozeUntil.toDate();
   const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: input.timezone.toString(),
+    timeZone: timezone.toString(),
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
