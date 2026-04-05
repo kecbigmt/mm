@@ -1,17 +1,11 @@
 import { Command } from "@cliffy/command";
 import { loadCliDependencies } from "../dependencies.ts";
-import { SnoozeItemWorkflow } from "../../../domain/workflows/snooze_item.ts";
+import { snoozeItem } from "../../../application/use_cases/snooze_item.ts";
 import { CwdResolutionService } from "../../../domain/services/cwd_resolution_service.ts";
 import { dateTimeFromDate } from "../../../domain/primitives/mod.ts";
-import { parsePathExpression } from "../../../domain/primitives/path_expression_parser.ts";
-import { createPathResolver } from "../../../domain/services/path_resolver.ts";
 import { parseFutureDateTime } from "../utils/future_date_time.ts";
 import { executeAutoCommit } from "../auto_commit_helper.ts";
 import { executePrePull } from "../pre_pull_helper.ts";
-
-const formatItemLabel = (
-  item: { data: { id: { toString(): string }; alias?: { toString(): string } } },
-): string => item.data.alias ? item.data.alias.toString() : item.data.id.toString().slice(-7);
 
 export function createSnoozeCommand() {
   return new Command()
@@ -86,14 +80,6 @@ export function createSnoozeCommand() {
         return;
       }
 
-      const pathResolver = createPathResolver({
-        aliasRepository: deps.aliasRepository,
-        itemRepository: deps.itemRepository,
-        timezone: deps.timezone,
-        today: now,
-        prefixCandidates: () => deps.cacheUpdateService.getAliases(),
-      });
-
       // Resolve snoozeUntil expression to DateTime (if provided)
       let snoozeUntil = undefined;
       if (until && !clearFlag) {
@@ -113,57 +99,33 @@ export function createSnoozeCommand() {
       // Process each item
       let successCount = 0;
       for (const itemRef of itemRefs) {
-        // Resolve item expression to ItemId
-        const itemExprResult = parsePathExpression(itemRef);
-        if (itemExprResult.type === "error") {
-          console.error(`Error processing ${itemRef}: ${itemExprResult.error.message}`);
+        const result = await snoozeItem({
+          itemLocator: itemRef,
+          cwd: cwdResult.value.directory,
+          snoozeUntil,
+          clear: clearFlag,
+          timezone: deps.timezone,
+          today: now,
+          occurredAt: occurredAtResult.value,
+        }, {
+          itemRepository: deps.itemRepository,
+          aliasRepository: deps.aliasRepository,
+          rankService: deps.rankService,
+          prefixCandidates: () => deps.cacheUpdateService.getAliases(),
+        });
+
+        if (result.type === "error") {
+          console.error(`Error processing ${itemRef}: ${result.error.message}`);
           continue;
         }
 
-        const itemPathResult = await pathResolver.resolvePath(
-          cwdResult.value.directory,
-          itemExprResult.value,
-        );
-        if (itemPathResult.type === "error") {
-          console.error(`Error processing ${itemRef}: ${itemPathResult.error.message}`);
-          continue;
-        }
-
-        if (itemPathResult.value.head.kind !== "item") {
-          console.error(
-            `Error processing ${itemRef}: expression must resolve to an item, not a date`,
-          );
-          continue;
-        }
-
-        const itemId = itemPathResult.value.head.id;
-
-        const workflowResult = await SnoozeItemWorkflow.execute(
-          {
-            itemId,
-            snoozeUntil,
-            clear: clearFlag,
-            timezone: deps.timezone,
-            occurredAt: occurredAtResult.value,
-          },
-          {
-            itemRepository: deps.itemRepository,
-            rankService: deps.rankService,
-          },
-        );
-
-        if (workflowResult.type === "error") {
-          console.error(`Error processing ${itemRef}: ${workflowResult.error.message}`);
-          continue;
-        }
-
-        const { item } = workflowResult.value;
-        const label = formatItemLabel(item);
+        const { item } = result.value;
+        const label = item.alias ?? item.id.slice(-7);
         successCount++;
 
-        if (item.data.snoozeUntil) {
+        if (item.snoozeUntil) {
           // Format snoozeUntil in workspace timezone (YYYY-MM-DD HH:MM)
-          const date = item.data.snoozeUntil.toDate();
+          const date = new Date(item.snoozeUntil);
           const dateFormatter = new Intl.DateTimeFormat("en-CA", {
             timeZone: deps.timezone.toString(),
             year: "numeric",
@@ -181,11 +143,11 @@ export function createSnoozeCommand() {
           const formattedTime = `${datePart} ${timePart}`;
 
           console.log(
-            `💤 [${label}] "${item.data.title.toString()}" is snoozing until ${formattedTime}`,
+            `\u{1F4A4} [${label}] "${item.title}" is snoozing until ${formattedTime}`,
           );
         } else {
           console.log(
-            `[${label}] "${item.data.title.toString()}" is no longer snoozing`,
+            `[${label}] "${item.title}" is no longer snoozing`,
           );
         }
       }
