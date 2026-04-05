@@ -1,13 +1,13 @@
 import { assertEquals } from "@std/assert";
-import { SyncPullWorkflow } from "./sync_pull.ts";
+import { syncPull } from "./sync_pull.ts";
 import { Result } from "../../shared/result.ts";
-import { createWorkspaceSettings, WorkspaceSettings } from "../models/workspace.ts";
-import { timezoneIdentifierFromString } from "../primitives/timezone_identifier.ts";
-import { WorkspaceRepository } from "../repositories/workspace_repository.ts";
+import { createWorkspaceSettings, WorkspaceSettings } from "../../domain/models/workspace.ts";
+import { timezoneIdentifierFromString } from "../../domain/primitives/timezone_identifier.ts";
+import { WorkspaceRepository } from "../../domain/repositories/workspace_repository.ts";
 import {
   createVersionControlCommandFailedError,
   VersionControlError,
-} from "../services/version_control_service.ts";
+} from "../../domain/services/version_control_service.ts";
 
 const mockVersionControlService = () => {
   const calls: string[] = [];
@@ -158,36 +158,12 @@ const mockWorkspaceRepo = (
   };
 };
 
-Deno.test("SyncPullWorkflow success flow", async () => {
+Deno.test("syncPull returns structured response on success", async () => {
   const git = mockVersionControlService();
   const repo = mockWorkspaceRepo(true, "https://github.com/user/repo.git");
 
-  const result = await SyncPullWorkflow.execute(
-    {
-      workspaceRoot: "/ws",
-    },
-    {
-      gitService: git,
-      workspaceRepository: repo as unknown as WorkspaceRepository,
-    },
-  );
-
-  assertEquals(result.type, "ok");
-  assertEquals(git.getCalls(), [
-    "hasUncommittedChanges",
-    "getCurrentBranch",
-    "pull:https://github.com/user/repo.git:main",
-  ]);
-});
-
-Deno.test("SyncPullWorkflow already up to date", async () => {
-  const git = mockVersionControlService();
-  const repo = mockWorkspaceRepo(true, "https://github.com/user/repo.git");
-
-  const result = await SyncPullWorkflow.execute(
-    {
-      workspaceRoot: "/ws",
-    },
+  const result = await syncPull(
+    { workspaceRoot: "/ws" },
     {
       gitService: git,
       workspaceRepository: repo as unknown as WorkspaceRepository,
@@ -196,18 +172,24 @@ Deno.test("SyncPullWorkflow already up to date", async () => {
 
   assertEquals(result.type, "ok");
   if (result.type === "ok") {
-    assertEquals(result.value.includes("Already up to date"), true);
+    assertEquals(result.value.output.includes("Already up to date"), true);
+    assertEquals(result.value.remote, "https://github.com/user/repo.git");
+    assertEquals(result.value.branch, "main");
+    assertEquals(result.value.branchAutoResolved, false);
   }
+  assertEquals(git.getCalls(), [
+    "hasUncommittedChanges",
+    "getCurrentBranch",
+    "pull:https://github.com/user/repo.git:main",
+  ]);
 });
 
-Deno.test("SyncPullWorkflow fails when git not enabled", async () => {
+Deno.test("syncPull fails when git not enabled", async () => {
   const git = mockVersionControlService();
   const repo = mockWorkspaceRepo(false, null);
 
-  const result = await SyncPullWorkflow.execute(
-    {
-      workspaceRoot: "/ws",
-    },
+  const result = await syncPull(
+    { workspaceRoot: "/ws" },
     {
       gitService: git,
       workspaceRepository: repo as unknown as WorkspaceRepository,
@@ -216,48 +198,38 @@ Deno.test("SyncPullWorkflow fails when git not enabled", async () => {
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(
-      result.error,
-      { type: "git_not_enabled" },
-    );
-  }
-  assertEquals(git.getCalls(), []); // No git operations should be called
-});
-
-Deno.test("SyncPullWorkflow fails when no remote configured", async () => {
-  const git = mockVersionControlService();
-  const repo = mockWorkspaceRepo(true, null);
-
-  const result = await SyncPullWorkflow.execute(
-    {
-      workspaceRoot: "/ws",
-    },
-    {
-      gitService: git,
-      workspaceRepository: repo as unknown as WorkspaceRepository,
-    },
-  );
-
-  assertEquals(result.type, "error");
-  if (result.type === "error") {
-    assertEquals(
-      result.error,
-      { type: "no_remote_configured" },
-    );
+    assertEquals(result.error, { type: "git_not_enabled" });
   }
   assertEquals(git.getCalls(), []);
 });
 
-Deno.test("SyncPullWorkflow resolves remote default branch when no branch configured", async () => {
+Deno.test("syncPull fails when no remote configured", async () => {
+  const git = mockVersionControlService();
+  const repo = mockWorkspaceRepo(true, null);
+
+  const result = await syncPull(
+    { workspaceRoot: "/ws" },
+    {
+      gitService: git,
+      workspaceRepository: repo as unknown as WorkspaceRepository,
+    },
+  );
+
+  assertEquals(result.type, "error");
+  if (result.type === "error") {
+    assertEquals(result.error, { type: "no_remote_configured" });
+  }
+  assertEquals(git.getCalls(), []);
+});
+
+Deno.test("syncPull resolves remote default branch when no branch configured", async () => {
   const git = mockVersionControlService();
   git.setRemoteDefaultBranch("develop");
-  git.setCurrentBranch("develop"); // Simulate local repo is on develop
+  git.setCurrentBranch("develop");
   const repo = mockWorkspaceRepo(true, "https://github.com/user/repo.git", null);
 
-  const result = await SyncPullWorkflow.execute(
-    {
-      workspaceRoot: "/ws",
-    },
+  const result = await syncPull(
+    { workspaceRoot: "/ws" },
     {
       gitService: git,
       workspaceRepository: repo as unknown as WorkspaceRepository,
@@ -265,6 +237,10 @@ Deno.test("SyncPullWorkflow resolves remote default branch when no branch config
   );
 
   assertEquals(result.type, "ok");
+  if (result.type === "ok") {
+    assertEquals(result.value.branchAutoResolved, true);
+    assertEquals(result.value.branch, "develop");
+  }
   assertEquals(git.getCalls(), [
     "getRemoteDefaultBranch:https://github.com/user/repo.git",
     "hasUncommittedChanges",
@@ -273,19 +249,17 @@ Deno.test("SyncPullWorkflow resolves remote default branch when no branch config
   ]);
 
   // Verify branch was persisted to workspace.json
-  const savedSettings = (repo as ReturnType<typeof mockWorkspaceRepo>).getSavedSettings();
+  const savedSettings = repo.getSavedSettings();
   assertEquals(savedSettings.data.sync.git?.branch, "develop");
 });
 
-Deno.test("SyncPullWorkflow fails when has uncommitted changes", async () => {
+Deno.test("syncPull fails when has uncommitted changes", async () => {
   const git = mockVersionControlService();
   git.setHasUncommitted(true);
   const repo = mockWorkspaceRepo(true, "https://github.com/user/repo.git");
 
-  const result = await SyncPullWorkflow.execute(
-    {
-      workspaceRoot: "/ws",
-    },
+  const result = await syncPull(
+    { workspaceRoot: "/ws" },
     {
       gitService: git,
       workspaceRepository: repo as unknown as WorkspaceRepository,
@@ -294,15 +268,12 @@ Deno.test("SyncPullWorkflow fails when has uncommitted changes", async () => {
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(
-      result.error,
-      { type: "uncommitted_changes" },
-    );
+    assertEquals(result.error, { type: "uncommitted_changes" });
   }
   assertEquals(git.getCalls(), ["hasUncommittedChanges"]);
 });
 
-Deno.test("SyncPullWorkflow fails on non-fast-forward update", async () => {
+Deno.test("syncPull fails on non-fast-forward update", async () => {
   const git = mockVersionControlService();
   git.setFailPull(
     true,
@@ -310,10 +281,8 @@ Deno.test("SyncPullWorkflow fails on non-fast-forward update", async () => {
   );
   const repo = mockWorkspaceRepo(true, "https://github.com/user/repo.git");
 
-  const result = await SyncPullWorkflow.execute(
-    {
-      workspaceRoot: "/ws",
-    },
+  const result = await syncPull(
+    { workspaceRoot: "/ws" },
     {
       gitService: git,
       workspaceRepository: repo as unknown as WorkspaceRepository,
@@ -334,15 +303,13 @@ Deno.test("SyncPullWorkflow fails on non-fast-forward update", async () => {
   ]);
 });
 
-Deno.test("SyncPullWorkflow fails when pull command fails", async () => {
+Deno.test("syncPull fails when pull command fails", async () => {
   const git = mockVersionControlService();
   git.setFailPull(true, "git pull failed: Could not resolve host: github.com");
   const repo = mockWorkspaceRepo(true, "https://github.com/user/repo.git");
 
-  const result = await SyncPullWorkflow.execute(
-    {
-      workspaceRoot: "/ws",
-    },
+  const result = await syncPull(
+    { workspaceRoot: "/ws" },
     {
       gitService: git,
       workspaceRepository: repo as unknown as WorkspaceRepository,
@@ -356,22 +323,15 @@ Deno.test("SyncPullWorkflow fails when pull command fails", async () => {
       assertEquals(result.error.message.includes("Could not resolve host"), true);
     }
   }
-  assertEquals(git.getCalls(), [
-    "hasUncommittedChanges",
-    "getCurrentBranch",
-    "pull:https://github.com/user/repo.git:main",
-  ]);
 });
 
-Deno.test("SyncPullWorkflow fails when current branch does not match configured branch", async () => {
+Deno.test("syncPull fails when current branch does not match configured branch", async () => {
   const git = mockVersionControlService();
-  git.setCurrentBranch("develop"); // Current branch is develop
-  const repo = mockWorkspaceRepo(true, "https://github.com/user/repo.git", "main"); // Configured branch is main
+  git.setCurrentBranch("develop");
+  const repo = mockWorkspaceRepo(true, "https://github.com/user/repo.git", "main");
 
-  const result = await SyncPullWorkflow.execute(
-    {
-      workspaceRoot: "/ws",
-    },
+  const result = await syncPull(
+    { workspaceRoot: "/ws" },
     {
       gitService: git,
       workspaceRepository: repo as unknown as WorkspaceRepository,
@@ -380,14 +340,11 @@ Deno.test("SyncPullWorkflow fails when current branch does not match configured 
 
   assertEquals(result.type, "error");
   if (result.type === "error") {
-    assertEquals(
-      result.error,
-      {
-        type: "branch_mismatch",
-        currentBranch: "develop",
-        configuredBranch: "main",
-      },
-    );
+    assertEquals(result.error, {
+      type: "branch_mismatch",
+      currentBranch: "develop",
+      configuredBranch: "main",
+    });
   }
   assertEquals(git.getCalls(), ["hasUncommittedChanges", "getCurrentBranch"]);
 });

@@ -71,3 +71,31 @@ export {
   type SnoozeItemRequest,
   type SnoozeItemResponse,
 } from "./snooze_item.ts";
+
+export {
+  isSyncPullValidationError,
+  syncPull,
+  type SyncPullApplicationError,
+  type SyncPullDeps,
+  type SyncPullRequest,
+  type SyncPullResponse,
+  type SyncPullValidationError,
+} from "./sync_pull.ts";
+
+export {
+  isSyncPushValidationError,
+  syncPush,
+  type SyncPushApplicationError,
+  type SyncPushDeps,
+  type SyncPushRequest,
+  type SyncPushResponse,
+  type SyncPushValidationError,
+} from "./sync_push.ts";
+
+export {
+  syncInit,
+  type SyncInitApplicationError,
+  type SyncInitDeps,
+  type SyncInitRequest,
+  type SyncInitResponse,
+} from "./sync_init.ts";
