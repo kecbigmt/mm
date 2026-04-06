@@ -1,5 +1,5 @@
 ---
-status: draft
+status: completed
 depends: []
 syncs:
   - feature_core-cli-json-rpc-separation/README.md

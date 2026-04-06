@@ -1,5 +1,5 @@
 ---
-status: draft
+status: completed
 depends:
   - story_extract-core-runtime-composition
   - story_move-path-and-range-parsing-out-of-cli
