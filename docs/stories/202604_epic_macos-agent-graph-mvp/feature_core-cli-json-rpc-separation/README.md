@@ -11,17 +11,19 @@ see `docs/stories/202604_epic_macos-agent-graph-mvp/README.md`.
 
 ## Goal
 
-Create a reusable core that can be consumed by both the existing CLI and a future SwiftUI macOS app
-through JSON-RPC, without copying workflows or binding domain logic to CLI-only parsing and output.
+Define a portable domain core and host-specific application/runtime layers so CLI, macOS, and
+future mobile apps can share business rules without being forced to share the same use-case
+orchestration or transport.
 
 ## In Scope
 
-- define a UI-agnostic core/application boundary
+- define a portable domain/core boundary
+- define host-specific application/runtime boundaries
 - move reusable use cases out of `presentation/cli`
 - remove domain/application dependencies on CLI parsing modules
-- introduce a structured local API surface for macOS integration
-- keep CLI as a thin presentation adapter over shared core use cases
-- define DTOs and error mapping suitable for JSON-RPC responses
+- introduce a structured local API surface for macOS integration where useful
+- keep CLI as a thin presentation adapter over Deno-host use cases
+- define typed core-function contracts and transport mappings where needed
 - preserve compatibility with the existing GitHub sync and multi-client file workflow
 
 ## Out of Scope
@@ -34,39 +36,41 @@ through JSON-RPC, without copying workflows or binding domain logic to CLI-only 
 
 ## Design Targets
 
-1. **One core, multiple adapters** CLI and JSON-RPC should call the same use cases.
+1. **One portable core, multiple hosts** shared business rules live in domain/core; each app may
+   own its own use cases.
 
-2. **Structured inputs and outputs** Core entry points should accept typed data, not CLI-shaped
-   strings as the only interface.
+2. **Typed core protocol** portable core functions should use typed request/response contracts that
+   can be called directly or serialized.
 
-3. **Presentation-free domain** Domain and application code must not import `presentation/cli`.
+3. **Presentation-free domain** Domain/core code must not import `presentation/cli`.
 
-4. **Clear composition root** Runtime wiring for repositories and services should move out of
-   CLI-only dependency loading.
+4. **Host-owned orchestration** repository, git, workspace-access, and background-work sequencing
+   belongs to app/runtime hosts, not to the portable core.
 
-5. **Sync compatibility is mandatory** Core and presentation separation must not break the existing
-   GitHub-based multi-client workflow.
+5. **JSON-RPC is optional transport** JSON-RPC may expose core or host functions, but it does not
+   define the core boundary.
+
+6. **Sync compatibility is mandatory** boundary changes must not break the existing GitHub-based
+   multi-client workflow.
 
 ## Expected Deliverables
 
-- `application` or equivalent core-facing module structure
-- shared runtime/composition entry point
+- clarified portable-core versus host-runtime module boundaries
+- current Deno host/runtime composition entry point
 - thin CLI adapter updates for migrated flows
-- JSON-RPC presentation skeleton and initial method set
-- migration plan for remaining commands still coupled to CLI behavior
-- explicit notes on preserving sync-related behaviors during the split
+- JSON-RPC presentation skeleton and protocol mapping guidance
+- extraction plan for moving pure logic from current use cases into domain/core
+- explicit notes on preserving sync-related host behaviors during the split
 
-## Candidate First Use Cases
+## Candidate First Core Functions
 
-- open workspace
-- list items
-- get item
-- create item
-- edit item
-- move item
+- parse path and range expressions
+- plan move placement from resolved inputs
+- compute snooze decisions from item state and requested target
+- validate status transitions and removal eligibility
 
 ## Open Questions
 
-- whether JSON-RPC should run as a long-lived sidecar or on-demand local process
-- how progress, warnings, and preview/apply flows should be represented in structured responses
-- which commands must migrate first to unblock the SwiftUI shell
+- which existing use-case logic should be extracted into pure domain/core first
+- whether macOS should call the Deno host in-process or across a local transport boundary
+- which core functions are worth exposing via JSON-RPC versus keeping host-local

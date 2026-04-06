@@ -8,37 +8,37 @@ syncs:
 # Define JSON-RPC Envelope
 
 **Role**: This story defines the transport-neutral JSON-RPC message contract that a future local
-adapter will use to expose shared core use cases to the macOS client.
+adapter may use to expose selected core or host functions to the macOS client.
 
 ## Story Log
 
 ### Goal
 
-Define the JSON-RPC request, response, and error envelope for local core access.
+Define the JSON-RPC request, response, and error envelope for local core or host access.
 
 ### Why
 
-The SwiftUI app is expected to consume shared use cases through a structured local API. Defining the
-envelope early allows core-facing APIs to shape responses and errors in a way that will fit a future
-JSON-RPC adapter without forcing transport details into the domain layer.
+The SwiftUI app may consume selected core or host functions through a structured local API.
+Defining the envelope early allows response and error shapes to fit a future JSON-RPC adapter
+without forcing transport details into the domain layer.
 
 ### User Story
 
-**As a macOS integration developer, I want a defined JSON-RPC envelope for local core calls, so that
-I can build the SwiftUI-side client against a stable structured contract.**
+**As a macOS integration developer, I want a defined JSON-RPC envelope for local core or host
+calls, so that I can build the SwiftUI-side client against a stable structured contract.**
 
 ### Acceptance Criteria
 
 #### 1. Message Shape
 
-- [ ] **Given** a future local JSON-RPC adapter, **When** it exposes core methods, **Then** request,
+- [ ] **Given** a future local JSON-RPC adapter, **When** it exposes core or host methods, **Then** request,
       success response, and error response envelopes are defined consistently
 - [ ] **Given** adapters need correlation, **When** messages are exchanged, **Then** the envelope
       defines how request IDs are represented
 
 #### 2. Error Mapping
 
-- [ ] **Given** validation and repository failures from shared use cases, **When** they are exposed
+- [ ] **Given** validation and repository failures from exposed functions, **When** they are exposed
       through JSON-RPC, **Then** the envelope defines how typed errors map to RPC errors
 - [ ] **Given** adapters need warnings or progress later, **When** the envelope is defined, **Then**
       it leaves room for structured extension without embedding CLI behavior
