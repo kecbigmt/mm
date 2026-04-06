@@ -40,6 +40,16 @@ This means:
 mm does **not** assume that every host can run a long-lived local sidecar process. That remains an
 optional macOS implementation choice, not a global architecture requirement.
 
+## Layer Shape
+
+```text
+[ UI / CLI / App ]
+        ↓
+[ Host Use Cases / Runtime Orchestration ]
+        ↓
+[ Core Functions (Pure Domain Logic) ]
+```
+
 ## Capability Boundary
 
 The following concerns are host-dependent and must stay behind capability interfaces or host
@@ -75,6 +85,70 @@ The following should remain portable and transport-independent:
 - typed request/response shapes for core functions
 - error types that describe business failures without transport formatting
 
+## Core Function Definition
+
+A core function is a function that:
+
+- does not perform IO or side effects
+- does not access filesystem, git, environment variables, process APIs, or background schedulers
+- does not read global state or ambient time directly
+- operates only on explicit inputs provided by the host
+- returns domain data, plans, decisions, or typed domain errors
+
+Core functions may accept data snapshots loaded by the host, but they do not load or persist data
+themselves.
+
+## Repository Boundary
+
+The portable core does not depend on repository interfaces.
+
+- repositories are a host/runtime concern
+- hosts load domain snapshots or persistence inputs
+- core functions operate on those explicit values
+
+This keeps the core independent from one runtime's persistence model and avoids leaking Deno-host
+abstractions into portable logic.
+
+## Parsing Boundary
+
+- domain parsing and normalization belong to the portable core
+- file parsing and system parsing belong to the host/runtime layer
+
+Examples:
+
+- parsing a path expression into a typed domain expression is core logic
+- reading Markdown/frontmatter from disk and decoding workspace files is host logic
+
+## JSON-RPC Boundary
+
+JSON-RPC operates at the host boundary, not the domain boundary.
+
+- it may expose host use cases
+- it may expose selected core functions when transport is useful
+- it is never required for in-process execution
+
+JSON-RPC is therefore a serialization and transport choice, not the source of truth for core
+contracts.
+
+## Time Boundary
+
+The portable core does not read "now" directly.
+
+- time-sensitive core logic must receive time as explicit input
+- hosts are responsible for obtaining current time from the platform/runtime
+
+This keeps scheduling and snooze decisions pure and portable.
+
+## Anti-Patterns
+
+The following violate the portable core boundary:
+
+- accessing filesystem, git, environment variables, or process APIs from core
+- using `Deno.*`, global state, or ambient runtime features inside core functions
+- embedding JSON-RPC, HTTP, CLI formatting, or other transport details into core logic
+- depending on repository interfaces or persistence handles inside core
+- reading current time implicitly instead of receiving it as input
+
 ## Consequences
 
 Positive:
@@ -101,6 +175,13 @@ Near-term follow-up design and implementation should proceed in this order:
 2. define the typed core-function protocol independent of transport
 3. define the serializable core protocol schema for request/response/error shapes
 4. map selected core or host functions onto JSON-RPC only where transport adds value
+
+## Migration Strategy
+
+- treat current `src/application/use_cases` as Deno-host orchestration unless proven pure
+- extract pure decision logic from those use cases into repository-free core functions
+- keep IO, environment access, git operations, and runtime cleanup in host layers
+- expose protocol/schema only after the pure input/output boundary is explicit
 
 ## Non-Goals
 

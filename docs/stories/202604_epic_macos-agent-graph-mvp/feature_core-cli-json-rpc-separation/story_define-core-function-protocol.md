@@ -32,6 +32,12 @@ domain logic consistently whether it runs in-process or across a local transport
 
 ### Acceptance Criteria
 
+- [ ] **Given** the portable core boundary, **When** this story defines "core function",
+      **Then** it uses explicit criteria:
+      no IO,
+      no repository dependency,
+      no ambient time/environment access,
+      and operation only on explicit inputs
 - [ ] **Given** representative portable core behaviors, **When** this story is completed, **Then**
       the docs define typed request/response shapes for at least parsing and one mutation-planning
       function
@@ -41,6 +47,8 @@ domain logic consistently whether it runs in-process or across a local transport
 - [ ] **Given** current use cases mix pure and effectful work, **When** example functions are
       listed, **Then** they focus on domain-level outputs such as parsed expressions, validated move
       plans, or snooze decisions rather than repository writes
+- [ ] **Given** time-sensitive domain behavior exists, **When** example functions are documented,
+      **Then** they receive time as explicit input rather than reading it implicitly
 
 ### Out Of Scope
 

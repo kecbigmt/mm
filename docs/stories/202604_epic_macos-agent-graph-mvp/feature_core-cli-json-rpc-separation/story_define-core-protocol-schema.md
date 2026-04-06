@@ -61,6 +61,8 @@ of truth for the core contract.**
 - [ ] **Given** those examples are documented, **When** they are reviewed, **Then** they use domain
       snapshots and typed DTOs rather than repository handles or filesystem paths as implicit host
       state
+- [ ] **Given** repository access is host-specific, **When** request/response schemas are defined,
+      **Then** the schema uses repository-free DTOs and explicit value objects only
 
 #### 3. Error Schema Is Serializable
 
@@ -76,6 +78,8 @@ of truth for the core contract.**
 - [ ] **Given** macOS may call the core or host through JSON-RPC, **When** this story is completed,
       **Then** the docs define how transport-neutral function schemas map onto JSON-RPC method
       names, `params`, `result`, and error payloads
+- [ ] **Given** JSON-RPC lives at the host boundary, **When** binding rules are written, **Then**
+      the docs explicitly distinguish binding selected core functions from binding host use cases
 - [ ] **Given** JSON-RPC is not the source of truth, **When** binding rules are written, **Then**
       they reference the core protocol schema rather than redefining per-method payloads from
       scratch
