@@ -31,6 +31,8 @@ mm adopts **portable domain core plus host-specific use cases** as the architect
 This means:
 
 - portable logic lives in domain models, parsing, validation, and pure decision functions
+- core-owned typed input/output models describe core function inputs and outputs independent from
+  any transport envelope
 - application/use-case orchestration belongs to the host runtime that owns repositories, git,
   workspace access, scheduling, and persistence
 - CLI, Deno JSON-RPC, macOS, iOS, and Android may each define different use cases over the same
@@ -82,7 +84,7 @@ The following should remain portable and transport-independent:
 - domain models and invariants
 - parsing and normalization helpers that are not presentation-specific
 - pure decision logic such as move planning, snooze decisions, and validation rules
-- typed request/response shapes for core functions
+- core-owned typed input/output models for core functions, independent from transport envelopes
 - error types that describe business failures without transport formatting
 
 ## Core Function Definition
@@ -109,6 +111,14 @@ The portable core does not depend on repository interfaces.
 This keeps the core independent from one runtime's persistence model and avoids leaking Deno-host
 abstractions into portable logic.
 
+## Host Use Case Boundary
+
+Host use cases coordinate capabilities and compose core functions, but they do not re-encode domain
+rules that belong in the portable core.
+
+When a rule can be expressed without side effects, it should be implemented in core rather than in
+host orchestration.
+
 ## Parsing Boundary
 
 - domain parsing and normalization belong to the portable core
@@ -118,6 +128,17 @@ Examples:
 
 - parsing a path expression into a typed domain expression is core logic
 - reading Markdown/frontmatter from disk and decoding workspace files is host logic
+
+## Serialization Boundary
+
+Serialization for storage or transport belongs outside the portable core unless the encoding is an
+intrinsic part of the domain model itself.
+
+Examples:
+
+- JSON-RPC payload shapes and persisted Markdown/frontmatter encoding are host concerns
+- core-owned input/output models may be serialized by hosts, but the transport/storage envelope does
+  not define the core
 
 ## JSON-RPC Boundary
 
