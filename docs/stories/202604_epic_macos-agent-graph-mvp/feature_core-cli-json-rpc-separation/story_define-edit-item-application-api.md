@@ -1,5 +1,5 @@
 ---
-status: draft
+status: completed
 depends:
   - story_define-create-item-application-api
   - story_relocate-create-item-domain-implementation-out-of-workflows

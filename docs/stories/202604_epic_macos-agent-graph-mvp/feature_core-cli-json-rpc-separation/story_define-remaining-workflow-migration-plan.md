@@ -1,5 +1,5 @@
 ---
-status: draft
+status: completed
 depends:
   - story_define-list-items-application-api
   - story_define-create-item-application-api

@@ -1,7 +1,8 @@
 # ADR: Multi-Host Core Boundary
 
 **Role**: This document defines the architectural decision for separating transport-independent core
-contracts from host-dependent capabilities. For the domain model, see `docs/steering/design.md`.
+contracts from host-dependent capabilities for `feature_core-cli-json-rpc-separation`. For the
+domain model, see `docs/steering/design.md`.
 
 ## Status
 

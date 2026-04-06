@@ -1,5 +1,5 @@
 ---
-status: draft
+status: completed
 depends:
   - story_define-final-parallel-workflow-migration-wave
   - story_extract-core-runtime-composition
@@ -131,4 +131,3 @@ The file `docs/stories/202604_epic_macos-agent-graph-mvp/feature_core-cli-json-r
 - deciding how much of current sync warning/reporting should be returned from use cases versus kept
   as CLI formatting concerns
 - coordinating final export wiring because this lane introduces multiple new use-case modules
-

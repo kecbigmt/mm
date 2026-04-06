@@ -1,5 +1,5 @@
 ---
-status: draft
+status: completed
 depends:
   - story_define-final-parallel-workflow-migration-wave
   - story_extract-core-runtime-composition

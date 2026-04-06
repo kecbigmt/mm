@@ -1,5 +1,5 @@
 ---
-status: draft
+status: completed
 depends:
   - story_define-final-parallel-workflow-migration-wave
   - story_define-move-item-application-api
@@ -132,4 +132,3 @@ snooze-specific date parsing staying inline vs. being extracted is correctly def
 
 - deciding whether snooze-specific date parsing should stay inline in the use case or be extracted
   after migration
-
