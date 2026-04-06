@@ -58,6 +58,7 @@ orchestration or transport.
 - clarified portable-core versus host-runtime module boundaries
 - current Deno host/runtime composition entry point
 - thin CLI adapter updates for migrated flows
+- core protocol schema for transport-neutral request/response/error shapes
 - JSON-RPC presentation skeleton and protocol mapping guidance
 - extraction plan for moving pure logic from current use cases into domain/core
 - explicit notes on preserving sync-related host behaviors during the split
@@ -72,5 +73,6 @@ orchestration or transport.
 ## Open Questions
 
 - which existing use-case logic should be extracted into pure domain/core first
+- which core protocol schemas should be defined first to unblock macOS integration
 - whether macOS should call the Deno host in-process or across a local transport boundary
 - which core functions are worth exposing via JSON-RPC versus keeping host-local

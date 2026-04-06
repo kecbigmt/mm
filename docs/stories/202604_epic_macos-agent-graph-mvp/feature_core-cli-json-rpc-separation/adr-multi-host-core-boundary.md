@@ -99,7 +99,8 @@ Near-term follow-up design and implementation should proceed in this order:
 
 1. define the portable-core versus Deno-host boundary explicitly in feature docs
 2. define the typed core-function protocol independent of transport
-3. map selected core or host functions onto JSON-RPC only where transport adds value
+3. define the serializable core protocol schema for request/response/error shapes
+4. map selected core or host functions onto JSON-RPC only where transport adds value
 
 ## Non-Goals
 
